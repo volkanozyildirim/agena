@@ -110,6 +110,7 @@ export default function TaskDetailPage() {
   const [logFilter, setLogFilter] = useState<'all' | 'errors' | 'code'>('all');
   const [activeCodeTab, setActiveCodeTab] = useState(0);
   const [isRerunBusy, setIsRerunBusy] = useState(false);
+  const [isCancelBusy, setIsCancelBusy] = useState(false);
 
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [logs, setLogs] = useState<TaskLog[]>([]);
@@ -191,6 +192,19 @@ export default function TaskDetailPage() {
       setError(err instanceof Error ? err.message : 'Failed to re-run task');
     } finally {
       setIsRerunBusy(false);
+    }
+  }
+
+  async function cancelTask() {
+    if (!taskId) return;
+    try {
+      setIsCancelBusy(true);
+      await apiFetch('/tasks/' + taskId + '/cancel', { method: 'POST' });
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to cancel task');
+    } finally {
+      setIsCancelBusy(false);
     }
   }
 
@@ -288,6 +302,13 @@ export default function TaskDetailPage() {
               <div style={{ display: 'grid', gap: 8 }}>
                 <button className='button button-primary' onClick={() => void rerunTask()} disabled={isRerunBusy}>
                   {isRerunBusy ? 'Re-running...' : 'Re-run Task'}
+                </button>
+                <button
+                  className='button button-outline'
+                  onClick={() => void cancelTask()}
+                  disabled={isCancelBusy || !(task.status === 'queued' || task.status === 'running')}
+                >
+                  {isCancelBusy ? 'Stopping...' : 'Stop Task'}
                 </button>
                 <button className='button button-outline' onClick={downloadLogs}>Download Logs</button>
                 {task.pr_url ? <a href={task.pr_url} target='_blank' rel='noreferrer' className='button button-outline'>Open Pull Request</a> : null}

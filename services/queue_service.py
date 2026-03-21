@@ -30,3 +30,31 @@ class QueueService:
     async def queue_size(self, queue_name: str | None = None) -> int:
         key = queue_name or self.settings.redis_queue_name
         return int(await self.client.llen(key))
+
+    async def remove_task(self, *, organization_id: int, task_id: int, queue_name: str | None = None) -> int:
+        key = queue_name or self.settings.redis_queue_name
+        payload = json.dumps({'organization_id': organization_id, 'task_id': task_id, 'create_pr': True})
+        removed = await self.client.lrem(key, 0, payload)
+        if removed > 0:
+            return int(removed)
+        # Backward compatibility for queue entries with create_pr false
+        payload2 = json.dumps({'organization_id': organization_id, 'task_id': task_id, 'create_pr': False})
+        removed2 = await self.client.lrem(key, 0, payload2)
+        return int(removed2)
+
+    async def acquire_lock(self, lock_key: str, owner: str, ttl_sec: int = 1800) -> bool:
+        full_key = f'queue_lock:{lock_key}'
+        result = await self.client.set(full_key, owner, nx=True, ex=ttl_sec)
+        return bool(result)
+
+    async def release_lock(self, lock_key: str, owner: str) -> bool:
+        full_key = f'queue_lock:{lock_key}'
+        script = """
+if redis.call("get", KEYS[1]) == ARGV[1] then
+  return redis.call("del", KEYS[1])
+else
+  return 0
+end
+"""
+        released = await self.client.eval(script, 1, full_key, owner)
+        return bool(released)

@@ -150,8 +150,33 @@ async def assign_task(
             create_pr=True,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     return AssignTaskResponse(queued=True, queue_key=queue_key)
+
+
+@router.post('/{task_id}/cancel', response_model=TaskResponse)
+async def cancel_task(
+    task_id: int,
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> TaskResponse:
+    service = TaskService(db)
+    try:
+        task = await service.cancel_task(tenant.organization_id, task_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    duration_sec, total_tokens = await service.get_task_metrics(tenant.organization_id, task.id)
+    return TaskResponse(
+        id=task.id,
+        title=task.title,
+        description=task.description,
+        source=task.source,
+        status=task.status,
+        pr_url=task.pr_url,
+        created_at=task.created_at,
+        duration_sec=duration_sec,
+        total_tokens=total_tokens,
+    )
 
 
 @router.get('/{task_id}/logs', response_model=list[TaskLogItem])
