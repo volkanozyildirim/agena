@@ -245,6 +245,8 @@ class TaskService:
             raise ValueError('Task not found')
         if task.status == 'cancelled':
             raise ValueError('Task is cancelled')
+        if task.status == 'running':
+            raise ValueError('Task is already running')
         blockers = await self.get_dependency_blockers(organization_id, task.id)
         if blockers:
             blocker_ids = ', '.join(str(b) for b in blockers)
@@ -273,6 +275,14 @@ class TaskService:
         if task.source != 'internal' and not has_local_mapping:
             create_pr = False
 
+        was_queued = task.status == 'queued'
+        was_terminal = task.status in {'failed', 'completed'}
+        if was_queued:
+            await self.queue_service.remove_task(
+                organization_id=organization_id,
+                task_id=task.id,
+            )
+
         queue_key = await self.queue_service.enqueue(
             {
                 'organization_id': organization_id,
@@ -281,8 +291,12 @@ class TaskService:
             }
         )
         task.status = 'queued'
+        task.failure_reason = None
         await self.db.commit()
-        await self.add_log(task.id, organization_id, 'queued', 'Task queued for AI processing')
+        if was_queued or was_terminal:
+            await self.add_log(task.id, organization_id, 'queued', 'Task re-queued for AI processing')
+        else:
+            await self.add_log(task.id, organization_id, 'queued', 'Task queued for AI processing')
         return queue_key
 
     async def cancel_task(self, organization_id: int, task_id: int) -> TaskRecord:
