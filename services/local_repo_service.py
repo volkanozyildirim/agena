@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+import tempfile
 from pathlib import Path
 from urllib.parse import quote, urlparse, urlunparse
 
@@ -30,34 +31,42 @@ class LocalRepoService:
 
         remote_target = self._build_remote_target(remote_url, remote_pat)
         await self._run_git(root, ['fetch', remote_target, base_branch])
-        await self._run_git(root, ['checkout', base_branch])
-        await self._run_git(root, ['pull', '--ff-only', remote_target, base_branch])
-        await self._run_git(root, ['checkout', '-B', branch_name])
 
-        for file_change in files:
-            target = self._safe_target(root, file_change.path)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(file_change.content, encoding='utf-8')
+        worktree_path = Path(tempfile.mkdtemp(prefix='ai-agent-worktree-'))
+        try:
+            await self._run_git(root, ['worktree', 'add', '--detach', str(worktree_path), 'FETCH_HEAD'])
+            await self._run_git(worktree_path, ['checkout', '-B', branch_name, 'FETCH_HEAD'])
 
-        await self._run_git(root, ['add', '-A'])
-        has_changes = await self._has_staged_changes(root)
-        if not has_changes:
-            return False, branch_name
+            for file_change in files:
+                target = self._safe_target(worktree_path, file_change.path)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(file_change.content, encoding='utf-8')
 
-        await self._run_git(
-            root,
-            [
-                '-c',
-                'user.name=AI Agent',
-                '-c',
-                'user.email=ai-agent@local',
-                'commit',
-                '-m',
-                commit_message,
-            ],
-        )
-        await self._run_git(root, ['push', '-u', remote_target, branch_name])
-        return True, branch_name
+            await self._run_git(worktree_path, ['add', '-A'])
+            has_changes = await self._has_staged_changes(worktree_path)
+            if not has_changes:
+                return False, branch_name
+
+            await self._run_git(
+                worktree_path,
+                [
+                    '-c',
+                    'user.name=AI Agent',
+                    '-c',
+                    'user.email=ai-agent@local',
+                    'commit',
+                    '-m',
+                    commit_message,
+                ],
+            )
+            await self._run_git(worktree_path, ['push', '-u', remote_target, branch_name])
+            return True, branch_name
+        finally:
+            try:
+                await self._run_git(root, ['worktree', 'remove', '--force', str(worktree_path)])
+            except Exception:
+                # Non-fatal cleanup issue; main flow already completed/failed.
+                pass
 
     async def _has_staged_changes(self, repo: Path) -> bool:
         proc = await asyncio.create_subprocess_exec(

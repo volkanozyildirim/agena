@@ -26,6 +26,7 @@ export default function TaskDetailPage() {
   const taskId = params.id;
   const liveStripRef = useRef<HTMLDivElement | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [logFilter, setLogFilter] = useState<'all' | 'errors' | 'code'>('all');
 
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [logs, setLogs] = useState<TaskLog[]>([]);
@@ -65,8 +66,23 @@ export default function TaskDetailPage() {
   }, [logs]);
 
   const latestLogs = useMemo(() => logs.slice(-8), [logs]);
-  const logHistory = useMemo(() => [...logs].reverse(), [logs]);
+  const filteredLogs = useMemo(() => {
+    if (logFilter === 'errors') {
+      return logs.filter((item) => item.stage === 'failed' || /error|failed|timeout/i.test(item.message));
+    }
+    if (logFilter === 'code') {
+      return logs.filter((item) => item.stage === 'code_preview' || item.stage === 'code_ready');
+    }
+    return logs;
+  }, [logs, logFilter]);
+  const liveFilteredLogs = useMemo(() => filteredLogs.slice(-8), [filteredLogs]);
+  const logHistory = useMemo(() => [...filteredLogs].reverse(), [filteredLogs]);
   const latestLog = logs.length > 0 ? logs[logs.length - 1] : null;
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const item of logs) counts[item.stage] = (counts[item.stage] || 0) + 1;
+    return counts;
+  }, [logs]);
 
   const stageColor = (stage: string) => {
     const map: Record<string, string> = {
@@ -78,6 +94,7 @@ export default function TaskDetailPage() {
       review_code: '#38bdf8',
       finalize: '#22c55e',
       code_ready: '#60a5fa',
+      code_preview: '#f97316',
       local_exec: '#c084fc',
       pr: '#f59e0b',
       run_metrics: '#22c55e',
@@ -88,7 +105,45 @@ export default function TaskDetailPage() {
   };
 
   return (
-    <div className='container' style={{ paddingTop: 96, paddingBottom: 20, maxWidth: 1760 }}>
+    <div className='container' style={{ paddingTop: 96, paddingBottom: 20, maxWidth: 1780 }}>
+      <section
+        style={{
+          borderRadius: 16,
+          border: '1px solid rgba(255,255,255,0.08)',
+          background: 'rgba(255,255,255,0.02)',
+          padding: '10px 12px',
+          marginBottom: 12,
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(6, minmax(0,1fr))',
+          gap: 8,
+        }}
+      >
+        <div style={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px' }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>Status</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.9)', fontWeight: 700 }}>{task?.status ?? '—'}</div>
+        </div>
+        <div style={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px' }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>Source</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.9)', fontWeight: 700, textTransform: 'capitalize' }}>{task?.source ?? '—'}</div>
+        </div>
+        <div style={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px' }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>Total Logs</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.9)', fontWeight: 700 }}>{logs.length}</div>
+        </div>
+        <div style={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px' }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>Agent Events</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.9)', fontWeight: 700 }}>{statusCounts.agent || 0}</div>
+        </div>
+        <div style={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px' }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>Last Stage</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.9)', fontWeight: 700 }}>{latestLog?.stage ?? '—'}</div>
+        </div>
+        <div style={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px' }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>Last Update</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.9)', fontWeight: 700 }}>{latestLog ? new Date(latestLog.created_at).toLocaleTimeString() : '—'}</div>
+        </div>
+      </section>
+
       <div
         style={{
           display: 'grid',
@@ -107,10 +162,21 @@ export default function TaskDetailPage() {
             borderRadius: 16,
           }}
         >
-          <h1 style={{ marginTop: 0, marginBottom: 10, fontSize: 20, lineHeight: 1.3 }}>{task?.title ?? 'Task'}</h1>
+          <h1 style={{ marginTop: 0, marginBottom: 8, fontSize: 18, lineHeight: 1.35 }}>{task?.title ?? 'Task'}</h1>
           {task ? (
             <>
-              <p style={{ marginTop: 0, color: 'rgba(255,255,255,0.78)', fontSize: 13, lineHeight: 1.45 }}>{task.description}</p>
+              <p
+                style={{
+                  marginTop: 0,
+                  color: 'rgba(255,255,255,0.78)',
+                  fontSize: 13,
+                  lineHeight: 1.45,
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                }}
+              >
+                {task.description}
+              </p>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
                 <StatusBadge status={task.status} />
                 <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, textTransform: 'capitalize' }}>Source: {task.source}</span>
@@ -139,21 +205,45 @@ export default function TaskDetailPage() {
 
         <section
           style={{
-              borderRadius: 20,
-              border: '1px solid rgba(255,255,255,0.06)',
-              background: 'rgba(255,255,255,0.02)',
-              overflow: 'hidden',
+            borderRadius: 20,
+            border: '1px solid rgba(255,255,255,0.06)',
+            background: 'rgba(255,255,255,0.02)',
+            overflow: 'hidden',
               minHeight: isMobile ? 560 : 'calc(100vh - 120px)',
               display: 'grid',
               gridTemplateRows: 'auto 1fr',
             }}
           >
-          <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '12px 14px 10px' }}>
+          <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '10px 12px 8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <h3 style={{ margin: 0, color: 'rgba(255,255,255,0.9)', fontSize: 16 }}>Live Logs</h3>
+              <h3 style={{ margin: 0, color: 'rgba(255,255,255,0.9)', fontSize: 15 }}>Live Logs</h3>
               <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>
                 {latestLog ? `${latestLog.stage} • ${new Date(latestLog.created_at).toLocaleTimeString()}` : 'Auto refresh: 5s'}
               </span>
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+              {[
+                { key: 'all', label: 'All' },
+                { key: 'errors', label: 'Errors' },
+                { key: 'code', label: 'Code Preview' },
+              ].map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => setLogFilter(f.key as 'all' | 'errors' | 'code')}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: 999,
+                    border: logFilter === f.key ? '1px solid rgba(94,234,212,0.55)' : '1px solid rgba(255,255,255,0.15)',
+                    background: logFilter === f.key ? 'rgba(94,234,212,0.12)' : 'transparent',
+                    color: logFilter === f.key ? '#5eead4' : 'rgba(255,255,255,0.6)',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {f.label}
+                </button>
+              ))}
             </div>
             <div
               ref={liveStripRef}
@@ -165,10 +255,10 @@ export default function TaskDetailPage() {
                 scrollbarWidth: 'thin',
               }}
             >
-              {latestLogs.length === 0 ? (
+              {liveFilteredLogs.length === 0 ? (
                 <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>No live logs yet.</div>
               ) : (
-                latestLogs.map((log, idx) => {
+                liveFilteredLogs.map((log, idx) => {
                   const color = stageColor(log.stage);
                   return (
                     <div
@@ -192,9 +282,11 @@ export default function TaskDetailPage() {
                           lineHeight: 1.4,
                           overflow: 'hidden',
                           display: '-webkit-box',
-                          WebkitLineClamp: 3,
+                          WebkitLineClamp: log.stage === 'code_preview' ? 8 : 3,
                           WebkitBoxOrient: 'vertical',
-                          minHeight: 50,
+                          minHeight: log.stage === 'code_preview' ? 110 : 50,
+                          whiteSpace: log.stage === 'code_preview' ? 'pre-wrap' : 'normal',
+                          fontFamily: log.stage === 'code_preview' ? 'ui-monospace, SFMono-Regular, Menlo, monospace' : 'inherit',
                         }}
                       >
                         {log.message}
@@ -207,7 +299,7 @@ export default function TaskDetailPage() {
             </div>
           </div>
 
-          <div style={{ overflowY: 'auto', padding: 12 }}>
+          <div style={{ overflowY: 'auto', padding: 10 }}>
             {logHistory.length === 0 ? (
               <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 14, margin: 0 }}>No logs yet.</p>
             ) : (
@@ -228,7 +320,18 @@ export default function TaskDetailPage() {
                         <span style={{ fontSize: 10, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: 0.8 }}>{log.stage}</span>
                         <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', whiteSpace: 'nowrap' }}>{new Date(log.created_at).toLocaleString()}</span>
                       </div>
-                      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', lineHeight: 1.45 }}>{log.message}</div>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: 'rgba(255,255,255,0.75)',
+                          lineHeight: 1.45,
+                          whiteSpace: log.stage === 'code_preview' ? 'pre-wrap' : 'normal',
+                          fontFamily: log.stage === 'code_preview' ? 'ui-monospace, SFMono-Regular, Menlo, monospace' : 'inherit',
+                          overflowX: log.stage === 'code_preview' ? 'auto' : 'visible',
+                        }}
+                      >
+                        {log.message}
+                      </div>
                     </div>
                   );
                 })}

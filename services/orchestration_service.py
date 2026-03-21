@@ -81,14 +81,29 @@ class OrchestrationService:
         try:
             if routing.preferred_agent_provider == 'codex_cli' and routing.local_repo_path:
                 openai_cfg = await IntegrationConfigService(self.db_session).get_config(organization_id, 'openai')
-                final_code = await self.codex_cli_service.generate_file_markdown(
-                    repo_path=routing.local_repo_path,
-                    task_title=task.title,
-                    task_description=task.description,
-                    model=routing.preferred_agent_model,
-                    api_key=openai_cfg.secret if openai_cfg else None,
-                    api_base_url=openai_cfg.base_url if openai_cfg else None,
+                await task_service.add_log(
+                    task.id,
+                    organization_id,
+                    'agent',
+                    f"Codex CLI started (model={routing.preferred_agent_model or 'default'})",
                 )
+                try:
+                    final_code = await self.codex_cli_service.generate_file_markdown(
+                        repo_path=routing.local_repo_path,
+                        task_title=task.title,
+                        task_description=task.description,
+                        model=routing.preferred_agent_model,
+                        api_key=openai_cfg.secret if openai_cfg else None,
+                        api_base_url=openai_cfg.base_url if openai_cfg else None,
+                    )
+                except Exception as codex_exc:
+                    await task_service.add_log(
+                        task.id,
+                        organization_id,
+                        'agent',
+                        f'Codex CLI failed before code generation: {str(codex_exc)[:280]}',
+                    )
+                    raise
                 prompt_estimate = self._estimate_tokens(
                     '\n'.join(
                         [
@@ -129,6 +144,12 @@ class OrchestrationService:
                 organization_id,
                 'code_ready',
                 f'Code pipeline finished, {len(pr_payload.files)} file candidate(s) prepared',
+            )
+            await task_service.add_log(
+                task.id,
+                organization_id,
+                'code_preview',
+                self._build_code_preview_message(pr_payload.files),
             )
 
             if routing.local_repo_path:
@@ -342,6 +363,22 @@ class OrchestrationService:
             f"CompletionTokens: {int(usage.get('completion_tokens', 0))} | "
             f"TotalTokens: {int(usage.get('total_tokens', 0))}"
         )
+
+    def _build_code_preview_message(self, files: list[GitHubFileChange]) -> str:
+        if not files:
+            return 'No generated files to preview.'
+
+        lines: list[str] = [f'Generated files ({len(files)}):']
+        for file in files[:3]:
+            snippet = file.content[:500].rstrip()
+            lines.append(f'\nFile: {file.path}')
+            lines.append('```')
+            lines.append(snippet if snippet else '(empty)')
+            lines.append('```')
+
+        if len(files) > 3:
+            lines.append(f'\n...and {len(files) - 3} more file(s).')
+        return '\n'.join(lines)
 
     def _is_mock_run(self, state: dict[str, Any]) -> bool:
         model_usage = state.get('model_usage') or []
