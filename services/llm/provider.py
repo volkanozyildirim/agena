@@ -51,8 +51,10 @@ class LLMProvider:
         cache_key = self.cache.build_key(model=model, system_prompt=system_prompt, user_prompt=truncated_user)
         cached = await self.cache.get(cache_key)
         if cached:
-            usage = cached.get('usage', {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0})
-            return cached.get('output', ''), usage, model, True
+            cached_output = (cached.get('output', '') or '').strip()
+            if cached_output:
+                usage = cached.get('usage', {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0})
+                return cached_output, usage, model, True
 
         if self.provider == 'gemini':
             output, usage = await self._generate_gemini(
@@ -73,8 +75,18 @@ class LLMProvider:
                 max_output_tokens=max_output_tokens,
                 temperature=0.2,
             )
-            output = getattr(response, 'output_text', '') or ''
+            output = self._extract_openai_output_text(response)
             usage = self._parse_usage(response)
+            if not output.strip():
+                fallback_output, fallback_usage = await self._generate_openai_chat_fallback(
+                    model=model,
+                    system_prompt=system_prompt,
+                    user_prompt=truncated_user,
+                    max_output_tokens=max_output_tokens,
+                )
+                if fallback_output.strip():
+                    output = fallback_output
+                    usage = fallback_usage
         await self.cache.set(cache_key, {'output': output, 'usage': usage})
         return output, usage, model, False
 
@@ -128,6 +140,59 @@ class LLMProvider:
             "    return 'generated in mock mode'\n"
             '```\n'
         )
+
+    def _extract_openai_output_text(self, response: Any) -> str:
+        text = (getattr(response, 'output_text', '') or '').strip()
+        if text:
+            return text
+
+        chunks: list[str] = []
+        outputs = getattr(response, 'output', None) or []
+        for item in outputs:
+            content_items = getattr(item, 'content', None) or []
+            for content in content_items:
+                ctype = getattr(content, 'type', '')
+                if ctype == 'output_text':
+                    ctext = getattr(content, 'text', None)
+                    if ctext:
+                        chunks.append(str(ctext))
+                    continue
+                # SDK object may expose text directly even when type differs.
+                ctext = getattr(content, 'text', None)
+                if ctext:
+                    chunks.append(str(ctext))
+        return '\n'.join(chunks).strip()
+
+    async def _generate_openai_chat_fallback(
+        self,
+        *,
+        model: str,
+        system_prompt: str,
+        user_prompt: str,
+        max_output_tokens: int,
+    ) -> tuple[str, dict[str, int]]:
+        if self.client is None:
+            return '', {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0}
+        chat = await self.client.chat.completions.create(
+            model=model,
+            messages=[
+                {'role': 'system', 'content': system_prompt},
+                {'role': 'user', 'content': user_prompt},
+            ],
+            max_tokens=max_output_tokens,
+            temperature=0.2,
+        )
+        text = ''
+        if chat.choices:
+            msg = chat.choices[0].message
+            text = (msg.content or '').strip()
+        usage_obj = getattr(chat, 'usage', None)
+        usage = {
+            'prompt_tokens': int(getattr(usage_obj, 'prompt_tokens', 0) or 0),
+            'completion_tokens': int(getattr(usage_obj, 'completion_tokens', 0) or 0),
+            'total_tokens': int(getattr(usage_obj, 'total_tokens', 0) or 0),
+        }
+        return text, usage
 
     async def _generate_gemini(
         self,
