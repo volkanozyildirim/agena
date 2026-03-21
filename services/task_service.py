@@ -241,50 +241,81 @@ class TaskService:
             raise ValueError('DB session required')
 
         payloads = await self.queue_service.list_payloads()
-        total = len(payloads)
-        queue_items: list[dict] = []
+        # Build tenant-scoped Redis queue positions (1 = next item to start).
+        org_entries: list[dict] = []
         for idx, payload in enumerate(payloads):
             if int(payload.get('organization_id', 0) or 0) != organization_id:
                 continue
             task_id = int(payload.get('task_id', 0) or 0)
             if task_id <= 0:
                 continue
-            queue_items.append(
-                {
-                    'task_id': task_id,
-                    'position': total - idx,  # right-most is next to process
-                    'create_pr': bool(payload.get('create_pr', True)),
-                }
+            org_entries.append({'task_id': task_id, 'create_pr': bool(payload.get('create_pr', True))})
+
+        redis_items: dict[int, dict] = {}
+        org_total = len(org_entries)
+        for idx, item in enumerate(org_entries):
+            # lpush + brpop FIFO: right-most is next, so position starts from 1.
+            position = org_total - idx
+            redis_items[item['task_id']] = {
+                'task_id': item['task_id'],
+                'position': position,
+                'create_pr': item['create_pr'],
+            }
+
+        result_queued = await self.db.execute(
+            select(TaskRecord).where(
+                TaskRecord.organization_id == organization_id,
+                TaskRecord.status == 'queued',
             )
+        )
+        queued_tasks = list(result_queued.scalars().all())
 
-        if not queue_items:
-            return []
-
-        ids = [i['task_id'] for i in queue_items]
+        ids = [i['task_id'] for i in redis_items.values()]
         result = await self.db.execute(
             select(TaskRecord).where(
                 TaskRecord.organization_id == organization_id,
                 TaskRecord.id.in_(ids),
             )
         )
-        tasks = {t.id: t for t in result.scalars().all()}
+        redis_tasks = {t.id: t for t in result.scalars().all()}
 
-        out: list[dict] = []
-        for item in sorted(queue_items, key=lambda x: x['position']):
-            task = tasks.get(item['task_id'])
+        out_by_task: dict[int, dict] = {}
+        for task in queued_tasks:
+            redis_item = redis_items.get(task.id)
+            out_by_task[task.id] = {
+                'task_id': task.id,
+                'title': task.title,
+                'status': task.status,
+                'position': redis_item['position'] if redis_item else 0,
+                'create_pr': redis_item['create_pr'] if redis_item else True,
+                'source': task.source,
+                'created_at': task.created_at,
+            }
+
+        # Also include Redis items whose DB status is not queued yet (transient state).
+        for task_id, redis_item in redis_items.items():
+            if task_id in out_by_task:
+                continue
+            task = redis_tasks.get(task_id)
             if task is None:
                 continue
-            out.append(
-                {
-                    'task_id': task.id,
-                    'title': task.title,
-                    'status': task.status,
-                    'position': item['position'],
-                    'create_pr': item['create_pr'],
-                    'source': task.source,
-                    'created_at': task.created_at,
-                }
-            )
+            out_by_task[task_id] = {
+                'task_id': task.id,
+                'title': task.title,
+                'status': task.status,
+                'position': redis_item['position'],
+                'create_pr': redis_item['create_pr'],
+                'source': task.source,
+                'created_at': task.created_at,
+            }
+
+        out = list(out_by_task.values())
+        next_virtual_position = org_total + 1
+        for item in out:
+            if item['position'] <= 0:
+                item['position'] = next_virtual_position
+                next_virtual_position += 1
+        out.sort(key=lambda x: (x['position'], x['created_at']))
         return out
 
     async def assign_task_to_ai(self, organization_id: int, task_id: int, create_pr: bool = True) -> str:
