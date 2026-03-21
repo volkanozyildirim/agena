@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { loadPrefs, savePrefs } from '@/lib/api';
+import { useLocale } from '@/lib/i18n';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type AgentRole = 'lead_developer' | 'pm' | 'qa' | 'manager' | 'developer';
@@ -126,6 +127,7 @@ export default function AgentsPage() {
   const [editing, setEditing] = useState<AgentRole | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const { t } = useLocale();
 
   useEffect(() => {
     // Önce localStorage'dan hızlı yükle, sonra DB'den güncelle
@@ -172,12 +174,12 @@ export default function AgentsPage() {
     <div style={{ display: 'grid', gap: 28, maxWidth: 900 }}>
       {/* Header */}
       <div>
-        <div className="section-label">Agents</div>
+        <div className="section-label">{t('agents.section')}</div>
         <h1 style={{ fontSize: 28, fontWeight: 800, color: 'rgba(255,255,255,0.95)', marginTop: 8, marginBottom: 4 }}>
-          Agent Yönetimi
+          {t('agents.title')}
         </h1>
         <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.3)', margin: 0 }}>
-          Her role bir AI modeli ata. İş kalemlerini bu agentlar işleyecek.
+          {t('agents.subtitle')}
         </p>
       </div>
 
@@ -198,15 +200,15 @@ export default function AgentsPage() {
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <button onClick={() => void handleSave()} disabled={saving}
           style={{ padding: '12px 28px', borderRadius: 12, border: 'none', background: saved ? 'rgba(34,197,94,0.3)' : saving ? 'rgba(13,148,136,0.4)' : 'linear-gradient(135deg, #0d9488, #22c55e)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: saving ? 'not-allowed' : 'pointer', transition: 'all 0.3s' }}>
-          {saved ? '✓ Kaydedildi' : saving ? 'Kaydediliyor…' : 'Kaydet'}
+          {saved ? t('agents.saved') : saving ? t('agents.saving') : t('agents.save')}
         </button>
       </div>
 
       {/* CLI hint */}
       <div style={{ borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', padding: '16px 20px' }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>CLI Kullanımı</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>{t('agents.cliUsage')}</div>
         <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', lineHeight: 1.7 }}>
-          Codex CLI veya başka bir CLI ile çalışmak için agent konfigürasyonunu export edebilirsin:
+          {t('agents.cliDesc')}
         </div>
         <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 8, background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.08)', fontFamily: 'monospace', fontSize: 12, color: '#5eead4' }}>
           tiqr agent run --role lead_developer --task &lt;task-id&gt; --model {agents.find(a => a.role === 'lead_developer')?.model || 'gpt-4o'}
@@ -223,6 +225,7 @@ function AgentCard({ agent, isEditing, onEdit, onUpdate }: {
   onEdit: () => void;
   onUpdate: (patch: Partial<AgentConfig>) => void;
 }) {
+  const { t } = useLocale();
   const models = agent.provider === 'openai' ? OPENAI_MODELS : agent.provider === 'gemini' ? GEMINI_MODELS : [];
 
   return (
@@ -241,7 +244,7 @@ function AgentCard({ agent, isEditing, onEdit, onUpdate }: {
               </span>
             ) : (
               <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.3)' }}>
-                Model seçilmedi
+                {t('agents.noModel')}
               </span>
             )}
             <span style={{ marginLeft: 'auto', fontSize: 12, color: 'rgba(255,255,255,0.2)', transform: isEditing ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block' }}>⌄</span>
@@ -260,7 +263,7 @@ function AgentCard({ agent, isEditing, onEdit, onUpdate }: {
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: '20px 20px 24px', display: 'grid', gap: 16 }}>
           {/* Provider seçimi */}
           <div>
-            <label style={labelStyle}>Provider</label>
+            <label style={labelStyle}>{t('agents.provider')}</label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
               {(['openai', 'gemini', 'custom'] as const).map((p) => (
                 <button key={p} onClick={() => onUpdate({ provider: p, model: '', custom_model: '' })}
@@ -274,7 +277,7 @@ function AgentCard({ agent, isEditing, onEdit, onUpdate }: {
           {/* Model seçimi */}
           {agent.provider && agent.provider !== 'custom' && (
             <div>
-              <label style={labelStyle}>Model</label>
+              <label style={labelStyle}>{t('agents.model')}</label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
                 {models.map((m) => (
                   <button key={m.id} onClick={() => onUpdate({ model: m.id })}

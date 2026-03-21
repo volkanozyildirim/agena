@@ -3,12 +3,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch, removeToken, loadPrefs, savePrefs } from '@/lib/api';
+import { useLocale } from '@/lib/i18n';
 
 type Opt = { id: string; name: string; path?: string };
 type MeRes = { user_id: number; email: string; full_name: string; organization_id: number };
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { t } = useLocale();
   const [user, setUser] = useState<MeRes | null>(null);
 
   const [projects, setProjects] = useState<Opt[]>([]);
@@ -91,11 +93,11 @@ export default function ProfilePage() {
   return (
     <div style={{ display: 'grid', gap: 28, maxWidth: 680 }}>
       <div>
-        <div className="section-label">Profil</div>
+        <div className="section-label">{t('profile.section')}</div>
         <h1 style={{ fontSize: 28, fontWeight: 800, color: 'rgba(255,255,255,0.95)', marginTop: 8, marginBottom: 4 }}>
-          Hesap Ayarları
+          {t('profile.title')}
         </h1>
-        <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.3)', margin: 0 }}>Sprint seçimini değiştir, hesap bilgilerini gör</p>
+        <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.3)', margin: 0 }}>{t('profile.subtitle')}</p>
       </div>
 
       {user && (
@@ -113,7 +115,7 @@ export default function ProfilePage() {
             </div>
           </div>
           <button onClick={logout} style={{ padding: '8px 16px', borderRadius: 10, border: '1px solid rgba(248,113,113,0.2)', background: 'rgba(248,113,113,0.06)', color: '#f87171', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
-            Çıkış Yap
+            {t('profile.logout')}
           </button>
         </div>
       )}
@@ -124,26 +126,26 @@ export default function ProfilePage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
           <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>◎</div>
           <div>
-            <div style={{ fontWeight: 700, color: 'rgba(255,255,255,0.9)', fontSize: 15 }}>Aktif Sprint</div>
+            <div style={{ fontWeight: 700, color: 'rgba(255,255,255,0.9)', fontSize: 15 }}>{t('profile.activeSprint')}</div>
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
-              {sprint && selS ? selS.name : sprint ? sprint.split('\\').pop() : 'Sprint seçilmedi'}
+              {sprint && selS ? selS.name : sprint ? sprint.split('\\').pop() : t('profile.noSprint')}
             </div>
           </div>
           {sprint && (
-            <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 999, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)', color: '#22c55e' }}>Aktif</span>
+            <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 999, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)', color: '#22c55e' }}>{t('profile.active')}</span>
           )}
         </div>
 
         <div style={{ display: 'grid', gap: 14 }}>
           <ProfileSel label="Project" value={project} onChange={onProjectChange}
             options={projects.map((p) => ({ id: p.name, name: p.name }))}
-            placeholder="Proje seç..." loading={false} disabled={false} />
+            placeholder={t('profile.selectProject')} loading={false} disabled={false} />
           <ProfileSel label="Team" value={team} onChange={onTeamChange}
-            options={teams.map((t) => ({ id: t.name, name: t.name }))}
-            placeholder={project ? 'Takım seç...' : 'Önce proje seç'} loading={ltm} disabled={!project} />
+            options={teams.map((t2) => ({ id: t2.name, name: t2.name }))}
+            placeholder={project ? t('profile.selectTeam') : t('profile.selectTeamFirst')} loading={ltm} disabled={!project} />
           <ProfileSel label="Sprint" value={sprint} onChange={onSprintChange}
             options={sprints.map((s) => ({ id: s.path ?? s.name, name: s.name }))}
-            placeholder={team ? 'Sprint seç...' : 'Önce takım seç'} loading={lsp} disabled={!team} />
+            placeholder={team ? t('profile.selectSprint') : t('profile.selectSprintFirst')} loading={lsp} disabled={!team} />
         </div>
 
         {err ? <div style={{ marginTop: 14, padding: '10px 14px', borderRadius: 10, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171', fontSize: 13 }}>{err}</div> : null}
@@ -151,22 +153,22 @@ export default function ProfilePage() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 20 }}>
           <button onClick={() => void save()} disabled={saving || !sprint}
             style={{ padding: '12px', borderRadius: 12, border: 'none', background: saved ? 'rgba(34,197,94,0.3)' : sprint ? 'linear-gradient(135deg, #7c3aed, #a78bfa)' : 'rgba(255,255,255,0.06)', color: sprint ? '#fff' : 'rgba(255,255,255,0.2)', fontWeight: 700, fontSize: 13, cursor: sprint ? 'pointer' : 'not-allowed', transition: 'all 0.3s' }}>
-            {saving ? 'Kaydediliyor…' : saved ? '✓ Kaydedildi' : 'Kaydet'}
+            {saving ? t('profile.saving') : saved ? t('profile.saved') : t('profile.save')}
           </button>
           <button onClick={() => router.push('/dashboard/sprints')} disabled={!sprint}
             style={{ padding: '12px', borderRadius: 12, border: '1px solid rgba(13,148,136,0.3)', background: 'rgba(13,148,136,0.08)', color: sprint ? '#5eead4' : 'rgba(255,255,255,0.2)', fontWeight: 700, fontSize: 13, cursor: sprint ? 'pointer' : 'not-allowed' }}>
-            Sprint Board →
+            {t('profile.sprintBoard')}
           </button>
         </div>
       </div>
 
       <div style={{ borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>Entegrasyon Ayarları</div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>Azure PAT veya Jira token'ını güncelle</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>{t('profile.integrations')}</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>{t('profile.integrationsDesc')}</div>
         </div>
         <a href="/dashboard/integrations" style={{ padding: '8px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
-          Ayarlar →
+          {t('profile.settings')}
         </a>
       </div>
     </div>
@@ -180,7 +182,7 @@ function ProfileSel({ label, value, onChange, options, placeholder, loading, dis
   return (
     <div>
       <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 6 }}>
-        {label} {loading ? <span style={{ color: 'rgba(255,255,255,0.2)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>yükleniyor…</span> : null}
+        {label} {loading ? <span style={{ color: 'rgba(255,255,255,0.2)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>loading…</span> : null}
       </label>
       <select value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled || loading}
         style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: '1px solid ' + (value ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.1)'), background: value ? 'rgba(139,92,246,0.08)' : 'rgba(255,255,255,0.04)', color: value ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.4)', fontSize: 13, outline: 'none', appearance: 'none', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.4 : 1 }}>

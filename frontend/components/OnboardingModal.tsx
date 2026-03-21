@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch, savePrefs } from '@/lib/api';
+import { useLocale } from '@/lib/i18n';
 
 type Opt = { id: string; name: string; path?: string };
 
@@ -15,6 +16,7 @@ interface Props {
 
 export default function OnboardingModal({ userName, onClose }: Props) {
   const router = useRouter();
+  const { t } = useLocale();
   const [step, setStep] = useState<Step>('welcome');
   const [provider, setProvider] = useState<'azure' | 'jira' | null>(null);
 
@@ -115,59 +117,57 @@ export default function OnboardingModal({ userName, onClose }: Props) {
 
         <div style={{ padding: '28px 32px 32px' }}>
 
-          {/* STEP: welcome */}
           {step === 'welcome' && (
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 52, marginBottom: 16 }}>👋</div>
               <h2 style={{ fontSize: 24, fontWeight: 800, color: 'rgba(255,255,255,0.95)', marginBottom: 10 }}>
-                Hoş geldin{userName ? ', ' + userName.split(' ')[0] : ''}!
+                {t('onboarding.welcome')}{userName ? ', ' + userName.split(' ')[0] : ''}!
               </h2>
               <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', lineHeight: 1.7, marginBottom: 32 }}>
-                Tiqr'ı kullanmaya başlamak için proje yönetim aracını bağla.<br />
-                Sadece 2 dakika sürer.
+                {t('onboarding.welcomeDesc').split('\n').map((line, i) => (
+                  <span key={i}>{line}{i === 0 && <br />}</span>
+                ))}
               </p>
               <div style={{ display: 'grid', gap: 10 }}>
                 <button onClick={() => setStep('provider')} style={{ padding: '14px', borderRadius: 14, border: 'none', background: 'linear-gradient(135deg, #0d9488, #22c55e)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
-                  Başlayalım →
+                  {t('onboarding.start')}
                 </button>
                 <button onClick={onClose} style={{ padding: '12px', borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: 'rgba(255,255,255,0.3)', fontSize: 13, cursor: 'pointer' }}>
-                  Şimdi değil
+                  {t('onboarding.skip')}
                 </button>
               </div>
             </div>
           )}
 
-          {/* STEP: provider */}
           {step === 'provider' && (
             <div>
-              <h2 style={{ fontSize: 20, fontWeight: 800, color: 'rgba(255,255,255,0.95)', marginBottom: 8 }}>Hangi aracı kullanıyorsun?</h2>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', marginBottom: 24 }}>İstediğin zaman diğerini de ekleyebilirsin</p>
+              <h2 style={{ fontSize: 20, fontWeight: 800, color: 'rgba(255,255,255,0.95)', marginBottom: 8 }}>{t('onboarding.whichTool')}</h2>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', marginBottom: 24 }}>{t('onboarding.toolDesc')}</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 24 }}>
                 <ProviderCard
-                  icon='🔷' title='Azure DevOps' desc='Microsoft ekosistemi'
+                  icon='🔷' title='Azure DevOps' desc={t('onboarding.azureEco')}
                   color='#60a5fa' selected={provider === 'azure'}
                   onClick={() => setProvider('azure')}
                 />
                 <ProviderCard
-                  icon='🟦' title='Jira' desc='Atlassian ekosistemi'
+                  icon='🟦' title='Jira' desc={t('onboarding.jiraEco')}
                   color='#818cf8' selected={provider === 'jira'}
                   onClick={() => setProvider('jira')}
                 />
               </div>
               <button onClick={() => provider && setStep('config')} disabled={!provider}
                 style={{ width: '100%', padding: '13px', borderRadius: 12, border: 'none', background: provider ? 'linear-gradient(135deg, #0d9488, #22c55e)' : 'rgba(255,255,255,0.06)', color: provider ? '#fff' : 'rgba(255,255,255,0.2)', fontWeight: 700, fontSize: 14, cursor: provider ? 'pointer' : 'not-allowed' }}>
-                Devam →
+                {t('onboarding.continue')}
               </button>
             </div>
           )}
 
-          {/* STEP: config */}
           {step === 'config' && (
             <div>
               <h2 style={{ fontSize: 20, fontWeight: 800, color: 'rgba(255,255,255,0.95)', marginBottom: 8 }}>
-                {provider === 'azure' ? '🔷 Azure DevOps' : '🟦 Jira'} bağlantısı
+                {provider === 'azure' ? '🔷 Azure DevOps' : '🟦 Jira'}
               </h2>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', marginBottom: 24 }}>Bilgilerin şifreli saklanır, asla paylaşılmaz</p>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', marginBottom: 24 }}>{t('onboarding.encrypted')}</p>
 
               {provider === 'azure' ? (
                 <div style={{ display: 'grid', gap: 14 }}>
@@ -177,7 +177,7 @@ export default function OnboardingModal({ userName, onClose }: Props) {
               ) : (
                 <div style={{ display: 'grid', gap: 14 }}>
                   <ConfigInput label='Jira URL' value={jiraUrl} onChange={setJiraUrl} placeholder='https://your-company.atlassian.net' />
-                  <ConfigInput label='E-posta' value={jiraEmail} onChange={setJiraEmail} placeholder='sen@sirket.com' />
+                  <ConfigInput label='Email' value={jiraEmail} onChange={setJiraEmail} placeholder='you@company.com' />
                   <ConfigInput label='API Token' value={jiraToken} onChange={setJiraToken} placeholder='Paste your API token' type='password' hint='Atlassian Account → Security → API Tokens' />
                 </div>
               )}
@@ -185,41 +185,40 @@ export default function OnboardingModal({ userName, onClose }: Props) {
               {err ? <div style={{ marginTop: 14, padding: '10px 14px', borderRadius: 10, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171', fontSize: 13 }}>{err}</div> : null}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10, marginTop: 24 }}>
-                <button onClick={() => setStep('provider')} style={{ padding: '12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer' }}>← Geri</button>
+                <button onClick={() => setStep('provider')} style={{ padding: '12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer' }}>{t('onboarding.back')}</button>
                 <button onClick={() => void saveConfig()} disabled={saving}
                   style={{ padding: '13px', borderRadius: 12, border: 'none', background: saving ? 'rgba(13,148,136,0.4)' : 'linear-gradient(135deg, #0d9488, #22c55e)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: saving ? 'not-allowed' : 'pointer' }}>
-                  {saving ? 'Bağlanıyor…' : 'Bağlan ve Devam →'}
+                  {saving ? t('onboarding.connecting') : t('onboarding.connect')}
                 </button>
               </div>
             </div>
           )}
 
-          {/* STEP: sprint */}
           {step === 'sprint' && (
             <div>
-              <h2 style={{ fontSize: 20, fontWeight: 800, color: 'rgba(255,255,255,0.95)', marginBottom: 8 }}>Sprint seç</h2>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', marginBottom: 24 }}>Üzerinde çalışacağın sprint'i seç, board hazır olsun</p>
+              <h2 style={{ fontSize: 20, fontWeight: 800, color: 'rgba(255,255,255,0.95)', marginBottom: 8 }}>{t('onboarding.selectSprint')}</h2>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', marginBottom: 24 }}>{t('onboarding.selectSprintDesc')}</p>
 
               {provider === 'azure' ? (
                 <div style={{ display: 'grid', gap: 14 }}>
                   <OnboardSel label='Project' value={project} onChange={setProject}
-                    options={projects.map((p) => ({ id: p.name, name: p.name }))} placeholder='Proje seç...' loading={false} />
+                    options={projects.map((p) => ({ id: p.name, name: p.name }))} placeholder={t('onboarding.selectProject')} loading={false} />
                   <OnboardSel label='Team' value={team} onChange={setTeam}
-                    options={teams.map((t) => ({ id: t.name, name: t.name }))} placeholder={project ? 'Takım seç...' : 'Önce proje seç'} loading={ltm} disabled={!project} />
+                    options={teams.map((t2) => ({ id: t2.name, name: t2.name }))} placeholder={project ? t('onboarding.selectTeam') : t('onboarding.selectTeamFirst')} loading={ltm} disabled={!project} />
                   <OnboardSel label='Sprint' value={sprint} onChange={setSprint}
-                    options={sprints.map((s) => ({ id: s.path ?? s.name, name: s.name }))} placeholder={team ? 'Sprint seç...' : 'Önce takım seç'} loading={lsp} disabled={!team} />
+                    options={sprints.map((s) => ({ id: s.path ?? s.name, name: s.name }))} placeholder={team ? t('onboarding.selectSprint2') : t('onboarding.selectSprintFirst')} loading={lsp} disabled={!team} />
                 </div>
               ) : (
                 <div style={{ padding: '32px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>
-                  Jira sprint seçimi yakında geliyor
+                  {t('onboarding.jiraComingSoon')}
                 </div>
               )}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10, marginTop: 24 }}>
-                <button onClick={() => setStep('config')} style={{ padding: '12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer' }}>← Geri</button>
+                <button onClick={() => setStep('config')} style={{ padding: '12px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer' }}>{t('onboarding.back')}</button>
                 <button onClick={() => void goToSprints()}
                   style={{ padding: '13px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #0d9488, #22c55e)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
-                  {sprint ? 'Sprint Board\'a Git →' : 'Atla, sonra seçerim →'}
+                  {sprint ? t('onboarding.goBoard') : t('onboarding.skipSprint')}
                 </button>
               </div>
             </div>
@@ -266,7 +265,7 @@ function OnboardSel({ label, value, onChange, options, placeholder, loading, dis
   return (
     <div>
       <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 6 }}>
-        {label} {loading ? <span style={{ color: 'rgba(255,255,255,0.2)', fontWeight: 400 }}>yükleniyor…</span> : null}
+        {label} {loading ? <span style={{ color: 'rgba(255,255,255,0.2)', fontWeight: 400 }}>loading…</span> : null}
       </label>
       <select value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled || loading}
         style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: '1px solid ' + (value ? 'rgba(13,148,136,0.4)' : 'rgba(255,255,255,0.1)'), background: value ? 'rgba(13,148,136,0.08)' : 'rgba(255,255,255,0.04)', color: value ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.4)', fontSize: 13, outline: 'none', appearance: 'none', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.4 : 1 }}>

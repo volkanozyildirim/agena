@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { loadPrefs, savePrefs, runFlow, getFlowRuns, FlowRunResult } from '@/lib/api';
+import { useLocale } from '@/lib/i18n';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type AgentRole = 'lead_developer' | 'pm' | 'qa' | 'manager' | 'developer' | string;
@@ -111,6 +112,7 @@ function saveFlowsLS(flows: Flow[]) { localStorage.setItem(LS_FLOWS, JSON.string
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function FlowsPage() {
+  const { t } = useLocale();
   const [flows, setFlows] = useState<Flow[]>(PRESET_FLOWS);
   const [activeFlow, setActiveFlow] = useState<string>('full-cycle');
   const [creating, setCreating] = useState(false);
@@ -188,8 +190,8 @@ export default function FlowsPage() {
       {/* Top bar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 0 16px', flexShrink: 0 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="section-label">Flows</div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'rgba(255,255,255,0.95)', margin: '4px 0 0' }}>Agent Flowları</h1>
+          <div className="section-label">{t('nav.flows')}</div>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'rgba(255,255,255,0.95)', margin: '4px 0 0' }}>{t('flows.title')}</h1>
         </div>
         {/* Flow tabs */}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -209,20 +211,20 @@ export default function FlowsPage() {
             <div style={{ display: 'flex', gap: 6 }}>
               <input value={newFlowName} onChange={(e) => setNewFlowName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && createFlow()}
-                placeholder="Flow adı..." autoFocus
+                placeholder={t('flows.newPlaceholder')} autoFocus
                 style={{ padding: '7px 12px', borderRadius: 10, border: '1px solid rgba(13,148,136,0.4)', background: 'rgba(13,148,136,0.08)', color: 'rgba(255,255,255,0.9)', fontSize: 13, outline: 'none', width: 140 }} />
               <button onClick={createFlow} style={{ padding: '7px 12px', borderRadius: 10, border: 'none', background: '#0d9488', color: '#fff', fontSize: 13, cursor: 'pointer', fontWeight: 700 }}>+</button>
               <button onClick={() => setCreating(false)} style={{ padding: '7px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer' }}>×</button>
             </div>
           ) : (
-            <button onClick={() => setCreating(true)}
+              <button onClick={() => setCreating(true)}
               style={{ padding: '7px 14px', borderRadius: 10, border: '1px dashed rgba(255,255,255,0.2)', background: 'transparent', color: 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer' }}>
-              + Yeni
+              {t('flows.new')}
             </button>
           )}
           <button onClick={toggleRuns}
             style={{ padding: '7px 14px', borderRadius: 10, border: '1px solid ' + (showRuns ? 'rgba(167,139,250,0.5)' : 'rgba(255,255,255,0.1)'), background: showRuns ? 'rgba(167,139,250,0.12)' : 'rgba(255,255,255,0.03)', color: showRuns ? '#a78bfa' : 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer', fontWeight: showRuns ? 700 : 400 }}>
-            📋 Run Geçmişi
+            {t('flows.runHistory')}
           </button>
         </div>
       </div>
@@ -234,7 +236,7 @@ export default function FlowsPage() {
             <FlowCanvas flow={current} onChange={updateFlow} />
           ) : (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 14, borderRadius: 20, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(3,7,18,0.6)' }}>
-              Yukarıdan bir flow seç veya yeni oluştur
+              {t('flows.empty')}
             </div>
           )}
         </div>
@@ -262,6 +264,7 @@ const NODE_W = 180;
 const NODE_H = 90;
 
 function FlowCanvas({ flow, onChange }: { flow: Flow; onChange: (f: Flow) => void }) {
+  const { t } = useLocale();
   const svgRef = useRef<SVGSVGElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState<{ id: string; ox: number; oy: number } | null>(null);
@@ -463,9 +466,9 @@ function FlowCanvas({ flow, onChange }: { flow: Flow; onChange: (f: Flow) => voi
 
       {/* Left toolbar */}
       <div style={{ width: 52, flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px 0', gap: 8, background: 'rgba(0,0,0,0.2)' }}>
-        <ToolBtn title="Node Ekle" onClick={() => setShowPicker(true)}>+</ToolBtn>
+        <ToolBtn title={t('flows.toolbarAddNode')} onClick={() => setShowPicker(true)}>+</ToolBtn>
         <div style={{ flex: 1 }} />
-        <ToolBtn title="Sıfırla" onClick={() => setCanvasOffset({ x: 0, y: 0 })}>⊙</ToolBtn>
+        <ToolBtn title={t('flows.toolbarReset')} onClick={() => setCanvasOffset({ x: 0, y: 0 })}>⊙</ToolBtn>
       </div>
 
       {/* Canvas */}
@@ -566,14 +569,14 @@ function FlowCanvas({ flow, onChange }: { flow: Flow; onChange: (f: Flow) => voi
         {flow.nodes.length === 0 && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
             <div style={{ fontSize: 40, opacity: 0.08, marginBottom: 12 }}>⟳</div>
-            <div style={{ color: 'rgba(255,255,255,0.15)', fontSize: 13 }}>Sol araç çubuğundan + ile node ekle</div>
+            <div style={{ color: 'rgba(255,255,255,0.15)', fontSize: 13 }}>{t('flows.addNodeHint')}</div>
           </div>
         )}
 
         {/* Connecting hint */}
         {connecting && (
           <div style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', padding: '6px 16px', borderRadius: 999, background: 'rgba(13,148,136,0.2)', border: '1px solid rgba(13,148,136,0.4)', color: '#5eead4', fontSize: 12, fontWeight: 700, pointerEvents: 'none' }}>
-            Hedef node'a sürükle ve bırak — ESC ile iptal
+            {t('flows.dragToTarget')} - {t('flows.dragCancel')}
           </div>
         )}
       </div>
@@ -581,7 +584,7 @@ function FlowCanvas({ flow, onChange }: { flow: Flow; onChange: (f: Flow) => voi
       {/* Node picker panel */}
       {showPicker && (
         <div style={{ position: 'absolute', left: 60, top: 12, zIndex: 100, borderRadius: 16, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(8,14,30,0.98)', padding: 16, width: 230, boxShadow: '0 20px 60px rgba(0,0,0,0.6)', maxHeight: 'calc(100% - 24px)', overflowY: 'auto' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', marginBottom: 8 }}>Agent Rolleri</div>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', marginBottom: 8 }}>{t('flows.agentRoles')}</div>
           <div style={{ display: 'grid', gap: 5, marginBottom: 12 }}>
             {AGENT_PRESETS.map((p) => (
               <button key={p.role} onClick={() => addNode(p)}
@@ -593,10 +596,10 @@ function FlowCanvas({ flow, onChange }: { flow: Flow; onChange: (f: Flow) => voi
             <button onClick={addCustomNode}
               style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 10, border: '1px dashed rgba(255,255,255,0.15)', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
               <span style={{ fontSize: 16 }}>🤖</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>Custom Agent</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>{t('flows.customAgent')}</span>
             </button>
           </div>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', marginBottom: 8 }}>Node Tipleri</div>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', marginBottom: 8 }}>{t('flows.nodeTypes')}</div>
           <div style={{ display: 'grid', gap: 5 }}>
             {NODE_TYPE_PRESETS.map((p) => (
               <button key={p.type} onClick={() => addTypeNode(p)}
@@ -608,7 +611,7 @@ function FlowCanvas({ flow, onChange }: { flow: Flow; onChange: (f: Flow) => voi
           </div>
           <button onClick={() => setShowPicker(false)}
             style={{ marginTop: 10, width: '100%', padding: '7px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: 'rgba(255,255,255,0.3)', fontSize: 12, cursor: 'pointer' }}>
-            Kapat
+            {t('flows.close')}
           </button>
         </div>
       )}
@@ -966,6 +969,8 @@ function RunHistoryPanel({ runs, loading, selected, onSelect, onRefresh, onClose
   onRefresh: () => void;
   onClose: () => void;
 }) {
+  const { t } = useLocale();
+
   function fmt(iso: string) {
     const d = new Date(iso);
     return d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' }) + ' ' +
@@ -975,7 +980,7 @@ function RunHistoryPanel({ runs, loading, selected, onSelect, onRefresh, onClose
   return (
     <div style={{ width: 320, flexShrink: 0, borderRadius: 20, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(3,7,18,0.7)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-        <span style={{ fontWeight: 700, fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>📋 Run Geçmişi</span>
+        <span style={{ fontWeight: 700, fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>{t('flows.runHistory')}</span>
         <div style={{ display: 'flex', gap: 6 }}>
           <button onClick={onRefresh} title="Yenile"
             style={{ width: 26, height: 26, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 12 }}>↻</button>

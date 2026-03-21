@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef } from 'react';
 import PricingCard from '@/components/PricingCard';
+import { useLocale } from '@/lib/i18n';
 
 /* ── Spotlight that follows mouse ── */
 function SpotlightCursor() {
@@ -97,6 +98,8 @@ function Counter({ target, suffix = '' }: { target: number; suffix?: string }) {
 }
 
 export default function HomePage() {
+  const { t } = useLocale();
+
   return (
     <>
       <SpotlightCursor />
@@ -118,28 +121,28 @@ export default function HomePage() {
             <div style={{ marginBottom: 24 }}>
               <span className='chip'>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', display: 'inline-block', animation: 'pulse-brand 2s infinite' }} />
-                AI-Powered Dev Automation
+                {t('landing.heroChip')}
               </span>
             </div>
 
             <h1 style={{ fontSize: 'clamp(38px, 5vw, 68px)', lineHeight: 1.05, fontWeight: 800, marginBottom: 24 }}>
-              <span className='gradient-text'>Backlog to PR</span>
+              <span className='gradient-text'>{t('landing.heroTitleMain')}</span>
               <br />
-              <span style={{ color: 'rgba(255,255,255,0.9)' }}>in Minutes,</span>
+              <span style={{ color: 'rgba(255,255,255,0.9)' }}>{t('landing.heroTitleLine2')}</span>
               <br />
-              <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 300 }}>not Sprints.</span>
+              <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 300 }}>{t('landing.heroTitleLine3')}</span>
             </h1>
 
             <p style={{ fontSize: 18, color: 'rgba(255,255,255,0.5)', maxWidth: 520, lineHeight: 1.7, marginBottom: 36 }}>
-              Tiqr runs an autonomous <span style={{ color: '#5eead4' }}>PM → Dev → Reviewer</span> pipeline that writes production code, reviews quality, and opens GitHub PRs with full task telemetry.
+              {t('landing.heroDesc')}
             </p>
 
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 48 }}>
               <Link href='/signup' className='button button-primary' style={{ fontSize: 15, padding: '13px 28px' }}>
-                Start Free →
+                {t('landing.heroStartFree')} →
               </Link>
               <Link href='/tasks' className='button button-outline' style={{ fontSize: 15, padding: '13px 28px' }}>
-                Explore Dashboard
+                {t('landing.heroExploreDashboard')}
               </Link>
             </div>
 
@@ -161,8 +164,8 @@ export default function HomePage() {
             </div>
 
             <div style={{ marginBottom: 16 }}>
-              <span className='chip' style={{ fontSize: 11 }}>● LIVE</span>
-              <span style={{ marginLeft: 10, fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>Autonomous Sprint Pulse</span>
+              <span className='chip' style={{ fontSize: 11 }}>● {t('landing.live')}</span>
+              <span style={{ marginLeft: 10, fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>{t('landing.pulse')}</span>
             </div>
 
             {/* Fake chart with bars */}
@@ -184,9 +187,9 @@ export default function HomePage() {
             </div>
 
             <div className='timeline-mini'>
-              <span>fetch_context completed in 2.1s</span>
-              <span>generate_code pushed 6 files</span>
-              <span>review_code opened PR #184</span>
+              <span>{t('landing.timeline1')}</span>
+              <span>{t('landing.timeline2')}</span>
+              <span>{t('landing.timeline3')}</span>
             </div>
 
             {/* Glow line at bottom */}
@@ -203,10 +206,10 @@ export default function HomePage() {
         <section style={{ padding: '60px 0' }}>
           <div className='stats-bar'>
             {[
-              { n: 98, s: '%', label: 'PR Success Rate' },
-              { n: 12, s: 'x', label: 'Faster Delivery' },
-              { n: 500, s: '+', label: 'Teams Onboarded' },
-              { n: 2, s: 'M+', label: 'Tasks Automated' },
+              { n: 98, s: '%', label: t('landing.stats1') },
+              { n: 12, s: 'x', label: t('landing.stats2') },
+              { n: 500, s: '+', label: t('landing.stats3') },
+              { n: 2, s: 'M+', label: t('landing.stats4') },
             ].map((stat) => (
               <div key={stat.label} className='stat-item'>
                 <div className='stat-number'>
@@ -221,18 +224,18 @@ export default function HomePage() {
         {/* ── FEATURES ── */}
         <section className='section-wrapper' style={{ padding: '60px 0' }}>
           <div style={{ marginBottom: 48 }}>
-            <div className='section-label'>Features</div>
+            <div className='section-label'>{t('landing.featuresLabel')}</div>
             <h2 style={{ fontSize: 'clamp(28px, 3vw, 42px)', fontWeight: 800, color: 'rgba(255,255,255,0.9)', maxWidth: 500 }}>
-              Everything your team needs to ship faster
+              {t('landing.featuresTitle')}
             </h2>
           </div>
 
           <div className='feature-grid'>
             {[
-              { icon: '🔐', title: 'Multi-Tenant Security', desc: 'JWT auth, org-level isolation, usage limits, and billing controls baked in from day one.' },
-              { icon: '🤖', title: 'Agentic Delivery Flow', desc: 'LangGraph state machine with full observability across each AI stage of your pipeline.' },
-              { icon: '⚡', title: 'GitHub Automation', desc: 'Branch, commit, and PR generation with traceable task links and review summaries.' },
-              { icon: '💰', title: 'Cost Optimized LLM', desc: 'Prompt caching, model routing, and token/cost tracking per organization.' },
+              { icon: '🔐', title: t('landing.feature1Title'), desc: t('landing.feature1Desc') },
+              { icon: '🤖', title: t('landing.feature2Title'), desc: t('landing.feature2Desc') },
+              { icon: '⚡', title: t('landing.feature3Title'), desc: t('landing.feature3Desc') },
+              { icon: '💰', title: t('landing.feature4Title'), desc: t('landing.feature4Desc') },
             ].map((f) => (
               <div key={f.title} className='feature-box'>
                 <div className='feature-icon'>{f.icon}</div>
@@ -246,17 +249,17 @@ export default function HomePage() {
         {/* ── HOW IT WORKS ── */}
         <section style={{ padding: '60px 0' }}>
           <div style={{ marginBottom: 48, textAlign: 'center' }}>
-            <div className='section-label' style={{ justifyContent: 'center' }}>How It Works</div>
+            <div className='section-label' style={{ justifyContent: 'center' }}>{t('landing.howLabel')}</div>
             <h2 style={{ fontSize: 'clamp(28px, 3vw, 42px)', fontWeight: 800, color: 'rgba(255,255,255,0.9)' }}>
-              Three steps to autonomous delivery
+              {t('landing.howTitle')}
             </h2>
           </div>
 
           <div className='steps-grid'>
             {[
-              { n: '01', title: 'Ingest', desc: 'Pull work from Jira/Azure or create directly in the dashboard. AI parses intent and context.' },
-              { n: '02', title: 'Orchestrate', desc: 'PM, Dev, and Reviewer agents collaborate through LangGraph states with full telemetry.' },
-              { n: '03', title: 'Ship', desc: 'Reviewed output becomes a GitHub PR with timeline, logs, and quality scores.' },
+              { n: '01', title: t('landing.step1Title'), desc: t('landing.step1Desc') },
+              { n: '02', title: t('landing.step2Title'), desc: t('landing.step2Desc') },
+              { n: '03', title: t('landing.step3Title'), desc: t('landing.step3Desc') },
             ].map((s) => (
               <div key={s.n} className='step-card'>
                 <div className='step-number'>{s.n}</div>
@@ -270,25 +273,102 @@ export default function HomePage() {
         {/* ── DEMO PREVIEW ── */}
         <section style={{ padding: '60px 0' }}>
           <div style={{ marginBottom: 32 }}>
-            <div className='section-label'>Demo Preview</div>
+            <div className='section-label'>{t('landing.demoPreview')}</div>
             <h2 style={{ fontSize: 'clamp(24px, 2.5vw, 36px)', fontWeight: 800, color: 'rgba(255,255,255,0.9)' }}>
-              See it in action
+              {t('landing.seeInAction')}
             </h2>
           </div>
           <div className='grid-2'>
             <div className='ai-panel'>
               <div style={{ fontSize: 28, marginBottom: 12 }}>📋</div>
-              <h3 style={{ color: 'rgba(255,255,255,0.9)', marginBottom: 8, fontSize: 18 }}>Live Task Board</h3>
+              <h3 style={{ color: 'rgba(255,255,255,0.9)', marginBottom: 8, fontSize: 18 }}>{t('landing.liveTaskBoardTitle')}</h3>
               <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, lineHeight: 1.6 }}>
-                Track queued, running, and completed tasks with per-task AI timeline and cost breakdown.
+                {t('landing.liveTaskBoardDesc')}
               </p>
             </div>
             <div className='ai-panel'>
               <div style={{ fontSize: 28, marginBottom: 12 }}>🎯</div>
-              <h3 style={{ color: 'rgba(255,255,255,0.9)', marginBottom: 8, fontSize: 18 }}>AI Assignment</h3>
+              <h3 style={{ color: 'rgba(255,255,255,0.9)', marginBottom: 8, fontSize: 18 }}>{t('landing.aiAssignmentTitle')}</h3>
               <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, lineHeight: 1.6 }}>
-                One click "Assign to AI" with Azure/Jira import actions inside the dashboard.
+                {t('landing.aiAssignmentDesc')}
               </p>
+            </div>
+          </div>
+        </section>
+
+        {/* ── FLOW + AGENT WIDGETS ── */}
+        <section style={{ padding: '60px 0' }}>
+          <div style={{ marginBottom: 32 }}>
+            <div className='section-label'>{t('landing.widgetsLabel')}</div>
+            <h2 style={{ fontSize: 'clamp(24px, 2.5vw, 36px)', fontWeight: 800, color: 'rgba(255,255,255,0.9)', marginBottom: 10 }}>
+              {t('landing.widgetsTitle')}
+            </h2>
+            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, maxWidth: 680 }}>
+              {t('landing.widgetsSubtitle')}
+            </p>
+          </div>
+
+          <div className='widget-grid'>
+            <div className='widget-card'>
+              <div className='widget-top'>
+                <div className='widget-kicker'>⟳ {t('landing.widgetFlowKicker')}</div>
+                <div className='chip' style={{ fontSize: 10 }}>{t('landing.widgetLive')}</div>
+              </div>
+              <h3 className='widget-title'>{t('landing.flowWidgetTitle')}</h3>
+              <p className='widget-desc'>{t('landing.flowWidgetDesc')}</p>
+
+              <div className='widget-metrics'>
+                {[
+                  { label: t('landing.flowMetric1Label'), value: t('landing.flowMetric1Value') },
+                  { label: t('landing.flowMetric2Label'), value: t('landing.flowMetric2Value') },
+                  { label: t('landing.flowMetric3Label'), value: t('landing.flowMetric3Value') },
+                ].map((m) => (
+                  <div key={m.label} className='metric-pill'>
+                    <span>{m.label}</span>
+                    <strong>{m.value}</strong>
+                  </div>
+                ))}
+              </div>
+
+              <div className='flow-rail'>
+                {[t('landing.flowStep1'), t('landing.flowStep2'), t('landing.flowStep3'), t('landing.flowStep4')].map((s, i) => (
+                  <div key={s} className='flow-step' style={{ animationDelay: `${i * 0.15}s` }}>
+                    <span className='flow-dot' />
+                    <span>{s}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className='widget-card'>
+              <div className='widget-top'>
+                <div className='widget-kicker'>🤖 {t('landing.widgetAgentsKicker')}</div>
+                <div className='widget-pulse'>{t('landing.agentPulse')}</div>
+              </div>
+              <h3 className='widget-title'>{t('landing.agentWidgetTitle')}</h3>
+              <p className='widget-desc'>{t('landing.agentWidgetDesc')}</p>
+
+              <div style={{ display: 'grid', gap: 10 }}>
+                {[
+                  { role: t('landing.agentRolePm'), model: t('landing.agentRolePmModel'), pct: 22, color: '#a78bfa' },
+                  { role: t('landing.agentRoleDev'), model: t('landing.agentRoleDevModel'), pct: 53, color: '#22c55e' },
+                  { role: t('landing.agentRoleQa'), model: t('landing.agentRoleQaModel'), pct: 25, color: '#38bdf8' },
+                ].map((a) => (
+                  <div key={a.role} className='agent-row'>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                      <span style={{ color: 'rgba(255,255,255,0.82)', fontSize: 13, fontWeight: 600 }}>{a.role}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>{a.model}</span>
+                    </div>
+                    <div className='agent-bar'>
+                      <div className='agent-fill' style={{ width: `${a.pct}%`, background: `linear-gradient(90deg, ${a.color}, #5eead4)` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ marginTop: 14, color: 'rgba(255,255,255,0.35)', fontSize: 12 }}>
+                {t('landing.agentShareLabel')}
+              </div>
             </div>
           </div>
         </section>
@@ -296,17 +376,17 @@ export default function HomePage() {
         {/* ── PRICING ── */}
         <section style={{ padding: '60px 0' }}>
           <div style={{ marginBottom: 48, textAlign: 'center' }}>
-            <div className='section-label' style={{ justifyContent: 'center' }}>Pricing</div>
+            <div className='section-label' style={{ justifyContent: 'center' }}>{t('landing.pricingLabel')}</div>
             <h2 style={{ fontSize: 'clamp(28px, 3vw, 42px)', fontWeight: 800, color: 'rgba(255,255,255,0.9)' }}>
-              Simple, transparent pricing
+              {t('landing.pricingTitle')}
             </h2>
           </div>
           <div className='pricing-grid'>
-            <PricingCard name='Free' price='$0' items={['5 tasks/month', 'Basic orchestration', 'Single organization']} />
+            <PricingCard name={t('landing.pricingFree')} price='$0' items={[t('landing.pricingFreeItem1'), t('landing.pricingFreeItem2'), t('landing.pricingFreeItem3')]} />
             <PricingCard
-              name='Pro'
+              name={t('landing.pricingPro')}
               price='$49/mo'
-              items={['Unlimited tasks', 'Priority pipelines', 'Team invites + advanced billing']}
+              items={[t('landing.pricingProItem1'), t('landing.pricingProItem2'), t('landing.pricingProItem3')]}
               highlight
             />
           </div>
@@ -315,17 +395,17 @@ export default function HomePage() {
         {/* ── CTA ── */}
         <section className='cta-section'>
           <div className='cta-glow' />
-          <div className='chip' style={{ marginBottom: 24, justifyContent: 'center' }}>Ready to ship?</div>
+          <div className='chip' style={{ marginBottom: 24, justifyContent: 'center' }}>{t('landing.ctaChip')}</div>
           <h2 style={{ fontSize: 'clamp(32px, 4vw, 56px)', fontWeight: 800, marginBottom: 20, lineHeight: 1.1 }}>
-            <span className='gradient-text'>Build Faster.</span>
+            <span className='gradient-text'>{t('landing.ctaTitle1')}</span>
             <br />
-            <span style={{ color: 'rgba(255,255,255,0.9)' }}>Review Better. Ship Safer.</span>
+            <span style={{ color: 'rgba(255,255,255,0.9)' }}>{t('landing.ctaTitle2')}</span>
           </h2>
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 18, marginBottom: 40, maxWidth: 480, margin: '0 auto 40px' }}>
-            Create your workspace and run your first autonomous delivery cycle today.
+            {t('landing.ctaDesc')}
           </p>
           <Link href='/signup' className='button button-primary' style={{ fontSize: 16, padding: '16px 40px' }}>
-            Launch Tiqr — It's Free →
+            {t('landing.ctaButton')} →
           </Link>
         </section>
 

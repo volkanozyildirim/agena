@@ -3,8 +3,11 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { isLoggedIn } from '@/lib/api';
+import LangToggle from '@/components/LangToggle';
+import { useLocale } from '@/lib/i18n';
 
 export default function Navbar() {
+  const { t } = useLocale();
   const [loggedIn, setLoggedIn] = useState(false);
 
   useEffect(() => {
@@ -19,21 +22,19 @@ export default function Navbar() {
           Tiqr
         </Link>
         <nav style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          <span className='chip' style={{ marginRight: 8 }}>AI Orchestration</span>
-          <Link href='/pricing' style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, padding: '6px 12px', borderRadius: 8, textDecoration: 'none' }}>
-            Pricing
-          </Link>
+          <LangToggle style={{ marginRight: 4 }} />
+          <span className='chip' style={{ marginRight: 8 }}>{t('nav.aiOrchestration')}</span>
           {loggedIn ? (
             <Link href='/dashboard' className='button button-primary' style={{ padding: '8px 16px', fontSize: 13 }}>
-              Dashboard →
+              {t('nav.dashboard')} →
             </Link>
           ) : (
             <>
               <Link href='/signin' style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, padding: '6px 12px', borderRadius: 8, textDecoration: 'none' }}>
-                Sign In
+                {t('nav.signIn')}
               </Link>
               <Link href='/signup' className='button button-primary' style={{ padding: '8px 16px', fontSize: 13 }}>
-                Start Free →
+                {t('nav.startFree')} →
               </Link>
             </>
           )}
