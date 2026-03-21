@@ -244,9 +244,34 @@ async def list_member_workitems(
     return result
 
 
-@router.get('/azure/states')
-async def list_azure_states(
+@router.get('/azure/repos')
+async def list_azure_repos(
     project: str = Query(...),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[dict[str, Any]]:
+    """Azure DevOps projesindeki git repolarını listeler."""
+    service = IntegrationConfigService(db)
+    config = await service.get_config(tenant.organization_id, 'azure')
+    if config is None or not config.secret:
+        raise HTTPException(status_code=400, detail='Azure integration not configured')
+    url = f"{config.base_url.rstrip('/')}/{project}/_apis/git/repositories?api-version=7.1-preview.1"
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.get(url, headers=_azure_headers(config.secret))
+        r.raise_for_status()
+    return [
+        {
+            'id': repo['id'],
+            'name': repo['name'],
+            'remote_url': repo.get('remoteUrl', ''),
+            'web_url': repo.get('webUrl', ''),
+        }
+        for repo in r.json().get('value', [])
+    ]
+
+
+@router.get('/azure/states')
+async def list_azure_states(    project: str = Query(...),
     team: str = Query(...),
     sprint_path: str = Query(...),
     tenant: CurrentTenant = Depends(get_current_tenant),

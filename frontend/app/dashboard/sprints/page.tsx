@@ -12,6 +12,7 @@ type WorkItem = {
 
 type AgentRole = 'lead_developer' | 'pm' | 'qa' | 'manager' | 'developer';
 interface AgentConfig { role: AgentRole; label: string; icon: string; provider: string; model: string; custom_model: string; enabled: boolean; }
+type AzureRepo = { id: string; name: string; remote_url: string; web_url: string };
 const LS_AGENTS = 'tiqr_agent_configs';
 const LS_LOCAL_REPOS = 'tiqr_local_repos';
 function loadAgentConfigs(): AgentConfig[] {
@@ -387,19 +388,30 @@ function DetailPanel({ item, onClose, aiLoading, aiResult, onAssignAI, projects,
   const toActiveDuration = item.activated_date ? elapsed(item.created_date, item.activated_date) : null;
 
   const [selProject, setSelProject] = useState(currentProject);
-  const [selRepo, setSelRepo] = useState(localRepos[0] ?? '');
+  const [azureRepos, setAzureRepos] = useState<AzureRepo[]>([]);
+  const [selAzureRepo, setSelAzureRepo] = useState('');
+  const [loadingRepos, setLoadingRepos] = useState(false);
+  const [selLocalRepo, setSelLocalRepo] = useState(localRepos[0] ?? '');
   const [selAgent, setSelAgent] = useState('');
   const [newRepo, setNewRepo] = useState('');
   const [showAddRepo, setShowAddRepo] = useState(false);
+
+  // Proje değişince Azure repoları çek
+  useEffect(() => {
+    setAzureRepos([]); setSelAzureRepo('');
+    if (!selProject) return;
+    setLoadingRepos(true);
+    apiFetch<AzureRepo[]>('/tasks/azure/repos?project=' + encodeURIComponent(selProject))
+      .then(setAzureRepos).catch(() => {}).finally(() => setLoadingRepos(false));
+  }, [selProject]);
 
   const enabledAgents = agentConfigs.filter((a) => a.enabled && (a.model || a.custom_model));
 
   function handleAddRepo() {
     if (!newRepo.trim()) return;
     onAddRepo(newRepo.trim());
-    setSelRepo(newRepo.trim());
-    setNewRepo('');
-    setShowAddRepo(false);
+    setSelLocalRepo(newRepo.trim());
+    setNewRepo(''); setShowAddRepo(false);
   }
 
   return (
@@ -413,7 +425,6 @@ function DetailPanel({ item, onClose, aiLoading, aiResult, onAssignAI, projects,
       maxHeight: 'calc(100vh - 220px)',
       position: 'sticky', top: 160,
     }}>
-      {/* Top accent */}
       <div style={{ height: 2, background: 'linear-gradient(90deg, ' + stateInfo.color + ', #7c3aed)' }} />
 
       {/* Header */}
@@ -431,39 +442,21 @@ function DetailPanel({ item, onClose, aiLoading, aiResult, onAssignAI, projects,
 
       {/* Body */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <DetailRow icon="👤" label="Atanan">{item.assigned_to || '—'}</DetailRow>
 
-        {/* Atanan */}
-        <DetailRow icon="👤" label="Atanan">
-          {item.assigned_to || '—'}
-        </DetailRow>
-
-        {/* Zaman bilgileri */}
         {item.created_date && (
           <DetailRow icon="📅" label="Açılış">
             {new Date(item.created_date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}
             {openDuration && <span style={{ marginLeft: 6, fontSize: 10, color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.05)', padding: '1px 6px', borderRadius: 999 }}>{openDuration} önce</span>}
           </DetailRow>
         )}
+        {toActiveDuration && <DetailRow icon="⚡" label="Açılıştan In Progress'e"><span style={{ color: '#38bdf8', fontWeight: 700 }}>{toActiveDuration}</span></DetailRow>}
+        {!toActiveDuration && item.created_date && <DetailRow icon="⏳" label="Açık süre"><span style={{ color: '#f59e0b', fontWeight: 700 }}>{openDuration}</span></DetailRow>}
 
-        {toActiveDuration && (
-          <DetailRow icon="⚡" label="Açılıştan In Progress'e">
-            <span style={{ color: '#38bdf8', fontWeight: 700 }}>{toActiveDuration}</span>
-          </DetailRow>
-        )}
-
-        {!toActiveDuration && item.created_date && (
-          <DetailRow icon="⏳" label="Açık süre">
-            <span style={{ color: '#f59e0b', fontWeight: 700 }}>{openDuration}</span>
-          </DetailRow>
-        )}
-
-        {/* Açıklama */}
         {item.description && (
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)', marginBottom: 6 }}>Açıklama</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6, background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '10px 12px', border: '1px solid rgba(255,255,255,0.06)' }}>
-              {item.description}
-            </div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6, background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '10px 12px', border: '1px solid rgba(255,255,255,0.06)' }}>{item.description}</div>
           </div>
         )}
 
@@ -474,20 +467,38 @@ function DetailPanel({ item, onClose, aiLoading, aiResult, onAssignAI, projects,
           {/* Azure Proje */}
           <div>
             <label style={dpLabelStyle}>Azure Proje</label>
-            <select value={selProject} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelProject(e.target.value)}
-              style={dpSelectStyle}>
+            <select value={selProject} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelProject(e.target.value)} style={dpSelectStyle}>
               <option value="" style={{ background: '#0d1117' }}>Proje seç...</option>
               {projects.map((p) => <option key={p.id} value={p.name} style={{ background: '#0d1117' }}>{p.name}</option>)}
             </select>
           </div>
 
-          {/* Local Repo */}
+          {/* Azure Repo */}
           <div>
-            <label style={dpLabelStyle}>Local Repo</label>
-            {localRepos.length > 0 && (
-              <select value={selRepo} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelRepo(e.target.value)}
-                style={{ ...dpSelectStyle, marginBottom: 6 }}>
+            <label style={dpLabelStyle}>
+              Azure Repo {loadingRepos && <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: 'rgba(255,255,255,0.2)' }}>yükleniyor…</span>}
+            </label>
+            {selProject ? (
+              <select value={selAzureRepo} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelAzureRepo(e.target.value)}
+                disabled={loadingRepos} style={dpSelectStyle}>
                 <option value="" style={{ background: '#0d1117' }}>Repo seç...</option>
+                {azureRepos.map((r) => <option key={r.id} value={r.remote_url} style={{ background: '#0d1117' }}>{r.name}</option>)}
+              </select>
+            ) : (
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', padding: '6px 0' }}>Önce proje seç</div>
+            )}
+            {selAzureRepo && (
+              <div style={{ marginTop: 4, fontSize: 10, color: 'rgba(255,255,255,0.25)', wordBreak: 'break-all' }}>{selAzureRepo}</div>
+            )}
+          </div>
+
+          {/* Local Repo (opsiyonel) */}
+          <div>
+            <label style={dpLabelStyle}>Local Repo (opsiyonel)</label>
+            {localRepos.length > 0 && (
+              <select value={selLocalRepo} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelLocalRepo(e.target.value)}
+                style={{ ...dpSelectStyle, marginBottom: 6 }}>
+                <option value="" style={{ background: '#0d1117' }}>Seç...</option>
                 {localRepos.map((r) => <option key={r} value={r} style={{ background: '#0d1117' }}>{r.split('/').pop() ?? r}</option>)}
               </select>
             )}
@@ -496,14 +507,14 @@ function DetailPanel({ item, onClose, aiLoading, aiResult, onAssignAI, projects,
                 <input value={newRepo} onChange={(e) => setNewRepo(e.target.value)}
                   placeholder="/Users/ali/projects/my-app"
                   onKeyDown={(e) => e.key === 'Enter' && handleAddRepo()}
-                  style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.9)', fontSize: 12, outline: 'none' }} />
-                <button onClick={handleAddRepo} style={{ padding: '8px 12px', borderRadius: 8, border: 'none', background: '#0d9488', color: '#fff', fontSize: 12, cursor: 'pointer', fontWeight: 700 }}>+</button>
-                <button onClick={() => setShowAddRepo(false)} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.4)', fontSize: 12, cursor: 'pointer' }}>×</button>
+                  style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.9)', fontSize: 12, outline: 'none' }} />
+                <button onClick={handleAddRepo} style={{ padding: '7px 12px', borderRadius: 8, border: 'none', background: '#0d9488', color: '#fff', fontSize: 12, cursor: 'pointer', fontWeight: 700 }}>+</button>
+                <button onClick={() => setShowAddRepo(false)} style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.4)', fontSize: 12, cursor: 'pointer' }}>×</button>
               </div>
             ) : (
               <button onClick={() => setShowAddRepo(true)}
                 style={{ fontSize: 11, padding: '5px 10px', borderRadius: 7, border: '1px dashed rgba(255,255,255,0.15)', background: 'transparent', color: 'rgba(255,255,255,0.35)', cursor: 'pointer' }}>
-                + Repo ekle
+                + Local path ekle
               </button>
             )}
           </div>
@@ -512,9 +523,7 @@ function DetailPanel({ item, onClose, aiLoading, aiResult, onAssignAI, projects,
           <div>
             <label style={dpLabelStyle}>Agent</label>
             {enabledAgents.length === 0 ? (
-              <a href="/dashboard/agents" style={{ fontSize: 12, color: '#f59e0b', textDecoration: 'none' }}>
-                ⚠ Agents sayfasından model seç →
-              </a>
+              <a href="/dashboard/agents" style={{ fontSize: 12, color: '#f59e0b', textDecoration: 'none' }}>⚠ Agents sayfasından model seç →</a>
             ) : (
               <div style={{ display: 'grid', gap: 6 }}>
                 {enabledAgents.map((a) => (
@@ -533,7 +542,6 @@ function DetailPanel({ item, onClose, aiLoading, aiResult, onAssignAI, projects,
           </div>
         </div>
 
-        {/* AI sonucu */}
         {aiResult && (
           <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(13,148,136,0.08)', border: '1px solid rgba(13,148,136,0.25)', fontSize: 12, color: '#5eead4', lineHeight: 1.5 }}>
             🤖 {aiResult}
@@ -541,28 +549,13 @@ function DetailPanel({ item, onClose, aiLoading, aiResult, onAssignAI, projects,
         )}
       </div>
 
-      {/* Footer — Assign AI */}
+      {/* Footer */}
       <div style={{ padding: '12px 18px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-        <button
-          onClick={onAssignAI}
-          disabled={aiLoading || !selAgent}
-          style={{
-            width: '100%', padding: '11px', borderRadius: 12, border: 'none',
-            background: aiLoading ? 'rgba(13,148,136,0.3)' : selAgent ? 'linear-gradient(135deg, #0d9488, #7c3aed)' : 'rgba(255,255,255,0.06)',
-            color: selAgent ? '#fff' : 'rgba(255,255,255,0.3)', fontWeight: 700, fontSize: 13,
-            cursor: aiLoading || !selAgent ? 'not-allowed' : 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          }}
-        >
-          {aiLoading ? (
-            <><span style={{ fontSize: 14 }}>⟳</span> AI çalışıyor…</>
-          ) : (
-            <><span style={{ fontSize: 14 }}>🤖</span> {selAgent ? 'Assign AI' : 'Agent seç'}</>
-          )}
+        <button onClick={onAssignAI} disabled={aiLoading || !selAgent}
+          style={{ width: '100%', padding: '11px', borderRadius: 12, border: 'none', background: aiLoading ? 'rgba(13,148,136,0.3)' : selAgent ? 'linear-gradient(135deg, #0d9488, #7c3aed)' : 'rgba(255,255,255,0.06)', color: selAgent ? '#fff' : 'rgba(255,255,255,0.3)', fontWeight: 700, fontSize: 13, cursor: aiLoading || !selAgent ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          {aiLoading ? <><span style={{ fontSize: 14 }}>⟳</span> AI çalışıyor…</> : <><span style={{ fontSize: 14 }}>🤖</span> {selAgent ? 'Assign AI' : 'Agent seç'}</>}
         </button>
-        <div style={{ marginTop: 8, fontSize: 10, color: 'rgba(255,255,255,0.2)', textAlign: 'center' }}>
-          AI bu işi analiz edip otomatik atar
-        </div>
+        <div style={{ marginTop: 8, fontSize: 10, color: 'rgba(255,255,255,0.2)', textAlign: 'center' }}>AI bu işi analiz edip otomatik atar</div>
       </div>
     </div>
   );
