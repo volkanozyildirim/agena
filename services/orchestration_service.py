@@ -91,6 +91,7 @@ class OrchestrationService:
             routing.execution_prompt,
             routing.repo_playbook,
             tenant_playbook,
+            self._build_repo_context(routing.local_repo_path),
             task.story_context,
             task.acceptance_criteria,
             task.edge_cases,
@@ -542,6 +543,7 @@ class OrchestrationService:
         execution_prompt: str | None,
         repo_playbook: str | None = None,
         tenant_playbook: str | None = None,
+        repo_context: str | None = None,
         story_context: str | None = None,
         acceptance_criteria: str | None = None,
         edge_cases: str | None = None,
@@ -550,12 +552,15 @@ class OrchestrationService:
         prompt = (execution_prompt or '').strip()
         repo_rules = (repo_playbook or '').strip()
         playbook = (tenant_playbook or '').strip()
+        repo_ctx = (repo_context or '').strip()
         story = (story_context or '').strip()
         criteria = (acceptance_criteria or '').strip()
         edges = (edge_cases or '').strip()
         chunks: list[str] = []
         if desc:
             chunks.append(desc)
+        if repo_ctx:
+            chunks.append(f'Repo Context:\n{repo_ctx}')
         if story:
             chunks.append(f'Business Context:\n{story}')
         if criteria:
@@ -569,6 +574,51 @@ class OrchestrationService:
         if playbook:
             chunks.append(f'Tenant Playbook:\n{playbook}')
         return '\n\n'.join(chunks)
+
+    def _build_repo_context(self, local_repo_path: str | None) -> str | None:
+        repo_path = (local_repo_path or '').strip()
+        if not repo_path:
+            return None
+        try:
+            root = Path(repo_path).expanduser().resolve()
+            if not root.exists() or not root.is_dir():
+                return f'Local repo path is configured but not reachable: {repo_path}'
+
+            top_dirs: list[str] = []
+            top_files: list[str] = []
+            for entry in sorted(root.iterdir(), key=lambda e: e.name.lower()):
+                if entry.name.startswith('.'):
+                    continue
+                if entry.is_dir():
+                    top_dirs.append(entry.name)
+                elif entry.is_file():
+                    top_files.append(entry.name)
+                if len(top_dirs) + len(top_files) >= 28:
+                    break
+
+            tech_markers: list[str] = []
+            if (root / 'package.json').exists():
+                tech_markers.append('Node.js/TypeScript (package.json)')
+            if (root / 'requirements.txt').exists() or (root / 'pyproject.toml').exists():
+                tech_markers.append('Python (requirements/pyproject)')
+            if (root / 'go.mod').exists():
+                tech_markers.append('Go (go.mod)')
+            if (root / 'pom.xml').exists() or (root / 'build.gradle').exists():
+                tech_markers.append('JVM (Maven/Gradle)')
+            if (root / 'Dockerfile').exists():
+                tech_markers.append('Dockerfile present')
+
+            lines = [f'Repo Root: {root}']
+            if tech_markers:
+                lines.append('Detected Stack: ' + ', '.join(tech_markers))
+            if top_dirs:
+                lines.append('Top-level Directories: ' + ', '.join(top_dirs[:16]))
+            if top_files:
+                lines.append('Top-level Files: ' + ', '.join(top_files[:12]))
+            lines.append('Instruction: prioritize editing existing project files; avoid placeholder markdown-only outputs.')
+            return '\n'.join(lines)
+        except Exception as exc:
+            return f'Repo context unavailable for {repo_path}: {str(exc)[:180]}'
 
     def _validate_cost_guardrails(
         self,
