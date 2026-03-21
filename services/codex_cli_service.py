@@ -10,6 +10,7 @@ from pathlib import Path
 class CodexCLIService:
     FALLBACK_MODEL = 'gpt-5'
     EXEC_TIMEOUT_SEC = 180
+    TRANSIENT_RETRIES = 3
 
     async def generate_file_markdown(
         self,
@@ -49,7 +50,7 @@ class CodexCLIService:
         effective_model = self._normalize_model_for_chatgpt(requested_model)
         effective_api_key = api_key
 
-        out, err, code = await self._run_codex_exec(
+        out, err, code = await self._run_codex_with_retry(
             codex_bin=codex_bin,
             repo=str(repo),
             model=effective_model,
@@ -62,7 +63,7 @@ class CodexCLIService:
             msg = (err.decode('utf-8', errors='ignore') or out.decode('utf-8', errors='ignore')).strip()
             if effective_api_key and self._is_api_key_scope_error(msg):
                 effective_api_key = None
-                out, err, code = await self._run_codex_exec(
+                out, err, code = await self._run_codex_with_retry(
                     codex_bin=codex_bin,
                     repo=str(repo),
                     model=effective_model,
@@ -74,7 +75,7 @@ class CodexCLIService:
                 if code != 0:
                     msg = (err.decode('utf-8', errors='ignore') or out.decode('utf-8', errors='ignore')).strip()
             if code != 0 and self._is_unsupported_model_error(msg) and effective_model != self.FALLBACK_MODEL:
-                out, err, code = await self._run_codex_exec(
+                out, err, code = await self._run_codex_with_retry(
                     codex_bin=codex_bin,
                     repo=str(repo),
                     model=self.FALLBACK_MODEL,
@@ -135,6 +136,37 @@ class CodexCLIService:
             raise RuntimeError(f'codex exec timed out after {self.EXEC_TIMEOUT_SEC}s')
         return out, err, int(proc.returncode or 0)
 
+    async def _run_codex_with_retry(
+        self,
+        *,
+        codex_bin: str,
+        repo: str,
+        model: str | None,
+        prompt: str,
+        output_file: str,
+        api_key: str | None,
+        api_base_url: str | None,
+    ) -> tuple[bytes, bytes, int]:
+        last: tuple[bytes, bytes, int] | None = None
+        for attempt in range(1, self.TRANSIENT_RETRIES + 1):
+            out, err, code = await self._run_codex_exec(
+                codex_bin=codex_bin,
+                repo=repo,
+                model=model,
+                prompt=prompt,
+                output_file=output_file,
+                api_key=api_key,
+                api_base_url=api_base_url,
+            )
+            last = (out, err, code)
+            if code == 0:
+                return last
+            msg = (err.decode('utf-8', errors='ignore') or out.decode('utf-8', errors='ignore')).strip()
+            if not self._is_transient_error(msg) or attempt >= self.TRANSIENT_RETRIES:
+                return last
+            await asyncio.sleep(min(2 ** (attempt - 1), 4))
+        return last or (b'', b'', 1)
+
     def _is_unsupported_model_error(self, message: str) -> bool:
         lowered = message.lower()
         return 'is not supported when using codex with a chatgpt account' in lowered
@@ -151,3 +183,12 @@ class CodexCLIService:
         if lowered in {'codex', 'gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-4.1-mini'}:
             return self.FALLBACK_MODEL
         return model
+
+    def _is_transient_error(self, message: str) -> bool:
+        lowered = message.lower()
+        return (
+            '500 internal server error' in lowered
+            or "currently experiencing high demand" in lowered
+            or 'timed out' in lowered
+            or 'failed to connect to websocket' in lowered
+        )

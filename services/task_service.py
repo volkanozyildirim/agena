@@ -223,6 +223,25 @@ class TaskService:
         task = await self.get_task(organization_id, task_id)
         if task is None:
             raise ValueError('Task not found')
+        if task.status == 'cancelled':
+            raise ValueError('Task is cancelled')
+
+        local_repo_path = self._extract_local_repo_path(task.description)
+        if local_repo_path:
+            conflict = await self.db.execute(
+                select(TaskRecord.id, TaskRecord.title)
+                .where(
+                    TaskRecord.organization_id == organization_id,
+                    TaskRecord.id != task.id,
+                    TaskRecord.status.in_(['queued', 'running']),
+                    TaskRecord.description.like(f'%Local Repo Path: {local_repo_path}%'),
+                )
+                .order_by(TaskRecord.id.desc())
+                .limit(1)
+            )
+            conflict_row = conflict.first()
+            if conflict_row is not None:
+                raise ValueError(f'Another active task is already running for this repo: #{conflict_row.id} {conflict_row.title}')
 
         # Legacy guard: external tasks without mapping should not auto-open PRs.
         # If mapping metadata exists, orchestration decides provider-specific PR flow.
@@ -241,6 +260,27 @@ class TaskService:
         await self.db.commit()
         await self.add_log(task.id, organization_id, 'queued', 'Task queued for AI processing')
         return queue_key
+
+    async def cancel_task(self, organization_id: int, task_id: int) -> TaskRecord:
+        if self.db is None:
+            raise ValueError('DB session required')
+        task = await self.get_task(organization_id, task_id)
+        if task is None:
+            raise ValueError('Task not found')
+        if task.status in {'completed', 'failed', 'cancelled'}:
+            return task
+
+        removed = await self.queue_service.remove_task(organization_id=organization_id, task_id=task.id)
+        task.status = 'cancelled'
+        task.failure_reason = 'Cancelled by user'
+        await self.db.commit()
+        await self.add_log(
+            task.id,
+            organization_id,
+            'cancelled',
+            'Task cancelled by user' + (f' (removed {removed} queued entry)' if removed > 0 else ''),
+        )
+        return task
 
     async def add_log(self, task_id: int, organization_id: int, stage: str, message: str) -> AgentLog:
         if self.db is None:
@@ -299,3 +339,11 @@ class TaskService:
             return float(match.group(1))
         except ValueError:
             return None
+
+    def _extract_local_repo_path(self, description: str | None) -> str | None:
+        if not description:
+            return None
+        for raw in description.splitlines():
+            if raw.lower().startswith('local repo path:'):
+                return raw.split(':', 1)[1].strip() or None
+        return None
