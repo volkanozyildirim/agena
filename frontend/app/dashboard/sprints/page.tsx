@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { apiFetch, loadPrefs, runFlow, FlowRunResult } from '@/lib/api';
+import { useLocale } from '@/lib/i18n';
 
 type Opt = { id: string; name: string; path?: string };
 type WorkItem = {
@@ -70,6 +71,7 @@ function shortName(full?: string): string {
 }
 
 export default function SprintsPage() {
+  const { t } = useLocale();
   const [projects, setProjects] = useState<Opt[]>([]);
   const [teams,    setTeams]    = useState<Opt[]>([]);
   const [sprints,  setSprints]  = useState<Opt[]>([]);
@@ -142,7 +144,7 @@ export default function SprintsPage() {
     if (!project) return;
     setLtm(true);
     apiFetch<Opt[]>('/tasks/azure/teams?project=' + encodeURIComponent(project))
-      .then(setTeams).catch((e: unknown) => setErr(e instanceof Error ? e.message : 'Takımlar yüklenemedi'))
+      .then(setTeams).catch((e: unknown) => setErr(e instanceof Error ? e.message : t('sprints.teamsError')))
       .finally(() => setLtm(false));
   }, [project]);
 
@@ -151,7 +153,7 @@ export default function SprintsPage() {
     if (!project || !team) return;
     setLsp(true);
     apiFetch<Opt[]>('/tasks/azure/sprints?project=' + encodeURIComponent(project) + '&team=' + encodeURIComponent(team))
-      .then(setSprints).catch((e: unknown) => setErr(e instanceof Error ? e.message : 'Sprintler yüklenemedi'))
+      .then(setSprints).catch((e: unknown) => setErr(e instanceof Error ? e.message : t('sprints.sprintsError')))
       .finally(() => setLsp(false));
   }, [project, team]);
 
@@ -177,7 +179,7 @@ export default function SprintsPage() {
         const merged: WorkItem[] = [];
         results.forEach((r) => { if (r.status === 'fulfilled') merged.push(...r.value); });
         setItems(merged);
-      }).catch((e: unknown) => setErr(e instanceof Error ? e.message : 'Board yüklenemedi'))
+      }).catch((e: unknown) => setErr(e instanceof Error ? e.message : t('sprints.boardError')))
         .finally(() => setLbd(false));
   }, [sprint, project, team]);
 
@@ -187,7 +189,7 @@ export default function SprintsPage() {
       method: 'POST',
       body: JSON.stringify({ project: project || undefined, team: team || undefined, sprint_path: sprint || undefined, state }),
     }).then((r) => setMsg('"' + state + '" — ' + String(r.imported) + ' import edildi, ' + String(r.skipped) + ' atlandı'))
-      .catch((e: unknown) => setErr(e instanceof Error ? e.message : 'Import başarısız'))
+      .catch((e: unknown) => setErr(e instanceof Error ? e.message : t('sprints.importFailed')))
       .finally(() => setImp(''));
   }
 
@@ -195,9 +197,9 @@ export default function SprintsPage() {
     setAiLoading(true); setAiResult('');
     try {
       const res = await apiFetch<{ message: string }>('/tasks/' + item.id + '/assign-ai', { method: 'POST' });
-      setAiResult(res.message || 'AI atandı');
+      setAiResult(res.message || t('sprints.aiAssigned'));
     } catch (e) {
-      setAiResult('AI atama başarısız: ' + (e instanceof Error ? e.message : 'Hata'));
+      setAiResult(t('sprints.aiAssignFailed') + (e instanceof Error ? e.message : 'Hata'));
     } finally {
       setAiLoading(false);
     }
@@ -228,7 +230,7 @@ export default function SprintsPage() {
   const selP = projects.find((p) => p.name === project);
   const breadcrumb = selP && selT && selS
     ? selP.name + ' › ' + selT.name + ' › ' + selS.name
-    : lpj ? 'Projeler yükleniyor…' : 'Aşağıdan proje, takım ve sprint seç';
+    : lpj ? t('sprints.loading') : t('sprints.selectHint');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, height: '100%' }}>
@@ -240,8 +242,8 @@ export default function SprintsPage() {
         </h1>
         {!hasAzure && !lpj ? (
           <p style={{ fontSize: 13, color: '#fbbf24', margin: 0 }}>
-            Azure PAT yapılandırılmamış.{' '}
-            <a href="/dashboard/integrations" style={{ color: '#fbbf24', textDecoration: 'underline' }}>Integrations</a> sayfasına git.
+            {t('sprints.noAzure')}{' '}
+            <a href="/dashboard/integrations" style={{ color: '#fbbf24', textDecoration: 'underline' }}>{t('sprints.goIntegrations')}</a>
           </p>
         ) : (
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', margin: 0 }}>{breadcrumb}</p>
@@ -250,15 +252,15 @@ export default function SprintsPage() {
 
       {/* Selectors */}
       <div style={{ position: 'sticky', top: 72, zIndex: 40, borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(3,7,18,0.92)', backdropFilter: 'blur(24px)', padding: '16px 20px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
-        <Sel step={1} label="Project" value={project} onChange={setProject}
+        <Sel step={1} t={t} label={t('sprints.projectLabel')} value={project} onChange={setProject}
           options={projects.map((p: Opt) => ({ id: p.name, name: p.name }))}
-          loading={lpj} placeholder="Proje seç..." active={true} />
-        <Sel step={2} label="Team" value={team} onChange={setTeam}
+          loading={lpj} placeholder={t('sprints.selectProject')} active={true} />
+        <Sel step={2} t={t} label={t('sprints.teamLabel')} value={team} onChange={setTeam}
           options={teams.map((t: Opt) => ({ id: t.name, name: t.name }))}
-          loading={ltm} placeholder={project ? 'Takım seç...' : 'Önce proje seç'} active={!!project} />
-        <Sel step={3} label="Sprint" value={sprint} onChange={setSprint}
+          loading={ltm} placeholder={project ? t('sprints.selectTeam') : t('sprints.selectTeamFirst')} active={!!project} />
+        <Sel step={3} t={t} label={t('sprints.sprintLabel')} value={sprint} onChange={setSprint}
           options={sprints.map((s: Opt) => ({ id: s.path ?? s.name, name: s.name }))}
-          loading={lsp} placeholder={team ? 'Sprint seç...' : 'Önce takım seç'} active={!!team} />
+          loading={lsp} placeholder={team ? t('sprints.selectSprint') : t('sprints.selectSprintFirst')} active={!!team} />
       </div>
 
       {(msg || err) ? (
@@ -275,7 +277,7 @@ export default function SprintsPage() {
           <div style={{ flex: 1, display: 'flex', gap: 10, alignItems: 'flex-start', overflowX: 'auto', paddingBottom: 8, minWidth: 0 }}>
             {(lbd ? states : visibleStates).length === 0 && !lbd ? (
               <div style={{ flex: 1, textAlign: 'center', padding: '60px 0', color: 'rgba(255,255,255,0.2)', fontSize: 14 }}>
-                Bu sprintte iş kalemi bulunamadı
+                {t('sprints.noItems')}
               </div>
             ) : (lbd ? states : visibleStates).map((state, idx) => {
               const s = sc(state, idx);
@@ -311,7 +313,7 @@ export default function SprintsPage() {
         ) : (
           <div style={{ flex: 1, textAlign: 'center', padding: '80px 0' }}>
             <div style={{ fontSize: 48, marginBottom: 14, opacity: 0.1 }}>◎</div>
-            <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 14 }}>Proje › Takım › Sprint seç, board otomatik yüklenir</div>
+            <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 14 }}>{t('sprints.selectPrompt')}</div>
           </div>
         )}
 
@@ -635,8 +637,9 @@ function DetailRow({ icon, label, children }: { icon: string; label: string; chi
   );
 }
 
-function Sel({ step, label, value, onChange, options, loading, placeholder, active }: {
+function Sel({ step, t, label, value, onChange, options, loading, placeholder, active }: {
   step: number; label: string; value: string; onChange: (v: string) => void;
+  t: (key: 'sprints.loadingShort') => string;
   options: Opt[]; loading: boolean; placeholder: string; active: boolean;
 }) {
   return (
@@ -644,7 +647,7 @@ function Sel({ step, label, value, onChange, options, loading, placeholder, acti
       <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 7 }}>
         <span style={{ width: 18, height: 18, borderRadius: '50%', fontSize: 9, fontWeight: 800, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: value ? 'linear-gradient(135deg, #0d9488, #22c55e)' : 'rgba(255,255,255,0.08)', color: value ? '#fff' : 'rgba(255,255,255,0.4)' }}>{step}</span>
         <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.1, textTransform: 'uppercase', color: value ? '#5eead4' : 'rgba(255,255,255,0.35)' }}>{label}</label>
-        {loading ? <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>yükleniyor…</span> : null}
+        {loading ? <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{t('sprints.loadingShort')}</span> : null}
       </div>
       <select value={value} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onChange(e.target.value)} disabled={!active || loading}
         style={{ width: '100%', border: '1px solid ' + (value ? 'rgba(13,148,136,0.4)' : 'rgba(255,255,255,0.1)'), borderRadius: 10, padding: '9px 12px', font: 'inherit', fontSize: 12, background: value ? 'rgba(13,148,136,0.08)' : 'rgba(255,255,255,0.04)', color: value ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.4)', cursor: active && !loading ? 'pointer' : 'not-allowed', appearance: 'none', outline: 'none' }}>

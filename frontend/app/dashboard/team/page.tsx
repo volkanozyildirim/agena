@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { apiFetch, loadPrefs, savePrefs, type AzureMember } from '@/lib/api';
+import { useLocale } from '@/lib/i18n';
 type WorkItem = { id: string; title: string; state: string };
 
 const STATE_COLORS: Record<string, string> = {
@@ -28,6 +29,7 @@ const initials = (name: string) =>
   name.split(' ').map((n) => n[0] ?? '').join('').toUpperCase().slice(0, 2);
 
 export default function TeamPage() {
+  const { t } = useLocale();
   const [project,    setProject]    = useState('');
   const [team,       setTeam]       = useState('');
   const [sprintPath, setSprintPath] = useState('');
@@ -70,13 +72,13 @@ export default function TeamPage() {
       setLoadingAll(true);
       apiFetch<AzureMember[]>('/tasks/azure/members')
         .then(setAllMembers)
-        .catch((e: unknown) => setErr(e instanceof Error ? e.message : 'Üyeler yüklenemedi'))
+        .catch((e: unknown) => setErr(e instanceof Error ? e.message : t('team.membersError')))
         .finally(() => setLoadingAll(false));
     }).catch(() => {
       const p = localStorage.getItem(LS_PROJECT) || '';
-      const t = localStorage.getItem(LS_TEAM)    || '';
+      const t2 = localStorage.getItem(LS_TEAM)    || '';
       const s = localStorage.getItem(LS_SPRINT)  || '';
-      setProject(p); setTeam(t); setSprintPath(s);
+      setProject(p); setTeam(t2); setSprintPath(s);
       try {
         const saved = localStorage.getItem(LS_MY_TEAM);
         if (saved) setMyTeam(JSON.parse(saved) as AzureMember[]);
@@ -85,7 +87,7 @@ export default function TeamPage() {
       setLoadingAll(true);
       apiFetch<AzureMember[]>('/tasks/azure/members')
         .then(setAllMembers)
-        .catch((e: unknown) => setErr(e instanceof Error ? e.message : 'Üyeler yüklenemedi'))
+        .catch((e: unknown) => setErr(e instanceof Error ? e.message : t('team.membersError')))
         .finally(() => setLoadingAll(false));
     });
   }, []);
@@ -137,20 +139,20 @@ export default function TeamPage() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
         <div>
-          <div className="section-label">Team</div>
+          <div className="section-label">{t('team.section')}</div>
           <h1 style={{ fontSize: 28, fontWeight: 800, color: 'rgba(255,255,255,0.95)', marginTop: 8, marginBottom: 4 }}>
-            Takımım
+            {t('team.title')}
           </h1>
           <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 14, margin: 0 }}>
             {myTeam.length > 0
-              ? myTeam.length + ' kişi · ' + (sprintPath ? 'Sprint iş dağılımı' : 'Sprint seçilmedi')
-              : 'Sağdaki butondan takım arkadaşlarını ekle'}
+              ? myTeam.length + ' · ' + (sprintPath ? 'Sprint' : t('team.noConfig'))
+              : t('team.addEdit')}
           </p>
         </div>
         {hasConfig && (
           <button onClick={() => setShowPicker(true)}
             style={{ flexShrink: 0, padding: '10px 18px', borderRadius: 12, border: '1px solid rgba(13,148,136,0.3)', background: 'rgba(13,148,136,0.1)', color: '#5eead4', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 16 }}>+</span> Üye Ekle / Düzenle
+            <span style={{ fontSize: 16 }}>+</span> {t('team.addEdit')}
           </button>
         )}
       </div>
@@ -158,11 +160,11 @@ export default function TeamPage() {
       {!hasConfig && (
         <div style={{ padding: '20px 24px', borderRadius: 16, border: '1px solid rgba(251,191,36,0.2)', background: 'rgba(251,191,36,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ fontWeight: 600, color: '#fbbf24', fontSize: 14 }}>Azure takımı seçilmedi</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>Profil sayfasından proje ve takım seç</div>
+            <div style={{ fontWeight: 600, color: '#fbbf24', fontSize: 14 }}>{t('team.noConfig')}</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>{t('team.noConfigDesc')}</div>
           </div>
           <a href="/dashboard/profile" style={{ padding: '8px 16px', borderRadius: 10, border: '1px solid rgba(251,191,36,0.3)', background: 'rgba(251,191,36,0.1)', color: '#fbbf24', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
-            Profil →
+            {t('team.profile')}
           </a>
         </div>
       )}
@@ -204,7 +206,7 @@ export default function TeamPage() {
                     {isLoadingItems ? (
                       <div style={{ display: 'grid', gap: 6 }}><Skel /><Skel /><Skel opacity={0.4} /></div>
                     ) : !items || items.length === 0 ? (
-                      <div style={{ padding: '14px 0', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>Bu sprintte atanmış iş yok</div>
+                      <div style={{ padding: '14px 0', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>{t('team.noItems')}</div>
                     ) : (
                       <div style={{ display: 'grid', gap: 6 }}>
                         {items.map((item) => (
@@ -226,10 +228,10 @@ export default function TeamPage() {
       ) : hasConfig && !loadingAll ? (
         <div style={{ textAlign: 'center', padding: '60px 0' }}>
           <div style={{ fontSize: 48, opacity: 0.1, marginBottom: 16 }}>◉</div>
-          <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 14, marginBottom: 20 }}>Henüz takım üyesi eklenmedi</div>
+          <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 14, marginBottom: 20 }}>{t('team.noMembers')}</div>
           <button onClick={() => setShowPicker(true)}
             style={{ padding: '10px 20px', borderRadius: 12, border: '1px solid rgba(13,148,136,0.3)', background: 'rgba(13,148,136,0.1)', color: '#5eead4', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-            + Üye Ekle
+            {t('team.addMember')}
           </button>
         </div>
       ) : null}
@@ -244,7 +246,7 @@ export default function TeamPage() {
             <div style={{ padding: '24px 24px 16px', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'rgba(255,255,255,0.95)' }}>Takım Üyelerini Seç</h3>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'rgba(255,255,255,0.95)' }}>{t('team.selectTitle')}</h3>
                   <p style={{ margin: '4px 0 0', fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>{myTeam.length} seçili · {allMembers.length} kişi</p>
                 </div>
                 <button onClick={() => setShowPicker(false)} style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
@@ -255,7 +257,7 @@ export default function TeamPage() {
                 <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: 'rgba(255,255,255,0.25)' }}>⌕</span>
                 <input
                   value={search} onChange={(e) => setSearch(e.target.value)}
-                  placeholder="İsim veya email ara..."
+                  placeholder={t('team.searchPlaceholder')}
                   autoFocus
                   style={{ width: '100%', padding: '10px 14px 10px 34px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.9)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
                 />
@@ -265,9 +267,9 @@ export default function TeamPage() {
             {/* Liste */}
             <div style={{ overflowY: 'auto', flex: 1, padding: '0 16px 16px' }}>
               {loadingAll ? (
-                <div style={{ padding: '32px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>Yükleniyor…</div>
+                <div style={{ padding: '32px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>{t('team.loading')}</div>
               ) : filtered.length === 0 ? (
-                <div style={{ padding: '32px', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>Sonuç bulunamadı</div>
+                <div style={{ padding: '32px', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>{t('team.noResults')}</div>
               ) : (
                 <div style={{ display: 'grid', gap: 4 }}>
                   {filtered.map((m) => {
@@ -295,7 +297,7 @@ export default function TeamPage() {
             <div style={{ padding: '14px 24px', borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
               <button onClick={() => setShowPicker(false)}
                 style={{ width: '100%', padding: '12px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #0d9488, #22c55e)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
-                Tamam — {myTeam.length} kişi seçildi
+                {t('team.done', { n: myTeam.length })}
               </button>
             </div>
           </div>

@@ -5,45 +5,68 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ReactNode, useEffect, useState, Suspense } from 'react';
 import { isLoggedIn, removeToken, apiFetch } from '@/lib/api';
 import OnboardingModal from '@/components/OnboardingModal';
+import { useLocale } from '@/lib/i18n';
 
-const navItems = [
-  { href: '/dashboard', label: 'Overview', icon: '⬡' },
-  { href: '/dashboard/tasks', label: 'Tasks', icon: '◈' },
-  { href: '/dashboard/sprints', label: 'Sprints', icon: '◎' },
-  { href: '/dashboard/team', label: 'Team', icon: '◉' },
-  { href: '/dashboard/agents', label: 'Agents', icon: '🤖' },
-  { href: '/dashboard/flows', label: 'Flows', icon: '⟳' },
-  { href: '/dashboard/integrations', label: 'Integrations', icon: '⬡' },
-  { href: '/dashboard/profile', label: 'Profil', icon: '◐' },
-];
+const NAV_KEYS = [
+  { href: '/dashboard', key: 'nav.overview', icon: '⬡' },
+  { href: '/dashboard/tasks', key: 'nav.tasks', icon: '◈' },
+  { href: '/dashboard/sprints', key: 'nav.sprints', icon: '◎' },
+  { href: '/dashboard/team', key: 'nav.team', icon: '◉' },
+  { href: '/dashboard/agents', key: 'nav.agents', icon: '🤖' },
+  { href: '/dashboard/flows', key: 'nav.flows', icon: '⟳' },
+  { href: '/dashboard/integrations', key: 'nav.integrations', icon: '⬡' },
+  { href: '/dashboard/profile', key: 'nav.profile', icon: '◐' },
+] as const;
 
 function DashboardInner({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useLocale();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [userName, setUserName] = useState('');
   const [checked, setChecked] = useState(false);
+  const shouldOpenOnboarding = searchParams.get('onboarding') === '1' || searchParams.get('welcome') === '1';
 
   useEffect(() => {
-    if (!isLoggedIn()) {
-      router.replace('/signin');
-      return;
-    }
-    setChecked(true);
+    let active = true;
 
-    // Kullanıcı adını çek
-    apiFetch<{ full_name?: string; email: string }>('/auth/me').then((u) => {
-      setUserName(u.full_name || u.email);
-    }).catch(() => {});
+    async function bootstrap() {
+      if (!isLoggedIn()) {
+        router.replace('/signin');
+        return;
+      }
+      if (!active) return;
+      setChecked(true);
 
-    // Onboarding veya welcome flag
-    const onboarding = searchParams.get('onboarding');
-    const welcome = searchParams.get('welcome');
-    if (onboarding === '1' || welcome === '1') {
-      setShowOnboarding(true);
+      apiFetch<{ full_name?: string; email: string }>('/auth/me').then((u) => {
+        if (!active) return;
+        setUserName(u.full_name || u.email);
+      }).catch(() => {});
+
+      if (!shouldOpenOnboarding) {
+        setShowOnboarding(false);
+        return;
+      }
+
+      try {
+        const integrations = await apiFetch<Array<{ has_secret: boolean; base_url?: string | null }>>('/integrations');
+        if (!active) return;
+        const hasIntegration = integrations.some((cfg) => cfg.has_secret || Boolean(cfg.base_url));
+        setShowOnboarding(!hasIntegration);
+      } catch {
+        if (!active) return;
+        // If integration check fails, keep onboarding visible for first-login links.
+        setShowOnboarding(true);
+      }
     }
-  }, [router, searchParams]);
+
+    void bootstrap();
+
+    return () => {
+      active = false;
+    };
+  }, [router, shouldOpenOnboarding]);
 
   function logout() {
     removeToken();
@@ -75,18 +98,18 @@ function DashboardInner({ children }: { children: ReactNode }) {
               </div>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userName}</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>Profil & Sprint →</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>{t('nav.profileHint')}</div>
               </div>
             </div>
           </a>
         )}
 
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', padding: '0 12px', marginBottom: 8 }}>
-          Workspace
+          {t('nav.workspace')}
         </div>
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {navItems.map((item) => {
+          {NAV_KEYS.map((item) => {
             const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
             return (
               <Link key={item.href} href={item.href} style={{
@@ -99,7 +122,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
                 transition: 'all 0.2s', textDecoration: 'none',
               }}>
                 <span style={{ fontSize: 16, opacity: active ? 1 : 0.5 }}>{item.icon}</span>
-                {item.label}
+                {t(item.key)}
                 {active && <span style={{ marginLeft: 'auto', width: 6, height: 6, borderRadius: '50%', background: '#5eead4' }} />}
               </Link>
             );
@@ -114,7 +137,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
             border: '1px solid rgba(13,148,136,0.3)',
             color: '#5eead4', fontWeight: 600, textDecoration: 'none',
           }}>
-            + New Task
+            {t('nav.newTask')}
           </Link>
           <button onClick={logout} style={{
             display: 'flex', alignItems: 'center', gap: 8,
@@ -122,7 +145,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
             background: 'transparent', border: '1px solid rgba(255,255,255,0.06)',
             color: 'rgba(255,255,255,0.3)', cursor: 'pointer', width: '100%',
           }}>
-            ↩ Çıkış Yap
+            {t('nav.logout')}
           </button>
         </div>
       </aside>
