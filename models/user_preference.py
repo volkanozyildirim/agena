@@ -18,4 +18,8 @@ class UserPreference(Base):
     azure_sprint_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Seçili takım üyeleri (JSON array of {id, displayName, uniqueName})
     my_team_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Agent konfigürasyonları (JSON array)
+    agents_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Flow tanımları (JSON array)
+    flows_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())

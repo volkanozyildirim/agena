@@ -75,6 +75,8 @@ export interface UserPrefs {
   azure_team: string | null;
   azure_sprint_path: string | null;
   my_team: AzureMember[];
+  agents: Record<string, unknown>[];
+  flows: Record<string, unknown>[];
 }
 
 const LS_PROJECT = 'tiqr_sprint_project';
@@ -85,10 +87,12 @@ const LS_MY_TEAM = 'tiqr_my_team';
 /** DB'den tercihleri çek, localStorage'a da yaz (cache) */
 export async function loadPrefs(): Promise<UserPrefs> {
   const prefs = await apiFetch<UserPrefs>('/preferences');
-  if (prefs.azure_project)    localStorage.setItem(LS_PROJECT, prefs.azure_project);
-  if (prefs.azure_team)       localStorage.setItem(LS_TEAM,    prefs.azure_team);
-  if (prefs.azure_sprint_path) localStorage.setItem(LS_SPRINT, prefs.azure_sprint_path);
-  if (prefs.my_team?.length)  localStorage.setItem(LS_MY_TEAM, JSON.stringify(prefs.my_team));
+  if (prefs.azure_project)     localStorage.setItem(LS_PROJECT, prefs.azure_project);
+  if (prefs.azure_team)        localStorage.setItem(LS_TEAM,    prefs.azure_team);
+  if (prefs.azure_sprint_path) localStorage.setItem(LS_SPRINT,  prefs.azure_sprint_path);
+  if (prefs.my_team?.length)   localStorage.setItem(LS_MY_TEAM, JSON.stringify(prefs.my_team));
+  if (prefs.agents?.length)    localStorage.setItem('tiqr_agent_configs', JSON.stringify(prefs.agents));
+  if (prefs.flows?.length)     localStorage.setItem('tiqr_flows', JSON.stringify(prefs.flows));
   return prefs;
 }
 
@@ -98,11 +102,15 @@ export async function savePrefs(partial: Partial<{
   azure_team: string;
   azure_sprint_path: string;
   my_team: AzureMember[];
+  agents: Record<string, unknown>[];
+  flows: Record<string, unknown>[];
 }>): Promise<void> {
-  if (partial.azure_project !== undefined)    localStorage.setItem(LS_PROJECT, partial.azure_project);
-  if (partial.azure_team !== undefined)       localStorage.setItem(LS_TEAM,    partial.azure_team);
-  if (partial.azure_sprint_path !== undefined) localStorage.setItem(LS_SPRINT, partial.azure_sprint_path);
-  if (partial.my_team !== undefined)          localStorage.setItem(LS_MY_TEAM, JSON.stringify(partial.my_team));
+  if (partial.azure_project !== undefined)     localStorage.setItem(LS_PROJECT, partial.azure_project);
+  if (partial.azure_team !== undefined)        localStorage.setItem(LS_TEAM,    partial.azure_team);
+  if (partial.azure_sprint_path !== undefined) localStorage.setItem(LS_SPRINT,  partial.azure_sprint_path);
+  if (partial.my_team !== undefined)           localStorage.setItem(LS_MY_TEAM, JSON.stringify(partial.my_team));
+  if (partial.agents !== undefined)            localStorage.setItem('tiqr_agent_configs', JSON.stringify(partial.agents));
+  if (partial.flows !== undefined)             localStorage.setItem('tiqr_flows', JSON.stringify(partial.flows));
   await apiFetch('/preferences', {
     method: 'PUT',
     body: JSON.stringify({
@@ -110,6 +118,8 @@ export async function savePrefs(partial: Partial<{
       azure_team:        partial.azure_team        ?? null,
       azure_sprint_path: partial.azure_sprint_path ?? null,
       my_team:           partial.my_team           ?? null,
+      agents:            partial.agents            ?? null,
+      flows:             partial.flows             ?? null,
     }),
   });
 }

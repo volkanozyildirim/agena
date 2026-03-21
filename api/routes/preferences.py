@@ -17,7 +17,9 @@ class PreferencePayload(BaseModel):
     azure_project: str | None = None
     azure_team: str | None = None
     azure_sprint_path: str | None = None
-    my_team: list[dict[str, Any]] | None = None  # [{id, displayName, uniqueName}]
+    my_team: list[dict[str, Any]] | None = None
+    agents: list[dict[str, Any]] | None = None
+    flows: list[dict[str, Any]] | None = None
 
 
 class PreferenceResponse(BaseModel):
@@ -25,6 +27,17 @@ class PreferenceResponse(BaseModel):
     azure_team: str | None
     azure_sprint_path: str | None
     my_team: list[dict[str, Any]]
+    agents: list[dict[str, Any]]
+    flows: list[dict[str, Any]]
+
+
+def _parse_json(val: str | None) -> list[dict[str, Any]]:
+    if not val:
+        return []
+    try:
+        return json.loads(val)  # type: ignore[return-value]
+    except Exception:
+        return []
 
 
 @router.get('', response_model=PreferenceResponse)
@@ -37,18 +50,17 @@ async def get_preferences(
     )
     pref = result.scalar_one_or_none()
     if pref is None:
-        return PreferenceResponse(azure_project=None, azure_team=None, azure_sprint_path=None, my_team=[])
-    my_team: list[dict[str, Any]] = []
-    if pref.my_team_json:
-        try:
-            my_team = json.loads(pref.my_team_json)
-        except Exception:
-            my_team = []
+        return PreferenceResponse(
+            azure_project=None, azure_team=None, azure_sprint_path=None,
+            my_team=[], agents=[], flows=[],
+        )
     return PreferenceResponse(
         azure_project=pref.azure_project,
         azure_team=pref.azure_team,
         azure_sprint_path=pref.azure_sprint_path,
-        my_team=my_team,
+        my_team=_parse_json(pref.my_team_json),
+        agents=_parse_json(pref.agents_json),
+        flows=_parse_json(pref.flows_json),
     )
 
 
@@ -74,20 +86,19 @@ async def save_preferences(
         pref.azure_sprint_path = payload.azure_sprint_path
     if payload.my_team is not None:
         pref.my_team_json = json.dumps(payload.my_team, ensure_ascii=False)
+    if payload.agents is not None:
+        pref.agents_json = json.dumps(payload.agents, ensure_ascii=False)
+    if payload.flows is not None:
+        pref.flows_json = json.dumps(payload.flows, ensure_ascii=False)
 
     await db.commit()
     await db.refresh(pref)
-
-    my_team_out: list[dict[str, Any]] = []
-    if pref.my_team_json:
-        try:
-            my_team_out = json.loads(pref.my_team_json)
-        except Exception:
-            my_team_out = []
 
     return PreferenceResponse(
         azure_project=pref.azure_project,
         azure_team=pref.azure_team,
         azure_sprint_path=pref.azure_sprint_path,
-        my_team=my_team_out,
+        my_team=_parse_json(pref.my_team_json),
+        agents=_parse_json(pref.agents_json),
+        flows=_parse_json(pref.flows_json),
     )

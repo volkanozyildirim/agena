@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { apiFetch } from '@/lib/api';
+import { loadPrefs, savePrefs } from '@/lib/api';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type AgentRole = 'lead_developer' | 'pm' | 'qa' | 'manager' | 'developer';
@@ -124,10 +124,22 @@ function saveAgents(agents: AgentConfig[]) {
 export default function AgentsPage() {
   const [agents, setAgents] = useState<AgentConfig[]>(DEFAULT_AGENTS);
   const [editing, setEditing] = useState<AgentRole | null>(null);
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
+    // Önce localStorage'dan hızlı yükle, sonra DB'den güncelle
     setAgents(loadAgents());
+    loadPrefs().then((prefs) => {
+      if (prefs.agents?.length) {
+        const merged = DEFAULT_AGENTS.map((def) => {
+          const found = (prefs.agents as Partial<AgentConfig>[]).find((p) => p.role === def.role);
+          return found ? { ...def, ...found } : def;
+        });
+        setAgents(merged);
+        saveAgents(merged); // localStorage cache güncelle
+      }
+    }).catch(() => {});
   }, []);
 
   function updateAgent(role: AgentRole, patch: Partial<AgentConfig>) {
@@ -138,10 +150,20 @@ export default function AgentsPage() {
     });
   }
 
-  function handleSave() {
-    saveAgents(agents);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  async function handleSave() {
+    setSaving(true);
+    try {
+      saveAgents(agents);
+      await savePrefs({ agents: agents as unknown as Record<string, unknown>[] });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch {
+      // localStorage'a yazıldı en azından
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } finally {
+      setSaving(false);
+    }
   }
 
   const editingAgent = agents.find((a) => a.role === editing);
@@ -174,9 +196,9 @@ export default function AgentsPage() {
 
       {/* Save button */}
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button onClick={handleSave}
-          style={{ padding: '12px 28px', borderRadius: 12, border: 'none', background: saved ? 'rgba(34,197,94,0.3)' : 'linear-gradient(135deg, #0d9488, #22c55e)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', transition: 'all 0.3s' }}>
-          {saved ? '✓ Kaydedildi' : 'Kaydet'}
+        <button onClick={() => void handleSave()} disabled={saving}
+          style={{ padding: '12px 28px', borderRadius: 12, border: 'none', background: saved ? 'rgba(34,197,94,0.3)' : saving ? 'rgba(13,148,136,0.4)' : 'linear-gradient(135deg, #0d9488, #22c55e)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: saving ? 'not-allowed' : 'pointer', transition: 'all 0.3s' }}>
+          {saved ? '✓ Kaydedildi' : saving ? 'Kaydediliyor…' : 'Kaydet'}
         </button>
       </div>
 

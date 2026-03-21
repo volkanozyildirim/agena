@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { loadPrefs, savePrefs } from '@/lib/api';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type AgentRole = 'lead_developer' | 'pm' | 'qa' | 'manager' | 'developer';
@@ -92,17 +93,35 @@ export default function FlowsPage() {
   const [editing, setEditing] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
-  useEffect(() => { setFlows(loadFlows()); }, []);
+  useEffect(() => {
+    // Önce localStorage'dan hızlı yükle
+    setFlows(loadFlows());
+    // Sonra DB'den güncelle
+    loadPrefs().then((prefs) => {
+      if (prefs.flows?.length) {
+        const dbFlows = prefs.flows as unknown as Flow[];
+        setFlows(dbFlows);
+        saveFlows(dbFlows);
+      }
+    }).catch(() => {});
+  }, []);
+
+  async function persistFlows(next: Flow[]) {
+    setFlows(next);
+    saveFlows(next);
+    try {
+      await savePrefs({ flows: next as unknown as Record<string, unknown>[] });
+    } catch { /* localStorage'a yazıldı */ }
+  }
 
   function deleteFlow(id: string) {
-    const next = flows.filter((f) => f.id !== id);
-    setFlows(next); saveFlows(next);
+    void persistFlows(flows.filter((f) => f.id !== id));
   }
 
   function saveFlow(flow: Flow) {
     const exists = flows.some((f) => f.id === flow.id);
     const next = exists ? flows.map((f) => f.id === flow.id ? flow : f) : [...flows, flow];
-    setFlows(next); saveFlows(next);
+    void persistFlows(next);
     setEditing(null); setCreating(false);
   }
 
