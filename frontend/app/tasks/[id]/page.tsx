@@ -24,6 +24,11 @@ type TaskDetail = {
   lock_scope?: string | null;
   blocked_by_task_id?: number | null;
   blocked_by_task_title?: string | null;
+  dependency_blockers?: number[];
+  dependent_task_ids?: number[];
+  pr_risk_score?: number | null;
+  pr_risk_level?: string | null;
+  pr_risk_reason?: string | null;
   total_tokens?: number | null;
 };
 
@@ -37,6 +42,12 @@ type CodeFile = {
   path: string;
   content: string;
   isDiff?: boolean;
+};
+
+type TaskDeps = {
+  depends_on_task_ids: number[];
+  dependent_task_ids: number[];
+  blocker_task_ids: number[];
 };
 
 const STEP_ORDER = ['queued', 'running', 'agent', 'code_ready', 'local_exec', 'pr', 'completed'];
@@ -129,6 +140,9 @@ export default function TaskDetailPage() {
   const [activeCodeTab, setActiveCodeTab] = useState(0);
   const [isRerunBusy, setIsRerunBusy] = useState(false);
   const [isCancelBusy, setIsCancelBusy] = useState(false);
+  const [isDepsBusy, setIsDepsBusy] = useState(false);
+  const [depsInput, setDepsInput] = useState('');
+  const [depsData, setDepsData] = useState<TaskDeps | null>(null);
 
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [logs, setLogs] = useState<TaskLog[]>([]);
@@ -142,6 +156,9 @@ export default function TaskDetailPage() {
       ]);
       setTask(taskData);
       setLogs(logsData);
+      const d = await apiFetch<TaskDeps>('/tasks/' + taskId + '/dependencies');
+      setDepsData(d);
+      setDepsInput((d.depends_on_task_ids || []).join(','));
       setError('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load task');
@@ -223,6 +240,29 @@ export default function TaskDetailPage() {
       setError(err instanceof Error ? err.message : 'Failed to cancel task');
     } finally {
       setIsCancelBusy(false);
+    }
+  }
+
+  async function saveDependencies() {
+    if (!taskId) return;
+    try {
+      setIsDepsBusy(true);
+      const ids = depsInput
+        .split(',')
+        .map((v) => Number(v.trim()))
+        .filter((v) => Number.isFinite(v) && v > 0);
+      const dedup = Array.from(new Set(ids));
+      const updated = await apiFetch<TaskDeps>('/tasks/' + taskId + '/dependencies', {
+        method: 'PUT',
+        body: JSON.stringify({ depends_on_task_ids: dedup }),
+      });
+      setDepsData(updated);
+      setDepsInput((updated.depends_on_task_ids || []).join(','));
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update dependencies');
+    } finally {
+      setIsDepsBusy(false);
     }
   }
 
@@ -336,6 +376,29 @@ export default function TaskDetailPage() {
                       Lock scope: {task.lock_scope}
                     </div>
                   ) : null}
+                </div>
+              ) : null}
+              <div style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '9px 10px', marginBottom: 12, background: 'rgba(255,255,255,0.015)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', marginBottom: 6 }}>Dependencies</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.68)', marginBottom: 8 }}>
+                  Blockers: {(depsData?.blocker_task_ids || []).length > 0 ? depsData?.blocker_task_ids?.join(', ') : 'none'}
+                </div>
+                <input
+                  value={depsInput}
+                  onChange={(e) => setDepsInput(e.target.value)}
+                  placeholder='Depends on task IDs, comma separated (e.g. 12,14)'
+                />
+                <button className='button button-outline' onClick={() => void saveDependencies()} disabled={isDepsBusy} style={{ marginTop: 8 }}>
+                  {isDepsBusy ? 'Saving...' : 'Save Dependencies'}
+                </button>
+              </div>
+              {(task.pr_risk_score !== null && task.pr_risk_score !== undefined) ? (
+                <div style={{ border: '1px solid rgba(245,158,11,0.28)', borderRadius: 10, padding: '9px 10px', marginBottom: 12, background: 'rgba(245,158,11,0.08)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase', marginBottom: 4 }}>PR Risk</div>
+                  <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.82)' }}>
+                    Score: <b>{task.pr_risk_score}</b> / 100 ({task.pr_risk_level || 'unknown'})
+                  </div>
+                  {task.pr_risk_reason ? <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.68)', marginTop: 3 }}>{task.pr_risk_reason}</div> : null}
                 </div>
               ) : null}
 

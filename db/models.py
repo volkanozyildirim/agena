@@ -8,6 +8,7 @@ from models.organization_member import OrganizationMember
 from models.payment_record import PaymentRecord
 from models.run_record import RunRecord
 from models.subscription import Subscription
+from models.task_dependency import TaskDependency
 from models.task_record import TaskRecord
 from models.usage_record import UsageRecord
 from models.user import User
@@ -18,6 +19,7 @@ __all__ = [
     'Organization',
     'OrganizationMember',
     'Subscription',
+    'TaskDependency',
     'PaymentRecord',
     'UsageRecord',
     'TaskRecord',

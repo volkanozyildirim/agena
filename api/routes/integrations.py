@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import CurrentTenant, get_current_tenant
@@ -7,6 +8,10 @@ from schemas.integration import IntegrationConfigResponse, IntegrationConfigUpse
 from services.integration_config_service import IntegrationConfigService
 
 router = APIRouter(prefix='/integrations', tags=['integrations'])
+
+
+class PlaybookContentResponse(BaseModel):
+    content: str
 
 
 @router.get('', response_model=list[IntegrationConfigResponse])
@@ -35,6 +40,18 @@ async def get_integration(
         raise HTTPException(status_code=404, detail='Integration config not found')
 
     return IntegrationConfigResponse(**service.to_public_dict(item))
+
+
+@router.get('/playbook/content', response_model=PlaybookContentResponse)
+async def get_playbook_content(
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> PlaybookContentResponse:
+    service = IntegrationConfigService(db)
+    item = await service.get_config(tenant.organization_id, 'playbook')
+    if item is None:
+        return PlaybookContentResponse(content='')
+    return PlaybookContentResponse(content=item.secret or '')
 
 
 @router.put('/{provider}', response_model=IntegrationConfigResponse)

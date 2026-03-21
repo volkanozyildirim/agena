@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 
 type IntegrationConfig = {
-  provider: 'jira' | 'azure' | 'openai';
+  provider: 'jira' | 'azure' | 'openai' | 'playbook';
   base_url: string;
   project?: string | null;
   username?: string | null;
@@ -22,12 +22,17 @@ export default function IntegrationsPage() {
   const [configs, setConfigs] = useState<IntegrationConfig[]>([]);
   const [openaiBaseUrl, setOpenaiBaseUrl] = useState('https://api.openai.com/v1');
   const [openaiKey, setOpenaiKey] = useState('');
+  const [playbookText, setPlaybookText] = useState('');
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
-    apiFetch<IntegrationConfig[]>('/integrations').then((data) => {
+    Promise.all([
+      apiFetch<IntegrationConfig[]>('/integrations'),
+      apiFetch<{ content: string }>('/integrations/playbook/content'),
+    ]).then(([data, playbook]) => {
       setConfigs(data);
+      setPlaybookText(playbook.content || '');
       const jira = data.find((c) => c.provider === 'jira');
       const azure = data.find((c) => c.provider === 'azure');
       const openai = data.find((c) => c.provider === 'openai');
@@ -68,9 +73,20 @@ export default function IntegrationsPage() {
     } catch (e) { setError(e instanceof Error ? e.message : 'Save failed'); }
   }
 
+  async function savePlaybook() {
+    try {
+      await apiFetch('/integrations/playbook', {
+        method: 'PUT',
+        body: JSON.stringify({ base_url: 'tenant://playbook', secret: playbookText }),
+      });
+      setMsg('Tenant playbook saved');
+    } catch (e) { setError(e instanceof Error ? e.message : 'Save failed'); }
+  }
+
   const jiraConfig = configs.find((c) => c.provider === 'jira');
   const azureConfig = configs.find((c) => c.provider === 'azure');
   const openaiConfig = configs.find((c) => c.provider === 'openai');
+  const playbookConfig = configs.find((c) => c.provider === 'playbook');
 
   return (
     <div style={{ display: 'grid', gap: 28 }}>
@@ -175,6 +191,27 @@ export default function IntegrationsPage() {
           </FieldGroup>
           <button className='button button-primary' onClick={() => void saveJira()} style={{ width: '100%', justifyContent: 'center', marginTop: 4 }}>
             Save Jira Config
+          </button>
+        </IntegrationCard>
+
+        {/* Tenant Playbook */}
+        <IntegrationCard
+          title='Tenant Playbook'
+          icon='📘'
+          color='#f59e0b'
+          connected={playbookConfig?.has_secret ?? false}
+          updatedAt={playbookConfig?.updated_at}
+        >
+          <FieldGroup label='Coding Rules'>
+            <textarea
+              value={playbookText}
+              onChange={(e) => setPlaybookText(e.target.value)}
+              rows={8}
+              placeholder={'Example:\n- Always write tests for new API paths\n- Never edit payment modules without approval\n- Prefer TypeScript strict mode'}
+            />
+          </FieldGroup>
+          <button className='button button-primary' onClick={() => void savePlaybook()} style={{ width: '100%', justifyContent: 'center', marginTop: 4 }}>
+            Save Tenant Playbook
           </button>
         </IntegrationCard>
       </div>

@@ -8,6 +8,7 @@ from schemas.saas_task import (
     AssignTaskResponse,
     AzureImportRequest,
     ImportTasksResponse,
+    TaskDependencyUpdateRequest,
     TaskCreateRequest,
     TaskLogItem,
     TaskResponse,
@@ -38,6 +39,11 @@ async def _to_task_response(service: TaskService, organization_id: int, task) ->
         lock_scope=insights['lock_scope'],
         blocked_by_task_id=insights['blocked_by_task_id'],
         blocked_by_task_title=insights['blocked_by_task_title'],
+        dependency_blockers=insights['dependency_blockers'],
+        dependent_task_ids=insights['dependent_task_ids'],
+        pr_risk_score=insights['pr_risk_score'],
+        pr_risk_level=insights['pr_risk_level'],
+        pr_risk_reason=insights['pr_risk_reason'],
         total_tokens=insights['total_tokens'],
     )
 
@@ -169,3 +175,40 @@ async def task_logs(
     service = TaskService(db)
     logs = await service.get_logs(tenant.organization_id, task_id)
     return [TaskLogItem(stage=l.stage, message=l.message, created_at=l.created_at) for l in logs]
+
+
+@router.get('/{task_id}/dependencies')
+async def get_task_dependencies(
+    task_id: int,
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> dict[str, list[int]]:
+    service = TaskService(db)
+    task = await service.get_task(tenant.organization_id, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail='Task not found')
+    deps = await service.get_dependencies(tenant.organization_id, task_id)
+    dependents = await service.get_dependents(tenant.organization_id, task_id)
+    blockers = await service.get_dependency_blockers(tenant.organization_id, task_id)
+    return {'depends_on_task_ids': deps, 'dependent_task_ids': dependents, 'blocker_task_ids': blockers}
+
+
+@router.put('/{task_id}/dependencies')
+async def set_task_dependencies(
+    task_id: int,
+    payload: TaskDependencyUpdateRequest,
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> dict[str, list[int]]:
+    service = TaskService(db)
+    try:
+        deps = await service.set_dependencies(
+            organization_id=tenant.organization_id,
+            task_id=task_id,
+            depends_on_task_ids=payload.depends_on_task_ids,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    dependents = await service.get_dependents(tenant.organization_id, task_id)
+    blockers = await service.get_dependency_blockers(tenant.organization_id, task_id)
+    return {'depends_on_task_ids': deps, 'dependent_task_ids': dependents, 'blocker_task_ids': blockers}

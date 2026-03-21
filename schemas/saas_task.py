@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class TaskCreateRequest(BaseModel):
@@ -27,6 +27,11 @@ class TaskResponse(BaseModel):
     lock_scope: str | None = None
     blocked_by_task_id: int | None = None
     blocked_by_task_title: str | None = None
+    dependency_blockers: list[int] = Field(default_factory=list)
+    dependent_task_ids: list[int] = Field(default_factory=list)
+    pr_risk_score: int | None = None
+    pr_risk_level: str | None = None
+    pr_risk_reason: str | None = None
     total_tokens: int | None = None
 
 
@@ -51,3 +56,7 @@ class AzureImportRequest(BaseModel):
     team: str | None = None
     sprint_path: str | None = None
     state: str | None = 'New'
+
+
+class TaskDependencyUpdateRequest(BaseModel):
+    depends_on_task_ids: list[int]

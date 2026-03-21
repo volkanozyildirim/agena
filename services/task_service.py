@@ -11,6 +11,7 @@ from integrations.azure_client import AzureDevOpsClient
 from integrations.jira_client import JiraClient
 from models.agent_log import AgentLog
 from models.run_record import RunRecord
+from models.task_dependency import TaskDependency
 from models.task_record import TaskRecord
 from schemas.task import ExternalTask
 from services.integration_config_service import IntegrationConfigService
@@ -228,6 +229,10 @@ class TaskService:
             raise ValueError('Task not found')
         if task.status == 'cancelled':
             raise ValueError('Task is cancelled')
+        blockers = await self.get_dependency_blockers(organization_id, task.id)
+        if blockers:
+            blocker_ids = ', '.join(str(b) for b in blockers)
+            raise ValueError(f'Task is blocked by dependencies: {blocker_ids}')
 
         local_repo_path = self._extract_local_repo_path(task.description)
         if local_repo_path:
@@ -378,6 +383,10 @@ class TaskService:
                 blocked_by_task_id = blocker.id
                 blocked_by_task_title = blocker.title
 
+        dependency_blockers = await self.get_dependency_blockers(organization_id, task.id)
+        dependent_task_ids = await self.get_dependents(organization_id, task.id)
+        pr_risk = self._compute_pr_risk(logs)
+
         return {
             'duration_sec': duration_sec,
             'run_duration_sec': run_duration_sec,
@@ -388,8 +397,104 @@ class TaskService:
             'lock_scope': lock_scope,
             'blocked_by_task_id': blocked_by_task_id,
             'blocked_by_task_title': blocked_by_task_title,
+            'dependency_blockers': dependency_blockers,
+            'dependent_task_ids': dependent_task_ids,
+            'pr_risk_score': pr_risk['score'],
+            'pr_risk_level': pr_risk['level'],
+            'pr_risk_reason': pr_risk['reason'],
             'total_tokens': total_tokens,
         }
+
+    async def get_dependencies(self, organization_id: int, task_id: int) -> list[int]:
+        if self.db is None:
+            raise ValueError('DB session required')
+        result = await self.db.execute(
+            select(TaskDependency.depends_on_task_id).where(
+                TaskDependency.organization_id == organization_id,
+                TaskDependency.task_id == task_id,
+            )
+        )
+        return [int(v) for v in result.scalars().all()]
+
+    async def get_dependents(self, organization_id: int, task_id: int) -> list[int]:
+        if self.db is None:
+            raise ValueError('DB session required')
+        result = await self.db.execute(
+            select(TaskDependency.task_id).where(
+                TaskDependency.organization_id == organization_id,
+                TaskDependency.depends_on_task_id == task_id,
+            )
+        )
+        return [int(v) for v in result.scalars().all()]
+
+    async def get_dependency_blockers(self, organization_id: int, task_id: int) -> list[int]:
+        if self.db is None:
+            raise ValueError('DB session required')
+        deps = await self.get_dependencies(organization_id, task_id)
+        if not deps:
+            return []
+        result = await self.db.execute(
+            select(TaskRecord.id, TaskRecord.status).where(
+                TaskRecord.organization_id == organization_id,
+                TaskRecord.id.in_(deps),
+            )
+        )
+        blockers: list[int] = []
+        for item_id, status in result.all():
+            if status != 'completed':
+                blockers.append(int(item_id))
+        blockers.sort()
+        return blockers
+
+    async def set_dependencies(self, organization_id: int, task_id: int, depends_on_task_ids: list[int]) -> list[int]:
+        if self.db is None:
+            raise ValueError('DB session required')
+        task = await self.get_task(organization_id, task_id)
+        if task is None:
+            raise ValueError('Task not found')
+
+        unique_ids: list[int] = sorted({int(i) for i in depends_on_task_ids if int(i) > 0})
+        if task_id in unique_ids:
+            raise ValueError('Task cannot depend on itself')
+
+        if unique_ids:
+            exists_result = await self.db.execute(
+                select(TaskRecord.id).where(
+                    TaskRecord.organization_id == organization_id,
+                    TaskRecord.id.in_(unique_ids),
+                )
+            )
+            existing_ids = {int(v) for v in exists_result.scalars().all()}
+            missing = [i for i in unique_ids if i not in existing_ids]
+            if missing:
+                raise ValueError(f'Dependency task(s) not found: {", ".join(str(m) for m in missing)}')
+
+            for dep_id in unique_ids:
+                if await self._would_create_cycle(organization_id, task_id=task_id, depends_on_task_id=dep_id):
+                    raise ValueError(f'Dependency cycle detected with task {dep_id}')
+
+        await self.db.execute(
+            TaskDependency.__table__.delete().where(
+                TaskDependency.organization_id == organization_id,
+                TaskDependency.task_id == task_id,
+            )
+        )
+        for dep_id in unique_ids:
+            self.db.add(
+                TaskDependency(
+                    organization_id=organization_id,
+                    task_id=task_id,
+                    depends_on_task_id=dep_id,
+                )
+            )
+        await self.db.commit()
+        await self.add_log(
+            task_id,
+            organization_id,
+            'dependency',
+            f'Dependencies updated: {", ".join(str(v) for v in unique_ids) if unique_ids else "none"}',
+        )
+        return unique_ids
 
     async def _get_recent_average_duration_sec(self, organization_id: int) -> float:
         if self.db is None:
@@ -444,3 +549,63 @@ class TaskService:
             if raw.lower().startswith('local repo path:'):
                 return raw.split(':', 1)[1].strip() or None
         return None
+
+    async def _would_create_cycle(self, organization_id: int, *, task_id: int, depends_on_task_id: int) -> bool:
+        if self.db is None:
+            raise ValueError('DB session required')
+        seen: set[int] = set()
+        stack: list[int] = [depends_on_task_id]
+        while stack:
+            current = stack.pop()
+            if current == task_id:
+                return True
+            if current in seen:
+                continue
+            seen.add(current)
+            next_result = await self.db.execute(
+                select(TaskDependency.depends_on_task_id).where(
+                    TaskDependency.organization_id == organization_id,
+                    TaskDependency.task_id == current,
+                )
+            )
+            stack.extend(int(v) for v in next_result.scalars().all())
+        return False
+
+    def _compute_pr_risk(self, logs: list[AgentLog]) -> dict[str, int | str | None]:
+        diff_logs = [l for l in logs if l.stage == 'code_diff']
+        if not diff_logs:
+            return {'score': None, 'level': None, 'reason': None}
+
+        files = 0
+        added = 0
+        removed = 0
+        critical_hits = 0
+        critical_markers = ('auth', 'security', 'payment', 'billing', 'alembic', 'models/', 'api/')
+
+        for item in diff_logs[-1:]:
+            lines = (item.message or '').splitlines()
+            current_file = ''
+            for line in lines:
+                if line.startswith('File:'):
+                    files += 1
+                    current_file = line.replace('File:', '', 1).strip().lower()
+                    if any(marker in current_file for marker in critical_markers):
+                        critical_hits += 1
+                    continue
+                if line.startswith('+++') or line.startswith('---'):
+                    continue
+                if line.startswith('+'):
+                    added += 1
+                elif line.startswith('-'):
+                    removed += 1
+
+        churn = added + removed
+        score = min(100, files * 8 + min(50, churn // 8) + critical_hits * 14)
+        if score >= 67:
+            level = 'high'
+        elif score >= 34:
+            level = 'medium'
+        else:
+            level = 'low'
+        reason = f'{files} file(s), {churn} changed line(s), {critical_hits} critical path touch'
+        return {'score': int(score), 'level': level, 'reason': reason}

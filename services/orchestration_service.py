@@ -73,7 +73,14 @@ class OrchestrationService:
         )
 
         routing = self._extract_task_routing(task)
-        effective_description = self._build_effective_description(task.description, routing.execution_prompt)
+        tenant_playbook = await self._load_tenant_playbook(organization_id)
+        if tenant_playbook:
+            await task_service.add_log(task.id, organization_id, 'playbook', 'Tenant playbook applied to prompt context')
+        effective_description = self._build_effective_description(
+            task.description,
+            routing.execution_prompt,
+            tenant_playbook,
+        )
         payload = {
             'id': str(task.id),
             'title': task.title,
@@ -443,11 +450,27 @@ class OrchestrationService:
         # Rough approximation for display/usage in codex_cli mode where provider usage is unavailable.
         return max(1, (len(content) + 3) // 4)
 
-    def _build_effective_description(self, base_description: str | None, execution_prompt: str | None) -> str:
+    async def _load_tenant_playbook(self, organization_id: int) -> str | None:
+        config = await IntegrationConfigService(self.db_session).get_config(organization_id, 'playbook')
+        if config is None:
+            return None
+        content = (config.secret or '').strip()
+        return content or None
+
+    def _build_effective_description(
+        self,
+        base_description: str | None,
+        execution_prompt: str | None,
+        tenant_playbook: str | None = None,
+    ) -> str:
         desc = (base_description or '').strip()
         prompt = (execution_prompt or '').strip()
-        if not prompt:
-            return desc
-        if not desc:
-            return f'Execution Prompt:\n{prompt}'
-        return f'{desc}\n\nExecution Prompt:\n{prompt}'
+        playbook = (tenant_playbook or '').strip()
+        chunks: list[str] = []
+        if desc:
+            chunks.append(desc)
+        if prompt:
+            chunks.append(f'Execution Prompt:\n{prompt}')
+        if playbook:
+            chunks.append(f'Tenant Playbook:\n{playbook}')
+        return '\n\n'.join(chunks)

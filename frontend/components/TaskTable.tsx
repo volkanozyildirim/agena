@@ -19,6 +19,11 @@ export type TaskItem = {
   lock_scope?: string | null;
   blocked_by_task_id?: number | null;
   blocked_by_task_title?: string | null;
+  dependency_blockers?: number[];
+  dependent_task_ids?: number[];
+  pr_risk_score?: number | null;
+  pr_risk_level?: string | null;
+  pr_risk_reason?: string | null;
   total_tokens?: number | null;
 };
 
