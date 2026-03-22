@@ -7,10 +7,11 @@ from models.integration_config import IntegrationConfig
 
 
 class IntegrationConfigService:
-    SUPPORTED_PROVIDERS = {'jira', 'azure', 'openai', 'gemini', 'playbook'}
+    SUPPORTED_PROVIDERS = {'jira', 'azure', 'openai', 'gemini', 'github', 'playbook'}
     DEFAULT_BASE_URLS = {
         'openai': 'https://api.openai.com/v1',
         'gemini': 'https://generativelanguage.googleapis.com',
+        'github': 'https://api.github.com',
         'playbook': 'tenant://playbook',
     }
 

@@ -5,7 +5,7 @@ import { apiFetch } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
 
 type IntegrationConfig = {
-  provider: 'jira' | 'azure' | 'openai' | 'gemini' | 'playbook';
+  provider: 'jira' | 'azure' | 'openai' | 'gemini' | 'github' | 'playbook';
   base_url: string;
   project?: string | null;
   username?: string | null;
@@ -47,6 +47,13 @@ export default function IntegrationsPage() {
   const [azureOrgUrl, setAzureOrgUrl] = useState('');
   const [azureProject, setAzureProject] = useState('');
   const [azurePat, setAzurePat] = useState('');
+  const [githubBaseUrl, setGithubBaseUrl] = useState('https://api.github.com');
+  const [githubOwner, setGithubOwner] = useState('');
+  const [githubRepo, setGithubRepo] = useState('');
+  const [githubToken, setGithubToken] = useState('');
+  const [githubTokenPreview, setGithubTokenPreview] = useState('');
+  const [githubRepos, setGithubRepos] = useState<Array<{ id: string; name: string; full_name: string; private: boolean }>>([]);
+  const [githubReposLoading, setGithubReposLoading] = useState(false);
   const [configs, setConfigs] = useState<IntegrationConfig[]>([]);
   const [openaiBaseUrl, setOpenaiBaseUrl] = useState('https://api.openai.com/v1');
   const [openaiKey, setOpenaiKey] = useState('');
@@ -70,10 +77,21 @@ export default function IntegrationsPage() {
     setPlaybookText(playbook.content || '');
     const jira = data.find((c) => c.provider === 'jira');
     const azure = data.find((c) => c.provider === 'azure');
+    const github = data.find((c) => c.provider === 'github');
     const openai = data.find((c) => c.provider === 'openai');
     const gemini = data.find((c) => c.provider === 'gemini');
     if (jira) { setJiraBaseUrl(jira.base_url); setJiraEmail(jira.username ?? ''); }
     if (azure) { setAzureOrgUrl(azure.base_url); setAzureProject(azure.project ?? ''); }
+    if (github) {
+      setGithubBaseUrl(github.base_url || 'https://api.github.com');
+      setGithubOwner(github.username ?? '');
+      setGithubRepo(github.project ?? '');
+      if (github.has_secret) {
+        void loadGithubRepos(github.username ?? '');
+      } else {
+        setGithubRepos([]);
+      }
+    }
     if (openai) { setOpenaiBaseUrl(openai.base_url); }
     if (gemini) { setGeminiBaseUrl(gemini.base_url); }
   }
@@ -82,6 +100,7 @@ export default function IntegrationsPage() {
     setOpenaiKeyPreview(loadSecretPreview('openai'));
     setGeminiKeyPreview(loadSecretPreview('gemini'));
     setAzurePatPreview(loadSecretPreview('azure'));
+    setGithubTokenPreview(loadSecretPreview('github'));
     setJiraTokenPreview(loadSecretPreview('jira'));
     void loadIntegrationState().catch(() => {});
   }, []);
@@ -125,6 +144,41 @@ export default function IntegrationsPage() {
         saveSecretPreview('azure', preview);
       }
       setAzurePat(''); setMsg(t('integrations.savedAzure'));
+    }).catch((e) => { setError(e instanceof Error ? e.message : t('integrations.saveFailed')); });
+  }
+
+  async function loadGithubRepos(ownerOverride?: string) {
+    const owner = (ownerOverride ?? githubOwner).trim();
+    setGithubReposLoading(true);
+    try {
+      const query = owner ? `?owner=${encodeURIComponent(owner)}` : '';
+      const repos = await apiFetch<Array<{ id: string; name: string; full_name: string; private: boolean }>>(`/integrations/github/repos${query}`);
+      setGithubRepos(repos);
+      if (!githubRepo && repos.length > 0) setGithubRepo(repos[0].name);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('integrations.saveFailed'));
+      setGithubRepos([]);
+    } finally {
+      setGithubReposLoading(false);
+    }
+  }
+
+  async function saveGithub() {
+    Promise.all([
+      apiFetch('/integrations/github', {
+        method: 'PUT',
+        body: JSON.stringify({ base_url: githubBaseUrl, username: githubOwner, project: githubRepo || undefined, secret: githubToken || undefined }),
+      }),
+      loadIntegrationState(),
+    ]).then(async () => {
+      if (githubToken.trim()) {
+        const preview = maskSecretPreview(githubToken);
+        setGithubTokenPreview(preview);
+        saveSecretPreview('github', preview);
+      }
+      setGithubToken('');
+      setMsg(t('integrations.savedGithub'));
+      await loadGithubRepos(githubOwner);
     }).catch((e) => { setError(e instanceof Error ? e.message : t('integrations.saveFailed')); });
   }
 
@@ -180,6 +234,7 @@ export default function IntegrationsPage() {
 
   const jiraConfig = configs.find((c) => c.provider === 'jira');
   const azureConfig = configs.find((c) => c.provider === 'azure');
+  const githubConfig = configs.find((c) => c.provider === 'github');
   const openaiConfig = configs.find((c) => c.provider === 'openai');
   const geminiConfig = configs.find((c) => c.provider === 'gemini');
   const playbookConfig = configs.find((c) => c.provider === 'playbook');
@@ -284,6 +339,46 @@ export default function IntegrationsPage() {
           </FieldGroup>
           <button className='button button-primary' onClick={() => void saveAzure()} style={{ width: '100%', justifyContent: 'center', marginTop: 4 }}>
             {t('integrations.saveAzure')}
+          </button>
+        </IntegrationCard>
+
+        {/* GitHub */}
+        <IntegrationCard
+          title='GitHub'
+          icon='🐙'
+          color='#a78bfa'
+          connected={githubConfig?.has_secret ?? false}
+          updatedAt={githubConfig?.updated_at}
+        >
+          <FieldGroup label={t('integrations.baseUrl')}>
+            <input value={githubBaseUrl} onChange={(e) => setGithubBaseUrl(e.target.value)} placeholder='https://api.github.com' />
+          </FieldGroup>
+          <FieldGroup label={t('integrations.githubOwner')}>
+            <input value={githubOwner} onChange={(e) => setGithubOwner(e.target.value)} placeholder={t('integrations.githubOwnerPlaceholder')} />
+          </FieldGroup>
+          <FieldGroup label={t('integrations.githubToken')}>
+            <input
+              type='password'
+              value={githubToken}
+              onChange={(e) => setGithubToken(e.target.value)}
+              placeholder={githubConfig?.has_secret ? `${githubConfig?.secret_preview || githubTokenPreview || '****'} (${t('integrations.keepExisting')})` : t('integrations.githubTokenPlaceholder')}
+            />
+          </FieldGroup>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'end' }}>
+            <FieldGroup label={t('integrations.githubRepo')}>
+              <select value={githubRepo} onChange={(e) => setGithubRepo(e.target.value)}>
+                <option value=''>{t('integrations.githubRepoPlaceholder')}</option>
+                {githubRepos.map((repo) => (
+                  <option key={repo.id} value={repo.name}>{repo.full_name}{repo.private ? ' 🔒' : ''}</option>
+                ))}
+              </select>
+            </FieldGroup>
+            <button className='button' onClick={() => void loadGithubRepos()} disabled={githubReposLoading} style={{ height: 40 }}>
+              {githubReposLoading ? t('integrations.loading') : t('integrations.loadRepos')}
+            </button>
+          </div>
+          <button className='button button-primary' onClick={() => void saveGithub()} style={{ width: '100%', justifyContent: 'center', marginTop: 4 }}>
+            {t('integrations.saveGithub')}
           </button>
         </IntegrationCard>
 

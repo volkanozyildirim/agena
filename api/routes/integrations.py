@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from urllib.parse import quote
+
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +15,63 @@ router = APIRouter(prefix='/integrations', tags=['integrations'])
 
 class PlaybookContentResponse(BaseModel):
     content: str
+
+
+@router.get('/github/repos')
+async def list_github_repos(
+    owner: str | None = Query(default=None),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[dict[str, str | bool]]:
+    service = IntegrationConfigService(db)
+    config = await service.get_config(tenant.organization_id, 'github')
+    if config is None or not config.secret:
+        raise HTTPException(status_code=400, detail='GitHub integration not configured')
+
+    token = (config.secret or '').strip()
+    if not token:
+        raise HTTPException(status_code=400, detail='GitHub token is missing')
+
+    resolved_owner = (owner or config.username or '').strip()
+    base = (config.base_url or 'https://api.github.com').rstrip('/')
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+    }
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        if resolved_owner:
+            org_url = f'{base}/orgs/{quote(resolved_owner, safe="")}/repos?per_page=100&sort=updated'
+            response = await client.get(org_url, headers=headers)
+            if response.status_code == 404:
+                user_url = f'{base}/users/{quote(resolved_owner, safe="")}/repos?per_page=100&sort=updated'
+                response = await client.get(user_url, headers=headers)
+        else:
+            response = await client.get(f'{base}/user/repos?per_page=100&sort=updated', headers=headers)
+
+    if response.status_code == 401:
+        raise HTTPException(status_code=401, detail='Invalid GitHub token')
+    if response.status_code == 403:
+        raise HTTPException(status_code=403, detail='GitHub access forbidden for repository listing')
+    if response.status_code == 404:
+        raise HTTPException(status_code=404, detail='GitHub owner not found')
+    response.raise_for_status()
+
+    data = response.json()
+    if not isinstance(data, list):
+        return []
+
+    return [
+        {
+            'id': str(item.get('id', '')),
+            'name': str(item.get('name', '')),
+            'full_name': str(item.get('full_name', '')),
+            'private': bool(item.get('private', False)),
+        }
+        for item in data
+        if item.get('id') and item.get('name')
+    ]
 
 
 @router.get('', response_model=list[IntegrationConfigResponse])
