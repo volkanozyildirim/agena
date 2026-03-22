@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = '0009_profile_settings_json'
-down_revision = '0008_task_story_and_cost_guardrails'
+down_revision = '0008_story_guardrails'
 branch_labels = None
 depends_on = None
 
