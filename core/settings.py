@@ -78,6 +78,7 @@ class Settings(BaseSettings):
     smtp_from_name: str = Field(default='Tiqr AI', alias='SMTP_FROM_NAME')
     smtp_use_tls: bool = Field(default=True, alias='SMTP_USE_TLS')
     smtp_use_ssl: bool = Field(default=False, alias='SMTP_USE_SSL')
+    pr_webhook_secret: str = Field(default='', alias='PR_WEBHOOK_SECRET')
 
     @property
     def sqlalchemy_database_uri(self) -> str:

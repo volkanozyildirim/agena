@@ -930,6 +930,44 @@ async def run_flow(
     return flow_run
 
 
+async def run_pr_feedback_autofix(
+    *,
+    db: AsyncSession,
+    organization_id: int,
+    task_id: int,
+    pr_url: str,
+) -> dict[str, Any]:
+    """Webhook/automation entrypoint: only run PR review feedback loop for an existing task."""
+    task_row = await db.get(TaskRecord, task_id)
+    if task_row is None or task_row.organization_id != organization_id:
+        return {'status': 'error', 'message': f'Task not found for organization: {task_id}'}
+
+    node = {
+        'type': 'agent',
+        'role': 'lead_developer',
+        'action': 'Review PR and approve or request changes',
+        'review_only': True,
+        'auto_fix_from_comments': True,
+        'require_explicit_fix_trigger': False,
+    }
+    context = {
+        'task': {
+            'id': str(task_row.id),
+            'title': task_row.title,
+            'description': task_row.description or '',
+            'source': task_row.source or 'internal',
+        },
+        'outputs': {'webhook_pr': {'pr_url': pr_url}},
+        'user_id': task_row.created_by_user_id,
+    }
+    return await _run_lead_pr_review_node(
+        node=node,
+        context=context,
+        db=db,
+        organization_id=organization_id,
+    )
+
+
 def _topo_sort(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Basit topological sort — Kahn's algorithm."""
     node_map = {n['id']: n for n in nodes}

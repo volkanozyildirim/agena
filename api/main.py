@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import agents, auth, billing, flows, github, integrations, memory, notifications, org, preferences, saas_tasks, tasks, usage_events
+from api.routes import agents, auth, billing, flows, github, integrations, memory, notifications, org, preferences, saas_tasks, tasks, usage_events, webhooks
 from core.database import engine
 from core.logging import configure_logging
 from core.settings import get_settings
@@ -37,6 +37,7 @@ app.include_router(preferences.router)
 app.include_router(notifications.router)
 app.include_router(usage_events.router)
 app.include_router(memory.router)
+app.include_router(webhooks.router)
 
 
 @app.on_event('startup')
