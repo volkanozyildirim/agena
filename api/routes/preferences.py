@@ -284,6 +284,14 @@ def _build_agents_md_from_profile(profile: dict[str, Any]) -> str:
     ])
 
 
+def _build_managed_agents_path(organization_id: int, mapping_id: str, scan_id: str) -> Path:
+    app_root = Path(__file__).resolve().parents[2]
+    safe_mapping = ''.join(ch if ch.isalnum() or ch in {'-', '_'} else '_' for ch in mapping_id)[:80] or 'mapping'
+    out_dir = app_root / 'data' / 'repo_agents' / f'org_{organization_id}' / safe_mapping
+    out_dir.mkdir(parents=True, exist_ok=True)
+    return out_dir / f'{scan_id}.md'
+
+
 async def _get_or_create_pref(db: AsyncSession, user_id: int) -> UserPreference:
     result = await db.execute(select(UserPreference).where(UserPreference.user_id == user_id))
     pref = result.scalar_one_or_none()
@@ -455,9 +463,7 @@ async def scan_repo_profile(
         agents_md_content = _build_agents_md_from_profile(profile)
 
     scan_id = str(uuid4())
-    agents_dir = root / '.tiqr' / 'agents'
-    agents_dir.mkdir(parents=True, exist_ok=True)
-    agents_file = agents_dir / f'{scan_id}.md'
+    agents_file = _build_managed_agents_path(tenant.organization_id, payload.mapping_id, scan_id)
     agents_file.write_text(agents_md_content, encoding='utf-8')
     profile['scan_id'] = scan_id
     profile['agents_md_path'] = str(agents_file)
