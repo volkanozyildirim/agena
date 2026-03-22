@@ -15,7 +15,6 @@ const LS_SIDEBAR_COLLAPSED = 'tiqr_sidebar_collapsed';
 const PRIMARY_NAV_KEYS = [
   { href: '/dashboard', key: 'nav.overview', icon: '🧭' },
   { href: '/dashboard/tasks', key: 'nav.tasks', icon: '✅' },
-  { href: '/dashboard/usage', key: 'nav.usage', icon: '📊' },
   { href: '/dashboard/sprints', key: 'nav.sprints', icon: '🗂' },
   { href: '/dashboard/team', key: 'nav.team', icon: '👥' },
   { href: '/dashboard/agents', key: 'nav.agents', icon: '🤖' },
@@ -27,6 +26,7 @@ const PRIMARY_NAV_KEYS = [
 
 const SECONDARY_NAV_KEYS = [
   { href: '/dashboard/notifications', key: 'nav.notifications', icon: '🔔' },
+  { href: '/dashboard/usage', key: 'nav.usage', icon: '📊' },
   { href: '/dashboard/profile', key: 'nav.profile', icon: '👤' },
 ] as const;
 
