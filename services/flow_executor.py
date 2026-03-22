@@ -85,6 +85,48 @@ def _extract_handled_pr_comment_ids(description: str) -> set[str]:
     return handled
 
 
+def _extract_pr_comment_baseline(description: str, pr_url: str) -> int:
+    target = pr_url.strip()
+    prefix = 'Handled PR Baseline:'
+    for line in (description or '').splitlines():
+        s = line.strip()
+        if not s.startswith(prefix):
+            continue
+        raw = s[len(prefix):].strip()
+        if '::' not in raw:
+            continue
+        left, right = raw.split('::', 1)
+        if left.strip() != target:
+            continue
+        try:
+            return int(right.strip())
+        except Exception:
+            return 0
+    return 0
+
+
+def _upsert_pr_comment_baseline(description: str, pr_url: str, baseline_id: int) -> str:
+    target = pr_url.strip()
+    prefix = 'Handled PR Baseline:'
+    lines = (description or '').splitlines()
+    out: list[str] = []
+    replaced = False
+    for line in lines:
+        s = line.strip()
+        if s.startswith(prefix):
+            raw = s[len(prefix):].strip()
+            if '::' in raw and raw.split('::', 1)[0].strip() == target:
+                out.append(f'{prefix} {target}::{int(baseline_id)}')
+                replaced = True
+                continue
+        out.append(line)
+    if not replaced:
+        if out and out[-1].strip():
+            out.append('')
+        out.append(f'{prefix} {target}::{int(baseline_id)}')
+    return '\n'.join(out).strip()
+
+
 async def _run_agent_node(
     node: dict[str, Any],
     context: dict[str, Any],
@@ -375,15 +417,52 @@ async def _run_lead_pr_review_node(
 
     current_desc = str(task_row.description or '')
     handled_ids = _extract_handled_pr_comment_ids(current_desc)
+    baseline_id = _extract_pr_comment_baseline(current_desc, pr_url)
 
-    actionable = [
+    candidate_comments = [
         c for c in comments
         if c.get('content')
-        and str(c.get('id') or '') not in handled_ids
         and '[Tiqr PR Review]' not in c.get('content', '')
         and 'tiqr' not in c.get('author', '').lower()
     ]
+    max_seen_id = 0
+    for c in candidate_comments:
+        try:
+            cid_num = int(str(c.get('id') or '0').strip() or '0')
+        except Exception:
+            cid_num = 0
+        if cid_num > max_seen_id:
+            max_seen_id = cid_num
+
+    # First pass after PR creation: establish baseline and do not auto-fix.
+    if baseline_id <= 0:
+        if max_seen_id > 0:
+            task_row.description = _upsert_pr_comment_baseline(current_desc, pr_url, max_seen_id)
+            await db.commit()
+        return {
+            'status': 'ok',
+            'pr_url': pr_url,
+            'message': 'PR review baseline captured; waiting for new reviewer comments',
+            'baseline_comment_id': max_seen_id,
+        }
+
+    actionable = []
+    for c in candidate_comments:
+        cid = str(c.get('id') or '').strip()
+        if not cid or cid in handled_ids:
+            continue
+        try:
+            cid_num = int(cid)
+        except Exception:
+            cid_num = 0
+        if cid_num <= baseline_id:
+            continue
+        actionable.append(c)
+
     if not actionable:
+        if max_seen_id > baseline_id:
+            task_row.description = _upsert_pr_comment_baseline(current_desc, pr_url, max_seen_id)
+            await db.commit()
         return {'status': 'ok', 'pr_url': pr_url, 'message': 'No new actionable PR review comments found'}
 
     lines = [f"- {c.get('author', 'Reviewer')}: {c.get('content', '').replace(chr(10), ' ').strip()}" for c in actionable[:8]]
@@ -412,13 +491,16 @@ async def _run_lead_pr_review_node(
     if ids_marker:
         extra_markers += f'\n{ids_marker}'
 
-    task_row.description = (
+    next_desc = (
         current_desc.strip()
         + '\n\n---\n'
         + 'Execution Prompt: Address the following PR review comments exactly and update code accordingly.\n'
         + feedback_blob
         + extra_markers
     ).strip()
+    if max_seen_id > 0:
+        next_desc = _upsert_pr_comment_baseline(next_desc, pr_url, max_seen_id)
+    task_row.description = next_desc
     await db.commit()
 
     auto_fix = _bool_val(node.get('auto_fix_from_comments'), True)
