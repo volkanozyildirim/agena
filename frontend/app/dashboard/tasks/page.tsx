@@ -371,7 +371,7 @@ export default function DashboardTasksPage() {
               <Link href={`/tasks/${q.task_id}`} className='button button-outline' style={{ padding: '5px 9px', fontSize: 12, whiteSpace: 'nowrap' }}>
                 {t('tasks.open')}
               </Link>
-              <button className='button button-outline' onClick={() => void onRemoveFromQueue(q.task_id)} style={{ padding: '5px 9px', fontSize: 12, whiteSpace: 'nowrap', borderColor: 'rgba(248,113,113,0.35)', color: '#f87171' }}>
+              <button className='button button-outline' onClick={() => void onRemoveFromQueue(q.task_id)} style={{ padding: '5px 9px', fontSize: 12, whiteSpace: 'nowrap', borderColor: 'rgba(248,113,113,0.35)', color: '#f87171', minHeight: 30 }}>
                 {t('tasks.remove')}
               </button>
             </div>
@@ -380,7 +380,8 @@ export default function DashboardTasksPage() {
       </div>
 
       {/* Task list */}
-      <div style={{ borderRadius: 20, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', overflow: 'hidden' }}>
+      <div style={{ borderRadius: 20, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', overflowX: 'auto' }}>
+        <div style={{ minWidth: 1040 }}>
         <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'grid', gridTemplateColumns: 'minmax(0,1.45fr) 80px 98px 88px 88px 70px 92px 78px minmax(180px,0.85fr)', gap: 10 }}>
           {[t('tasks.col.task'), t('tasks.col.source'), t('tasks.col.status'), t('tasks.col.run'), t('tasks.col.queue'), t('tasks.col.retry'), t('tasks.col.tokens'), t('tasks.col.pr'), t('tasks.col.actions')].map((h) => (
             <span key={h} style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: 1 }}>{h}</span>
@@ -425,7 +426,7 @@ export default function DashboardTasksPage() {
                 color: statusColor(task.status), width: 'fit-content', textTransform: 'capitalize',
               }}>
                 <span style={{ width: 5, height: 5, borderRadius: '50%', background: statusColor(task.status), animation: task.status === 'running' ? 'pulse-brand 1.5s infinite' : 'none' }} />
-                {task.status}
+                {statusLabel(task.status, t)}
               </span>
               <div>
                 <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', fontWeight: 600 }}>{fmtDuration(task.run_duration_sec ?? task.duration_sec)}</span>
@@ -452,17 +453,18 @@ export default function DashboardTasksPage() {
                 <button
                   className='button button-primary'
                   onClick={() => void onAssign(task.id)}
-                  style={{ padding: '6px 10px', fontSize: 12, whiteSpace: 'nowrap' }}
+                  style={{ padding: '6px 10px', fontSize: 12, whiteSpace: 'nowrap', minHeight: 32 }}
                 >
                   {t('tasks.assignAi')}
                 </button>
-                <Link href={`/tasks/${task.id}`} className='button button-outline' style={{ padding: '6px 10px', fontSize: 12, whiteSpace: 'nowrap' }}>
+                <Link href={`/tasks/${task.id}`} className='button button-outline' style={{ padding: '6px 10px', fontSize: 12, whiteSpace: 'nowrap', minHeight: 32 }}>
                   {t('tasks.details')}
                 </Link>
               </div>
             </div>
           ))
         )}
+        </div>
       </div>
 
       {/* Pagination */}

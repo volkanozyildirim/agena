@@ -292,11 +292,11 @@ export default function AgentsPage() {
         <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 10 }}>
           {t('agents.analyticsDesc')}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(165px, 1fr))', gap: 8, alignItems: 'stretch' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(185px, 1fr))', gap: 8, alignItems: 'stretch' }}>
           {agents.map((a) => {
             const m = analytics[a.role] ?? { coveragePct: 0, activityPct: 0, latencySec: 0, successPct: 0 };
             return (
-              <div key={a.role} style={{ borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', padding: 8, minHeight: 122 }}>
+              <div key={a.role} style={{ borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', padding: 8, minHeight: 128 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                   <span>{a.icon}</span>
                   <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.88)', fontSize: 12 }}>{a.label}</span>
@@ -313,7 +313,7 @@ export default function AgentsPage() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 8, alignItems: 'stretch' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 8, alignItems: 'stretch' }}>
         {agents.map((agent) => {
           const isEditing = editing === agent.role;
           return (
@@ -356,22 +356,22 @@ export default function AgentsPage() {
               <button onClick={() => setShowNewAgent(false)} style={{ border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.45)', fontSize: 18, cursor: 'pointer' }}>×</button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <input value={draft.label} onChange={(e) => setDraft((d) => ({ ...d, label: e.target.value }))} placeholder={t('agents.newLabelPlaceholder')} />
-              <input value={draft.role} onChange={(e) => setDraft((d) => ({ ...d, role: e.target.value }))} placeholder={t('agents.newRolePlaceholder')} />
-              <input value={draft.icon} onChange={(e) => setDraft((d) => ({ ...d, icon: e.target.value }))} placeholder={t('agents.newIconPlaceholder')} />
-              <input value={draft.color} onChange={(e) => setDraft((d) => ({ ...d, color: e.target.value }))} placeholder={t('agents.newColorPlaceholder')} />
+              <input value={draft.label} onChange={(e) => setDraft((d) => ({ ...d, label: e.target.value }))} placeholder={t('agents.newLabelPlaceholder')} style={inputStyle} />
+              <input value={draft.role} onChange={(e) => setDraft((d) => ({ ...d, role: e.target.value }))} placeholder={t('agents.newRolePlaceholder')} style={inputStyle} />
+              <input value={draft.icon} onChange={(e) => setDraft((d) => ({ ...d, icon: e.target.value }))} placeholder={t('agents.newIconPlaceholder')} style={inputStyle} />
+              <input value={draft.color} onChange={(e) => setDraft((d) => ({ ...d, color: e.target.value }))} placeholder={t('agents.newColorPlaceholder')} style={inputStyle} />
             </div>
-            <textarea value={draft.description} onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))} rows={2} placeholder={t('agents.newDescriptionPlaceholder')} />
+            <textarea value={draft.description} onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))} rows={2} placeholder={t('agents.newDescriptionPlaceholder')} style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <select value={draft.provider} onChange={(e) => setDraft((d) => ({ ...d, provider: e.target.value as AgentConfig['provider'] }))}>
+              <select value={draft.provider} onChange={(e) => setDraft((d) => ({ ...d, provider: e.target.value as AgentConfig['provider'] }))} style={inputStyle}>
                 <option value='custom'>{t('agents.providerCustom')}</option>
                 <option value='codex_cli'>Codex CLI</option>
                 <option value='openai'>OpenAI</option>
                 <option value='gemini'>Gemini</option>
               </select>
-              <input value={draft.model} onChange={(e) => setDraft((d) => ({ ...d, model: e.target.value, custom_model: e.target.value }))} placeholder={t('agents.newModelPlaceholder')} />
+              <input value={draft.model} onChange={(e) => setDraft((d) => ({ ...d, model: e.target.value, custom_model: e.target.value }))} placeholder={t('agents.newModelPlaceholder')} style={inputStyle} />
             </div>
-            <textarea value={draft.system_prompt} onChange={(e) => setDraft((d) => ({ ...d, system_prompt: e.target.value }))} rows={3} placeholder={t('agents.newPromptPlaceholder')} />
+            <textarea value={draft.system_prompt} onChange={(e) => setDraft((d) => ({ ...d, system_prompt: e.target.value }))} rows={3} placeholder={t('agents.newPromptPlaceholder')} style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }} />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button onClick={() => setShowNewAgent(false)} className='button button-outline'>{t('agents.cancel')}</button>
               <button onClick={createNewAgent} disabled={!draft.label.trim() || !(draft.model.trim() || draft.custom_model.trim())} className='button button-primary'>{t('agents.create')}</button>
