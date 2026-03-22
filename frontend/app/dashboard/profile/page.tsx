@@ -9,6 +9,7 @@ type Opt = { id: string; name: string; path?: string };
 type MeRes = { user_id: number; email: string; full_name: string; organization_id: number };
 type ProfileSettings = {
   email_notifications: boolean;
+  web_push_notifications: boolean;
   daily_summary: boolean;
   auto_assign_new_tasks: boolean;
   default_create_pr: boolean;
@@ -32,6 +33,7 @@ export default function ProfilePage() {
   const [lsp, setLsp] = useState(false);
   const [profileSettings, setProfileSettings] = useState<ProfileSettings>({
     email_notifications: true,
+    web_push_notifications: true,
     daily_summary: false,
     auto_assign_new_tasks: false,
     default_create_pr: true,
@@ -55,6 +57,7 @@ export default function ProfilePage() {
       setProfileSettings((prev) => ({
         ...prev,
         email_notifications: rawSettings.email_notifications !== false,
+        web_push_notifications: rawSettings.web_push_notifications !== false,
         daily_summary: rawSettings.daily_summary === true,
         auto_assign_new_tasks: rawSettings.auto_assign_new_tasks === true,
         default_create_pr: rawSettings.default_create_pr !== false,
@@ -203,6 +206,7 @@ export default function ProfilePage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <ToggleRow label='Email notifications' checked={profileSettings.email_notifications} onChange={(v) => { setProfileSettings((p) => ({ ...p, email_notifications: v })); setSaved(false); }} />
+            <ToggleRow label='Web push notifications' checked={profileSettings.web_push_notifications} onChange={(v) => { setProfileSettings((p) => ({ ...p, web_push_notifications: v })); setSaved(false); }} />
             <ToggleRow label='Daily summary email' checked={profileSettings.daily_summary} onChange={(v) => { setProfileSettings((p) => ({ ...p, daily_summary: v })); setSaved(false); }} />
             <ToggleRow label='Auto-assign new tasks' checked={profileSettings.auto_assign_new_tasks} onChange={(v) => { setProfileSettings((p) => ({ ...p, auto_assign_new_tasks: v })); setSaved(false); }} />
             <ToggleRow label='Create PR by default' checked={profileSettings.default_create_pr} onChange={(v) => { setProfileSettings((p) => ({ ...p, default_create_pr: v })); setSaved(false); }} />

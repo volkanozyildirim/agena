@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ReactNode, useEffect, useState, Suspense } from 'react';
 import { isLoggedIn, removeToken, apiFetch } from '@/lib/api';
 import OnboardingModal from '@/components/OnboardingModal';
+import WebPushBridge from '@/components/WebPushBridge';
 import { useLocale } from '@/lib/i18n';
 
 const NAV_KEYS = [
@@ -166,6 +167,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
           onClose={() => setShowOnboarding(false)}
         />
       )}
+      <WebPushBridge />
     </div>
   );
 }

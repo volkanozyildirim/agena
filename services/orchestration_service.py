@@ -23,6 +23,7 @@ from services.github_service import GitHubService
 from services.integration_config_service import IntegrationConfigService
 from services.llm.cost_tracker import CostTracker
 from services.local_repo_service import LocalRepoService
+from services.notification_service import NotificationService
 from services.task_service import TaskService
 from services.usage_service import UsageService
 
@@ -67,6 +68,7 @@ class OrchestrationService:
             raise ValueError('Task not found for organization')
 
         task_service = TaskService(self.db_session)
+        notification_service = NotificationService(self.db_session)
         usage_service = UsageService(self.db_session)
         run_started_at = datetime.utcnow()
         run_started_clock = time.perf_counter()
@@ -293,6 +295,15 @@ class OrchestrationService:
                 ),
             )
             await task_service.add_log(task.id, organization_id, 'completed', 'Task completed successfully')
+            notified = await notification_service.notify_task_result(
+                user_id=task.created_by_user_id,
+                task_id=task.id,
+                task_title=task.title,
+                status='completed',
+                pr_url=pr_url,
+            )
+            if notified:
+                await task_service.add_log(task.id, organization_id, 'notify', 'Completion email sent')
 
             return AgentRunResult(
                 task_id=str(task.id),
@@ -321,6 +332,16 @@ class OrchestrationService:
                 ),
             )
             await task_service.add_log(task.id, organization_id, 'failed', str(exc))
+            notified = await notification_service.notify_task_result(
+                user_id=task.created_by_user_id,
+                task_id=task.id,
+                task_title=task.title,
+                status='failed',
+                pr_url=task.pr_url,
+                failure_reason=str(exc),
+            )
+            if notified:
+                await task_service.add_log(task.id, organization_id, 'notify', 'Failure email sent')
             raise
 
     def _build_pr_payload(self, task: dict[str, Any], reviewed_code: str) -> CreatePRRequest:

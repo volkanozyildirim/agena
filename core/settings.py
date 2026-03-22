@@ -70,6 +70,15 @@ class Settings(BaseSettings):
     max_agent_retries: int = Field(default=3, alias='MAX_AGENT_RETRIES')
     max_context_chars: int = Field(default=8000, alias='MAX_CONTEXT_CHARS')
 
+    smtp_host: str = Field(default='', alias='SMTP_HOST')
+    smtp_port: int = Field(default=587, alias='SMTP_PORT')
+    smtp_user: str = Field(default='', alias='SMTP_USER')
+    smtp_password: str = Field(default='', alias='SMTP_PASSWORD')
+    smtp_from_email: str = Field(default='noreply@tiqr.local', alias='SMTP_FROM_EMAIL')
+    smtp_from_name: str = Field(default='Tiqr AI', alias='SMTP_FROM_NAME')
+    smtp_use_tls: bool = Field(default=True, alias='SMTP_USE_TLS')
+    smtp_use_ssl: bool = Field(default=False, alias='SMTP_USE_SSL')
+
     @property
     def sqlalchemy_database_uri(self) -> str:
         return (
