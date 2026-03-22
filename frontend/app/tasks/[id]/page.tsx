@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, loadPrefs } from '@/lib/api';
 import StatusBadge from '@/components/StatusBadge';
 
 type TaskDetail = {
@@ -155,6 +155,7 @@ export default function TaskDetailPage() {
   const [selectedDependencyIds, setSelectedDependencyIds] = useState<number[]>([]);
   const [dependencyCandidates, setDependencyCandidates] = useState<DependencyTaskOption[]>([]);
   const [depsData, setDepsData] = useState<TaskDeps | null>(null);
+  const [defaultCreatePr, setDefaultCreatePr] = useState(true);
 
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [logs, setLogs] = useState<TaskLog[]>([]);
@@ -186,6 +187,13 @@ export default function TaskDetailPage() {
     const interval = setInterval(() => void loadData(), 5000);
     return () => clearInterval(interval);
   }, [taskId]);
+
+  useEffect(() => {
+    loadPrefs().then((prefs) => {
+      const raw = (prefs.profile_settings || {}) as Record<string, unknown>;
+      if (typeof raw.default_create_pr === 'boolean') setDefaultCreatePr(raw.default_create_pr);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -236,7 +244,7 @@ export default function TaskDetailPage() {
     if (!taskId) return;
     try {
       setIsRerunBusy(true);
-      await apiFetch('/tasks/' + taskId + '/assign', { method: 'POST' });
+      await apiFetch('/tasks/' + taskId + '/assign', { method: 'POST', body: JSON.stringify({ create_pr: defaultCreatePr }) });
       await loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to re-run task');

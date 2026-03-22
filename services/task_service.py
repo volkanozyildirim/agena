@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.settings import get_settings
@@ -227,6 +227,49 @@ class TaskService:
             .order_by(TaskRecord.created_at.desc())
         )
         return list(result.scalars().all())
+
+    async def search_tasks(
+        self,
+        organization_id: int,
+        *,
+        status: str | None = None,
+        q: str | None = None,
+        created_from: datetime | None = None,
+        created_to: datetime | None = None,
+        page: int = 1,
+        page_size: int = 12,
+    ) -> tuple[list[TaskRecord], int]:
+        if self.db is None:
+            raise ValueError('DB session required')
+
+        page = max(1, int(page))
+        page_size = max(1, min(int(page_size), 100))
+
+        filters = [TaskRecord.organization_id == organization_id]
+        if status and status != 'all':
+            filters.append(TaskRecord.status == status)
+        if q:
+            needle = f'%{q.strip()}%'
+            if needle != '%%':
+                filters.append(TaskRecord.title.ilike(needle))
+        if created_from is not None:
+            filters.append(TaskRecord.created_at >= created_from)
+        if created_to is not None:
+            filters.append(TaskRecord.created_at <= created_to)
+
+        total_stmt = select(func.count(TaskRecord.id)).where(*filters)
+        total_result = await self.db.execute(total_stmt)
+        total = int(total_result.scalar_one() or 0)
+
+        stmt = (
+            select(TaskRecord)
+            .where(*filters)
+            .order_by(TaskRecord.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all()), total
 
     async def get_task(self, organization_id: int, task_id: int) -> TaskRecord | None:
         if self.db is None:

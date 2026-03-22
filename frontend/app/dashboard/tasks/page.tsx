@@ -1,8 +1,8 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, loadPrefs } from '@/lib/api';
 import { TaskItem } from '@/components/TaskTable';
 
 const STATUS_FILTERS = ['all', 'queued', 'running', 'completed', 'failed'];
@@ -22,6 +22,7 @@ function fmtDuration(sec?: number | null): string {
 
 export default function DashboardTasksPage() {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [total, setTotal] = useState(0);
   const [queueItems, setQueueItems] = useState<{
     task_id: number;
     title: string;
@@ -37,6 +38,7 @@ export default function DashboardTasksPage() {
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
   const pageSize = 12;
+  const [defaultCreatePr, setDefaultCreatePr] = useState(true);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [storyContext, setStoryContext] = useState('');
@@ -48,10 +50,20 @@ export default function DashboardTasksPage() {
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
 
-  async function load() {
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  const load = useCallback(async () => {
     try {
+      const qs = new URLSearchParams();
+      qs.set('status', filter);
+      qs.set('q', search);
+      qs.set('page', String(page));
+      qs.set('page_size', String(pageSize));
+      if (dateFrom) qs.set('created_from', dateFrom);
+      if (dateTo) qs.set('created_to', dateTo);
+
       const [data, queueData] = await Promise.all([
-        apiFetch<TaskItem[]>('/tasks'),
+        apiFetch<{ items: TaskItem[]; total: number; page: number; page_size: number }>(`/tasks/search?${qs.toString()}`),
         apiFetch<{
           task_id: number;
           title: string;
@@ -62,18 +74,30 @@ export default function DashboardTasksPage() {
           created_at: string;
         }[]>('/tasks/queue'),
       ]);
-      setTasks(data);
+      setTasks(data.items);
+      setTotal(data.total);
       setQueueItems(queueData);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Load failed');
     }
-  }
+  }, [dateFrom, dateTo, filter, page, search]);
+
+  useEffect(() => {
+    loadPrefs().then((prefs) => {
+      const raw = (prefs.profile_settings || {}) as Record<string, unknown>;
+      if (typeof raw.default_create_pr === 'boolean') setDefaultCreatePr(raw.default_create_pr);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     void load();
     const iv = setInterval(() => void load(), 5000);
     return () => clearInterval(iv);
-  }, []);
+  }, [load]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
@@ -104,7 +128,7 @@ export default function DashboardTasksPage() {
 
   async function onAssign(id: number) {
     try {
-      await apiFetch('/tasks/' + id + '/assign', { method: 'POST' });
+      await apiFetch('/tasks/' + id + '/assign', { method: 'POST', body: JSON.stringify({ create_pr: defaultCreatePr }) });
       setMsg('Assigned to AI'); await load();
     } catch (e) { setError(e instanceof Error ? e.message : 'Assign failed'); }
   }
@@ -119,19 +143,16 @@ export default function DashboardTasksPage() {
     }
   }
 
-  const filtered = tasks.filter((t: TaskItem) => {
-    const matchStatus = filter === 'all' || t.status === filter;
-    const matchSearch = !search || t.title.toLowerCase().includes(search.toLowerCase());
-    const created = new Date(t.created_at).getTime();
-    const fromTs = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
-    const toTs = dateTo ? new Date(`${dateTo}T23:59:59`).getTime() : null;
-    const matchFrom = fromTs === null || created >= fromTs;
-    const matchTo = toTs === null || created <= toTs;
-    return matchStatus && matchSearch && matchFrom && matchTo;
-  });
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
-  const paged = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  function applyRange(days: number) {
+    const to = new Date();
+    const from = new Date();
+    from.setDate(to.getDate() - days);
+    setDateFrom(from.toISOString().slice(0, 10));
+    setDateTo(to.toISOString().slice(0, 10));
+    setPage(1);
+  }
 
   return (
     <div style={{ display: 'grid', gap: 24 }}>
@@ -142,7 +163,7 @@ export default function DashboardTasksPage() {
           <h1 style={{ fontSize: 28, fontWeight: 800, color: 'rgba(255,255,255,0.95)', marginTop: 8, marginBottom: 4 }}>
             Agent Task Feed
           </h1>
-          <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 14 }}>{tasks.length} total tasks</p>
+          <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 14 }}>{total.toLocaleString()} total tasks</p>
         </div>
         <button
           className='button button-primary'
@@ -210,7 +231,7 @@ export default function DashboardTasksPage() {
       )}
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 10, background: 'rgba(255,255,255,0.02)' }}>
         <input
           value={search}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setSearch(e.target.value); setPage(1); }}
@@ -234,22 +255,40 @@ export default function DashboardTasksPage() {
             </button>
           ))}
         </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {[7, 30].map((d) => (
+            <button
+              key={d}
+              className='button button-outline'
+              onClick={() => applyRange(d)}
+              style={{ padding: '5px 8px', fontSize: 11 }}
+            >
+              Last {d}d
+            </button>
+          ))}
+        </div>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>From</span>
         <input
           type='date'
           value={dateFrom}
           onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
-          style={{ padding: '8px 10px', fontSize: 12 }}
+            style={{ padding: '4px 6px', fontSize: 11, minWidth: 130 }}
         />
+        </div>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>To</span>
         <input
           type='date'
           value={dateTo}
           onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
-          style={{ padding: '8px 10px', fontSize: 12 }}
+            style={{ padding: '4px 6px', fontSize: 11, minWidth: 130 }}
         />
+        </div>
         <button
           className='button button-outline'
           onClick={() => { setDateFrom(''); setDateTo(''); setSearch(''); setFilter('all'); setPage(1); }}
-          style={{ padding: '6px 10px', fontSize: 12 }}
+          style={{ padding: '6px 10px', fontSize: 11 }}
         >
           Reset
         </button>
@@ -310,12 +349,12 @@ export default function DashboardTasksPage() {
           ))}
         </div>
 
-        {filtered.length === 0 ? (
+        {tasks.length === 0 ? (
           <div style={{ padding: '40px 24px', textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: 14 }}>
             No tasks found.
           </div>
         ) : (
-          paged.map((t) => (
+          tasks.map((t) => (
             <div key={t.id} style={{
               padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.04)',
               display: 'grid', gridTemplateColumns: 'minmax(0,1.45fr) 80px 98px 88px 88px 70px 92px 78px minmax(180px,0.85fr)', gap: 10, alignItems: 'center',
@@ -391,7 +430,7 @@ export default function DashboardTasksPage() {
       {/* Pagination */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
-          Showing {(currentPage - 1) * pageSize + (paged.length > 0 ? 1 : 0)}-{(currentPage - 1) * pageSize + paged.length} of {filtered.length}
+          Showing {(currentPage - 1) * pageSize + (tasks.length > 0 ? 1 : 0)}-{(currentPage - 1) * pageSize + tasks.length} of {total}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button

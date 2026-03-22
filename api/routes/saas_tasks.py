@@ -1,13 +1,17 @@
 import httpx
-from fastapi import APIRouter, Body, Depends, HTTPException
+from datetime import datetime, timedelta
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import CurrentTenant, get_current_tenant
 from core.database import get_db_session
 from schemas.saas_task import (
+    AssignTaskRequest,
     AssignTaskResponse,
     AzureImportRequest,
     ImportTasksResponse,
+    TaskListResponse,
     QueueTaskItem,
     TaskDependencyUpdateRequest,
     TaskCreateRequest,
@@ -91,6 +95,44 @@ async def list_tasks(
     return response
 
 
+@router.get('/search', response_model=TaskListResponse)
+async def search_tasks(
+    status: str = Query(default='all'),
+    q: str = Query(default=''),
+    created_from: str | None = Query(default=None),
+    created_to: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=12, ge=1, le=100),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> TaskListResponse:
+    service = TaskService(db)
+
+    from_dt: datetime | None = None
+    to_dt: datetime | None = None
+    try:
+        if created_from:
+            from_dt = datetime.fromisoformat(created_from)
+        if created_to:
+            to_dt = datetime.fromisoformat(created_to) + timedelta(days=1) - timedelta(seconds=1)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail='Invalid date format. Use YYYY-MM-DD') from exc
+
+    tasks, total = await service.search_tasks(
+        tenant.organization_id,
+        status=status,
+        q=q,
+        created_from=from_dt,
+        created_to=to_dt,
+        page=page,
+        page_size=page_size,
+    )
+    items: list[TaskResponse] = []
+    for t in tasks:
+        items.append(await _to_task_response(service, tenant.organization_id, t))
+    return TaskListResponse(items=items, total=total, page=page, page_size=page_size)
+
+
 @router.get('/queue', response_model=list[QueueTaskItem])
 async def list_queue(
     tenant: CurrentTenant = Depends(get_current_tenant),
@@ -158,6 +200,7 @@ async def get_task(
 @router.post('/{task_id}/assign', response_model=AssignTaskResponse)
 async def assign_task(
     task_id: int,
+    payload: AssignTaskRequest = Body(default_factory=AssignTaskRequest),
     tenant: CurrentTenant = Depends(get_current_tenant),
     db: AsyncSession = Depends(get_db_session),
 ) -> AssignTaskResponse:
@@ -166,7 +209,7 @@ async def assign_task(
         queue_key = await service.assign_task_to_ai(
             tenant.organization_id,
             task_id,
-            create_pr=True,
+            create_pr=payload.create_pr,
         )
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc

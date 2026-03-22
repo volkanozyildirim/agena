@@ -50,6 +50,10 @@ class AssignTaskResponse(BaseModel):
     queue_key: str
 
 
+class AssignTaskRequest(BaseModel):
+    create_pr: bool = True
+
+
 class TaskLogItem(BaseModel):
     stage: str
     message: str
@@ -80,3 +84,10 @@ class QueueTaskItem(BaseModel):
     create_pr: bool
     source: str
     created_at: datetime
+
+
+class TaskListResponse(BaseModel):
+    items: list[TaskResponse]
+    total: int
+    page: int
+    page_size: int
