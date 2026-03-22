@@ -55,6 +55,10 @@ class QueueService:
 
     async def acquire_lock(self, lock_key: str, owner: str, ttl_sec: int = 1800) -> bool:
         full_key = f'queue_lock:{lock_key}'
+        current = await self.client.get(full_key)
+        if current == owner:
+            await self.client.expire(full_key, ttl_sec)
+            return True
         result = await self.client.set(full_key, owner, nx=True, ex=ttl_sec)
         return bool(result)
 
@@ -69,6 +73,16 @@ end
 """
         released = await self.client.eval(script, 1, full_key, owner)
         return bool(released)
+
+    async def get_lock_owner(self, lock_key: str) -> str | None:
+        full_key = f'queue_lock:{lock_key}'
+        value = await self.client.get(full_key)
+        return str(value) if value else None
+
+    async def force_delete_lock(self, lock_key: str) -> bool:
+        full_key = f'queue_lock:{lock_key}'
+        deleted = await self.client.delete(full_key)
+        return bool(deleted)
 
     async def get_task_position(self, *, organization_id: int, task_id: int, queue_name: str | None = None) -> int | None:
         key = queue_name or self.settings.redis_queue_name
