@@ -281,3 +281,58 @@ curl -X POST http://localhost:8010/tasks/1/assign \
 curl http://localhost:8010/tasks/1 -H "Authorization: Bearer $TOKEN"
 curl http://localhost:8010/tasks/1/logs -H "Authorization: Bearer $TOKEN"
 ```
+
+---
+
+## Today Updates (2026-03-23)
+
+### Queue + Worker Reliability
+
+- Fixed repo lock stability to prevent duplicate/retry loops and stuck tasks:
+  - `services/queue_service.py`
+    - re-entrant `acquire_lock` for same owner
+    - new helpers: `get_lock_owner`, `force_delete_lock`
+  - `workers/redis_worker.py`
+    - deterministic lock owner format: `task:<task_id>`
+    - stale/terminal-owner lock recovery before processing
+    - periodic stale lock cleanup (`queue_lock:*`) for non-running owners
+- Fixed assign race condition that could leave task `queued` in DB while missing from Redis:
+  - `services/task_service.py`
+  - assignment flow is now: persist `queued` in DB first, then enqueue; on enqueue error mark task failed + log.
+- Added git command safety for local execution to avoid hanging worker runs:
+  - `services/local_repo_service.py`
+  - `GIT_TERMINAL_PROMPT=0`
+  - command timeout support (`GIT_COMMAND_TIMEOUT_SEC`, default 300s)
+
+### PR Feedback / Review Flow Hardening
+
+- Added PR comment webhook entrypoint:
+  - `api/routes/webhooks.py`
+  - registered in `api/main.py`
+  - setting: `PR_WEBHOOK_SECRET` in `core/settings.py`
+- Added auto-fix trigger helper for PR feedback pipeline:
+  - `services/flow_executor.py` (`run_pr_feedback_autofix`)
+- Improved Azure PR URL parsing for different API/web URL variants:
+  - `services/azure_pr_service.py`
+
+### Flow Canvas UX Fixes (`/dashboard/flows`)
+
+- Edge delete `x` is now reliably clickable (no accidental pan/drag conflict):
+  - `frontend/app/dashboard/flows/page.tsx`
+  - edge delete now handles both `mousedown` and `click` with `preventDefault + stopPropagation`
+  - larger delete hit area and center delete badge
+  - node layer pointer-event conflict fixed (`wrapper: none`, `node cards: all`)
+- New nodes no longer keep drifting to far right/outside viewport:
+  - replaced linear `x = 80 + count*220` placement
+  - viewport-aware grid placement based on visible canvas + current pan offset
+- Canvas cursor behavior improved:
+  - default cursor is `default`
+  - `grabbing` only during active pan
+  - `crosshair` only during connect mode
+
+### Validation Notes
+
+- For backend/worker reliability changes, container rebuild/restart was required:
+  - `docker compose up -d --build backend worker`
+- For frontend flow fixes, hard refresh required after deploy:
+  - `Cmd+Shift+R` / `Ctrl+F5`
