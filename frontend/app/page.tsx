@@ -499,6 +499,40 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* ── WHAT'S NEW ── */}
+        <section style={{ padding: '60px 0' }}>
+          <div style={{ marginBottom: 28 }}>
+            <div className='section-label'>{t('landing.newLabel')}</div>
+            <h2 style={{ fontSize: 'clamp(24px, 2.5vw, 36px)', fontWeight: 800, color: 'rgba(255,255,255,0.92)', marginBottom: 10 }}>
+              {t('landing.newTitle')}
+            </h2>
+            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, maxWidth: 760 }}>
+              {t('landing.newSubtitle')}
+            </p>
+          </div>
+
+          <div className='release-grid'>
+            {[
+              { icon: '🟢', title: t('landing.newItem1Title'), desc: t('landing.newItem1Desc'), tone: 'teal' },
+              { icon: '🧠', title: t('landing.newItem2Title'), desc: t('landing.newItem2Desc'), tone: 'blue' },
+              { icon: '🧭', title: t('landing.newItem3Title'), desc: t('landing.newItem3Desc'), tone: 'amber' },
+              { icon: '📊', title: t('landing.newItem4Title'), desc: t('landing.newItem4Desc'), tone: 'green' },
+            ].map((item, i) => (
+              <article key={item.title} className={`release-card release-${item.tone}`} style={{ animationDelay: `${i * 0.12}s` }}>
+                <div className='release-head'>
+                  <span className='release-icon'>{item.icon}</span>
+                  <span className='chip' style={{ fontSize: 10 }}>{t('landing.widgetLive')}</span>
+                </div>
+                <h3 className='release-title'>{item.title}</h3>
+                <p className='release-desc'>{item.desc}</p>
+                <div className='release-track'>
+                  <i />
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
         {/* ── PRICING ── */}
         <section style={{ padding: '60px 0' }}>
           <div style={{ marginBottom: 48, textAlign: 'center' }}>
