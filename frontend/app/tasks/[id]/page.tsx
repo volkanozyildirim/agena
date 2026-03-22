@@ -333,6 +333,12 @@ export default function TaskDetailPage() {
   const stepMap = useMemo(() => {
     const map: Record<string, TaskLog | undefined> = {};
     for (const step of STEP_ORDER) {
+      if (step === 'agent') {
+        map[step] = logs.find((l) =>
+          ['agent', 'analyze', 'generate_code', 'review_code', 'finalize', 'playbook'].includes(l.stage),
+        );
+        continue;
+      }
       map[step] = logs.find((l) => l.stage === step);
     }
     if (!map.completed) map.failed = logs.find((l) => l.stage === 'failed');
