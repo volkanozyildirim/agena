@@ -11,6 +11,7 @@ from core.settings import get_settings
 from integrations.azure_client import AzureDevOpsClient
 from integrations.jira_client import JiraClient
 from models.agent_log import AgentLog
+from models.ai_usage_event import AIUsageEvent
 from models.run_record import RunRecord
 from models.task_dependency import TaskDependency
 from models.task_record import TaskRecord
@@ -503,6 +504,17 @@ class TaskService:
             select(AgentLog)
             .where(AgentLog.organization_id == organization_id, AgentLog.task_id == task_id)
             .order_by(AgentLog.created_at.asc())
+        )
+        return list(result.scalars().all())
+
+    async def get_usage_events(self, organization_id: int, task_id: int) -> list[AIUsageEvent]:
+        if self.db is None:
+            raise ValueError('DB session required')
+
+        result = await self.db.execute(
+            select(AIUsageEvent)
+            .where(AIUsageEvent.organization_id == organization_id, AIUsageEvent.task_id == task_id)
+            .order_by(AIUsageEvent.created_at.desc())
         )
         return list(result.scalars().all())
 

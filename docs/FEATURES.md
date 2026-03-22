@@ -22,6 +22,9 @@ This file is the single source of truth for currently implemented product capabi
 - Task assignment to AI pipeline.
 - Task cancellation endpoint and UI flow.
 - Task logs endpoint with step-based event stream.
+- Task usage-events endpoint:
+  - `GET /tasks/{id}/usage-events`
+  - captures provider/model/token/cost/duration per AI operation
 - Dependency graph:
   - read dependencies
   - update dependencies
@@ -143,6 +146,9 @@ This file is the single source of truth for currently implemented product capabi
 - `/health` endpoint for liveness checks.
 - CORS middleware configured for frontend/backend local runs.
 - Structured startup logging and DB table bootstrap on startup.
+- Dedicated AI usage ledger table:
+  - `ai_usage_events` with `operation_type` (for example `task_orchestration_run`, future `repo_profile_scan`)
+  - includes token/cost/status/duration/cache/local-repo context fields
 - Dockerized local stack:
   - API
   - Worker
@@ -156,4 +162,3 @@ This file is the single source of truth for currently implemented product capabi
 - Project rule enforced for new strings:
   - do not hardcode UI strings in components when locale helper is available
   - provide both `en` and `tr` keys for every new translation key
-

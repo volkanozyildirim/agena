@@ -91,3 +91,23 @@ class TaskListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class UsageEventItem(BaseModel):
+    id: int
+    operation_type: str
+    provider: str
+    model: str | None = None
+    status: str
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    cost_usd: float
+    duration_ms: int | None = None
+    cache_hit: bool = False
+    local_repo_path: str | None = None
+    profile_version: int | None = None
+    error_message: str | None = None
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
+    created_at: datetime
