@@ -136,6 +136,7 @@ Services:
 - Frontend: `http://localhost:3010`
 - MySQL: `localhost:3306`
 - Redis: `localhost:6379`
+- Qdrant (vector memory): `http://localhost:6333`
 
 ## Local Development
 
