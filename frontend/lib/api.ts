@@ -134,6 +134,11 @@ export interface RepoProfileSummary {
   top_files: string[];
   profile_version: number;
   scanned_at: string;
+  scan_id?: string;
+  agents_md_path?: string;
+  scanned_by_provider?: string;
+  scanned_model?: string | null;
+  repo_rules?: string[];
 }
 
 const LS_PROJECT = 'tiqr_sprint_project';

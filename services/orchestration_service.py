@@ -764,6 +764,23 @@ class OrchestrationService:
                 lines.append('Top-level Directories: ' + ', '.join(top_dirs[:16]))
             if top_files:
                 lines.append('Top-level Files: ' + ', '.join(top_files[:12]))
+            # Include latest auto-generated repo AGENTS guidance when available.
+            agents_dir = root / '.tiqr' / 'agents'
+            if agents_dir.exists() and agents_dir.is_dir():
+                md_files = sorted(
+                    [p for p in agents_dir.glob('*.md') if p.is_file()],
+                    key=lambda p: p.stat().st_mtime,
+                    reverse=True,
+                )
+                if md_files:
+                    latest = md_files[0]
+                    try:
+                        agents_text = latest.read_text(encoding='utf-8', errors='ignore')[:5000].strip()
+                        if agents_text:
+                            lines.append(f'Auto AGENTS Context File: {latest}')
+                            lines.append('Auto AGENTS Context:\n' + agents_text)
+                    except Exception:
+                        pass
             lines.append('Instruction: prioritize editing existing project files; avoid placeholder markdown-only outputs.')
             return '\n'.join(lines)
         except Exception as exc:

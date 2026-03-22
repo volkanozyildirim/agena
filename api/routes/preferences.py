@@ -3,6 +3,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -11,8 +12,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import CurrentTenant, get_current_tenant
 from core.database import get_db_session
+from core.settings import get_settings
 from models.user_preference import UserPreference
 from services.ai_usage_event_service import AIUsageEventService
+from services.integration_config_service import IntegrationConfigService
+from services.llm.cost_tracker import CostTracker
+from services.llm.provider import LLMProvider
+from services.usage_service import UsageService
 
 router = APIRouter(prefix='/preferences', tags=['preferences'])
 
@@ -44,6 +50,7 @@ class RepoProfileScanRequest(BaseModel):
     mapping_name: str
     local_path: str
     azure_repo_name: str | None = None
+    preferred_provider: str | None = None
 
 
 class RepoProfileScanResponse(BaseModel):
@@ -147,6 +154,136 @@ def _build_repo_profile(local_path: str, mapping_name: str, azure_repo_name: str
     }
 
 
+def _read_file_safe(path: Path, max_chars: int = 5000) -> str:
+    try:
+        if not path.exists() or not path.is_file():
+            return ''
+        return path.read_text(encoding='utf-8', errors='ignore')[:max_chars]
+    except Exception:
+        return ''
+
+
+def _build_repo_snapshot_text(root: Path) -> str:
+    top_dirs: list[str] = []
+    top_files: list[str] = []
+    for entry in sorted(root.iterdir(), key=lambda e: e.name.lower()):
+        if entry.name.startswith('.'):
+            continue
+        if entry.is_dir():
+            top_dirs.append(entry.name)
+        elif entry.is_file():
+            top_files.append(entry.name)
+        if len(top_dirs) + len(top_files) >= 40:
+            break
+
+    samples: list[tuple[str, str]] = []
+    for rel in ['README.md', 'package.json', 'pyproject.toml', 'requirements.txt', 'go.mod', 'pom.xml', 'build.gradle', 'build.gradle.kts']:
+        p = root / rel
+        txt = _read_file_safe(p, max_chars=3500)
+        if txt.strip():
+            samples.append((rel, txt))
+
+    lines: list[str] = [
+        f'Repo root: {root}',
+        'Top directories: ' + (', '.join(top_dirs[:20]) if top_dirs else '(none)'),
+        'Top files: ' + (', '.join(top_files[:20]) if top_files else '(none)'),
+    ]
+    for rel, txt in samples[:6]:
+        lines.append(f'\n=== FILE: {rel} ===\n{txt}')
+    return '\n'.join(lines)
+
+
+async def _resolve_repo_profile_llm(
+    db: AsyncSession,
+    organization_id: int,
+    preferred_provider: str | None,
+) -> tuple[LLMProvider | None, str]:
+    settings = get_settings()
+    cfg = IntegrationConfigService(db)
+
+    pref = (preferred_provider or '').strip().lower()
+    if pref not in {'openai', 'gemini'}:
+        pref = ''
+
+    order = [pref] if pref else []
+    for p in ['openai', 'gemini']:
+        if p not in order:
+            order.append(p)
+
+    for provider in order:
+        icfg = await cfg.get_config(organization_id, provider)
+        key = ((icfg.secret if icfg else '') or '').strip()
+        base_url = ((icfg.base_url if icfg else '') or '').strip()
+        if provider == 'openai' and (not key or key.startswith('your_')):
+            key = (settings.openai_api_key or '').strip()
+            base_url = base_url or (settings.openai_base_url or '').strip()
+        if not key or key.startswith('your_'):
+            continue
+        llm = LLMProvider(
+            provider=provider,
+            api_key=key,
+            base_url=base_url,
+            small_model='gpt-4o-mini' if provider == 'openai' else 'gemini-2.5-flash',
+            large_model='gpt-4.1' if provider == 'openai' else 'gemini-2.5-pro',
+        )
+        return llm, provider
+    return None, 'local'
+
+
+def _extract_json_object(text: str) -> dict[str, Any] | None:
+    src = (text or '').strip()
+    if not src:
+        return None
+    try:
+        data = json.loads(src)
+        return data if isinstance(data, dict) else None
+    except Exception:
+        pass
+    start = src.find('{')
+    end = src.rfind('}')
+    if start >= 0 and end > start:
+        try:
+            data = json.loads(src[start:end + 1])
+            return data if isinstance(data, dict) else None
+        except Exception:
+            return None
+    return None
+
+
+def _build_agents_md_from_profile(profile: dict[str, Any]) -> str:
+    stack = profile.get('stack') or ['Unknown/Custom']
+    tests = profile.get('suggested_test_commands') or []
+    lint = profile.get('suggested_lint_commands') or []
+    top_dirs = profile.get('top_directories') or []
+    top_files = profile.get('top_files') or []
+    return '\n'.join([
+        '# AGENTS.md (Auto-Generated)',
+        '',
+        '## Repository Summary',
+        f"- Stack: {', '.join(stack)}",
+        f"- Package Manager: {profile.get('package_manager') or 'unknown'}",
+        '',
+        '## Recommended Workflow',
+        '- Prefer editing existing modules over adding isolated mock/demo files.',
+        '- Keep changes minimal and targeted to the requested task scope.',
+        '- Validate via repository-native lint/test commands before finalizing.',
+        '',
+        '## Suggested Commands',
+        *(f'- Test: `{c}`' for c in tests[:3]),
+        *(f'- Lint: `{c}`' for c in lint[:3]),
+        '',
+        '## Structure Hints',
+        f"- Top directories: {', '.join(top_dirs[:16]) if top_dirs else '(none)'}",
+        f"- Top files: {', '.join(top_files[:16]) if top_files else '(none)'}",
+        '',
+        '## Output Contract',
+        '- Generate real code changes, not markdown-only placeholder output.',
+        '- Respect existing project conventions and naming.',
+        '- If context is insufficient, add assumptions explicitly in task log output.',
+        '',
+    ])
+
+
 async def _get_or_create_pref(db: AsyncSession, user_id: int) -> UserPreference:
     result = await db.execute(select(UserPreference).where(UserPreference.user_id == user_id))
     pref = result.scalar_one_or_none()
@@ -229,6 +366,7 @@ async def scan_repo_profile(
     tenant: CurrentTenant = Depends(get_current_tenant),
     db: AsyncSession = Depends(get_db_session),
 ) -> RepoProfileScanResponse:
+    root = Path(payload.local_path).expanduser().resolve()
     started_at = datetime.utcnow()
     started_clock = time.perf_counter()
     usage = AIUsageEventService(db)
@@ -258,6 +396,74 @@ async def scan_repo_profile(
         )
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    llm, llm_provider = await _resolve_repo_profile_llm(db, tenant.organization_id, payload.preferred_provider)
+    prompt_tokens = 0
+    completion_tokens = 0
+    total_tokens = 0
+    cost_usd = 0.0
+    used_model: str | None = None
+    agents_md_content = ''
+    if llm is not None:
+        system_prompt = (
+            'You are a senior repository analyst. Return STRICT JSON object only.\n'
+            'Keys: stack (array), package_manager (string|null), '
+            'suggested_test_commands (array), suggested_lint_commands (array), '
+            'top_directories (array), top_files (array), '
+            'repo_rules (array), agents_md (string markdown).\n'
+            'Keep it concise and practical.'
+        )
+        user_prompt = (
+            f"Mapping Name: {payload.mapping_name}\n"
+            f"Azure Repo: {payload.azure_repo_name or ''}\n"
+            f"Local Path: {root}\n\n"
+            f"{_build_repo_snapshot_text(root)}"
+        )
+        try:
+            output, usage_meta, model, _ = await llm.generate(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                complexity_hint='normal',
+                max_output_tokens=1800,
+            )
+            used_model = model
+            prompt_tokens = int(usage_meta.get('prompt_tokens', 0))
+            completion_tokens = int(usage_meta.get('completion_tokens', 0))
+            total_tokens = int(usage_meta.get('total_tokens', 0))
+            cost_usd = CostTracker().estimate_cost_usd(
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                model=model or 'gpt-4o-mini',
+            )
+            parsed = _extract_json_object(output) or {}
+            if isinstance(parsed.get('stack'), list) and parsed.get('stack'):
+                profile['stack'] = [str(x) for x in parsed.get('stack', [])[:6]]
+            if 'package_manager' in parsed:
+                profile['package_manager'] = parsed.get('package_manager')
+            if isinstance(parsed.get('suggested_test_commands'), list):
+                profile['suggested_test_commands'] = [str(x) for x in parsed.get('suggested_test_commands', [])[:4]]
+            if isinstance(parsed.get('suggested_lint_commands'), list):
+                profile['suggested_lint_commands'] = [str(x) for x in parsed.get('suggested_lint_commands', [])[:4]]
+            if isinstance(parsed.get('repo_rules'), list):
+                profile['repo_rules'] = [str(x) for x in parsed.get('repo_rules', [])[:12]]
+            raw_agents_md = str(parsed.get('agents_md') or '').strip()
+            agents_md_content = raw_agents_md if raw_agents_md else ''
+        except Exception:
+            # Keep deterministic local profile fallback.
+            llm = None
+
+    if not agents_md_content:
+        agents_md_content = _build_agents_md_from_profile(profile)
+
+    scan_id = str(uuid4())
+    agents_dir = root / '.tiqr' / 'agents'
+    agents_dir.mkdir(parents=True, exist_ok=True)
+    agents_file = agents_dir / f'{scan_id}.md'
+    agents_file.write_text(agents_md_content, encoding='utf-8')
+    profile['scan_id'] = scan_id
+    profile['agents_md_path'] = str(agents_file)
+    profile['scanned_by_provider'] = llm_provider
+    profile['scanned_model'] = used_model
+
     pref = await _get_or_create_pref(db, tenant.user_id)
     settings = _parse_json_obj(pref.profile_settings_json)
     repo_profiles = settings.get('repo_profiles')
@@ -270,19 +476,28 @@ async def scan_repo_profile(
 
     ended_at = datetime.utcnow()
     duration_ms = int((time.perf_counter() - started_clock) * 1000)
-    completion_tokens = _estimate_tokens(json.dumps(profile, ensure_ascii=False))
+    if total_tokens <= 0:
+        completion_tokens = _estimate_tokens(json.dumps(profile, ensure_ascii=False))
+        prompt_tokens = 0
+        total_tokens = completion_tokens
+        cost_usd = 0.0
+        used_model = used_model or 'filesystem-profiler-v1'
+        llm_provider = 'local'
+    else:
+        usage_counter = UsageService(db)
+        await usage_counter.increment_tokens(tenant.organization_id, total_tokens)
     await usage.create_event(
         organization_id=tenant.organization_id,
         user_id=tenant.user_id,
         task_id=None,
         operation_type='repo_profile_scan',
-        provider='local',
-        model='filesystem-profiler-v1',
+        provider=llm_provider,
+        model=used_model,
         status='completed',
-        prompt_tokens=0,
+        prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
-        total_tokens=completion_tokens,
-        cost_usd=0.0,
+        total_tokens=total_tokens,
+        cost_usd=cost_usd,
         started_at=started_at,
         ended_at=ended_at,
         duration_ms=duration_ms,

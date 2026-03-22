@@ -309,6 +309,15 @@ export default function RepoMappingsPage() {
                       <div style={{ fontSize: 11, color: '#86efac', fontWeight: 700, lineHeight: 1.3 }}>
                         {(repoProfiles[m.id].stack || []).slice(0, 2).join(', ') || 'Profile ready'}
                       </div>
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>
+                        {(repoProfiles[m.id].scanned_by_provider || 'local')}
+                        {repoProfiles[m.id].scanned_model ? ` / ${repoProfiles[m.id].scanned_model}` : ''}
+                      </div>
+                      {repoProfiles[m.id].agents_md_path && (
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {repoProfiles[m.id].agents_md_path}
+                        </div>
+                      )}
                       <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.38)' }}>
                         {new Date(repoProfiles[m.id].scanned_at).toLocaleString()}
                       </div>
