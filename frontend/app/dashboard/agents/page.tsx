@@ -292,11 +292,11 @@ export default function AgentsPage() {
         <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 10 }}>
           {t('agents.analyticsDesc')}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(165px, 1fr))', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(165px, 1fr))', gap: 8, alignItems: 'stretch' }}>
           {agents.map((a) => {
             const m = analytics[a.role] ?? { coveragePct: 0, activityPct: 0, latencySec: 0, successPct: 0 };
             return (
-              <div key={a.role} style={{ borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', padding: 8 }}>
+              <div key={a.role} style={{ borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', padding: 8, minHeight: 122 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                   <span>{a.icon}</span>
                   <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.88)', fontSize: 12 }}>{a.label}</span>
@@ -313,7 +313,7 @@ export default function AgentsPage() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 8, alignItems: 'stretch' }}>
         {agents.map((agent) => {
           const isEditing = editing === agent.role;
           return (
@@ -394,7 +394,7 @@ function AgentCard({ agent, isEditing, onEdit, onUpdate }: {
   const models = agent.provider === 'openai' ? OPENAI_MODELS : agent.provider === 'gemini' ? GEMINI_MODELS : [];
 
   return (
-    <div style={{ width: '100%', minWidth: 0, borderRadius: 14, border: '1px solid ' + (isEditing ? agent.color + '40' : 'rgba(255,255,255,0.07)'), background: isEditing ? agent.color + '08' : 'rgba(255,255,255,0.02)', overflow: 'hidden', transition: 'all 0.2s' }}>
+    <div style={{ width: '100%', minWidth: 0, minHeight: isEditing ? 'auto' : 118, borderRadius: 14, border: '1px solid ' + (isEditing ? agent.color + '40' : 'rgba(255,255,255,0.07)'), background: isEditing ? agent.color + '08' : 'rgba(255,255,255,0.02)', overflow: 'hidden', transition: 'all 0.2s' }}>
       {/* Card header */}
       <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', minWidth: 0 }} onClick={onEdit}>
         <div style={{ width: 36, height: 36, borderRadius: 10, background: agent.color + '18', border: '1px solid ' + agent.color + '30', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
@@ -414,7 +414,7 @@ function AgentCard({ agent, isEditing, onEdit, onUpdate }: {
             )}
             <span style={{ marginLeft: 'auto', fontSize: 12, color: 'rgba(255,255,255,0.2)', transform: isEditing ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block', flexShrink: 0 }}>⌄</span>
           </div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', lineHeight: 1.35 }}>{agent.description}</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: 30 }}>{agent.description}</div>
         </div>
         {/* Toggle */}
         <div onClick={(e) => { e.stopPropagation(); onUpdate({ enabled: !agent.enabled }); }}
