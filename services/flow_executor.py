@@ -127,6 +127,34 @@ def _upsert_pr_comment_baseline(description: str, pr_url: str, baseline_id: int)
     return '\n'.join(out).strip()
 
 
+def _has_lead_review_comment_marker(description: str, pr_url: str) -> bool:
+    target = pr_url.strip()
+    prefix = 'Lead PR Review Comment Posted:'
+    for line in (description or '').splitlines():
+        s = line.strip()
+        if not s.startswith(prefix):
+            continue
+        raw = s[len(prefix):].strip()
+        if raw == target:
+            return True
+    return False
+
+
+def _append_lead_review_comment_marker(description: str, pr_url: str) -> str:
+    target = pr_url.strip()
+    prefix = 'Lead PR Review Comment Posted:'
+    lines = (description or '').splitlines()
+    for line in lines:
+        s = line.strip()
+        if s.startswith(prefix) and s[len(prefix):].strip() == target:
+            return (description or '').strip()
+    out = list(lines)
+    if out and out[-1].strip():
+        out.append('')
+    out.append(f'{prefix} {target}')
+    return '\n'.join(out).strip()
+
+
 async def _run_agent_node(
     node: dict[str, Any],
     context: dict[str, Any],
@@ -418,6 +446,28 @@ async def _run_lead_pr_review_node(
     current_desc = str(task_row.description or '')
     handled_ids = _extract_handled_pr_comment_ids(current_desc)
     baseline_id = _extract_pr_comment_baseline(current_desc, pr_url)
+    lead_review_marked = _has_lead_review_comment_marker(current_desc, pr_url)
+
+    async def _post_lead_review_summary_once(msg: str) -> str | None:
+        nonlocal current_desc, lead_review_marked
+        if lead_review_marked:
+            return None
+        if is_azure:
+            ref = await AzurePRService(db).post_pr_comment(
+                organization_id,
+                pr_url=pr_url,
+                comment=msg,
+            )
+        else:
+            ref = await GitHubService().post_pr_comment(
+                pr_url=pr_url,
+                comment=msg,
+            )
+        current_desc = _append_lead_review_comment_marker(current_desc, pr_url)
+        task_row.description = current_desc
+        await db.commit()
+        lead_review_marked = True
+        return str(ref) if ref is not None else None
 
     candidate_comments = [
         c for c in comments
@@ -439,11 +489,18 @@ async def _run_lead_pr_review_node(
         if max_seen_id > 0:
             task_row.description = _upsert_pr_comment_baseline(current_desc, pr_url, max_seen_id)
             await db.commit()
+            current_desc = str(task_row.description or '')
+        comment_ref = await _post_lead_review_summary_once(
+            '[Tiqr PR Review] Lead Developer review pass completed. '
+            'No blocking issue detected in this pass. '
+            'Add a PR comment with requested changes, then rerun the flow for auto-fix.'
+        )
         return {
             'status': 'ok',
             'pr_url': pr_url,
             'message': 'PR review baseline captured; waiting for new reviewer comments',
             'baseline_comment_id': max_seen_id,
+            'comment_ref': comment_ref,
         }
 
     actionable = []
@@ -463,7 +520,17 @@ async def _run_lead_pr_review_node(
         if max_seen_id > baseline_id:
             task_row.description = _upsert_pr_comment_baseline(current_desc, pr_url, max_seen_id)
             await db.commit()
-        return {'status': 'ok', 'pr_url': pr_url, 'message': 'No new actionable PR review comments found'}
+            current_desc = str(task_row.description or '')
+        comment_ref = await _post_lead_review_summary_once(
+            '[Tiqr PR Review] Lead Developer checked this PR again. '
+            'No new blocking review comment found to auto-fix.'
+        )
+        return {
+            'status': 'ok',
+            'pr_url': pr_url,
+            'message': 'No new actionable PR review comments found',
+            'comment_ref': comment_ref,
+        }
 
     lines = [f"- {c.get('author', 'Reviewer')}: {c.get('content', '').replace(chr(10), ' ').strip()}" for c in actionable[:8]]
     feedback_blob = '\n'.join(lines).strip()
