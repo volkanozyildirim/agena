@@ -225,6 +225,12 @@ IYZICO_API_KEY=
 - **State:** React `useState`/`useRef`/`useCallback` — no external state library
 - **API calls:** always through `lib/api.ts`, never raw fetch in components
 
+### Documentation Discipline
+
+- At the end of each day, update this `AGENTS.md` with newly implemented capabilities.
+- When a feature is shipped, keep `AGENTS.md`, `docs/FEATURES.md`, and `docs/openapi.json` aligned.
+- Prefer adding short operational notes (what changed, where it is wired, and how to validate) instead of vague summaries.
+
 ---
 
 ## Running the Project

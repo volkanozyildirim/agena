@@ -238,6 +238,65 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* ── VECTOR MEMORY DETAILS ── */}
+        <section style={{ padding: '8px 0 56px' }}>
+          <div style={{ marginBottom: 20 }}>
+            <div className='section-label'>{t('landing.vectorLabel')}</div>
+            <h2 style={{ fontSize: 'clamp(24px, 2.5vw, 36px)', fontWeight: 800, color: 'rgba(255,255,255,0.92)', marginBottom: 10 }}>
+              {t('landing.vectorTitle')}
+            </h2>
+            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, maxWidth: 820, lineHeight: 1.7 }}>
+              {t('landing.vectorSubtitle')}
+            </p>
+          </div>
+
+          <div className='vector-grid'>
+            <article className='vector-card'>
+              <h3 className='vector-card-title'>{t('landing.vectorHowTitle')}</h3>
+              <p className='vector-card-desc'>{t('landing.vectorHowDesc')}</p>
+              <div className='vector-flow'>
+                {[t('landing.vectorStep1'), t('landing.vectorStep2'), t('landing.vectorStep3'), t('landing.vectorStep4')].map((s, i) => (
+                  <div key={s} className='vector-flow-row' style={{ animationDelay: `${i * 0.12}s` }}>
+                    <span className='vector-flow-dot' />
+                    <span>{s}</span>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className='vector-card'>
+              <h3 className='vector-card-title'>{t('landing.vectorFieldsTitle')}</h3>
+              <p className='vector-card-desc'>{t('landing.vectorFieldsDesc')}</p>
+              <div className='vector-fields'>
+                {[
+                  { k: 'key', v: t('landing.vectorFieldKey') },
+                  { k: 'organization_id', v: t('landing.vectorFieldOrg') },
+                  { k: 'input', v: t('landing.vectorFieldInput') },
+                  { k: 'output', v: t('landing.vectorFieldOutput') },
+                ].map((f, i) => (
+                  <div key={f.k} className='vector-field-row' style={{ animationDelay: `${0.1 + i * 0.1}s` }}>
+                    <code>{f.k}</code>
+                    <span>{f.v}</span>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className='vector-card'>
+              <h3 className='vector-card-title'>{t('landing.vectorEmbedTitle')}</h3>
+              <p className='vector-card-desc'>{t('landing.vectorEmbedDesc')}</p>
+              <div className='vector-embed-list'>
+                {[t('landing.vectorEmbed1'), t('landing.vectorEmbed2'), t('landing.vectorEmbed3'), t('landing.vectorEmbed4')].map((x, i) => (
+                  <div key={x} className='vector-embed-item' style={{ animationDelay: `${0.16 + i * 0.1}s` }}>
+                    <span className='vector-badge'>{String(i + 1).padStart(2, '0')}</span>
+                    <span>{x}</span>
+                  </div>
+                ))}
+              </div>
+            </article>
+          </div>
+        </section>
+
         {/* ── STATS ── */}
         <section style={{ padding: '60px 0' }}>
           <div className='stats-bar'>
