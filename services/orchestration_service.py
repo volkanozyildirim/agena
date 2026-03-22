@@ -18,6 +18,7 @@ from models.task_record import TaskRecord
 from schemas.agent import AgentRunResult, UsageStats
 from schemas.github import CreatePRRequest, GitHubFileChange
 from services.azure_pr_service import AzurePRService
+from services.ai_usage_event_service import AIUsageEventService
 from services.codex_cli_service import CodexCLIService
 from services.github_service import GitHubService
 from services.integration_config_service import IntegrationConfigService
@@ -70,6 +71,7 @@ class OrchestrationService:
         task_service = TaskService(self.db_session)
         notification_service = NotificationService(self.db_session)
         usage_service = UsageService(self.db_session)
+        usage_event_service = AIUsageEventService(self.db_session)
         run_started_at = datetime.utcnow()
         run_started_clock = time.perf_counter()
 
@@ -345,6 +347,29 @@ class OrchestrationService:
             await usage_service.increment_tokens(organization_id, int(usage.get('total_tokens', 0)))
             run_finished_at = datetime.utcnow()
             duration_sec = round(time.perf_counter() - run_started_clock, 2)
+            provider_name, model_name = self._extract_provider_model(state)
+            await usage_event_service.create_event(
+                organization_id=organization_id,
+                user_id=task.created_by_user_id,
+                task_id=task.id,
+                operation_type='task_orchestration_run',
+                provider=provider_name,
+                model=model_name,
+                status='completed',
+                prompt_tokens=int(usage.get('prompt_tokens', 0)),
+                completion_tokens=int(usage.get('completion_tokens', 0)),
+                total_tokens=int(usage.get('total_tokens', 0)),
+                cost_usd=float(estimated_cost),
+                started_at=run_started_at,
+                ended_at=run_finished_at,
+                duration_ms=int(duration_sec * 1000),
+                local_repo_path=routing.local_repo_path,
+                details_json={
+                    'source': routing.effective_source,
+                    'external_source': routing.external_source,
+                    'create_pr': create_pr,
+                },
+            )
             await task_service.add_log(
                 task.id,
                 organization_id,
@@ -383,6 +408,35 @@ class OrchestrationService:
             usage = state.get('usage', {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0})
             run_finished_at = datetime.utcnow()
             duration_sec = round(time.perf_counter() - run_started_clock, 2)
+            provider_name, model_name = self._extract_provider_model(state)
+            estimated_cost = self.cost_tracker.estimate_cost_usd(
+                prompt_tokens=int(usage.get('prompt_tokens', 0)),
+                completion_tokens=int(usage.get('completion_tokens', 0)),
+                model=model_name or provider_name or 'gpt-4o-mini',
+            )
+            await usage_event_service.create_event(
+                organization_id=organization_id,
+                user_id=task.created_by_user_id,
+                task_id=task.id,
+                operation_type='task_orchestration_run',
+                provider=provider_name,
+                model=model_name,
+                status='failed',
+                prompt_tokens=int(usage.get('prompt_tokens', 0)),
+                completion_tokens=int(usage.get('completion_tokens', 0)),
+                total_tokens=int(usage.get('total_tokens', 0)),
+                cost_usd=float(estimated_cost),
+                started_at=run_started_at,
+                ended_at=run_finished_at,
+                duration_ms=int(duration_sec * 1000),
+                local_repo_path=routing.local_repo_path,
+                error_message=str(exc)[:800],
+                details_json={
+                    'source': routing.effective_source,
+                    'external_source': routing.external_source,
+                    'create_pr': create_pr,
+                },
+            )
             await task_service.add_log(
                 task.id,
                 organization_id,
@@ -558,6 +612,16 @@ class OrchestrationService:
     def _is_mock_run(self, state: dict[str, Any]) -> bool:
         model_usage = state.get('model_usage') or []
         return any(str(model).startswith('mock-local') for model in model_usage)
+
+    def _extract_provider_model(self, state: dict[str, Any]) -> tuple[str, str | None]:
+        model_usage = state.get('model_usage') or []
+        last = str(model_usage[-1]) if model_usage else ''
+        if ':' in last:
+            provider, model = last.split(':', 1)
+            return provider.strip() or 'unknown', model.strip() or None
+        if last:
+            return 'openai', last
+        return 'unknown', None
 
     def _estimate_tokens(self, text: str) -> int:
         content = (text or '').strip()

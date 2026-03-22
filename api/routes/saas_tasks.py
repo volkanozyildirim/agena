@@ -16,6 +16,7 @@ from schemas.saas_task import (
     TaskDependencyUpdateRequest,
     TaskCreateRequest,
     TaskLogItem,
+    UsageEventItem,
     TaskResponse,
 )
 from services.notification_service import NotificationService
@@ -264,6 +265,41 @@ async def task_logs(
     service = TaskService(db)
     logs = await service.get_logs(tenant.organization_id, task_id)
     return [TaskLogItem(stage=l.stage, message=l.message, created_at=l.created_at) for l in logs]
+
+
+@router.get('/{task_id}/usage-events', response_model=list[UsageEventItem])
+async def task_usage_events(
+    task_id: int,
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[UsageEventItem]:
+    service = TaskService(db)
+    task = await service.get_task(tenant.organization_id, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail='Task not found')
+    events = await service.get_usage_events(tenant.organization_id, task_id)
+    return [
+        UsageEventItem(
+            id=e.id,
+            operation_type=e.operation_type,
+            provider=e.provider,
+            model=e.model,
+            status=e.status,
+            prompt_tokens=e.prompt_tokens,
+            completion_tokens=e.completion_tokens,
+            total_tokens=e.total_tokens,
+            cost_usd=e.cost_usd,
+            duration_ms=e.duration_ms,
+            cache_hit=e.cache_hit,
+            local_repo_path=e.local_repo_path,
+            profile_version=e.profile_version,
+            error_message=e.error_message,
+            started_at=e.started_at,
+            ended_at=e.ended_at,
+            created_at=e.created_at,
+        )
+        for e in events
+    ]
 
 
 @router.get('/{task_id}/dependencies')

@@ -1,4 +1,5 @@
 from models.agent_log import AgentLog
+from models.ai_usage_event import AIUsageEvent
 from models.flow_assets import AgentAnalyticsSnapshot, FlowTemplate, FlowVersion
 from models.flow_run import FlowRun, FlowRunStep
 from models.integration_config import IntegrationConfig
@@ -26,6 +27,7 @@ __all__ = [
     'TaskRecord',
     'RunRecord',
     'AgentLog',
+    'AIUsageEvent',
     'FlowTemplate',
     'FlowVersion',
     'AgentAnalyticsSnapshot',
