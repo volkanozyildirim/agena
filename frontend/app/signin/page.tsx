@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { apiFetch, setToken } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
@@ -11,11 +11,19 @@ type AuthResponse = { access_token: string };
 
 export default function SignInPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { t } = useLocale();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  function resolveNextUrl(): string {
+    const raw = searchParams.get('next') || '';
+    if (!raw.startsWith('/')) return '/dashboard?welcome=1';
+    if (raw.startsWith('//')) return '/dashboard?welcome=1';
+    return raw;
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -26,7 +34,7 @@ export default function SignInPage() {
         body: JSON.stringify({ email, password }),
       }, false);
       setToken(res.access_token);
-      router.push('/dashboard?welcome=1');
+      router.push(resolveNextUrl());
     } catch (err) {
       setError(err instanceof Error ? err.message : t('signin.error'));
     } finally {
@@ -70,7 +78,7 @@ export default function SignInPage() {
 
           <p style={{ textAlign: 'center', marginTop: 24, fontSize: 13, color: 'rgba(255,255,255,0.3)' }}>
             {t('signin.noAccount')}{' '}
-            <Link href='/signup' style={{ color: '#5eead4', fontWeight: 600, textDecoration: 'none' }}>{t('signin.startFree')}</Link>
+            <Link href={`/signup${searchParams.get('next') ? `?next=${encodeURIComponent(searchParams.get('next') || '')}` : ''}`} style={{ color: '#5eead4', fontWeight: 600, textDecoration: 'none' }}>{t('signin.startFree')}</Link>
           </p>
         </div>
       </div>

@@ -35,7 +35,9 @@ function DashboardInner({ children }: { children: ReactNode }) {
 
     async function bootstrap() {
       if (!isLoggedIn()) {
-        router.replace('/signin');
+        const qs = searchParams.toString();
+        const next = qs ? `${pathname}?${qs}` : pathname;
+        router.replace(`/signin?next=${encodeURIComponent(next)}`);
         return;
       }
       if (!active) return;

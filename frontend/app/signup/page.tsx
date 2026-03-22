@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { apiFetch, setToken } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
@@ -11,6 +11,7 @@ type AuthResponse = { access_token: string };
 
 export default function SignUpPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { t } = useLocale();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -18,6 +19,13 @@ export default function SignUpPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  function resolveNextUrl(): string {
+    const raw = searchParams.get('next') || '';
+    if (!raw.startsWith('/')) return '/dashboard?onboarding=1';
+    if (raw.startsWith('//')) return '/dashboard?onboarding=1';
+    return raw;
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -28,7 +36,7 @@ export default function SignUpPage() {
         body: JSON.stringify({ email, full_name: fullName, organization_name: orgName, password }),
       }, false);
       setToken(res.access_token);
-      router.push('/dashboard?onboarding=1');
+      router.push(resolveNextUrl());
     } catch (err) {
       setError(err instanceof Error ? err.message : t('signup.error'));
     } finally {
@@ -76,7 +84,7 @@ export default function SignUpPage() {
 
           <p style={{ textAlign: 'center', marginTop: 24, fontSize: 13, color: 'rgba(255,255,255,0.3)' }}>
             {t('signup.hasAccount')}{' '}
-            <Link href='/signin' style={{ color: '#a78bfa', fontWeight: 600, textDecoration: 'none' }}>{t('signup.signin')}</Link>
+            <Link href={`/signin${searchParams.get('next') ? `?next=${encodeURIComponent(searchParams.get('next') || '')}` : ''}`} style={{ color: '#a78bfa', fontWeight: 600, textDecoration: 'none' }}>{t('signup.signin')}</Link>
           </p>
         </div>
       </div>
