@@ -11,6 +11,8 @@ from schemas.github import GitHubFileChange
 
 
 class LocalRepoService:
+    GIT_COMMAND_TIMEOUT_SEC = 300
+
     async def apply_changes_and_push(
         self,
         repo_path: str,
@@ -96,9 +98,20 @@ class LocalRepoService:
                 **os.environ,
                 'LC_ALL': 'C',
                 'GIT_SSH_COMMAND': 'ssh -o StrictHostKeyChecking=accept-new',
+                'GIT_TERMINAL_PROMPT': '0',
             },
         )
-        out, err = await proc.communicate()
+        try:
+            out, err = await asyncio.wait_for(
+                proc.communicate(),
+                timeout=self.GIT_COMMAND_TIMEOUT_SEC,
+            )
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.communicate()
+            raise RuntimeError(
+                f"git {' '.join(args)} timed out after {self.GIT_COMMAND_TIMEOUT_SEC}s"
+            )
         if proc.returncode != 0:
             msg = (err.decode('utf-8', errors='ignore') or out.decode('utf-8', errors='ignore')).strip()
             raise RuntimeError(f"git {' '.join(args)} failed: {msg}")
