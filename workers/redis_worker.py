@@ -73,10 +73,29 @@ async def _run_single_task(payload: dict) -> None:
             lock_scope = f"org:{organization_id}:external:{task.external_id or task.id}"
 
         queue_service = QueueService()
-        lock_owner = f'{task_id}:{uuid.uuid4().hex}'
+        lock_owner = f'task:{task_id}'
         lock_key = f'org:{organization_id}:{lock_scope}' if lock_scope else None
         if lock_key:
             acquired = await queue_service.acquire_lock(lock_key, lock_owner, ttl_sec=1800)
+            if not acquired:
+                current_owner = await queue_service.get_lock_owner(lock_key)
+                stale_owner = False
+                if current_owner and current_owner.startswith('task:'):
+                    try:
+                        owner_task_id = int(current_owner.split(':', 1)[1])
+                    except Exception:
+                        owner_task_id = 0
+                    if owner_task_id > 0:
+                        owner_task = await task_service.get_task(organization_id, owner_task_id)
+                        if owner_task is None or owner_task.status in {'failed', 'completed', 'cancelled'}:
+                            stale_owner = True
+                elif not current_owner:
+                    stale_owner = True
+
+                if stale_owner:
+                    await queue_service.force_delete_lock(lock_key)
+                    acquired = await queue_service.acquire_lock(lock_key, lock_owner, ttl_sec=1800)
+
             if not acquired:
                 if lock_retries >= settings.queue_lock_max_retries:
                     task.status = 'failed'
