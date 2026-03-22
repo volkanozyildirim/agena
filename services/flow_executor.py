@@ -167,6 +167,24 @@ def _parse_task_meta_from_description(description: str) -> dict[str, str]:
     return out
 
 
+def _is_fix_request_comment(content: str) -> bool:
+    text = (content or '').strip().lower()
+    if not text:
+        return False
+    triggers = (
+        '/fix',
+        '/tiqr fix',
+        'request changes',
+        'needs changes',
+        'please fix',
+        'lütfen düzelt',
+        'lutfen duzelt',
+        'duzelt',
+        'düzelt',
+    )
+    return any(token in text for token in triggers)
+
+
 async def _load_latest_code_diff(db: AsyncSession, task_id: int, organization_id: int) -> str:
     row = await db.execute(
         select(AgentLog.message).where(
@@ -669,6 +687,8 @@ async def _run_lead_pr_review_node(
     await db.commit()
 
     auto_fix = _bool_val(node.get('auto_fix_from_comments'), True)
+    fix_requested = any(_is_fix_request_comment(str(c.get('content') or '')) for c in actionable)
+
     if not auto_fix:
         if is_azure:
             comment_ref = await AzurePRService(db).post_pr_comment(
@@ -687,6 +707,32 @@ async def _run_lead_pr_review_node(
             'feedback_hash': feedback_hash,
             'comment_ref': comment_ref,
             'message': 'Review comments captured; auto-fix disabled',
+        }
+
+    if not fix_requested:
+        if is_azure:
+            comment_ref = await AzurePRService(db).post_pr_comment(
+                organization_id,
+                pr_url=pr_url,
+                comment=(
+                    '[Tiqr PR Review] New comments captured, but no explicit fix trigger found. '
+                    "To run auto-fix, add one of: '/fix', '/tiqr fix', 'request changes', 'please fix'."
+                ),
+            )
+        else:
+            comment_ref = await GitHubService().post_pr_comment(
+                pr_url=pr_url,
+                comment=(
+                    '[Tiqr PR Review] New comments captured, but no explicit fix trigger found. '
+                    "To run auto-fix, add one of: '/fix', '/tiqr fix', 'request changes', 'please fix'."
+                ),
+            )
+        return {
+            'status': 'ok',
+            'pr_url': pr_url,
+            'feedback_hash': feedback_hash,
+            'comment_ref': comment_ref,
+            'message': 'Review comments captured; waiting for explicit fix trigger',
         }
 
     rerun = await OrchestrationService(db).run_task_record(
