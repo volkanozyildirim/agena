@@ -266,7 +266,7 @@ export default function IntegrationsPage() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
         {/* OpenAI */}
         <IntegrationCard
           title='OpenAI'
@@ -462,19 +462,19 @@ function IntegrationCard({
   return (
     <div style={{
       borderRadius: 20, border: `1px solid ${borderColor}`,
-      background: bgColor, padding: 28,
+      background: bgColor, padding: 18,
       position: 'relative', overflow: 'hidden',
       boxShadow: glow,
     }}>
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: topLine }} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
         <div style={{
-          width: 44, height: 44, borderRadius: 12, fontSize: 22,
+          width: 36, height: 36, borderRadius: 10, fontSize: 18,
           background: `${color}15`, border: `1px solid ${color}25`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>{icon}</div>
         <div>
-          <div style={{ fontWeight: 700, color: 'rgba(255,255,255,0.9)', fontSize: 16 }}>{title}</div>
+          <div style={{ fontWeight: 700, color: 'rgba(255,255,255,0.9)', fontSize: 14 }}>{title}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
             <span className={connected ? 'connected-dot' : ''} style={{ width: 6, height: 6, borderRadius: '50%', background: connected ? '#22c55e' : 'rgba(255,255,255,0.2)' }} />
             <span style={{ fontSize: 11, color: connected ? '#22c55e' : 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
@@ -488,7 +488,7 @@ function IntegrationCard({
           </span>
         )}
       </div>
-      <div style={{ display: 'grid', gap: 14 }}>{children}</div>
+      <div style={{ display: 'grid', gap: 10 }}>{children}</div>
     </div>
   );
 }

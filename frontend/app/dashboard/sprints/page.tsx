@@ -68,6 +68,9 @@ const LS_PROJECT = 'tiqr_sprint_project';
 const LS_TEAM    = 'tiqr_sprint_team';
 const LS_SPRINT  = 'tiqr_sprint_path';
 const LS_PROVIDER = 'tiqr_sprint_provider';
+const LS_JIRA_PROJECT = 'tiqr_jira_project';
+const LS_JIRA_BOARD = 'tiqr_jira_board';
+const LS_JIRA_SPRINT = 'tiqr_jira_sprint';
 
 function elapsed(from?: string, to?: string): string | null {
   if (!from) return null;
@@ -158,19 +161,28 @@ export default function SprintsPage() {
   const [hydrating, setHydrating] = useState(true);
   const [preferredSprint, setPreferredSprint] = useState('');
 
-  const setProject = useCallback((v: string) => { setProjectRaw(v); localStorage.setItem(LS_PROJECT, v); }, []);
-  const setTeam    = useCallback((v: string) => { setTeamRaw(v);    localStorage.setItem(LS_TEAM, v);    }, []);
-  const setSprint  = useCallback((v: string) => { setSprintRaw(v);  localStorage.setItem(LS_SPRINT, v);  }, []);
+  const setProject = useCallback((v: string) => {
+    setProjectRaw(v);
+    localStorage.setItem(provider === 'jira' ? LS_JIRA_PROJECT : LS_PROJECT, v);
+  }, [provider]);
+  const setTeam    = useCallback((v: string) => {
+    setTeamRaw(v);
+    localStorage.setItem(provider === 'jira' ? LS_JIRA_BOARD : LS_TEAM, v);
+  }, [provider]);
+  const setSprint  = useCallback((v: string) => {
+    setSprintRaw(v);
+    localStorage.setItem(provider === 'jira' ? LS_JIRA_SPRINT : LS_SPRINT, v);
+  }, [provider]);
   const setProvider = useCallback((v: 'azure' | 'jira') => { setProviderRaw(v); localStorage.setItem(LS_PROVIDER, v); }, []);
 
   // İlk yükleme — DB'den + localStorage'dan
   useEffect(() => {
     setAgentConfigs(loadAgentConfigs());
     const init = async () => {
-      let savedProject = localStorage.getItem(LS_PROJECT) || '';
-      let savedTeam    = localStorage.getItem(LS_TEAM)    || '';
-      let savedSprint  = localStorage.getItem(LS_SPRINT)  || '';
       let savedProvider = (localStorage.getItem(LS_PROVIDER) || 'azure') as 'azure' | 'jira';
+      let savedProject = localStorage.getItem(savedProvider === 'jira' ? LS_JIRA_PROJECT : LS_PROJECT) || '';
+      let savedTeam    = localStorage.getItem(savedProvider === 'jira' ? LS_JIRA_BOARD : LS_TEAM) || '';
+      let savedSprint  = localStorage.getItem(savedProvider === 'jira' ? LS_JIRA_SPRINT : LS_SPRINT) || '';
       try {
         const prefs = await loadPrefs();
         const rawSettings = (prefs.profile_settings || {}) as Record<string, unknown>;
@@ -220,6 +232,13 @@ export default function SprintsPage() {
         if (savedProvider === 'jira') {
           const projs = await apiFetch<Opt[]>('/tasks/jira/projects');
           setProjects(projs);
+          if (savedProject) {
+            const byId = projs.find((p) => (p.id ?? p.name) === savedProject);
+            if (!byId) {
+              const byName = projs.find((p) => p.name === savedProject);
+              if (byName) savedProject = byName.id ?? byName.name;
+            }
+          }
           if (!savedProject) return;
           setProjectRaw(savedProject);
           const boards = await apiFetch<Opt[]>('/tasks/jira/boards?project_key=' + encodeURIComponent(savedProject));
