@@ -121,9 +121,9 @@ export default function RepoMappingsPage() {
     if (sourceProvider !== 'github') return;
     setGithubRepos([]);
     setSelGithubRepo('');
-    if (!githubOwner.trim()) return;
     setLoadingGithubRepos(true);
-    const query = `?owner=${encodeURIComponent(githubOwner.trim())}`;
+    const owner = githubOwner.trim();
+    const query = owner ? `?owner=${encodeURIComponent(owner)}` : '';
     apiFetch<GithubRepo[]>(`/integrations/github/repos${query}`)
       .then(setGithubRepos)
       .catch(() => {})
@@ -342,7 +342,7 @@ export default function RepoMappingsPage() {
               </div>
               <div>
                 <div style={fieldLabelStyle}>{t('mappings.githubRepo')}</div>
-                <select value={selGithubRepo} onChange={(e) => setSelGithubRepo(e.target.value)} disabled={!githubOwner.trim() || loadingGithubRepos || !hasGithubIntegration} style={fieldStyle}>
+                <select value={selGithubRepo} onChange={(e) => setSelGithubRepo(e.target.value)} disabled={loadingGithubRepos || !hasGithubIntegration} style={fieldStyle}>
                   <option value='' style={{ background: '#0d1117' }}>
                     {!hasGithubIntegration ? t('mappings.connectGithubFirst') : (loadingGithubRepos ? t('mappings.loadingGithubRepos') : t('mappings.selectGithubRepo'))}
                   </option>
