@@ -258,7 +258,11 @@ export default function SprintsPage() {
             const byId = projs.find((p) => (p.id ?? p.name) === savedProject);
             if (!byId) {
               const byName = projs.find((p) => p.name === savedProject);
-              if (byName) savedProject = byName.id ?? byName.name;
+              if (byName) {
+                savedProject = byName.id ?? byName.name;
+              } else {
+                savedProject = '';
+              }
             }
             if (savedProject) {
               setProjectRaw(savedProject);
@@ -268,11 +272,20 @@ export default function SprintsPage() {
             // Some Jira tenants may return no projects for this account.
             // In that case, allow board-first selection.
             boards = await apiFetch<Opt[]>('/tasks/jira/boards');
+            if (projs.length > 0) {
+              const firstProject = projs[0].id ?? projs[0].name;
+              setProjectRaw(firstProject);
+            }
           }
           setTeams(boards);
           if (!savedTeam) return;
-          setTeamRaw(savedTeam);
-          const sps = await apiFetch<Opt[]>('/tasks/jira/sprints?board_id=' + encodeURIComponent(savedTeam));
+          const validBoard =
+            boards.find((b) => (b.id ?? b.name) === savedTeam) ||
+            boards.find((b) => b.name === savedTeam);
+          if (!validBoard) return;
+          const boardId = validBoard.id ?? validBoard.name;
+          setTeamRaw(boardId);
+          const sps = await apiFetch<Opt[]>('/tasks/jira/sprints?board_id=' + encodeURIComponent(boardId));
           setSprints(sps);
           const current = pickCurrentSprint(sps);
           if (current) {
@@ -334,9 +347,13 @@ export default function SprintsPage() {
             const byId = list.find((p) => (p.id ?? p.name) === normalized);
             if (!byId) {
               const byName = list.find((p) => p.name === normalized);
-              if (byName) normalized = byName.id ?? byName.name;
+              if (byName) {
+                normalized = byName.id ?? byName.name;
+              } else {
+                normalized = list[0] ? (list[0].id ?? list[0].name) : '';
+              }
             }
-            setProjectRaw(normalized);
+            if (normalized) setProjectRaw(normalized);
           } else {
             setProjectRaw(storedProject);
           }
