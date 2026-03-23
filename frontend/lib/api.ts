@@ -69,17 +69,26 @@ export async function apiFetch<T>(path: string, init?: RequestInit, auth = true)
     cache: 'no-store',
   });
 
+  const text = response.ok ? '' : await response.text();
+
   if (response.status === 401 && auth) {
-    removeToken();
-    if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/signin') && !window.location.pathname.startsWith('/signup')) {
-      const next = `${window.location.pathname}${window.location.search}`;
-      window.location.replace(`/signin?next=${encodeURIComponent(next)}`);
+    let detail = text || 'Unauthorized';
+    try {
+      const parsed = JSON.parse(text) as { detail?: string };
+      if (typeof parsed.detail === 'string' && parsed.detail.trim()) detail = parsed.detail.trim();
+    } catch {}
+    const tokenErrors = new Set(['Invalid token', 'Invalid auth context', 'User not found']);
+    if (tokenErrors.has(detail)) {
+      removeToken();
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/signin') && !window.location.pathname.startsWith('/signup')) {
+        const next = `${window.location.pathname}${window.location.search}`;
+        window.location.replace(`/signin?next=${encodeURIComponent(next)}`);
+      }
     }
-    throw new Error('Invalid token');
+    throw new Error(detail);
   }
 
   if (!response.ok) {
-    const text = await response.text();
     let message = text || `Request failed: ${response.status}`;
     try {
       const parsed = JSON.parse(text) as { detail?: string };
