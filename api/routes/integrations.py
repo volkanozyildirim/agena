@@ -92,6 +92,33 @@ async def list_github_repos(
                     org_data = org_response.json()
                     if isinstance(org_data, list) and org_data:
                         data = org_data
+            if isinstance(data, list) and not data and response.status_code < 400:
+                # Last fallback: collect repos from all organizations this user belongs to.
+                orgs_response = await client.get(f'{base}/user/orgs?per_page=100', headers=headers)
+                if orgs_response.status_code < 400:
+                    orgs = orgs_response.json()
+                    if isinstance(orgs, list):
+                        merged: list[dict] = []
+                        seen: set[str] = set()
+                        for org in orgs:
+                            login = str(org.get('login', '')).strip()
+                            if not login:
+                                continue
+                            org_url = f'{base}/orgs/{quote(login, safe="")}/repos?per_page=100&sort=updated'
+                            org_response = await client.get(org_url, headers=headers)
+                            if org_response.status_code >= 400:
+                                continue
+                            org_repos = org_response.json()
+                            if not isinstance(org_repos, list):
+                                continue
+                            for item in org_repos:
+                                rid = str(item.get('id', ''))
+                                if not rid or rid in seen:
+                                    continue
+                                seen.add(rid)
+                                merged.append(item)
+                        if merged:
+                            data = merged
 
     if response.status_code == 401:
         raise HTTPException(status_code=401, detail='Invalid GitHub token')
