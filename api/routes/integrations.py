@@ -17,6 +17,20 @@ class PlaybookContentResponse(BaseModel):
     content: str
 
 
+def _normalize_owner(raw: str | None) -> str:
+    value = (raw or '').strip()
+    if not value:
+        return ''
+    value = value.replace('https://', '').replace('http://', '').strip('/')
+    if value.startswith('github.com/'):
+        value = value[len('github.com/'):]
+    if '/' in value:
+        value = value.split('/')[0]
+    if value.startswith('@'):
+        value = value[1:]
+    return value.strip()
+
+
 @router.get('/github/repos')
 async def list_github_repos(
     owner: str | None = Query(default=None),
@@ -32,8 +46,8 @@ async def list_github_repos(
     if not token:
         raise HTTPException(status_code=400, detail='GitHub token is missing')
 
-    resolved_owner = (owner or '').strip()
-    default_owner = (config.username or '').strip()
+    resolved_owner = _normalize_owner(owner)
+    default_owner = _normalize_owner(config.username)
     base = (config.base_url or 'https://api.github.com').rstrip('/')
     headers = {
         'Authorization': f'Bearer {token}',
