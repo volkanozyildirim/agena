@@ -155,6 +155,40 @@ async def list_github_repos(
                                 merged.append(item)
                         if merged:
                             data = merged
+            if isinstance(data, list) and not data and response.status_code < 400:
+                # Final fallback: GraphQL viewer repositories (helps with some fine-grained token setups).
+                gql_headers = dict(headers)
+                gql_payload = {
+                    'query': """
+                    query {
+                      viewer {
+                        repositories(first: 100, affiliations: [OWNER, COLLABORATOR, ORGANIZATION_MEMBER], orderBy: {field: UPDATED_AT, direction: DESC}) {
+                          nodes {
+                            id
+                            name
+                            nameWithOwner
+                            isPrivate
+                          }
+                        }
+                      }
+                    }
+                    """
+                }
+                gql_resp = await client.post(f'{base}/graphql', headers=gql_headers, json=gql_payload)
+                if gql_resp.status_code < 400:
+                    gql_data = gql_resp.json()
+                    nodes = (((gql_data.get('data') or {}).get('viewer') or {}).get('repositories') or {}).get('nodes') or []
+                    if isinstance(nodes, list) and nodes:
+                        data = [
+                            {
+                                'id': node.get('id') or node.get('nameWithOwner') or '',
+                                'name': node.get('name') or '',
+                                'full_name': node.get('nameWithOwner') or '',
+                                'private': bool(node.get('isPrivate', False)),
+                            }
+                            for node in nodes
+                            if node.get('name') and node.get('nameWithOwner')
+                        ]
 
     if response.status_code == 401:
         raise HTTPException(status_code=401, detail='Invalid GitHub token')
