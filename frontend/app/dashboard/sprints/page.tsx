@@ -179,7 +179,8 @@ export default function SprintsPage() {
   useEffect(() => {
     setAgentConfigs(loadAgentConfigs());
     const init = async () => {
-      let savedProvider = (localStorage.getItem(LS_PROVIDER) || 'azure') as 'azure' | 'jira';
+      // Always prefer Azure on first load. Switch to Jira only if Azure is not connected.
+      let savedProvider: 'azure' | 'jira' = 'azure';
       let savedProject = localStorage.getItem(savedProvider === 'jira' ? LS_JIRA_PROJECT : LS_PROJECT) || '';
       let savedTeam    = localStorage.getItem(savedProvider === 'jira' ? LS_JIRA_BOARD : LS_TEAM) || '';
       let savedSprint  = localStorage.getItem(savedProvider === 'jira' ? LS_JIRA_SPRINT : LS_SPRINT) || '';
@@ -226,8 +227,14 @@ export default function SprintsPage() {
         // Jira is selected only when Azure is unavailable.
         if (azureConnected) {
           savedProvider = 'azure';
+          savedProject = localStorage.getItem(LS_PROJECT) || savedProject;
+          savedTeam = localStorage.getItem(LS_TEAM) || savedTeam;
+          savedSprint = localStorage.getItem(LS_SPRINT) || savedSprint;
         } else if (jiraConnected) {
           savedProvider = 'jira';
+          savedProject = localStorage.getItem(LS_JIRA_PROJECT) || savedProject;
+          savedTeam = localStorage.getItem(LS_JIRA_BOARD) || savedTeam;
+          savedSprint = localStorage.getItem(LS_JIRA_SPRINT) || savedSprint;
           if (jiraProjectPref) savedProject = jiraProjectPref;
           if (jiraBoardPref) savedTeam = jiraBoardPref;
           if (jiraSprintPref) savedSprint = jiraSprintPref;
