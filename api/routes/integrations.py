@@ -42,15 +42,37 @@ async def list_github_repos(
     }
 
     async with httpx.AsyncClient(timeout=30) as client:
-        # user/repos returns repositories visible to this token (including private repos)
-        # and works better than users/{owner}/repos for authenticated private repositories.
-        response = await client.get(
+        # Collect repos via multiple user/repos variants because token types can differ
+        # (classic PAT vs fine-grained) and some variants may return partial lists.
+        endpoints = [
+            f'{base}/user/repos?per_page=100&sort=updated&visibility=all&type=all',
+            f'{base}/user/repos?per_page=100&sort=updated&type=owner',
             f'{base}/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member',
-            headers=headers,
-        )
+        ]
+        merged_by_id: dict[str, dict] = {}
+        response = None
+        for url in endpoints:
+            r = await client.get(url, headers=headers)
+            if response is None:
+                response = r
+            if r.status_code >= 400:
+                continue
+            payload = r.json()
+            if not isinstance(payload, list):
+                continue
+            for item in payload:
+                rid = str(item.get('id', ''))
+                if not rid:
+                    continue
+                merged_by_id[rid] = item
+
+        if response is None:
+            raise HTTPException(status_code=500, detail='GitHub repo listing failed')
+
+        base_list = list(merged_by_id.values())
 
         if resolved_owner and response.status_code < 400:
-            raw = response.json()
+            raw = base_list
             if isinstance(raw, list):
                 filtered = [item for item in raw if str(item.get('full_name', '')).lower().startswith(f'{resolved_owner.lower()}/')]
                 if filtered:
@@ -79,7 +101,7 @@ async def list_github_repos(
             else:
                 data = []
         else:
-            data = response.json() if response.status_code < 400 else []
+            data = base_list if response.status_code < 400 else []
             if (
                 isinstance(data, list)
                 and not data
