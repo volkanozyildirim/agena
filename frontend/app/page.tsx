@@ -100,6 +100,15 @@ function Counter({ target, suffix = '' }: { target: number; suffix?: string }) {
 export default function HomePage() {
   const { t } = useLocale();
   const flowWords = t('landing.flowShowcaseWords').split(' ');
+  const integrations = [
+    { key: 'azure', logo: '/media/azure-logo.svg', name: t('landing.integrationAzure') },
+    { key: 'jira', logo: '/media/jira-logo.svg', name: t('landing.integrationJira') },
+    { key: 'github', logo: '/media/github-logo.svg', name: t('landing.integrationGithub') },
+    { key: 'openai', logo: '/media/openai-logo.svg', name: t('landing.integrationOpenai') },
+    { key: 'gemini', logo: '/media/gemini-logo.svg', name: t('landing.integrationGemini') },
+    { key: 'slack', logo: '/media/slack-logo.svg', name: t('landing.integrationSlack') },
+    { key: 'teams', logo: '/media/teams-logo.svg', name: t('landing.integrationTeams') },
+  ];
 
   return (
     <>
@@ -206,8 +215,23 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* ── INTEGRATIONS MARQUEE ── */}
+        <section style={{ padding: '0 0 2px' }}>
+          <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 9, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(2,6,23,0.56)', maxHeight: 64 }}>
+            <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(90deg, rgba(2,6,23,0.95), rgba(2,6,23,0) 10%, rgba(2,6,23,0) 90%, rgba(2,6,23,0.95))', zIndex: 2 }} />
+            <div style={{ display: 'flex', width: 'max-content', animation: 'integrationMarqueeSingle 34s linear infinite', padding: '7px 0' }}>
+              {integrations.map((item) => (
+                <div key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 9, margin: '0 7px', padding: '5px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', whiteSpace: 'nowrap' }}>
+                  <img src={item.logo} alt={item.name} loading='lazy' style={{ width: 18, height: 18, borderRadius: 4, objectFit: 'contain', flexShrink: 0 }} />
+                  <span style={{ color: 'rgba(255,255,255,0.76)', fontSize: 11, fontWeight: 600, lineHeight: 1 }}>{item.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* ── FLOW SHOWCASE ── */}
-        <section style={{ padding: '26px 0 52px' }}>
+        <section style={{ padding: '16px 0 52px' }}>
           <div className='flow-showcase'>
             <div className='flow-showcase-image-wrap'>
               <img src='/media/flow.png' alt='Flow Diagram' className='flow-showcase-image' loading='lazy' />
@@ -480,113 +504,146 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className='capability-grid'>
-            {[
-              {
-                kind: 'dependency',
-                icon: '🧩',
-                title: t('landing.capDependencyTitle'),
-                desc: t('landing.capDependencyDesc'),
-                badges: [t('landing.capDependencyBadge1'), t('landing.capDependencyBadge2'), t('landing.capDependencyBadge3')],
-                photo: 'https://images.unsplash.com/photo-1516383740770-fbcc5ccbece0?auto=format&fit=crop&w=900&q=80',
-              },
-              {
-                kind: 'risk',
-                icon: '🛡️',
-                title: t('landing.capRiskTitle'),
-                desc: t('landing.capRiskDesc'),
-                badges: [t('landing.capRiskBadge1'), t('landing.capRiskBadge2'), t('landing.capRiskBadge3')],
-                photo: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=900&q=80',
-              },
-              {
-                kind: 'playbook',
-                icon: '📘',
-                title: t('landing.capPlaybookTitle'),
-                desc: t('landing.capPlaybookDesc'),
-                badges: [t('landing.capPlaybookBadge1'), t('landing.capPlaybookBadge2'), t('landing.capPlaybookBadge3')],
-                photo: 'https://images.unsplash.com/photo-1523475472560-d2df97ec485c?auto=format&fit=crop&w=900&q=80',
-              },
-              {
-                kind: 'story',
-                icon: '📝',
-                title: t('landing.capStoryTitle'),
-                desc: t('landing.capStoryDesc'),
-                badges: [t('landing.capStoryBadge1'), t('landing.capStoryBadge2'), t('landing.capStoryBadge3')],
-                photo: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=900&q=80',
-              },
-              {
-                kind: 'guardrail',
-                icon: '💸',
-                title: t('landing.capGuardrailTitle'),
-                desc: t('landing.capGuardrailDesc'),
-                badges: [t('landing.capGuardrailBadge1'), t('landing.capGuardrailBadge2'), t('landing.capGuardrailBadge3')],
-                photo: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=900&q=80',
-              },
-            ].map((item, idx) => (
-              <article key={item.title} className={`capability-card capability-${item.kind}`} style={{ animationDelay: `${idx * 0.12}s` }}>
-                <div className='capability-photo-wrap'>
-                  <img src={item.photo} alt={item.title} className='capability-photo' loading='lazy' />
-                  <div className='capability-overlay'>
-                    <span className='chip' style={{ fontSize: 10 }}>{item.icon} {t('landing.widgetLive')}</span>
+          <div className='capability-mosaic'>
+            <article className='cap-hero'>
+              <div className='cap-hero-head'>
+                <span className='chip' style={{ fontSize: 10 }}>🧩 {t('landing.widgetLive')}</span>
+                <span className='cap-hero-kpi'>{t('landing.capDependencyKpi')}</span>
+              </div>
+              <h3>{t('landing.capDependencyTitle')}</h3>
+              <p>{t('landing.capDependencyDesc')}</p>
+              <div className='cap-visual-dep'>
+                <span className='dep-node'>{t('landing.capDependencyNodeIntake')}</span>
+                <span className='dep-line' />
+                <span className='dep-node active'>{t('landing.capDependencyNodeDev')}</span>
+                <span className='dep-line' />
+                <span className='dep-node blocked'>{t('landing.capDependencyNodeReview')}</span>
+              </div>
+              <div className='capability-badges'>
+                <span className='capability-badge'>{t('landing.capDependencyBadge1')}</span>
+                <span className='capability-badge'>{t('landing.capDependencyBadge2')}</span>
+                <span className='capability-badge'>{t('landing.capDependencyBadge3')}</span>
+              </div>
+            </article>
+
+            <article className='cap-side cap-risk-tile'>
+              <div className='cap-visual-risk'>
+                <div className='cap-risk-gauge'><span>72</span></div>
+                <div className='cap-risk-meta'>{t('landing.capRiskLevelHigh')}</div>
+              </div>
+              <h4>{t('landing.capRiskTitle')}</h4>
+              <p>{t('landing.capRiskDesc')}</p>
+            </article>
+
+            <article className='cap-side cap-playbook-tile cap-diagonal-tile'>
+              <h4>{t('landing.capPlaybookTitle')}</h4>
+              <div className='cap-visual-rules'>
+                <div className='rule-row'>$ {t('landing.capPlaybookRule1')}</div>
+                <div className='rule-row'>$ {t('landing.capPlaybookRule2')}</div>
+                <div className='rule-row'>$ {t('landing.capPlaybookRule3')}</div>
+              </div>
+              <div className='capability-badges'>
+                <span className='capability-badge'>{t('landing.capPlaybookBadge1')}</span>
+                <span className='capability-badge'>{t('landing.capPlaybookBadge2')}</span>
+              </div>
+            </article>
+
+            <article className='cap-wide cap-story-tile'>
+              <div className='cap-story-content'>
+                <h4>{t('landing.capStoryTitle')}</h4>
+                <p>{t('landing.capStoryDesc')}</p>
+              </div>
+              <div className='cap-visual-story'>
+                <div className='story-mini'>{t('landing.capStoryMiniContext')}</div>
+                <div className='story-mini'>{t('landing.capStoryMiniAcceptance')}</div>
+                <div className='story-mini'>{t('landing.capStoryMiniEdgeCases')}</div>
+              </div>
+            </article>
+
+            <article className='cap-wide cap-guard-tile'>
+              <div>
+                <h4>{t('landing.capGuardrailTitle')}</h4>
+                <p>{t('landing.capGuardrailDesc')}</p>
+              </div>
+              <div className='cap-timeline'>
+                <div className='cap-timeline-item done'>
+                  <span className='cap-timeline-dot' />
+                  <div className='cap-timeline-content'>{t('landing.flowStep1')}</div>
+                </div>
+                <div className='cap-timeline-item done'>
+                  <span className='cap-timeline-dot' />
+                  <div className='cap-timeline-content'>{t('landing.flowStep2')}</div>
+                </div>
+                <div className='cap-timeline-item active'>
+                  <span className='cap-timeline-dot' />
+                  <div className='cap-timeline-content'>{t('landing.flowStep3')}</div>
+                </div>
+                <div className='cap-timeline-item pending'>
+                  <span className='cap-timeline-dot' />
+                  <div className='cap-timeline-content'>{t('landing.flowStep4')}</div>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        {/* ── CHATOPS INTEGRATIONS ── */}
+        <section style={{ padding: '60px 0' }}>
+          <div style={{ marginBottom: 28 }}>
+            <div className='section-label'>{t('landing.chatopsLabel')}</div>
+            <h2 style={{ fontSize: 'clamp(24px, 2.5vw, 36px)', fontWeight: 800, color: 'rgba(255,255,255,0.92)', marginBottom: 10 }}>
+              {t('landing.chatopsTitle')}
+            </h2>
+            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, maxWidth: 780 }}>
+              {t('landing.chatopsSubtitle')}
+            </p>
+          </div>
+
+          <div className='grid-2' style={{ marginBottom: 14 }}>
+            <article className='ai-panel' style={{ position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 80% -20%, rgba(74, 21, 75, 0.32), transparent 52%)' }} />
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+                  <img src='/media/slack-logo.svg' alt='Slack' style={{ width: 48, height: 48 }} loading='lazy' />
+                  <div>
+                    <div style={{ color: 'rgba(255,255,255,0.94)', fontWeight: 700, fontSize: 17 }}>{t('landing.slackTitle')}</div>
+                    <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>{t('landing.chatopsSlackSub')}</div>
                   </div>
                 </div>
-                <div className='capability-content'>
-                  <h3 className='capability-title'>{item.title}</h3>
-                  <p className='capability-desc'>{item.desc}</p>
-
-                  {item.kind === 'dependency' ? (
-                    <div className='cap-dep-graph'>
-                      <div className='cap-node active'>#18</div>
-                      <div className='cap-link' />
-                      <div className='cap-node active'>#22</div>
-                      <div className='cap-link' />
-                      <div className='cap-node blocked'>#31</div>
-                    </div>
-                  ) : null}
-
-                  {item.kind === 'risk' ? (
-                    <div className='cap-risk-wrap'>
-                      <div className='cap-risk-gauge'>
-                        <span>72</span>
-                      </div>
-                      <div className='cap-risk-meta'>HIGH RISK</div>
-                    </div>
-                  ) : null}
-
-                  {item.kind === 'playbook' ? (
-                    <div className='cap-rules'>
-                      {item.badges.map((badge) => (
-                        <div key={badge} className='cap-rule-line'>• {badge}</div>
-                      ))}
-                    </div>
-                  ) : null}
-
-                  {item.kind === 'story' ? (
-                    <div className='cap-story-lines'>
-                      <div className='cap-story-pill'>{item.badges[0]}</div>
-                      <div className='cap-story-pill'>{item.badges[1]}</div>
-                      <div className='cap-story-pill'>{item.badges[2]}</div>
-                    </div>
-                  ) : null}
-
-                  {item.kind === 'guardrail' ? (
-                    <div className='cap-guardrail-bars'>
-                      <div className='cap-guardrail-row'>
-                        <span>{item.badges[0]}</span>
-                        <div className='cap-meter'><i style={{ width: '66%' }} /></div>
-                      </div>
-                      <div className='cap-guardrail-row'>
-                        <span>{item.badges[1]}</span>
-                        <div className='cap-meter'><i style={{ width: '48%' }} /></div>
-                      </div>
-                      <div className='cap-guardrail-row'>
-                        <span>{item.badges[2]}</span>
-                        <div className='cap-meter'><i style={{ width: '84%' }} /></div>
-                      </div>
-                    </div>
-                  ) : null}
+                <p style={{ color: 'rgba(255,255,255,0.48)', fontSize: 14, lineHeight: 1.65 }}>
+                  {t('landing.slackDesc')}
+                </p>
+                <div style={{ marginTop: 12, height: 4, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                  <div style={{ width: '76%', height: '100%', background: 'linear-gradient(90deg, #e01e5a, #2eb67d, #36c5f0)', animation: 'progressPulse 2.8s ease-in-out infinite' }} />
                 </div>
-              </article>
+              </div>
+            </article>
+
+            <article className='ai-panel' style={{ position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 20% -20%, rgba(75, 137, 220, 0.3), transparent 55%)' }} />
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+                  <img src='/media/teams-logo.svg' alt='Microsoft Teams' style={{ width: 48, height: 48 }} loading='lazy' />
+                  <div>
+                    <div style={{ color: 'rgba(255,255,255,0.94)', fontWeight: 700, fontSize: 17 }}>{t('landing.teamsTitle')}</div>
+                    <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>{t('landing.chatopsTeamsSub')}</div>
+                  </div>
+                </div>
+                <p style={{ color: 'rgba(255,255,255,0.48)', fontSize: 14, lineHeight: 1.65 }}>
+                  {t('landing.teamsDesc')}
+                </p>
+                <div style={{ marginTop: 12, height: 4, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                  <div style={{ width: '84%', height: '100%', background: 'linear-gradient(90deg, #4f46e5, #22d3ee)', animation: 'progressPulse 3.2s ease-in-out infinite' }} />
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+            {[t('landing.chatopsPoint1'), t('landing.chatopsPoint2'), t('landing.chatopsPoint3'), t('landing.chatopsPoint4')].map((point, i) => (
+              <div key={point} style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(2,8,23,0.72)', padding: '10px 12px', color: 'rgba(255,255,255,0.63)', fontSize: 12, animation: 'fade-up 0.45s ease both', animationDelay: `${i * 0.09}s` }}>
+                {point}
+              </div>
             ))}
           </div>
         </section>
@@ -662,6 +719,17 @@ export default function HomePage() {
         </section>
 
       </div>
+
+      <style>{`
+        @keyframes progressPulse {
+          0%, 100% { transform: translateX(-2%); filter: saturate(1); }
+          50% { transform: translateX(2%); filter: saturate(1.15); }
+        }
+        @keyframes integrationMarqueeSingle {
+          0% { transform: translateX(100%); }
+          100% { transform: translateX(-100%); }
+        }
+      `}</style>
     </>
   );
 }
