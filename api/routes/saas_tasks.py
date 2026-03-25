@@ -20,6 +20,7 @@ from schemas.saas_task import (
     TaskDependencyUpdateRequest,
     TaskCreateRequest,
     TaskLogItem,
+    RunItem,
     UsageEventItem,
     TaskResponse,
 )
@@ -268,6 +269,30 @@ async def cancel_task(
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return await _to_task_response(service, tenant.organization_id, task)
+
+
+@router.get('/{task_id}/runs', response_model=list[RunItem])
+async def task_runs(
+    task_id: int,
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[RunItem]:
+    service = TaskService(db)
+    runs = await service.get_runs(tenant.organization_id, task_id)
+    return [
+        RunItem(
+            id=r.id,
+            task_id=r.task_id,
+            source=r.source,
+            usage_prompt_tokens=r.usage_prompt_tokens or 0,
+            usage_completion_tokens=r.usage_completion_tokens or 0,
+            usage_total_tokens=r.usage_total_tokens or 0,
+            estimated_cost_usd=r.estimated_cost_usd or 0,
+            pr_url=r.pr_url,
+            created_at=r.created_at,
+        )
+        for r in runs
+    ]
 
 
 @router.get('/{task_id}/logs', response_model=list[TaskLogItem])

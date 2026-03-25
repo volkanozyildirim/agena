@@ -45,6 +45,13 @@ class AgentOrchestrator:
             organization_id=org_id,
         )
         context_summary, usage, model = await self.agents.fetch_context(task_payload=task, memory_context=memory_context)
+        # Extract source files from task description and append to context_summary
+        desc = task.get('description', '')
+        if '=== RELEVANT SOURCE FILES ===' in desc:
+            start = desc.index('=== RELEVANT SOURCE FILES ===')
+            end_marker = '=== END SOURCE FILES ==='
+            end = desc.index(end_marker) + len(end_marker) if end_marker in desc else len(desc)
+            context_summary = context_summary + '\n\n' + desc[start:end]
         self._merge_usage(state, usage)
         state['memory_context'] = memory_context
         state['memory_status'] = memory_status
@@ -63,9 +70,16 @@ class AgentOrchestrator:
         return state
 
     async def generate_code_node(self, state: OrchestrationState) -> OrchestrationState:
+        # Read files referenced in PM spec's file_changes
+        spec = state.get('spec', {})
+        desc = state.get('task', {}).get('description', '')
+        target_files_context = self._read_spec_target_files(spec, desc)
+
         generated_code, usage, model = await self.agents.run_developer(
-            spec=state['spec'],
+            spec=spec,
             context_summary=state.get('context_summary', ''),
+            task_description=desc,
+            target_files_context=target_files_context,
         )
         self._merge_usage(state, usage)
         state['generated_code'] = generated_code
@@ -76,6 +90,7 @@ class AgentOrchestrator:
         reviewed_code, usage, model = await self.agents.run_reviewer(
             generated_code=state['generated_code'],
             spec=state['spec'],
+            context_summary=state.get('context_summary', ''),
         )
         self._merge_usage(state, usage)
         state['reviewed_code'] = reviewed_code
@@ -96,6 +111,61 @@ class AgentOrchestrator:
             organization_id=int(task.get('organization_id', 0) or 0) or None,
         )
         return state
+
+    def _read_spec_target_files(self, spec: dict, description: str) -> str:
+        """Read full contents of files referenced in PM spec file_changes."""
+        import re
+        from pathlib import Path
+
+        # Extract local repo path from description
+        local_repo = ''
+        for line in description.splitlines():
+            if line.strip().startswith('Local Repo Path:'):
+                local_repo = line.split(':', 1)[1].strip()
+                break
+        if not local_repo:
+            return ''
+
+        root = Path(local_repo).expanduser().resolve()
+        if not root.is_dir():
+            return ''
+
+        # Collect file paths from spec.file_changes
+        target_paths: list[str] = []
+        for fc in spec.get('file_changes', []):
+            fp = str(fc.get('file', '')).strip()
+            if fp:
+                target_paths.append(fp)
+
+        # Also extract file paths from spec.technical_notes
+        for note in spec.get('technical_notes', []):
+            for match in re.findall(r'[\w/]+\.\w{1,6}', str(note)):
+                if match not in target_paths:
+                    target_paths.append(match)
+
+        if not target_paths:
+            return ''
+
+        lines = ['=== TARGET FILES (full contents for modification) ===']
+        total = 0
+        max_total = 120000  # ~30K tokens
+        for rel in target_paths:
+            fp = root / rel
+            if not fp.is_file():
+                lines.append(f'\n--- {rel} (not found) ---')
+                continue
+            try:
+                content = fp.read_text(errors='replace')
+                if total + len(content) > max_total:
+                    lines.append(f'\n--- {rel} ({len(content)} chars, skipped — budget reached) ---')
+                    continue
+                lines.append(f'\n--- {rel} ({len(content)} chars) ---')
+                lines.append(content)
+                total += len(content)
+            except Exception:
+                lines.append(f'\n--- {rel} (read error) ---')
+        lines.append('=== END TARGET FILES ===')
+        return '\n'.join(lines)
 
     def _merge_usage(self, state: OrchestrationState, usage: dict[str, int]) -> None:
         current = state.get('usage', {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0})

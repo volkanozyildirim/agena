@@ -279,8 +279,8 @@ function DashboardInner({ children }: { children: ReactNode }) {
             height: 28,
             borderRadius: 8,
             border: '1px solid rgba(255,255,255,0.12)',
-            background: 'rgba(255,255,255,0.03)',
-            color: 'rgba(255,255,255,0.7)',
+            background: 'var(--glass)',
+            color: 'var(--ink)',
             cursor: 'pointer',
             marginBottom: 10,
           }}
@@ -290,7 +290,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
         {/* User info */}
         {userName && (
           <a href="/dashboard/profile" title={userName}
-            style={{ textDecoration: 'none', padding: sidebarCollapsed ? '8px 6px' : '10px 12px', marginBottom: 16, borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', display: 'block', transition: 'border-color 0.2s' }}
+            style={{ textDecoration: 'none', padding: sidebarCollapsed ? '8px 6px' : '10px 12px', marginBottom: 16, borderRadius: 12, background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.06)', display: 'block', transition: 'border-color 0.2s' }}
             onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(139,92,246,0.3)'; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(255,255,255,0.06)'; }}
           >
@@ -299,14 +299,14 @@ function DashboardInner({ children }: { children: ReactNode }) {
                 {userName[0]?.toUpperCase()}
               </div>
               {!sidebarCollapsed && <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userName}</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>{t('nav.profileHint')}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userName}</div>
+                <div style={{ fontSize: 10, color: 'var(--muted)' }}>{t('nav.profileHint')}</div>
               </div>}
             </div>
           </a>
         )}
 
-        {!sidebarCollapsed && <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', padding: '0 12px', marginBottom: 8 }}>
+        {!sidebarCollapsed && <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: 'var(--muted)', textTransform: 'uppercase', padding: '0 12px', marginBottom: 8 }}>
           {t('nav.workspace')}
         </div>}
 
@@ -318,7 +318,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: sidebarCollapsed ? '9px 10px' : '9px 12px', borderRadius: 10, fontSize: 14,
                 fontWeight: active ? 600 : 400,
-                color: active ? '#5eead4' : 'rgba(255,255,255,0.45)',
+                color: active ? '#5eead4' : 'var(--muted)',
                 background: active ? 'rgba(13,148,136,0.12)' : 'transparent',
                 border: active ? '1px solid rgba(13,148,136,0.2)' : '1px solid transparent',
                 transition: 'all 0.2s', textDecoration: 'none', justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
@@ -336,7 +336,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
             const active = pathname === item.href || pathname.startsWith(item.href);
             const isNotificationItem = item.href === '/dashboard/notifications';
             const hasUnread = isNotificationItem && unreadCount > 0;
-            const itemColor = hasUnread ? '#ef4444' : (active ? '#5eead4' : 'rgba(255,255,255,0.45)');
+            const itemColor = hasUnread ? '#ef4444' : (active ? '#5eead4' : 'var(--muted)');
             return (
               <Link key={item.href} href={item.href} title={t(item.key)} style={{
                 display: 'flex', alignItems: 'center', gap: 10,
@@ -383,9 +383,9 @@ function DashboardInner({ children }: { children: ReactNode }) {
               display: 'flex', alignItems: 'center', gap: 8,
               justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
               padding: sidebarCollapsed ? '8px 8px' : '8px 12px', borderRadius: 10, fontSize: 13,
-              background: notifPermission === 'granted' ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.03)',
+              background: notifPermission === 'granted' ? 'rgba(34,197,94,0.12)' : 'var(--glass)',
               border: notifPermission === 'granted' ? '1px solid rgba(34,197,94,0.28)' : '1px solid rgba(255,255,255,0.06)',
-              color: notifPermission === 'granted' ? '#22c55e' : 'rgba(255,255,255,0.65)',
+              color: notifPermission === 'granted' ? '#22c55e' : 'var(--muted)',
               cursor: 'pointer', width: '100%',
             }}
           >
@@ -414,9 +414,9 @@ function DashboardInner({ children }: { children: ReactNode }) {
             {!sidebarCollapsed && t('notifications.section')}
           </button>
           {notifOpen && !sidebarCollapsed && (
-            <div style={{ border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(2,6,23,0.92)', borderRadius: 12, padding: 10, display: 'grid', gap: 8, maxHeight: 250, overflow: 'auto' }}>
+            <div style={{ border: '1px solid var(--border)', background: 'rgba(2,6,23,0.92)', borderRadius: 12, padding: 10, display: 'grid', gap: 8, maxHeight: 250, overflow: 'auto' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', fontWeight: 700 }}>{t('notifications.recent')}</span>
+                <span style={{ fontSize: 12, color: 'var(--ink)', fontWeight: 700 }}>{t('notifications.recent')}</span>
                 <button onClick={() => void markAllReadAndRefresh()} style={{ border: 'none', background: 'transparent', color: '#5eead4', fontSize: 11, cursor: 'pointer' }}>{t('notifications.markAllRead')}</button>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
@@ -424,8 +424,8 @@ function DashboardInner({ children }: { children: ReactNode }) {
                   onClick={() => setNotifFilter('all')}
                   style={{
                     border: '1px solid rgba(57,255,136,0.35)',
-                    background: notifFilter === 'all' ? 'rgba(57,255,136,0.16)' : 'rgba(255,255,255,0.03)',
-                    color: notifFilter === 'all' ? '#39ff88' : 'rgba(255,255,255,0.6)',
+                    background: notifFilter === 'all' ? 'rgba(57,255,136,0.16)' : 'var(--glass)',
+                    color: notifFilter === 'all' ? '#39ff88' : 'var(--muted)',
                     padding: '4px 8px',
                     borderRadius: 999,
                     fontSize: 11,
@@ -438,8 +438,8 @@ function DashboardInner({ children }: { children: ReactNode }) {
                   onClick={() => setNotifFilter('failed')}
                   style={{
                     border: '1px solid rgba(239,68,68,0.35)',
-                    background: notifFilter === 'failed' ? 'rgba(239,68,68,0.16)' : 'rgba(255,255,255,0.03)',
-                    color: notifFilter === 'failed' ? '#ef4444' : 'rgba(255,255,255,0.6)',
+                    background: notifFilter === 'failed' ? 'rgba(239,68,68,0.16)' : 'var(--glass)',
+                    color: notifFilter === 'failed' ? '#ef4444' : 'var(--muted)',
                     padding: '4px 8px',
                     borderRadius: 999,
                     fontSize: 11,
@@ -450,9 +450,9 @@ function DashboardInner({ children }: { children: ReactNode }) {
                 </button>
               </div>
               {notifLoading ? (
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>{t('notifications.loading')}</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>{t('notifications.loading')}</div>
               ) : notifications.filter((n) => notifFilter === 'all' || n.severity === 'error' || n.event_type.includes('failed') || n.title.toLowerCase().includes('failed')).length === 0 ? (
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>{t('notifications.emptyShort')}</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>{t('notifications.emptyShort')}</div>
               ) : notifications
                 .filter((n) => notifFilter === 'all' || n.severity === 'error' || n.event_type.includes('failed') || n.title.toLowerCase().includes('failed'))
                 .map((n) => (
@@ -471,10 +471,10 @@ function DashboardInner({ children }: { children: ReactNode }) {
                     void markNotificationRead(n.id).finally(() => void refreshNotifications(12));
                   }}
                   style={{ textDecoration: 'none', border: `1px solid ${notifColor(n)}44`, borderLeft: `3px solid ${notifColor(n)}`, borderRadius: 10, padding: '7px 8px', display: 'grid', gap: 3, background: n.is_read ? 'rgba(255,255,255,0.01)' : `${notifColor(n)}18` }}>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)', fontWeight: 700 }}>{n.title}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ink)', fontWeight: 700 }}>{n.title}</div>
                   <div style={{ fontSize: 10, color: notifColor(n), textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 700 }}>{n.event_type.replace(/_/g, ' ')}</div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', lineHeight: 1.3 }}>{n.message}</div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>{new Date(n.created_at).toLocaleString()}</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.3 }}>{n.message}</div>
+                  <div style={{ fontSize: 10, color: 'var(--muted)' }}>{new Date(n.created_at).toLocaleString()}</div>
                 </Link>
               ))}
               <Link href='/dashboard/notifications' style={{ textDecoration: 'none', textAlign: 'center', padding: '7px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', color: '#39ff88', fontSize: 12, fontWeight: 700 }}>

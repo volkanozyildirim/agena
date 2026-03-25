@@ -7,8 +7,14 @@ WORKDIR /app
 
 # System deps
 RUN apt-get update && apt-get install -y --no-install-recommends --fix-missing \
-    git openssh-client curl && \
+    git openssh-client curl ca-certificates && \
     rm -rf /var/lib/apt/lists/*
+
+# Corporate SSL certificate (FLO McAfee Web Gateway)
+COPY docker/FLOMcAfeeWG.crt /usr/local/share/ca-certificates/FLOMcAfeeWG.crt
+RUN update-ca-certificates
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 
 # Python deps (requirements.txt değişmezse cache'den gelir)
 COPY requirements.txt /app/requirements.txt

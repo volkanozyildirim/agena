@@ -45,6 +45,16 @@ type TaskLog = {
   created_at: string;
 };
 
+type RunInfo = {
+  id: number;
+  task_id: number;
+  source: string;
+  usage_total_tokens: number;
+  estimated_cost_usd: number;
+  pr_url?: string | null;
+  created_at: string;
+};
+
 type CodeFile = {
   path: string;
   content: string;
@@ -188,11 +198,27 @@ function fmtAgo(iso: string | null, nowMs: number): string {
   return `${Math.floor(diff / 3600)}h ago`;
 }
 
+/** Split flat log array into per-run groups using 'running' stage as boundary */
+function splitLogsByRun(allLogs: TaskLog[]): TaskLog[][] {
+  if (allLogs.length === 0) return [[]];
+  const runs: TaskLog[][] = [];
+  let current: TaskLog[] = [];
+  for (const log of allLogs) {
+    if (log.stage === 'running' && current.length > 0) {
+      runs.push(current);
+      current = [];
+    }
+    current.push(log);
+  }
+  if (current.length > 0) runs.push(current);
+  return runs.length > 0 ? runs : [[]];
+}
+
 export default function TaskDetailPage() {
   const { t } = useLocale();
   const params = useParams<{ id: string }>();
   const taskId = params.id;
-  const liveStripRef = useRef<HTMLDivElement | null>(null);
+  const terminalRef = useRef<HTMLDivElement | null>(null);
   const lastLogIdRef = useRef(0);
   const [isMobile, setIsMobile] = useState(false);
   const [logFilter, setLogFilter] = useState<'all' | 'errors' | 'code'>('all');
@@ -205,21 +231,27 @@ export default function TaskDetailPage() {
   const [depsData, setDepsData] = useState<TaskDeps | null>(null);
   const [defaultCreatePr, setDefaultCreatePr] = useState(true);
   const [clockMs, setClockMs] = useState(() => Date.now());
+  const [selectedRunIndex, setSelectedRunIndex] = useState<number>(-1); // -1 = latest
+  const [terminalAutoScroll, setTerminalAutoScroll] = useState(true);
 
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [logs, setLogs] = useState<TaskLog[]>([]);
+  const [runs, setRuns] = useState<RunInfo[]>([]);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
   const [streamState, setStreamState] = useState<'live' | 'reconnecting' | 'offline'>('offline');
 
   async function loadData() {
     try {
-      const [taskData, logsData, taskList] = await Promise.all([
+      const [taskData, logsData, runsData, taskList] = await Promise.all([
         apiFetch<TaskDetail>('/tasks/' + taskId),
         apiFetch<TaskLog[]>('/tasks/' + taskId + '/logs'),
+        apiFetch<RunInfo[]>('/tasks/' + taskId + '/runs').catch(() => [] as RunInfo[]),
         apiFetch<DependencyTaskOption[]>('/tasks'),
       ]);
       setTask(taskData);
       setLogs(logsData);
+      setRuns(runsData);
       const currentTaskId = Number(taskId);
       setDependencyCandidates(taskList.filter((item) => item.id !== currentTaskId));
       const d = await apiFetch<TaskDeps>('/tasks/' + taskId + '/dependencies');
@@ -228,6 +260,8 @@ export default function TaskDetailPage() {
       setError('');
     } catch (err) {
       setError(err instanceof Error ? err.message : t('taskDetail.errorLoad'));
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -335,35 +369,42 @@ export default function TaskDetailPage() {
   }, []);
 
   useEffect(() => {
-    if (!liveStripRef.current) return;
-    liveStripRef.current.scrollTo({ left: liveStripRef.current.scrollWidth, behavior: 'smooth' });
-  }, [logs, logFilter]);
-
-  useEffect(() => {
     const timer = window.setInterval(() => setClockMs(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
 
-  const filteredLogs = useMemo(() => {
-    if (logFilter === 'errors') return logs.filter((item) => item.stage === 'failed' || /error|failed|timeout/i.test(item.message));
-    if (logFilter === 'code') return logs.filter((item) => item.stage === 'code_preview' || item.stage === 'code_ready' || item.stage === 'code_diff');
-    return logs;
-  }, [logs, logFilter]);
+  // Auto-scroll terminal
+  useEffect(() => {
+    if (terminalAutoScroll && terminalRef.current) {
+      terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+    }
+  }, [logs, terminalAutoScroll]);
 
-  const liveLogs = useMemo(() => filteredLogs.slice(-8), [filteredLogs]);
+  // Split logs into runs
+  const logRuns = useMemo(() => splitLogsByRun(logs), [logs]);
+  const activeRunIndex = selectedRunIndex === -1 ? logRuns.length - 1 : selectedRunIndex;
+  const activeRunLogs = logRuns[activeRunIndex] || [];
+  const isLatestRun = activeRunIndex === logRuns.length - 1;
+
+  const filteredLogs = useMemo(() => {
+    if (logFilter === 'errors') return activeRunLogs.filter((item) => item.stage === 'failed' || /error|failed|timeout/i.test(item.message));
+    if (logFilter === 'code') return activeRunLogs.filter((item) => item.stage === 'code_preview' || item.stage === 'code_ready' || item.stage === 'code_diff');
+    return activeRunLogs;
+  }, [activeRunLogs, logFilter]);
+
   const logHistory = useMemo(() => [...filteredLogs].reverse(), [filteredLogs]);
-  const latestLog = logs.length > 0 ? logs[logs.length - 1] : null;
-  const metrics = useMemo(() => parseRunMetrics(logs), [logs]);
-  const codeFiles = useMemo(() => parseCodePreview(logs), [logs]);
-  const memoryImpact = useMemo(() => parseMemoryImpact(logs), [logs]);
+  const latestLog = activeRunLogs.length > 0 ? activeRunLogs[activeRunLogs.length - 1] : null;
+  const metrics = useMemo(() => parseRunMetrics(activeRunLogs), [activeRunLogs]);
+  const codeFiles = useMemo(() => parseCodePreview(activeRunLogs), [activeRunLogs]);
+  const memoryImpact = useMemo(() => parseMemoryImpact(activeRunLogs), [activeRunLogs]);
   const latestFailure = useMemo(() => {
-    const failedLog = [...logs].reverse().find((l) => l.stage === 'failed');
-    return task?.failure_reason || failedLog?.message || '';
-  }, [task?.failure_reason, logs]);
+    const failedLog = [...activeRunLogs].reverse().find((l) => l.stage === 'failed');
+    return (isLatestRun ? task?.failure_reason : null) || failedLog?.message || '';
+  }, [task?.failure_reason, activeRunLogs, isLatestRun]);
   const failure = useMemo(() => classifyFailure(latestFailure), [latestFailure]);
 
-  const createdAt = useMemo(() => logs.find((l) => l.stage === 'created')?.created_at || task?.created_at || '', [logs, task?.created_at]);
-  const runningAt = useMemo(() => logs.find((l) => l.stage === 'running')?.created_at || '', [logs]);
+  const createdAt = useMemo(() => activeRunLogs.find((l) => l.stage === 'created' || l.stage === 'queued')?.created_at || task?.created_at || '', [activeRunLogs, task?.created_at]);
+  const runningAt = useMemo(() => activeRunLogs.find((l) => l.stage === 'running')?.created_at || '', [activeRunLogs]);
   const queueWaitSec = useMemo(() => {
     if (!createdAt || !runningAt) return null;
     return Math.max(0, Math.round((new Date(runningAt).getTime() - new Date(createdAt).getTime()) / 1000));
@@ -373,16 +414,16 @@ export default function TaskDetailPage() {
     const map: Record<string, TaskLog | undefined> = {};
     for (const step of STEP_ORDER) {
       if (step === 'agent') {
-        map[step] = logs.find((l) =>
+        map[step] = activeRunLogs.find((l) =>
           ['agent', 'analyze', 'generate_code', 'review_code', 'finalize', 'playbook'].includes(l.stage),
         );
         continue;
       }
-      map[step] = logs.find((l) => l.stage === step);
+      map[step] = activeRunLogs.find((l) => l.stage === step);
     }
-    if (!map.completed) map.failed = logs.find((l) => l.stage === 'failed');
+    if (!map.completed) map.failed = activeRunLogs.find((l) => l.stage === 'failed');
     return map;
-  }, [logs]);
+  }, [activeRunLogs]);
 
   const executionProgress = useMemo(() => {
     const hasQueued = Boolean(stepMap.queued);
@@ -399,10 +440,17 @@ export default function TaskDetailPage() {
     const fallback = {
       title: t('taskDetail.waitingLogsTitle'),
       detail: t('taskDetail.waitingLogsDesc'),
-      color: 'rgba(255,255,255,0.65)',
+      color: 'var(--ink-65)',
       pulse: false,
     };
     if (!task) return fallback;
+    if (!isLatestRun) {
+      const hasCompleted = activeRunLogs.some((l) => l.stage === 'completed');
+      const hasFailed = activeRunLogs.some((l) => l.stage === 'failed');
+      if (hasCompleted) return { title: t('taskDetail.completed'), detail: t('taskDetail.executionDone'), color: '#22c55e', pulse: false };
+      if (hasFailed) return { title: t('taskDetail.failed'), detail: latestFailure || t('taskDetail.executionFailedNoDetail'), color: '#f87171', pulse: false };
+      return { title: 'Run #' + (activeRunIndex + 1), detail: latestLog?.message || '', color: '#94a3b8', pulse: false };
+    }
     if (task.status === 'queued') {
       return {
         title: t('taskDetail.queued'),
@@ -445,13 +493,14 @@ export default function TaskDetailPage() {
       };
     }
     return fallback;
-  }, [task, latestLog, latestFailure]);
+  }, [task, latestLog, latestFailure, isLatestRun, activeRunIndex, activeRunLogs]);
 
   async function rerunTask() {
     if (!taskId) return;
     try {
       setIsRerunBusy(true);
       await apiFetch('/tasks/' + taskId + '/assign', { method: 'POST', body: JSON.stringify({ create_pr: defaultCreatePr }) });
+      setSelectedRunIndex(-1);
       await loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : t('taskDetail.errorRerun'));
@@ -493,14 +542,14 @@ export default function TaskDetailPage() {
   }
 
   function downloadLogs() {
-    const body = logs
+    const body = activeRunLogs
       .map((l) => `[${new Date(l.created_at).toISOString()}] ${l.stage}\n${l.message}\n`)
       .join('\n');
     const blob = new Blob([body], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${t('taskDetail.task').toLowerCase()}-${taskId}-logs.txt`;
+    a.download = `${t('taskDetail.task').toLowerCase()}-${taskId}-run${activeRunIndex + 1}-logs.txt`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -509,7 +558,7 @@ export default function TaskDetailPage() {
   const renderCodeContent = (item: CodeFile) => {
     if (!item.isDiff) {
       return (
-        <pre style={{ margin: 0, maxHeight: 300, overflow: 'auto', padding: 10, fontSize: 12, lineHeight: 1.45, color: 'rgba(255,255,255,0.82)' }}>
+        <pre style={{ margin: 0, maxHeight: 300, overflow: 'auto', padding: 10, fontSize: 12, lineHeight: 1.45, color: 'var(--ink-90)' }}>
           {item.content}
         </pre>
       );
@@ -520,7 +569,7 @@ export default function TaskDetailPage() {
           const isAdd = line.startsWith('+') && !line.startsWith('+++');
           const isDel = line.startsWith('-') && !line.startsWith('---');
           const bg = isAdd ? 'rgba(34,197,94,0.18)' : isDel ? 'rgba(248,113,113,0.18)' : 'transparent';
-          const color = isAdd ? '#86efac' : isDel ? '#fca5a5' : 'rgba(255,255,255,0.82)';
+          const color = isAdd ? '#86efac' : isDel ? '#fca5a5' : 'var(--ink-90)';
           return (
             <div key={`${idx}-${line.slice(0, 8)}`} style={{ padding: '1px 10px', background: bg, color, whiteSpace: 'pre' }}>
               {line || ' '}
@@ -531,13 +580,79 @@ export default function TaskDetailPage() {
     );
   };
 
+  // Get run info for the matched RunRecord (if exists)
+  const activeRunRecord = runs[activeRunIndex] || null;
+
   return (
     <div className='container' style={{ paddingTop: 96, paddingBottom: 20, maxWidth: 1820 }}>
+      {/* Run selector tabs */}
+      {logRuns.length > 1 && (
+        <section
+          style={{
+            borderRadius: 16,
+            border: '1px solid var(--panel-border-2)',
+            background: 'var(--panel)',
+            padding: '10px 12px',
+            marginBottom: 12,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-50)', textTransform: 'uppercase', letterSpacing: 0.8 }}>
+              Runs ({logRuns.length})
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4 }}>
+            {logRuns.map((runLogs, idx) => {
+              const isActive = idx === activeRunIndex;
+              const hasCompleted = runLogs.some((l) => l.stage === 'completed');
+              const hasFailed = runLogs.some((l) => l.stage === 'failed');
+              const isRunning = idx === logRuns.length - 1 && task?.status === 'running';
+              const statusColor = hasCompleted ? '#22c55e' : hasFailed ? '#f87171' : isRunning ? '#38bdf8' : '#a3a3a3';
+              const runRecord = runs[idx];
+              const runTime = runLogs[0]?.created_at ? new Date(runLogs[0].created_at).toLocaleTimeString() : '';
+              return (
+                <button
+                  key={idx}
+                  onClick={() => setSelectedRunIndex(idx === logRuns.length - 1 ? -1 : idx)}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 10,
+                    border: isActive ? `1px solid ${statusColor}88` : '1px solid var(--panel-border-3)',
+                    background: isActive ? `${statusColor}18` : 'var(--panel-alt)',
+                    color: isActive ? statusColor : 'var(--ink-65)',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: 3,
+                    minWidth: 120,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: 999, background: statusColor, flexShrink: 0 }} />
+                    Run #{idx + 1}
+                    {isRunning && <span style={{ fontSize: 10, opacity: 0.7 }}>(live)</span>}
+                  </div>
+                  <div style={{ fontSize: 10, opacity: 0.6, fontWeight: 400 }}>
+                    {runTime}
+                    {runRecord ? ` | ${Math.round(runRecord.usage_total_tokens)} tok` : ` | ${runLogs.length} logs`}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Top stats strip */}
       <section
         style={{
           borderRadius: 16,
-          border: '1px solid rgba(255,255,255,0.08)',
-          background: 'rgba(255,255,255,0.02)',
+          border: '1px solid var(--panel-border-2)',
+          background: 'var(--panel)',
           padding: '10px 12px',
           marginBottom: 12,
           display: 'grid',
@@ -556,11 +671,11 @@ export default function TaskDetailPage() {
           [t('taskDetail.tokens'), task?.total_tokens !== null && task?.total_tokens !== undefined ? String(task.total_tokens) : metrics?.totalTokens || '—'],
           [t('taskDetail.lastStage'), latestLog?.stage ?? '—'],
           [t('taskDetail.lastUpdate'), latestLog ? new Date(latestLog.created_at).toLocaleTimeString() : '—'],
-          [t('taskDetail.logs'), String(logs.length)],
+          [t('taskDetail.logs'), String(activeRunLogs.length)],
         ].map(([k, v]) => (
-          <div key={k} style={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px' }}>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>{k}</div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.9)', fontWeight: 700, textTransform: k === t('taskDetail.source') ? 'capitalize' : 'none' }}>{v}</div>
+          <div key={k} style={{ border: '1px solid var(--panel-border)', borderRadius: 10, padding: '8px 10px' }}>
+            <div style={{ fontSize: 10, color: 'var(--ink-35)', textTransform: 'uppercase' }}>{k}</div>
+            <div style={{ fontSize: 13, color: 'var(--ink-90)', fontWeight: 700, textTransform: k === t('taskDetail.source') ? 'capitalize' : 'none' }}>{v}</div>
           </div>
         ))}
       </section>
@@ -573,25 +688,47 @@ export default function TaskDetailPage() {
           <h1 style={{ marginTop: 0, marginBottom: 8, fontSize: 18, lineHeight: 1.35 }}>{task?.title ?? t('taskDetail.task')}</h1>
           {task ? (
             <>
-              <p style={{ marginTop: 0, color: 'rgba(255,255,255,0.78)', fontSize: 13, lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+              <p style={{ marginTop: 0, color: 'var(--ink-78)', fontSize: 13, lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                 {task.description}
               </p>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
                 <StatusBadge status={task.status} />
-                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, textTransform: 'capitalize' }}>{t('taskDetail.source')}: {task.source}</span>
+                <span style={{ color: 'var(--ink-50)', fontSize: 13, textTransform: 'capitalize' }}>{t('taskDetail.source')}: {task.source}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                <button className='button button-primary' onClick={() => void rerunTask()} disabled={isRerunBusy} style={{ flex: 1 }}>
+                  {isRerunBusy ? t('taskDetail.rerunning') : t('taskDetail.rerunTask')}
+                </button>
+                <button
+                  className='button button-outline'
+                  onClick={() => void cancelTask()}
+                  disabled={isCancelBusy || !(task.status === 'queued' || task.status === 'running')}
+                  style={{ flex: 1 }}
+                >
+                  {isCancelBusy ? t('taskDetail.stopping') : t('taskDetail.stopTask')}
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+                <button className='button button-outline' onClick={downloadLogs} style={{ fontSize: 11, padding: '5px 10px' }}>{t('taskDetail.downloadLogs')}</button>
+                {task.pr_url ? <a href={task.pr_url} target='_blank' rel='noreferrer' className='button button-outline' style={{ fontSize: 11, padding: '5px 10px' }}>{t('taskDetail.openPullRequest')}</a> : null}
+                {task.branch_name ? (
+                  <button className='button button-outline' onClick={() => navigator.clipboard.writeText(task.branch_name || '')} style={{ fontSize: 11, padding: '5px 10px' }}>
+                    {t('taskDetail.copyBranch')}
+                  </button>
+                ) : null}
               </div>
               <div style={{ display: 'grid', gap: 7, marginBottom: 12 }}>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>{t('taskDetail.created')}: {new Date(task.created_at).toLocaleString()}</div>
-                {metrics?.startedAt ? <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>{t('taskDetail.runStart')}: {new Date(metrics.startedAt).toLocaleString()}</div> : null}
-                {metrics?.finishedAt ? <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>{t('taskDetail.runEnd')}: {new Date(metrics.finishedAt).toLocaleString()}</div> : null}
+                <div style={{ fontSize: 12, color: 'var(--ink-45)' }}>{t('taskDetail.created')}: {new Date(task.created_at).toLocaleString()}</div>
+                {metrics?.startedAt ? <div style={{ fontSize: 12, color: 'var(--ink-45)' }}>{t('taskDetail.runStart')}: {new Date(metrics.startedAt).toLocaleString()}</div> : null}
+                {metrics?.finishedAt ? <div style={{ fontSize: 12, color: 'var(--ink-45)' }}>{t('taskDetail.runEnd')}: {new Date(metrics.finishedAt).toLocaleString()}</div> : null}
               </div>
               {(task.story_context || task.acceptance_criteria || task.edge_cases || task.max_tokens || task.max_cost_usd) ? (
                 <div style={{ border: '1px solid rgba(56,189,248,0.25)', borderRadius: 10, background: 'rgba(56,189,248,0.06)', padding: '9px 10px', marginBottom: 12 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#7dd3fc', textTransform: 'uppercase', marginBottom: 5 }}>{t('taskDetail.storyGuardrails')}</div>
-                  {task.story_context ? <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.78)', marginBottom: 4 }}><b>{t('taskDetail.context')}:</b> {task.story_context}</div> : null}
-                  {task.acceptance_criteria ? <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.72)', marginBottom: 4 }}><b>{t('taskDetail.acceptance')}:</b> {task.acceptance_criteria}</div> : null}
-                  {task.edge_cases ? <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.72)', marginBottom: 4 }}><b>{t('taskDetail.edgeCases')}:</b> {task.edge_cases}</div> : null}
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)' }}>
+                  {task.story_context ? <div style={{ fontSize: 12, color: 'var(--ink-78)', marginBottom: 4 }}><b>{t('taskDetail.context')}:</b> {task.story_context}</div> : null}
+                  {task.acceptance_criteria ? <div style={{ fontSize: 12, color: 'var(--ink-72)', marginBottom: 4 }}><b>{t('taskDetail.acceptance')}:</b> {task.acceptance_criteria}</div> : null}
+                  {task.edge_cases ? <div style={{ fontSize: 12, color: 'var(--ink-72)', marginBottom: 4 }}><b>{t('taskDetail.edgeCases')}:</b> {task.edge_cases}</div> : null}
+                  <div style={{ fontSize: 12, color: 'var(--ink-65)' }}>
                     {t('taskDetail.guardrails')}: max_tokens={task.max_tokens ?? '—'} | max_cost_usd={task.max_cost_usd ?? '—'}
                   </div>
                 </div>
@@ -599,35 +736,35 @@ export default function TaskDetailPage() {
               {(task.lock_scope || task.blocked_by_task_id || (task.queue_position !== null && task.queue_position !== undefined)) ? (
                 <div style={{ border: '1px solid rgba(94,234,212,0.25)', borderRadius: 10, background: 'rgba(94,234,212,0.06)', padding: '9px 10px', marginBottom: 12 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#5eead4', textTransform: 'uppercase', marginBottom: 5 }}>{t('taskDetail.queueInsight')}</div>
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.78)', lineHeight: 1.45 }}>
+                  <div style={{ fontSize: 12, color: 'var(--ink-78)', lineHeight: 1.45 }}>
                     {task.queue_position !== null && task.queue_position !== undefined ? `${t('taskDetail.position')}: #${task.queue_position} | ` : ''}
                     ETA: {fmtEta(task.estimated_start_sec)}
                   </div>
                   {task.blocked_by_task_id ? (
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.72)', marginTop: 4 }}>
+                    <div style={{ fontSize: 12, color: 'var(--ink-72)', marginTop: 4 }}>
                       {t('taskDetail.blockedBy')} #{task.blocked_by_task_id}{task.blocked_by_task_title ? ` — ${task.blocked_by_task_title}` : ''}
                     </div>
                   ) : null}
                   {task.lock_scope ? (
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 4, wordBreak: 'break-all' }}>
+                    <div style={{ fontSize: 11, color: 'var(--ink-50)', marginTop: 4, wordBreak: 'break-all' }}>
                       {t('taskDetail.lockScope')}: {task.lock_scope}
                     </div>
                   ) : null}
                 </div>
               ) : null}
-              <div style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '9px 10px', marginBottom: 12, background: 'rgba(255,255,255,0.015)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.72)', textTransform: 'uppercase', marginBottom: 6 }}>{t('taskDetail.dependencies')}</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.68)', marginBottom: 8 }}>
+              <div style={{ border: '1px solid var(--panel-border-2)', borderRadius: 10, padding: '9px 10px', marginBottom: 12, background: 'var(--panel)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-72)', textTransform: 'uppercase', marginBottom: 6 }}>{t('taskDetail.dependencies')}</div>
+                <div style={{ fontSize: 12, color: 'var(--ink-65)', marginBottom: 8 }}>
                   {t('taskDetail.blockers')}: {(depsData?.blocker_task_ids || []).length > 0 ? depsData?.blocker_task_ids?.join(', ') : t('taskDetail.none')}
                 </div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.48)', marginBottom: 6 }}>
+                <div style={{ fontSize: 11, color: 'var(--ink-45)', marginBottom: 6 }}>
                   {t('taskDetail.selectedDependencies')}: {selectedDependencyIds.length}
                 </div>
                 <div
                   style={{
                     borderRadius: 10,
-                    border: '1px solid rgba(255,255,255,0.12)',
-                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid var(--panel-border-3)',
+                    background: 'var(--panel-alt)',
                     maxHeight: 170,
                     overflowY: 'auto',
                     padding: '6px 8px',
@@ -636,7 +773,7 @@ export default function TaskDetailPage() {
                   }}
                 >
                   {dependencyCandidates.length === 0 ? (
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', padding: '4px 2px' }}>{t('taskDetail.noOtherTasks')}</div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-45)', padding: '4px 2px' }}>{t('taskDetail.noOtherTasks')}</div>
                   ) : (
                     dependencyCandidates.map((candidate) => {
                       const checked = selectedDependencyIds.includes(candidate.id);
@@ -653,8 +790,8 @@ export default function TaskDetailPage() {
                             }}
                             style={{ marginTop: 2 }}
                           />
-                          <span style={{ fontSize: 12, color: checked ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.7)', lineHeight: 1.35 }}>
-                            #{candidate.id} • {candidate.title} <span style={{ color: 'rgba(255,255,255,0.45)' }}>({candidate.status})</span>
+                          <span style={{ fontSize: 12, color: checked ? 'var(--ink-90)' : 'var(--ink-72)', lineHeight: 1.35 }}>
+                            #{candidate.id} • {candidate.title} <span style={{ color: 'var(--ink-45)' }}>({candidate.status})</span>
                           </span>
                         </label>
                       );
@@ -676,40 +813,139 @@ export default function TaskDetailPage() {
               {(task.pr_risk_score !== null && task.pr_risk_score !== undefined) ? (
                 <div style={{ border: '1px solid rgba(245,158,11,0.28)', borderRadius: 10, padding: '9px 10px', marginBottom: 12, background: 'rgba(245,158,11,0.08)' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase', marginBottom: 4 }}>{t('taskDetail.prRisk')}</div>
-                  <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.82)' }}>
+                  <div style={{ fontSize: 13, color: 'var(--ink-90)' }}>
                     {t('taskDetail.score')}: <b>{task.pr_risk_score}</b> / 100 ({task.pr_risk_level || t('taskDetail.unknown')})
                   </div>
-                  {task.pr_risk_reason ? <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.68)', marginTop: 3 }}>{task.pr_risk_reason}</div> : null}
+                  {task.pr_risk_reason ? <div style={{ fontSize: 12, color: 'var(--ink-65)', marginTop: 3 }}>{task.pr_risk_reason}</div> : null}
                 </div>
               ) : null}
 
-              <div style={{ display: 'grid', gap: 8 }}>
-                <button className='button button-primary' onClick={() => void rerunTask()} disabled={isRerunBusy}>
-                  {isRerunBusy ? t('taskDetail.rerunning') : t('taskDetail.rerunTask')}
-                </button>
-                <button
-                  className='button button-outline'
-                  onClick={() => void cancelTask()}
-                  disabled={isCancelBusy || !(task.status === 'queued' || task.status === 'running')}
-                >
-                  {isCancelBusy ? t('taskDetail.stopping') : t('taskDetail.stopTask')}
-                </button>
-                <button className='button button-outline' onClick={downloadLogs}>{t('taskDetail.downloadLogs')}</button>
-                {task.pr_url ? <a href={task.pr_url} target='_blank' rel='noreferrer' className='button button-outline'>{t('taskDetail.openPullRequest')}</a> : null}
-                {task.branch_name ? (
-                  <button className='button button-outline' onClick={() => navigator.clipboard.writeText(task.branch_name || '')}>
-                    {t('taskDetail.copyBranch')}
-                  </button>
-                ) : null}
-              </div>
+              {/* action buttons moved to top of sidebar */}
             </>
           ) : null}
           {error ? <p style={{ color: '#f87171', marginTop: 10, marginBottom: 0 }}>{error}</p> : null}
         </section>
 
         <section style={{ display: 'grid', gap: 12 }}>
-          <section style={{ borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', padding: 12 }}>
-            <h3 style={{ marginTop: 0, marginBottom: 10, color: 'rgba(255,255,255,0.9)', fontSize: 15 }}>{t('taskDetail.executionSteps')}</h3>
+          {/* Terminal-like agent output */}
+          <section
+            style={{
+              borderRadius: 16,
+              border: isLatestRun && task?.status === 'running'
+                ? '1px solid rgba(56,189,248,0.35)'
+                : '1px solid var(--panel-border-2)',
+              background: 'var(--terminal-bg)',
+              overflow: 'hidden',
+              minHeight: 320,
+              display: 'grid',
+              gridTemplateRows: 'auto 1fr',
+            }}
+          >
+            <div style={{
+              borderBottom: '1px solid var(--panel-border-2)',
+              padding: '8px 12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'var(--panel-alt)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 5 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: 999, background: '#f87171' }} />
+                  <span style={{ width: 10, height: 10, borderRadius: 999, background: '#fbbf24' }} />
+                  <span style={{ width: 10, height: 10, borderRadius: 999, background: '#22c55e' }} />
+                </div>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-72)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+                  Agent Output — Run #{activeRunIndex + 1}
+                </span>
+                {isLatestRun && task?.status === 'running' && (
+                  <span style={{
+                    fontSize: 10,
+                    color: '#38bdf8',
+                    padding: '2px 8px',
+                    borderRadius: 999,
+                    border: '1px solid rgba(56,189,248,0.4)',
+                    background: 'rgba(56,189,248,0.12)',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                    animation: 'pulse 2s ease-in-out infinite',
+                  }}>
+                    LIVE
+                  </span>
+                )}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 11, color: streamState === 'live' ? '#22c55e' : streamState === 'reconnecting' ? '#f59e0b' : 'var(--ink-35)' }}>
+                  {streamState === 'live' ? t('taskDetail.liveOn') : streamState === 'reconnecting' ? t('taskDetail.reconnecting') : t('taskDetail.offline')}
+                </span>
+                <button
+                  onClick={() => setTerminalAutoScroll(!terminalAutoScroll)}
+                  style={{
+                    padding: '3px 8px',
+                    borderRadius: 6,
+                    border: '1px solid var(--panel-border-4)',
+                    background: terminalAutoScroll ? 'rgba(94,234,212,0.15)' : 'transparent',
+                    color: terminalAutoScroll ? '#5eead4' : 'var(--ink-50)',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Auto-scroll {terminalAutoScroll ? 'ON' : 'OFF'}
+                </button>
+              </div>
+            </div>
+            <div
+              ref={terminalRef}
+              onScroll={(e) => {
+                const el = e.currentTarget;
+                const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+                if (terminalAutoScroll && !atBottom) setTerminalAutoScroll(false);
+                if (!terminalAutoScroll && atBottom) setTerminalAutoScroll(true);
+              }}
+              style={{
+                overflowY: 'auto',
+                padding: '10px 14px',
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                fontSize: 12,
+                lineHeight: 1.6,
+                color: 'var(--ink-78)',
+                maxHeight: 420,
+              }}
+            >
+              {activeRunLogs.length === 0 ? (
+                <div style={{ color: 'var(--ink-30)' }}>Waiting for agent output...</div>
+              ) : (
+                activeRunLogs.map((log, idx) => {
+                  const color = stageColor(log.stage);
+                  const ts = new Date(log.created_at).toLocaleTimeString();
+                  return (
+                    <div key={`${log.id || idx}-term`} style={{ marginBottom: 2, display: 'flex', gap: 0 }}>
+                      <span style={{ color: 'var(--ink-25)', minWidth: 70, flexShrink: 0 }}>{ts}</span>
+                      <span style={{ color, fontWeight: 700, minWidth: 110, flexShrink: 0, textTransform: 'uppercase', fontSize: 11, paddingTop: 1 }}>{log.stage}</span>
+                      <span style={{
+                        color: log.stage === 'failed' ? '#fca5a5' : 'var(--ink-78)',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                      }}>
+                        {log.message}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+              {isLatestRun && task?.status === 'running' && (
+                <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ color: '#38bdf8', animation: 'pulse 1.5s ease-in-out infinite' }}>_</span>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Execution steps */}
+          <section style={{ borderRadius: 16, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', padding: 12 }}>
+            <h3 style={{ marginTop: 0, marginBottom: 10, color: 'var(--ink-90)', fontSize: 15 }}>{t('taskDetail.executionSteps')}</h3>
             <div style={{ border: `1px solid ${currentActivity.color}66`, background: `${currentActivity.color}18`, borderRadius: 10, padding: '8px 10px', marginBottom: 10 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 5 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -726,14 +962,14 @@ export default function TaskDetailPage() {
                     {currentActivity.title}
                   </span>
                 </div>
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)' }}>
+                <span style={{ fontSize: 11, color: 'var(--ink-42)' }}>
                   {latestLog ? `${t('taskDetail.updated')} ${fmtAgo(latestLog.created_at, clockMs)}` : t('taskDetail.autoRefresh')}
                 </span>
               </div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.78)', lineHeight: 1.45, marginBottom: 6, whiteSpace: 'pre-wrap' }}>
+              <div style={{ fontSize: 12, color: 'var(--ink-78)', lineHeight: 1.45, marginBottom: 6, whiteSpace: 'pre-wrap' }}>
                 {currentActivity.detail}
               </div>
-              <div style={{ height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+              <div style={{ height: 6, borderRadius: 999, background: 'var(--panel-border-3)', overflow: 'hidden' }}>
                 <div
                   style={{
                     width: `${executionProgress.percent}%`,
@@ -743,7 +979,7 @@ export default function TaskDetailPage() {
                   }}
                 />
               </div>
-              <div style={{ marginTop: 5, fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
+              <div style={{ marginTop: 5, fontSize: 11, color: 'var(--ink-45)' }}>
                 {t('taskDetail.progress')}: {executionProgress.doneCount}/{executionProgress.total} {t('taskDetail.steps')} ({executionProgress.percent}%)
               </div>
             </div>
@@ -751,62 +987,63 @@ export default function TaskDetailPage() {
               {executionProgress.effectiveSteps.map((step) => {
                 const item = stepMap[step];
                 const done = Boolean(item);
-                const color = done ? stageColor(step) : 'rgba(255,255,255,0.25)';
+                const color = done ? stageColor(step) : 'var(--ink-25)';
                 return (
-                  <div key={step} style={{ display: 'grid', gridTemplateColumns: '110px 1fr auto', gap: 10, alignItems: 'center', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px' }}>
+                  <div key={step} style={{ display: 'grid', gridTemplateColumns: '110px 1fr auto', gap: 10, alignItems: 'center', border: '1px solid var(--panel-border)', borderRadius: 10, padding: '8px 10px' }}>
                     <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color }}>{step}</span>
-                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.72)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item?.message || t('taskDetail.pending')}</span>
-                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)' }}>{item ? new Date(item.created_at).toLocaleTimeString() : '—'}</span>
+                    <span style={{ fontSize: 12, color: 'var(--ink-72)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item?.message || t('taskDetail.pending')}</span>
+                    <span style={{ fontSize: 11, color: 'var(--ink-42)' }}>{item ? new Date(item.created_at).toLocaleTimeString() : '—'}</span>
                   </div>
                 );
               })}
               {stepMap.failed ? (
                 <div style={{ border: '1px solid rgba(248,113,113,0.5)', borderRadius: 10, padding: '8px 10px', background: 'rgba(248,113,113,0.08)' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#f87171', textTransform: 'uppercase', marginBottom: 4 }}>{t('taskDetail.failed')}</div>
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.82)', whiteSpace: 'pre-wrap' }}>{stepMap.failed.message}</div>
+                  <div style={{ fontSize: 12, color: 'var(--ink-90)', whiteSpace: 'pre-wrap' }}>{stepMap.failed.message}</div>
                 </div>
               ) : null}
             </div>
           </section>
 
+          {/* Memory impact */}
           <section style={{ borderRadius: 16, border: '1px solid rgba(94,234,212,0.18)', background: 'rgba(10,20,32,0.46)', padding: 12 }}>
             <h3 style={{ marginTop: 0, marginBottom: 10, color: '#5eead4', fontSize: 15 }}>{t('taskDetail.memoryImpact')}</h3>
             {!memoryImpact ? (
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>{t('taskDetail.memoryImpactEmpty')}</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-45)' }}>{t('taskDetail.memoryImpactEmpty')}</div>
             ) : (
               <div style={{ display: 'grid', gap: 10 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, minmax(0,1fr))', gap: 8 }}>
                   <div style={{ border: '1px solid rgba(94,234,212,0.25)', borderRadius: 10, padding: '8px 10px', background: 'rgba(94,234,212,0.08)' }}>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase' }}>{t('taskDetail.memoryMode')}</div>
+                    <div style={{ fontSize: 10, color: 'var(--ink-45)', textTransform: 'uppercase' }}>{t('taskDetail.memoryMode')}</div>
                     <div style={{ fontSize: 12, fontWeight: 700, color: '#5eead4' }}>{memoryImpact.mode}</div>
                   </div>
                   <div style={{ border: '1px solid rgba(56,189,248,0.25)', borderRadius: 10, padding: '8px 10px', background: 'rgba(56,189,248,0.08)' }}>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase' }}>{t('taskDetail.memoryHits')}</div>
+                    <div style={{ fontSize: 10, color: 'var(--ink-45)', textTransform: 'uppercase' }}>{t('taskDetail.memoryHits')}</div>
                     <div style={{ fontSize: 12, fontWeight: 700, color: '#7dd3fc' }}>{memoryImpact.hits}</div>
                   </div>
                   <div style={{ border: '1px solid rgba(34,197,94,0.25)', borderRadius: 10, padding: '8px 10px', background: 'rgba(34,197,94,0.08)' }}>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase' }}>{t('taskDetail.memoryBestScore')}</div>
+                    <div style={{ fontSize: 10, color: 'var(--ink-45)', textTransform: 'uppercase' }}>{t('taskDetail.memoryBestScore')}</div>
                     <div style={{ fontSize: 12, fontWeight: 700, color: '#86efac' }}>{memoryImpact.best_score !== null ? memoryImpact.best_score.toFixed(3) : '—'}</div>
                   </div>
                   <div style={{ border: '1px solid rgba(245,158,11,0.25)', borderRadius: 10, padding: '8px 10px', background: 'rgba(245,158,11,0.08)' }}>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase' }}>{t('taskDetail.memoryAvgScore')}</div>
+                    <div style={{ fontSize: 10, color: 'var(--ink-45)', textTransform: 'uppercase' }}>{t('taskDetail.memoryAvgScore')}</div>
                     <div style={{ fontSize: 12, fontWeight: 700, color: '#fbbf24' }}>{memoryImpact.avg_score !== null ? memoryImpact.avg_score.toFixed(3) : '—'}</div>
                   </div>
                 </div>
 
-                <div style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, overflow: 'hidden' }}>
-                  <div style={{ padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)', fontSize: 11, color: 'rgba(255,255,255,0.58)', textTransform: 'uppercase', fontWeight: 700 }}>
+                <div style={{ border: '1px solid var(--panel-border-2)', borderRadius: 10, overflow: 'hidden' }}>
+                  <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--panel-border-2)', fontSize: 11, color: 'var(--ink-58)', textTransform: 'uppercase', fontWeight: 700 }}>
                     {t('taskDetail.memoryTopMatches')}
                   </div>
                   {memoryImpact.top_matches.length === 0 ? (
-                    <div style={{ padding: '10px', fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>{t('taskDetail.memoryNoMatch')}</div>
+                    <div style={{ padding: '10px', fontSize: 12, color: 'var(--ink-45)' }}>{t('taskDetail.memoryNoMatch')}</div>
                   ) : (
                     <div style={{ display: 'grid', gap: 0 }}>
                       {memoryImpact.top_matches.map((m, idx) => (
-                        <div key={`${m.key}-${idx}`} style={{ padding: '9px 10px', borderTop: idx === 0 ? 'none' : '1px solid rgba(255,255,255,0.06)', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '120px 100px 1fr', gap: 8 }}>
-                          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>key: <b>{m.key || '—'}</b></div>
+                        <div key={`${m.key}-${idx}`} style={{ padding: '9px 10px', borderTop: idx === 0 ? 'none' : '1px solid var(--panel-border)', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '120px 100px 1fr', gap: 8 }}>
+                          <div style={{ fontSize: 12, color: 'var(--ink-78)' }}>key: <b>{m.key || '—'}</b></div>
                           <div style={{ fontSize: 12, color: '#7dd3fc' }}>score: {m.score !== null ? m.score.toFixed(3) : '—'}</div>
-                          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.preview || '—'}</div>
+                          <div style={{ fontSize: 12, color: 'var(--ink-65)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.preview || '—'}</div>
                         </div>
                       ))}
                     </div>
@@ -816,10 +1053,11 @@ export default function TaskDetailPage() {
             )}
           </section>
 
-          <section style={{ borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', padding: 12 }}>
-            <h3 style={{ marginTop: 0, marginBottom: 10, color: 'rgba(255,255,255,0.9)', fontSize: 15 }}>{t('taskDetail.codeDiffPreview')}</h3>
+          {/* Code diff/preview */}
+          <section style={{ borderRadius: 16, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', padding: 12 }}>
+            <h3 style={{ marginTop: 0, marginBottom: 10, color: 'var(--ink-90)', fontSize: 15 }}>{t('taskDetail.codeDiffPreview')}</h3>
             {codeFiles.length === 0 ? (
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>{t('taskDetail.noGeneratedCode')}</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-45)' }}>{t('taskDetail.noGeneratedCode')}</div>
             ) : (
               <div style={{ display: 'grid', gap: 10 }}>
                 <div style={{ display: 'flex', gap: 6, overflowX: 'auto' }}>
@@ -830,9 +1068,9 @@ export default function TaskDetailPage() {
                       style={{
                         padding: '5px 10px',
                         borderRadius: 999,
-                        border: activeCodeTab === idx ? '1px solid rgba(94,234,212,0.55)' : '1px solid rgba(255,255,255,0.15)',
+                        border: activeCodeTab === idx ? '1px solid rgba(94,234,212,0.55)' : '1px solid var(--panel-border-4)',
                         background: activeCodeTab === idx ? 'rgba(94,234,212,0.12)' : 'transparent',
-                        color: activeCodeTab === idx ? '#5eead4' : 'rgba(255,255,255,0.65)',
+                        color: activeCodeTab === idx ? '#5eead4' : 'var(--ink-65)',
                         fontSize: 11,
                         fontWeight: 700,
                         whiteSpace: 'nowrap',
@@ -844,8 +1082,8 @@ export default function TaskDetailPage() {
                   ))}
                 </div>
                 {activeCode ? (
-                  <div style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, overflow: 'hidden' }}>
-                    <div style={{ padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)', fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>{activeCode.path}</div>
+                  <div style={{ border: '1px solid var(--panel-border-2)', borderRadius: 10, overflow: 'hidden' }}>
+                    <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--panel-border-2)', fontSize: 11, color: 'var(--ink-58)' }}>{activeCode.path}</div>
                     {renderCodeContent(activeCode)}
                   </div>
                 ) : null}
@@ -853,13 +1091,13 @@ export default function TaskDetailPage() {
             )}
           </section>
 
-          <section style={{ borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', overflow: 'hidden', minHeight: 380, display: 'grid', gridTemplateRows: 'auto 1fr' }}>
-            <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '10px 12px 8px' }}>
+          {/* Log history */}
+          <section style={{ borderRadius: 16, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', overflow: 'hidden', minHeight: 300, display: 'grid', gridTemplateRows: 'auto 1fr' }}>
+            <div style={{ borderBottom: '1px solid var(--panel-border)', padding: '10px 12px 8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                <h3 style={{ margin: 0, color: 'rgba(255,255,255,0.9)', fontSize: 15 }}>{t('taskDetail.liveLogs')}</h3>
-                <span style={{ fontSize: 12, color: streamState === 'live' ? '#22c55e' : streamState === 'reconnecting' ? '#f59e0b' : 'rgba(255,255,255,0.35)' }}>
-                  {streamState === 'live' ? t('taskDetail.liveOn') : streamState === 'reconnecting' ? t('taskDetail.reconnecting') : t('taskDetail.offline')}
-                  {latestLog ? ` • ${latestLog.stage} • ${new Date(latestLog.created_at).toLocaleTimeString()}` : ''}
+                <h3 style={{ margin: 0, color: 'var(--ink-90)', fontSize: 15 }}>{t('taskDetail.liveLogs')}</h3>
+                <span style={{ fontSize: 12, color: 'var(--ink-42)' }}>
+                  {latestLog ? `${latestLog.stage} • ${new Date(latestLog.created_at).toLocaleTimeString()}` : ''}
                 </span>
               </div>
               <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
@@ -874,9 +1112,9 @@ export default function TaskDetailPage() {
                     style={{
                       padding: '4px 10px',
                       borderRadius: 999,
-                      border: logFilter === f.key ? '1px solid rgba(94,234,212,0.55)' : '1px solid rgba(255,255,255,0.15)',
+                      border: logFilter === f.key ? '1px solid rgba(94,234,212,0.55)' : '1px solid var(--panel-border-4)',
                       background: logFilter === f.key ? 'rgba(94,234,212,0.12)' : 'transparent',
-                      color: logFilter === f.key ? '#5eead4' : 'rgba(255,255,255,0.6)',
+                      color: logFilter === f.key ? '#5eead4' : 'var(--ink-58)',
                       fontSize: 11,
                       fontWeight: 700,
                       cursor: 'pointer',
@@ -886,42 +1124,26 @@ export default function TaskDetailPage() {
                   </button>
                 ))}
               </div>
-              <div ref={liveStripRef} style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 6, scrollbarWidth: 'thin' }}>
-                {liveLogs.length === 0 ? (
-                  <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>{t('taskDetail.noLiveLogs')}</div>
-                ) : (
-                  liveLogs.map((log, idx) => {
-                    const color = stageColor(log.stage);
-                    return (
-                      <div key={`${log.created_at}-${idx}`} style={{ minWidth: isMobile ? 240 : 280, maxWidth: 360, borderRadius: 10, border: `1px solid ${color}55`, background: `${color}12`, padding: '8px 9px' }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>{log.stage}</div>
-                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.78)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>{log.message}</div>
-                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 6 }}>{new Date(log.created_at).toLocaleString()}</div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
             </div>
 
             <div style={{ overflowY: 'auto', padding: 10 }}>
-              <div style={{ border: `1px solid ${latestFailure ? 'rgba(248,113,113,0.35)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 10, padding: '8px 10px', marginBottom: 10, background: latestFailure ? 'rgba(248,113,113,0.08)' : 'rgba(255,255,255,0.015)' }}>
-                <div style={{ fontSize: 11, color: latestFailure ? '#f87171' : 'rgba(255,255,255,0.6)', fontWeight: 700, textTransform: 'uppercase' }}>{t('taskDetail.failureAnalysis')}: {t(failure.labelKey as never)}</div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 4 }}>{t(failure.detailKey as never)}</div>
+              <div style={{ border: `1px solid ${latestFailure ? 'rgba(248,113,113,0.35)' : 'var(--panel-border-2)'}`, borderRadius: 10, padding: '8px 10px', marginBottom: 10, background: latestFailure ? 'rgba(248,113,113,0.08)' : 'var(--panel)' }}>
+                <div style={{ fontSize: 11, color: latestFailure ? '#f87171' : 'var(--ink-58)', fontWeight: 700, textTransform: 'uppercase' }}>{t('taskDetail.failureAnalysis')}: {t(failure.labelKey as never)}</div>
+                <div style={{ fontSize: 12, color: 'var(--ink-78)', marginTop: 4 }}>{t(failure.detailKey as never)}</div>
               </div>
               {logHistory.length === 0 ? (
-                <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 14, margin: 0 }}>{t('taskDetail.noLogs')}</p>
+                <p style={{ color: 'var(--ink-35)', fontSize: 14, margin: 0 }}>{t('taskDetail.noLogs')}</p>
               ) : (
                 <div style={{ display: 'grid', gap: 8 }}>
                   {logHistory.map((log, idx) => {
                     const color = stageColor(log.stage);
                     return (
-                      <div key={`${log.created_at}-${idx}-history`} style={{ borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.015)', padding: '9px 10px' }}>
+                      <div key={`${log.created_at}-${idx}-history`} style={{ borderRadius: 10, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', padding: '9px 10px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 6 }}>
                           <span style={{ fontSize: 10, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: 0.8 }}>{log.stage}</span>
-                          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', whiteSpace: 'nowrap' }}>{new Date(log.created_at).toLocaleString()}</span>
+                          <span style={{ fontSize: 11, color: 'var(--ink-35)', whiteSpace: 'nowrap' }}>{new Date(log.created_at).toLocaleString()}</span>
                         </div>
-                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', lineHeight: 1.45, whiteSpace: log.stage === 'code_preview' || log.stage === 'code_diff' ? 'pre-wrap' : 'normal', fontFamily: log.stage === 'code_preview' || log.stage === 'code_diff' ? 'ui-monospace, SFMono-Regular, Menlo, monospace' : 'inherit', overflowX: log.stage === 'code_preview' || log.stage === 'code_diff' ? 'auto' : 'visible' }}>
+                        <div style={{ fontSize: 12, color: 'var(--ink-78)', lineHeight: 1.45, whiteSpace: log.stage === 'code_preview' || log.stage === 'code_diff' ? 'pre-wrap' : 'normal', fontFamily: log.stage === 'code_preview' || log.stage === 'code_diff' ? 'ui-monospace, SFMono-Regular, Menlo, monospace' : 'inherit', overflowX: log.stage === 'code_preview' || log.stage === 'code_diff' ? 'auto' : 'visible' }}>
                           {log.message}
                         </div>
                       </div>

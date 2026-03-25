@@ -101,6 +101,18 @@ class TaskListResponse(BaseModel):
     page_size: int
 
 
+class RunItem(BaseModel):
+    id: int
+    task_id: int
+    source: str
+    usage_prompt_tokens: float = 0
+    usage_completion_tokens: float = 0
+    usage_total_tokens: float = 0
+    estimated_cost_usd: float = 0
+    pr_url: str | None = None
+    created_at: datetime
+
+
 class UsageEventItem(BaseModel):
     id: int
     operation_type: str

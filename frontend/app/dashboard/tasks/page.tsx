@@ -57,6 +57,8 @@ export default function DashboardTasksPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
+  const [agentConfigs, setAgentConfigs] = useState<{ role: string; model: string; provider: string; enabled: boolean }[]>([]);
+  const [assignPopupTaskId, setAssignPopupTaskId] = useState<number | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -128,6 +130,13 @@ export default function DashboardTasksPage() {
     loadPrefs().then((prefs) => {
       const raw = (prefs.profile_settings || {}) as Record<string, unknown>;
       if (typeof raw.default_create_pr === 'boolean') setDefaultCreatePr(raw.default_create_pr);
+      if (prefs.agents?.length) {
+        setAgentConfigs(
+          (prefs.agents as { role: string; model: string; custom_model?: string; provider: string; enabled: boolean }[])
+            .filter((a) => a.enabled !== false)
+            .map((a) => ({ role: a.role, model: a.custom_model || a.model || '', provider: a.provider || '', enabled: a.enabled }))
+        );
+      }
     }).catch(() => {});
   }, []);
 
@@ -169,9 +178,24 @@ export default function DashboardTasksPage() {
   }
 
   async function onAssign(id: number) {
+    if (agentConfigs.length > 0) {
+      setAssignPopupTaskId(id);
+      return;
+    }
     try {
       await apiFetch('/tasks/' + id + '/assign', { method: 'POST', body: JSON.stringify({ create_pr: defaultCreatePr }) });
       setMsg(t('tasks.assigned')); await load();
+    } catch (e) { setError(e instanceof Error ? e.message : t('tasks.assignFailed')); }
+  }
+
+  async function onAssignWithAgent(id: number, agent: { role: string; model: string; provider: string }) {
+    setAssignPopupTaskId(null);
+    try {
+      await apiFetch('/tasks/' + id + '/assign', {
+        method: 'POST',
+        body: JSON.stringify({ create_pr: defaultCreatePr, agent_role: agent.role, agent_model: agent.model, agent_provider: agent.provider }),
+      });
+      setMsg(`${t('tasks.assigned')} (${agent.role} / ${agent.model})`); await load();
     } catch (e) { setError(e instanceof Error ? e.message : t('tasks.assignFailed')); }
   }
 
@@ -514,6 +538,60 @@ export default function DashboardTasksPage() {
           </button>
         </div>
       </div>
+      {/* Agent Select Popup */}
+      {assignPopupTaskId !== null && (
+        <div
+          onClick={() => setAssignPopupTaskId(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16,
+              padding: '20px 24px', minWidth: 340, maxWidth: 440,
+            }}
+          >
+            <h3 style={{ marginTop: 0, marginBottom: 14, fontSize: 16, color: 'var(--ink)' }}>
+              {t('tasks.selectAgent')}
+            </h3>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {agentConfigs.map((agent) => (
+                <button
+                  key={agent.role}
+                  onClick={() => void onAssignWithAgent(assignPopupTaskId, agent)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+                    padding: '12px 14px', borderRadius: 12,
+                    border: '1px solid var(--panel-border-3)',
+                    background: 'var(--panel)',
+                    cursor: 'pointer', textAlign: 'left', width: '100%',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', textTransform: 'capitalize' }}>
+                      {agent.role}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                      {agent.model || 'default'} {agent.provider ? `• ${agent.provider}` : ''}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 18 }}>→</span>
+                </button>
+              ))}
+              <button
+                onClick={() => setAssignPopupTaskId(null)}
+                className='button button-outline'
+                style={{ marginTop: 4, fontSize: 12 }}
+              >
+                {t('tasks.cancel')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { apiFetch, getRepoAgentsDoc, loadPrefs, RepoMapping, RepoProfileSummary, savePrefs, saveRepoAgentsDoc, scanRepoProfile } from '@/lib/api';
+import { apiFetch, loadPrefs, RepoMapping, RepoProfileSummary, savePrefs, scanRepoProfile } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
 
 const LS_REPO_MAPPINGS = 'tiqr_repo_mappings';
@@ -61,6 +61,7 @@ export default function RepoMappingsPage() {
   const [path, setPath] = useState('');
   const [notes, setNotes] = useState('');
   const [repoPlaybook, setRepoPlaybook] = useState('');
+  const [analyzePrompt, setAnalyzePrompt] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
@@ -71,12 +72,6 @@ export default function RepoMappingsPage() {
   const [hasGithubIntegration, setHasGithubIntegration] = useState(false);
   const [repoProfiles, setRepoProfiles] = useState<Record<string, RepoProfileSummary>>({});
   const [scanningId, setScanningId] = useState<string | null>(null);
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [editorMappingId, setEditorMappingId] = useState<string | null>(null);
-  const [editorPath, setEditorPath] = useState('');
-  const [editorContent, setEditorContent] = useState('');
-  const [editorLoading, setEditorLoading] = useState(false);
-  const [editorSaving, setEditorSaving] = useState(false);
   const githubFetchRef = useRef(0);
 
   useEffect(() => {
@@ -234,6 +229,7 @@ export default function RepoMappingsPage() {
     setPath('');
     setNotes('');
     setRepoPlaybook('');
+    setAnalyzePrompt('');
     setEditingId(null);
   }
 
@@ -279,6 +275,7 @@ export default function RepoMappingsPage() {
     setPath(item.local_path || '');
     setNotes(item.notes || '');
     setRepoPlaybook(item.repo_playbook || '');
+    setAnalyzePrompt(item.analyze_prompt || '');
   }
 
   useEffect(() => {
@@ -317,6 +314,7 @@ export default function RepoMappingsPage() {
         local_path: path.trim(),
         notes: notes.trim() || undefined,
         repo_playbook: repoPlaybook.trim() || undefined,
+        analyze_prompt: analyzePrompt.trim() || undefined,
         azure_project: effectiveProject,
         azure_repo_url: effectiveRepoUrl,
         azure_repo_name: effectiveRepoName,
@@ -334,6 +332,7 @@ export default function RepoMappingsPage() {
         local_path: path.trim(),
         notes: notes.trim() || undefined,
         repo_playbook: repoPlaybook.trim() || undefined,
+        analyze_prompt: analyzePrompt.trim() || undefined,
         github_owner: owner,
         github_repo: repoName,
         github_repo_full_name: fullName,
@@ -385,41 +384,6 @@ export default function RepoMappingsPage() {
 
   async function removeMapping(id: string) {
     await persist(items.filter((m) => m.id !== id));
-  }
-
-  async function openAgentsEditor(mapping: RepoMapping) {
-    setEditorOpen(true);
-    setEditorMappingId(mapping.id);
-    setEditorContent('');
-    setEditorPath('');
-    setEditorLoading(true);
-    try {
-      const res = await getRepoAgentsDoc(mapping.id);
-      setEditorPath(res.agents_md_path);
-      setEditorContent(res.content || '');
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : t('mappings.agentsLoadFailed'));
-      setEditorOpen(false);
-      setEditorMappingId(null);
-    } finally {
-      setEditorLoading(false);
-    }
-  }
-
-  async function saveAgentsEditor() {
-    if (!editorMappingId) return;
-    setEditorSaving(true);
-    setErr('');
-    try {
-      const res = await saveRepoAgentsDoc(editorMappingId, editorContent);
-      setEditorPath(res.agents_md_path);
-      setMsg(t('mappings.agentsSaved'));
-      setTimeout(() => setMsg(''), 1800);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : t('mappings.agentsSaveFailed'));
-    } finally {
-      setEditorSaving(false);
-    }
   }
 
   const empty = useMemo(() => items.length === 0, [items.length]);
@@ -545,6 +509,24 @@ export default function RepoMappingsPage() {
               }}
             />
           </div>
+          <div>
+            <div style={fieldLabelStyle}>{t('mappings.analyzePrompt')}</div>
+            <textarea
+              value={analyzePrompt}
+              onChange={(e) => setAnalyzePrompt(e.target.value)}
+              placeholder={t('mappings.analyzePromptPlaceholder')}
+              rows={8}
+              style={{
+                ...fieldStyle,
+                height: 'auto',
+                padding: '10px 12px',
+                resize: 'vertical',
+                lineHeight: 1.45,
+                fontFamily: 'monospace',
+                fontSize: 12,
+              }}
+            />
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, minHeight: 38 }}>
             <button
               onClick={() => void upsertMapping()}
@@ -619,21 +601,6 @@ export default function RepoMappingsPage() {
                         {' · '}
                         {(repoProfiles[m.id].scanned_by_provider || 'local')}
                       </div>
-                      <button
-                        onClick={() => void openAgentsEditor(m)}
-                        style={{
-                          padding: '4px 8px',
-                          borderRadius: 8,
-                          border: '1px solid rgba(56,189,248,0.35)',
-                          background: 'rgba(56,189,248,0.12)',
-                          color: '#7dd3fc',
-                          fontSize: 11,
-                          cursor: 'pointer',
-                          fontWeight: 700,
-                        }}
-                      >
-                        {t('mappings.openAgents')}
-                      </button>
                     </>
                   ) : (
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{t('mappings.notScanned')}</div>
@@ -675,56 +642,6 @@ export default function RepoMappingsPage() {
         </div>
       )}
 
-      {editorOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(2,6,23,0.75)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ width: 'min(980px, 100%)', maxHeight: '86vh', borderRadius: 14, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(7,13,24,0.98)', boxShadow: '0 24px 80px rgba(0,0,0,0.5)', display: 'grid', gridTemplateRows: 'auto auto 1fr auto', gap: 10, padding: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-              <div style={{ fontSize: 14, fontWeight: 800, color: 'rgba(255,255,255,0.9)' }}>{t('mappings.agentsEditor')}</div>
-              <button onClick={() => { setEditorOpen(false); setEditorMappingId(null); }} style={{ border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.5)', fontSize: 18, cursor: 'pointer' }}>×</button>
-            </div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {editorPath || (editorLoading ? t('mappings.loading') : '')}
-            </div>
-            <textarea
-              value={editorContent}
-              onChange={(e) => setEditorContent(e.target.value)}
-              disabled={editorLoading || editorSaving}
-              style={{
-                width: '100%',
-                minHeight: 380,
-                height: '100%',
-                borderRadius: 10,
-                border: '1px solid rgba(255,255,255,0.14)',
-                background: 'rgba(255,255,255,0.03)',
-                color: 'rgba(255,255,255,0.92)',
-                padding: 12,
-                fontSize: 12,
-                lineHeight: 1.5,
-                resize: 'none',
-                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                outline: 'none',
-              }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button
-                onClick={() => { setEditorOpen(false); setEditorMappingId(null); }}
-                className='button button-outline'
-                style={{ minWidth: 120 }}
-              >
-                {t('mappings.close')}
-              </button>
-              <button
-                onClick={() => void saveAgentsEditor()}
-                disabled={editorLoading || editorSaving || !editorMappingId}
-                className='button button-primary'
-                style={{ minWidth: 140 }}
-              >
-                {editorSaving ? t('mappings.saving') : t('mappings.saveAgents')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

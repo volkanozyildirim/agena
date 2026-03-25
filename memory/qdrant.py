@@ -55,9 +55,12 @@ class QdrantMemoryStore(MemoryStore):
         if self.embedding_provider == 'openai':
             api_key = (self.embedding_api_key or '').strip()
             if api_key and not api_key.startswith('your_'):
+                import os as _os
+                _ssl_verify = _os.getenv('SSL_VERIFY', 'true').strip().lower() not in ('false', '0', 'no')
                 self._openai_embedding_client = AsyncOpenAI(
                     api_key=api_key,
                     base_url=self.embedding_base_url or None,
+                    http_client=httpx.AsyncClient(verify=_ssl_verify),
                 )
 
     async def ensure_collection(self) -> None:

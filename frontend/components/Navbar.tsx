@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { isLoggedIn } from '@/lib/api';
 import LangToggle from '@/components/LangToggle';
+import ThemeToggle from '@/components/ThemeToggle';
 import { useLocale } from '@/lib/i18n';
 
 export default function Navbar() {
@@ -17,12 +18,13 @@ export default function Navbar() {
   return (
     <header className='navbar-shell'>
       <div className='container navbar-inner'>
-        <Link href='/' style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-0.3px', display: 'flex', alignItems: 'center', gap: 10, color: 'rgba(255,255,255,0.95)', textDecoration: 'none' }}>
+        <Link href='/' style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-0.3px', display: 'flex', alignItems: 'center', gap: 10, color: 'var(--ink)', textDecoration: 'none' }}>
           <span className='brand-mark' />
           Tiqr
         </Link>
         <nav style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           <LangToggle style={{ marginRight: 4 }} />
+          <ThemeToggle style={{ marginRight: 4 }} />
           <span className='chip' style={{ marginRight: 8 }}>{t('nav.aiOrchestration')}</span>
           {loggedIn ? (
             <Link href='/dashboard' className='button button-primary' style={{ padding: '8px 16px', fontSize: 13 }}>
@@ -30,7 +32,7 @@ export default function Navbar() {
             </Link>
           ) : (
             <>
-              <Link href='/signin' style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, padding: '6px 12px', borderRadius: 8, textDecoration: 'none' }}>
+              <Link href='/signin' style={{ color: 'var(--muted)', fontSize: 14, padding: '6px 12px', borderRadius: 8, textDecoration: 'none' }}>
                 {t('nav.signIn')}
               </Link>
               <Link href='/signup' className='button button-primary' style={{ padding: '8px 16px', fontSize: 13 }}>

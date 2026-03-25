@@ -40,26 +40,36 @@ class CrewAIAgentRunner:
             'Task details:\n'
             f"ID: {task_payload.get('id', '')}\n"
             f"Title: {task_payload.get('title', '')}\n"
-            f"Description: {task_payload.get('description', '')}\n"
-            f'Context summary:\n{context_summary}\n'
-            'Return only valid JSON.'
+            f"Description: {task_payload.get('description', '')}\n\n"
+            f'Context and source files:\n{context_summary}\n\n'
+            'Analyze the source files above carefully. Identify which files and structs/functions need changes. '
+            'Return only valid JSON with: goal, requirements, acceptance_criteria, technical_notes, file_changes.'
         )
         content, usage, model = await self._run_with_crewai_or_llm(
             role='Product Manager Agent',
-            goal='Analyze tasks and generate a structured specification.',
+            goal='Analyze tasks and generate a structured specification with file-level change plan.',
             system_prompt=PM_SYSTEM_PROMPT,
             user_prompt=prompt,
             complexity_hint='normal',
+            max_output_tokens=8000,
         )
         spec = self._safe_json(content)
         return spec, usage, model
 
-    async def run_developer(self, spec: dict[str, Any], context_summary: str) -> tuple[str, dict[str, int], str]:
+    async def run_developer(self, spec: dict[str, Any], context_summary: str, task_description: str = '', target_files_context: str = '') -> tuple[str, dict[str, int], str]:
         prompt = (
             'Use this specification to generate code:\n'
             f'{json.dumps(spec, indent=2)}\n\n'
-            f'Context summary:\n{context_summary}\n\n'
-            'Return complete file outputs in markdown format with paths.'
+        )
+        # Target files from PM spec — full file contents for modification
+        if target_files_context:
+            prompt += f'{target_files_context}\n\n'
+
+        prompt += (
+            'IMPORTANT: You must modify the EXISTING source files shown above. '
+            'Do NOT create placeholder markdown files. Return actual code changes.\n'
+            'Return complete file outputs using **File: relative/path.ext** format with fenced code blocks.\n'
+            'Output the FULL updated file content, not just changed parts.'
         )
         return await self._run_with_crewai_or_llm(
             role='Developer Agent',
@@ -67,12 +77,15 @@ class CrewAIAgentRunner:
             system_prompt=DEV_SYSTEM_PROMPT,
             user_prompt=prompt,
             complexity_hint='high',
+            max_output_tokens=16000,
         )
 
-    async def run_reviewer(self, generated_code: str, spec: dict[str, Any]) -> tuple[str, dict[str, int], str]:
+    async def run_reviewer(self, generated_code: str, spec: dict[str, Any], context_summary: str = '') -> tuple[str, dict[str, int], str]:
         prompt = (
-            'Review and improve this generated code according to the specification.\n\n'
+            'Review and improve this generated code according to the specification.\n'
+            'IMPORTANT: Keep the **File: path** markers and fenced code blocks in your output.\n\n'
             f'Specification:\n{json.dumps(spec, indent=2)}\n\n'
+            f'Context:\n{context_summary}\n\n'
             f'Generated code:\n{generated_code}\n'
         )
         return await self._run_with_crewai_or_llm(
@@ -81,12 +94,15 @@ class CrewAIAgentRunner:
             system_prompt=REVIEWER_SYSTEM_PROMPT,
             user_prompt=prompt,
             complexity_hint='normal',
+            max_output_tokens=16000,
         )
 
     async def finalize(self, reviewed_code: str) -> tuple[str, dict[str, int], str]:
         prompt = (
-            'Normalize and clean this code output for final commit. Keep file markers explicit as '\
-            '**File: path** and fenced code blocks.\n\n'
+            'Normalize and clean this code output for final commit.\n'
+            'CRITICAL: You MUST preserve all **File: path** markers and fenced code blocks exactly.\n'
+            'If the input already has proper **File: path** + code blocks, return them as-is.\n'
+            'Do NOT remove code or replace it with commentary.\n\n'
             f'{reviewed_code}'
         )
         return await self._run_with_crewai_or_llm(
@@ -95,6 +111,7 @@ class CrewAIAgentRunner:
             system_prompt=FINALIZE_SYSTEM_PROMPT,
             user_prompt=prompt,
             complexity_hint='simple',
+            max_output_tokens=16000,
         )
 
     async def _run_with_crewai_or_llm(
@@ -104,6 +121,7 @@ class CrewAIAgentRunner:
         system_prompt: str,
         user_prompt: str,
         complexity_hint: str,
+        max_output_tokens: int = 2500,
     ) -> tuple[str, dict[str, int], str]:
         raw_key = (self.llm.settings.openai_api_key or '').strip()
         if not raw_key or raw_key.startswith('your_'):
@@ -111,6 +129,7 @@ class CrewAIAgentRunner:
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
                 complexity_hint=complexity_hint,
+                max_output_tokens=max_output_tokens,
             )
             return content, usage, model
         try:
@@ -129,6 +148,7 @@ class CrewAIAgentRunner:
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
                 complexity_hint=complexity_hint,
+                max_output_tokens=max_output_tokens,
             )
             return content, usage, model
 

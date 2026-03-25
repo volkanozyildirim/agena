@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import core.http  # noqa: F401 – apply SSL patch before any httpx clients are created
 import asyncio
 import logging
 import uuid

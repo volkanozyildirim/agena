@@ -30,6 +30,13 @@ type AgentAnalytics = {
 const OPENAI_MODELS = [
   { id: 'o3', name: 'o3' },
   { id: 'o4-mini', name: 'o4-mini' },
+  { id: 'gpt-5', name: 'GPT-5' },
+  { id: 'gpt-5-codex', name: 'GPT-5 Codex' },
+  { id: 'gpt-5.1-codex', name: 'GPT-5.1 Codex' },
+  { id: 'gpt-5.1-codex-mini', name: 'GPT-5.1 Codex Mini' },
+  { id: 'gpt-5.1-codex-max', name: 'GPT-5.1 Codex Max' },
+  { id: 'gpt-5.2-codex', name: 'GPT-5.2 Codex' },
+  { id: 'gpt-5.3-codex', name: 'GPT-5.3 Codex' },
   { id: 'gpt-4.1', name: 'GPT-4.1' },
   { id: 'gpt-4.1-mini', name: 'GPT-4.1 mini' },
   { id: 'gpt-4o', name: 'GPT-4o' },

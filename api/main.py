@@ -1,5 +1,6 @@
 import logging
 
+import core.http  # noqa: F401 – apply SSL patch before any httpx clients are created
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 

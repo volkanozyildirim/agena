@@ -17,7 +17,6 @@ from agents.orchestrator import AgentOrchestrator
 from core.settings import get_settings
 from models.run_record import RunRecord
 from models.task_record import TaskRecord
-from models.user_preference import UserPreference
 from schemas.agent import AgentRunResult, UsageStats
 from schemas.github import CreatePRRequest, GitHubFileChange
 from services.azure_pr_service import AzurePRService
@@ -80,11 +79,23 @@ class OrchestrationService:
 
         task.status = 'running'
         await self.db_session.commit()
+
+        routing = self._extract_task_routing(task)
+
+        run_info_parts = [f'Agent pipeline started at {run_started_at.isoformat()}Z']
+        if routing.preferred_agent_model:
+            run_info_parts.append(f'model={routing.preferred_agent_model}')
+        if routing.preferred_agent_provider:
+            run_info_parts.append(f'provider={routing.preferred_agent_provider}')
+        if routing.local_repo_path:
+            run_info_parts.append(f'repo={routing.local_repo_path}')
+        run_info_parts.append(f'source={routing.effective_source}')
+        run_info_parts.append(f'create_pr={create_pr}')
         await task_service.add_log(
             task.id,
             organization_id,
             'running',
-            f'Agent pipeline started at {run_started_at.isoformat()}Z',
+            ' | '.join(run_info_parts),
         )
         await notification_service.notify_event(
             organization_id=organization_id,
@@ -95,8 +106,6 @@ class OrchestrationService:
             severity='info',
             task_id=task.id,
         )
-
-        routing = self._extract_task_routing(task)
         tenant_playbook = await self._load_tenant_playbook(organization_id)
         if routing.repo_playbook:
             await task_service.add_log(task.id, organization_id, 'playbook', 'Repo playbook applied to prompt context')
@@ -111,6 +120,8 @@ class OrchestrationService:
                 local_repo_path=routing.local_repo_path,
                 organization_id=organization_id,
                 user_id=task.created_by_user_id,
+                task_title=task.title or '',
+                task_description=task.description or '',
             ),
             task.story_context,
             task.acceptance_criteria,
@@ -178,7 +189,90 @@ class OrchestrationService:
                 await task_service.add_log(task.id, organization_id, 'agent', 'Using codex_cli preferred agent')
             else:
                 orchestrator = await self._build_orchestrator(organization_id, routing)
-                state = await orchestrator.run(payload)
+                # Run flow step-by-step with logging
+                flow_state: dict[str, Any] = {
+                    'task': payload,
+                    'usage': {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0},
+                    'model_usage': [],
+                }
+                def _get_usage(fs: dict) -> dict:
+                    return dict(fs.get('usage', {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0}))
+
+                def _usage_delta(before: dict, after: dict) -> dict:
+                    return {
+                        'prompt_tokens': after.get('prompt_tokens', 0) - before.get('prompt_tokens', 0),
+                        'completion_tokens': after.get('completion_tokens', 0) - before.get('completion_tokens', 0),
+                        'total_tokens': after.get('total_tokens', 0) - before.get('total_tokens', 0),
+                    }
+
+                async def _step_event(step_name: str, delta: dict, step_model: str, step_start: datetime, step_dur: float):
+                    step_cost = self.cost_tracker.estimate_cost_usd(
+                        prompt_tokens=int(delta.get('prompt_tokens', 0)),
+                        completion_tokens=int(delta.get('completion_tokens', 0)),
+                        model=step_model or routing.preferred_agent_model or 'gpt-4o-mini',
+                    )
+                    await usage_event_service.create_event(
+                        organization_id=organization_id,
+                        user_id=task.created_by_user_id,
+                        task_id=task.id,
+                        operation_type=f'flow_step:{step_name}',
+                        provider=routing.preferred_agent_provider or 'openai',
+                        model=step_model or routing.preferred_agent_model,
+                        status='completed',
+                        prompt_tokens=int(delta.get('prompt_tokens', 0)),
+                        completion_tokens=int(delta.get('completion_tokens', 0)),
+                        total_tokens=int(delta.get('total_tokens', 0)),
+                        cost_usd=float(step_cost),
+                        started_at=step_start,
+                        ended_at=datetime.utcnow(),
+                        duration_ms=int(step_dur * 1000),
+                        local_repo_path=routing.local_repo_path,
+                    )
+
+                # Step 1: Fetch context
+                await task_service.add_log(task.id, organization_id, 'agent', 'Step 1/3: Fetching context & memory...')
+                u_before = _get_usage(flow_state)
+                s_start = datetime.utcnow()
+                s_clock = time.perf_counter()
+                flow_state = await orchestrator.fetch_context_node(flow_state)
+                u_after = _get_usage(flow_state)
+                s_model = (flow_state.get('model_usage') or [''])[-1]
+                await _step_event('fetch_context', _usage_delta(u_before, u_after), s_model, s_start, time.perf_counter() - s_clock)
+                ctx_len = len(flow_state.get('context_summary', ''))
+                mem_hits = len(flow_state.get('memory_context', []))
+
+                # Step 2: PM analyze
+                await task_service.add_log(task.id, organization_id, 'agent', f'Step 2/3: PM analyzing task... (context={ctx_len} chars, memory_hits={mem_hits})')
+                u_before = _get_usage(flow_state)
+                s_start = datetime.utcnow()
+                s_clock = time.perf_counter()
+                flow_state = await orchestrator.analyze_node(flow_state)
+                u_after = _get_usage(flow_state)
+                s_model = (flow_state.get('model_usage') or [''])[-1]
+                await _step_event('pm_analyze', _usage_delta(u_before, u_after), s_model, s_start, time.perf_counter() - s_clock)
+                spec = flow_state.get('spec', {})
+
+                # Step 3: Developer generate code
+                await task_service.add_log(task.id, organization_id, 'agent', f'Step 3/3: Developer generating code... (spec_goal={str(spec.get("goal",""))[:120]})')
+                u_before = _get_usage(flow_state)
+                s_start = datetime.utcnow()
+                s_clock = time.perf_counter()
+                flow_state = await orchestrator.generate_code_node(flow_state)
+                u_after = _get_usage(flow_state)
+                s_model = (flow_state.get('model_usage') or [''])[-1]
+                gen_len = len(flow_state.get('generated_code', ''))
+                await _step_event('developer_generate', _usage_delta(u_before, u_after), s_model, s_start, time.perf_counter() - s_clock)
+
+                # Developer output = final output. Skip reviewer/finalize.
+                generated = flow_state.get('generated_code', '')
+                # Log developer raw output for debugging
+                await task_service.add_log(task.id, organization_id, 'agent', f'Developer raw output ({gen_len} chars): {generated[:500]}')
+                flow_state['reviewed_code'] = generated
+                flow_state['final_code'] = generated
+                final_len = gen_len
+
+                await task_service.add_log(task.id, organization_id, 'agent', f'Flow complete: final_code={final_len} chars, tokens={flow_state.get("usage",{}).get("total_tokens",0)}')
+                state = flow_state
             await task_service.add_log(
                 task.id,
                 organization_id,
@@ -398,6 +492,13 @@ class OrchestrationService:
                     'source': routing.effective_source,
                     'external_source': routing.external_source,
                     'create_pr': create_pr,
+                    'pr_url': pr_url,
+                    'branch_name': branch_name,
+                    'model_usage': state.get('model_usage', []),
+                    'spec_goal': str(state.get('spec', {}).get('goal', ''))[:200],
+                    'generated_code_len': len(state.get('generated_code', '')),
+                    'final_code_len': len(state.get('final_code', '')),
+                    'files_count': len(self._parse_reviewed_output_to_files(state.get('final_code', ''))),
                 },
             )
             await task_service.add_log(
@@ -518,8 +619,17 @@ class OrchestrationService:
         )
 
     def _parse_reviewed_output_to_files(self, reviewed_code: str) -> list[GitHubFileChange]:
-        file_pattern = re.compile(r'(?:\*\*)?File:\s*(.*?)(?:\*\*)?\r?\n```[^\n]*\r?\n(.*?)```', re.DOTALL)
-        matches = file_pattern.findall(reviewed_code)
+        # Try multiple patterns: **File: path**, `File: path`, ### File: path, # path, etc.
+        patterns = [
+            re.compile(r'(?:\*\*)?File:\s*(.*?)(?:\*\*)?\r?\n```[^\n]*\r?\n(.*?)```', re.DOTALL),
+            re.compile(r'#+\s*(?:File:?\s*)?`?([^\n`]+)`?\r?\n```[^\n]*\r?\n(.*?)```', re.DOTALL),
+            re.compile(r'`([^`\n]+\.[a-zA-Z]{1,10})`\s*:?\r?\n```[^\n]*\r?\n(.*?)```', re.DOTALL),
+        ]
+        matches: list[tuple[str, str]] = []
+        for pat in patterns:
+            matches = pat.findall(reviewed_code)
+            if matches:
+                break
         files: list[GitHubFileChange] = []
         for path, content in matches:
             clean_path = path.strip().strip('`').strip()
@@ -832,7 +942,14 @@ class OrchestrationService:
             chunks.append(f'Tenant Playbook:\n{playbook}')
         return '\n\n'.join(chunks)
 
-    async def _build_repo_context(self, local_repo_path: str | None, organization_id: int, user_id: int | None) -> str | None:
+    async def _build_repo_context(
+        self,
+        local_repo_path: str | None,
+        organization_id: int,
+        user_id: int | None,
+        task_title: str = '',
+        task_description: str = '',
+    ) -> str | None:
         repo_path = (local_repo_path or '').strip()
         if not repo_path:
             return None
@@ -872,57 +989,140 @@ class OrchestrationService:
                 lines.append('Top-level Directories: ' + ', '.join(top_dirs[:16]))
             if top_files:
                 lines.append('Top-level Files: ' + ', '.join(top_files[:12]))
-            # Prefer managed AGENTS.md generated by repo-profile scan and saved in app storage.
-            if user_id is not None:
-                pref_result = await self.db_session.execute(select(UserPreference).where(UserPreference.user_id == user_id))
-                pref = pref_result.scalar_one_or_none()
-                if pref is not None and pref.profile_settings_json:
-                    try:
-                        settings = json.loads(pref.profile_settings_json)
-                        repo_profiles = settings.get('repo_profiles', {}) if isinstance(settings, dict) else {}
-                        if isinstance(repo_profiles, dict):
-                            target_profile = None
-                            for profile in repo_profiles.values():
-                                if not isinstance(profile, dict):
-                                    continue
-                                p = str(profile.get('local_path') or '').strip()
-                                if p and Path(p).expanduser().resolve() == root:
-                                    target_profile = profile
-                                    break
-                            if isinstance(target_profile, dict):
-                                agents_path = str(target_profile.get('agents_md_path') or '').strip()
-                                if agents_path:
-                                    p = Path(agents_path).expanduser()
-                                    if p.exists() and p.is_file():
-                                        agents_text = p.read_text(encoding='utf-8', errors='ignore')[:5000].strip()
-                                        if agents_text:
-                                            lines.append(f'Auto AGENTS Context File: {p}')
-                                            lines.append('Auto AGENTS Context:\n' + agents_text)
-                    except Exception:
-                        pass
-            # Backward compatibility: legacy AGENTS stored under mapped repo path.
-            agents_dir = root / '.tiqr' / 'agents'
-            if agents_dir.exists() and agents_dir.is_dir():
-                try:
-                    md_files = sorted(
-                        [p for p in agents_dir.glob('*.md') if p.is_file()],
-                        key=lambda p: p.stat().st_mtime,
-                        reverse=True,
-                    )
-                    if md_files:
-                        latest = md_files[0]
-                        legacy_text = latest.read_text(encoding='utf-8', errors='ignore')[:4000].strip()
-                        if legacy_text:
-                            lines.append(f'Legacy AGENTS Context File: {latest}')
-                            lines.append('Legacy AGENTS Context:\n' + legacy_text)
-                except Exception:
-                    pass
-            lines.append('Instruction: prioritize editing existing project files; avoid placeholder markdown-only outputs.')
+
+            # Scan relevant source files based on task keywords
+            relevant_files = self._find_relevant_source_files(root, task_title, task_description)
+            if relevant_files:
+                lines.append('')
+                lines.append('=== RELEVANT SOURCE FILES ===')
+                total_chars = 0
+                max_chars = 48000  # ~12k tokens budget for source context
+                for rel_path, content in relevant_files:
+                    if total_chars + len(content) > max_chars:
+                        lines.append(f'\n--- {rel_path} (skipped, context budget reached) ---')
+                        continue
+                    lines.append(f'\n--- {rel_path} ---')
+                    lines.append(content)
+                    total_chars += len(content)
+                lines.append('=== END SOURCE FILES ===')
+
+            lines.append('')
+            lines.append('Instruction: prioritize editing existing project files shown above; avoid placeholder markdown-only outputs.')
             lines.append('Hard Rule: keep repository language/framework; do not rewrite feature in a different stack.')
             lines.append('Hard Rule: return repository-relative file paths only; never absolute paths.')
+            lines.append('Hard Rule: you MUST return actual code changes using **File: path** format with fenced code blocks.')
+            lines.append('Hard Rule: ONLY output files with extensions matching the detected stack. Do NOT create .md, .txt, .java or other unrelated files.')
+            if tech_markers:
+                stack_str = ', '.join(tech_markers)
+                lines.append(f'Hard Rule: this repository uses {stack_str}. All output files MUST match this stack.')
             return '\n'.join(lines)
         except Exception as exc:
             return f'Repo context unavailable for {repo_path}: {str(exc)[:180]}'
+
+    def _find_relevant_source_files(
+        self,
+        root: Path,
+        task_title: str,
+        task_description: str,
+    ) -> list[tuple[str, str]]:
+        """Search repo for source files relevant to the task using keyword grep."""
+        import subprocess
+
+        # Extract meaningful keywords from title and first line of description
+        raw_text = f'{task_title} {task_description}'.lower()
+        # Remove HTML tags and common metadata lines
+        clean = re.sub(r'<[^>]+>', ' ', raw_text)
+        clean = re.sub(r'(external source|project|azure repo|local repo|preferred agent):[^\n]*', '', clean)
+        # Extract words that look like identifiers (snake_case, camelCase, etc.)
+        words = set(re.findall(r'[a-z_][a-z0-9_]{2,}', clean))
+        # Remove very common words
+        stop = {'the', 'and', 'for', 'with', 'from', 'that', 'this', 'not', 'are', 'was', 'has', 'have',
+                'been', 'will', 'can', 'should', 'would', 'could', 'into', 'also', 'its'}
+        keywords = [w for w in words if w not in stop and len(w) > 2][:12]
+
+        if not keywords:
+            return []
+
+        # Determine source file extensions
+        source_exts = {'*.go', '*.py', '*.ts', '*.tsx', '*.js', '*.jsx', '*.java', '*.rs', '*.rb', '*.cs'}
+        ignore_dirs = {'vendor', 'node_modules', '.git', 'dist', 'build', '__pycache__', '.next'}
+
+        # Use grep to find files containing keywords
+        matched_files: dict[str, int] = {}  # path -> hit count
+        for kw in keywords:
+            try:
+                result = subprocess.run(
+                    ['grep', '-rl', '--include=*.go', '--include=*.py', '--include=*.ts',
+                     '--include=*.js', '--include=*.java', '--include=*.rs',
+                     '-i', kw, str(root)],
+                    capture_output=True, text=True, timeout=5,
+                )
+                for line in result.stdout.strip().splitlines():
+                    rel = line.replace(str(root) + '/', '', 1)
+                    # Skip ignored dirs
+                    if any(f'/{d}/' in f'/{rel}' or rel.startswith(f'{d}/') for d in ignore_dirs):
+                        continue
+                    matched_files[rel] = matched_files.get(rel, 0) + 1
+            except Exception:
+                continue
+
+        if not matched_files:
+            # Fallback: just list key source files in common dirs
+            return self._collect_tree_files(root, max_files=8, max_chars=32000)
+
+        # Sort by relevance (hit count), take top files
+        sorted_files = sorted(matched_files.items(), key=lambda x: -x[1])
+        result: list[tuple[str, str]] = []
+        for rel_path, _hits in sorted_files[:15]:
+            full = root / rel_path
+            if not full.is_file():
+                continue
+            try:
+                content = full.read_text(errors='replace')
+                if len(content) > 8000:
+                    content = content[:8000] + '\n... (truncated)'
+                result.append((rel_path, content))
+            except Exception:
+                continue
+        return result
+
+    def _collect_tree_files(self, root: Path, max_files: int = 8, max_chars: int = 32000) -> list[tuple[str, str]]:
+        """Fallback: collect key source files from common project directories."""
+        source_dirs = ['src', 'pkg', 'cmd', 'internal', 'lib', 'app', 'api', 'services', 'handlers', 'controllers']
+        source_exts = {'.go', '.py', '.ts', '.tsx', '.js', '.jsx', '.java', '.rs', '.rb', '.cs'}
+        ignore_dirs = {'vendor', 'node_modules', '.git', 'dist', 'build', '__pycache__', '.next', 'test', 'tests'}
+
+        candidates: list[Path] = []
+        for d in source_dirs:
+            dir_path = root / d
+            if not dir_path.is_dir():
+                continue
+            for f in sorted(dir_path.rglob('*')):
+                if not f.is_file() or f.suffix not in source_exts:
+                    continue
+                if any(part in ignore_dirs for part in f.parts):
+                    continue
+                candidates.append(f)
+                if len(candidates) >= max_files * 3:
+                    break
+
+        # Take smaller files first (more likely to be relevant models/types)
+        candidates.sort(key=lambda f: f.stat().st_size)
+        result: list[tuple[str, str]] = []
+        total = 0
+        for f in candidates[:max_files]:
+            try:
+                content = f.read_text(errors='replace')
+                if total + len(content) > max_chars:
+                    break
+                rel = str(f.relative_to(root))
+                if len(content) > 8000:
+                    content = content[:8000] + '\n... (truncated)'
+                result.append((rel, content))
+                total += len(content)
+            except Exception:
+                continue
+        return result
 
     def _validate_cost_guardrails(
         self,

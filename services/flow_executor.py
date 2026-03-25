@@ -23,6 +23,43 @@ from services.orchestration_service import OrchestrationService
 logger = logging.getLogger(__name__)
 
 
+# ── Helpers ──────────────────────────────────────────────────────────────────
+
+async def _resolve_agent_model(
+    db: AsyncSession,
+    user_id: int,
+    node_role: str,
+    node_model: str,
+    default: str = 'gpt-4o',
+) -> tuple[str, str]:
+    """Node'da model bos ise kullanicinin agent config'inden role'a gore model/provider al."""
+    if node_model:
+        return node_model, ''
+    from models.user_preference import UserPreference
+    result = await db.execute(select(UserPreference).where(UserPreference.user_id == user_id))
+    pref = result.scalar_one_or_none()
+    if pref and pref.agents_json:
+        try:
+            agents = json.loads(pref.agents_json)
+            role_map = {
+                'pm': ['pm', 'product_review', 'product_manager'],
+                'developer': ['developer', 'dev'],
+                'lead_developer': ['lead_developer', 'lead'],
+                'qa': ['qa', 'tester'],
+            }
+            match_roles = role_map.get(node_role.lower(), [node_role.lower()])
+            for a in agents:
+                a_role = str(a.get('role', '')).strip().lower()
+                if a_role in match_roles and a.get('enabled', True):
+                    m = str(a.get('custom_model') or a.get('model') or '').strip()
+                    p = str(a.get('provider') or '').strip()
+                    if m:
+                        return m, p
+        except Exception:
+            pass
+    return default, ''
+
+
 # ── Node executor dispatch ────────────────────────────────────────────────────
 
 async def execute_node(
@@ -229,6 +266,137 @@ async def _build_lead_llm_for_task(
     return llm
 
 
+async def _run_product_review_node(
+    node: dict[str, Any],
+    context: dict[str, Any],
+    db: AsyncSession,
+    organization_id: int,
+) -> dict[str, Any]:
+    """Product Review agent: LLM ile task'ı analiz edip structured spec üretir, context'e yazar."""
+    task = context.get('task', {})
+    role = node.get('role', 'product_review')
+    user_id = context.get('user_id', 0)
+
+    # Resolve model from node config or user's agent settings
+    resolved_model, resolved_provider = await _resolve_agent_model(
+        db, user_id, role, node.get('model', ''), default='gpt-4o',
+    )
+    model = resolved_model
+
+    # LLM resolve — org'un kayıtlı provider'ını kullan
+    provider = (str(node.get('provider') or resolved_provider or '') or 'openai').strip().lower()
+    if provider not in {'openai', 'gemini'}:
+        provider = 'openai'
+    cfg = await IntegrationConfigService(db).get_config(organization_id, provider)
+    api_key = (cfg.secret if cfg else '') or ''
+    base_url = (cfg.base_url if cfg else '') or ''
+    if not api_key or api_key.startswith('your_'):
+        fallback = await IntegrationConfigService(db).get_config(organization_id, 'openai')
+        api_key = (fallback.secret if fallback else '') or ''
+        base_url = (fallback.base_url if fallback else '') or ''
+        provider = 'openai'
+
+    llm = LLMProvider(
+        provider=provider,
+        api_key=api_key or None,
+        base_url=base_url or None,
+        small_model=model,
+        large_model=model,
+    )
+
+    system_prompt = (
+        'You are a senior product manager and technical lead.\n'
+        'Analyze the incoming task and produce a structured implementation brief for a developer agent.\n'
+        'Return a JSON object with these keys:\n'
+        '- goal: string (one-sentence implementation goal)\n'
+        '- requirements: string[] (concrete functional requirements, 3-7 items)\n'
+        '- acceptance_criteria: string[] (testable acceptance criteria, 3-5 items)\n'
+        '- edge_cases: string[] (important edge cases to handle, 2-4 items)\n'
+        '- technical_notes: string[] (architectural hints, affected files/services, 2-5 items)\n'
+        '- story_context: string (full narrative context for the developer, 2-4 sentences)\n\n'
+        'Rules:\n'
+        '- Be concrete and specific — no vague statements\n'
+        '- Reference real file paths or service names if inferable from the task\n'
+        '- Return only valid JSON, no prose before or after'
+    )
+    user_prompt = (
+        f"Task title: {task.get('title', '')}\n"
+        f"Task description: {task.get('description', '')}\n"
+        f"Source: {task.get('source', 'internal')}\n"
+    )
+    if task.get('acceptance_criteria'):
+        user_prompt += f"Existing acceptance criteria: {task['acceptance_criteria']}\n"
+
+    # Inject repo source files if available in description
+    desc = task.get('description', '')
+    if '=== RELEVANT SOURCE FILES ===' in desc:
+        start = desc.index('=== RELEVANT SOURCE FILES ===')
+        end_marker = '=== END SOURCE FILES ==='
+        end = desc.index(end_marker) + len(end_marker) if end_marker in desc else len(desc)
+        user_prompt += f'\n{desc[start:end]}\n'
+    elif context.get('outputs'):
+        # Check if a previous node already produced repo context
+        for out in context['outputs'].values():
+            raw = str(out.get('output', '') or '')
+            if '=== RELEVANT SOURCE FILES ===' in raw:
+                si = raw.index('=== RELEVANT SOURCE FILES ===')
+                ei_m = '=== END SOURCE FILES ==='
+                ei = raw.index(ei_m) + len(ei_m) if ei_m in raw else len(raw)
+                user_prompt += f'\n{raw[si:ei]}\n'
+                break
+
+    # Also build repo context from local_repo_path if available
+    local_repo = ''
+    for line in desc.splitlines():
+        if line.strip().startswith('Local Repo Path:'):
+            local_repo = line.split(':', 1)[1].strip()
+            break
+    if local_repo and '=== RELEVANT SOURCE FILES ===' not in user_prompt:
+        from services.orchestration_service import OrchestrationService
+        orch = OrchestrationService(db)
+        repo_ctx = await orch._build_repo_context(
+            local_repo_path=local_repo,
+            organization_id=organization_id,
+            user_id=context.get('user_id'),
+            task_title=task.get('title', ''),
+            task_description=desc,
+        )
+        if repo_ctx:
+            user_prompt += f'\n{repo_ctx}\n'
+
+    try:
+        output, usage_meta, used_model, _ = await llm.generate(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            complexity_hint='high',
+            max_output_tokens=8000,
+        )
+        parsed: dict[str, Any] = {}
+        try:
+            raw = output.strip()
+            if raw.startswith('```'):
+                raw = raw.split('\n', 1)[1].rsplit('```', 1)[0]
+            parsed = json.loads(raw)
+        except Exception:
+            parsed = {}
+
+        # context'e yaz — developer node okuyacak
+        context['product_review_output'] = parsed
+        context['product_review_raw'] = output
+
+        return {
+            'status': 'ok',
+            'role': role,
+            'model': used_model,
+            'output': parsed,
+            'usage': usage_meta,
+        }
+    except Exception as exc:
+        logger.warning('Product review LLM call failed: %s', exc)
+        context['product_review_output'] = {}
+        return {'status': 'error', 'role': role, 'message': str(exc)}
+
+
 async def _run_agent_node(
     node: dict[str, Any],
     context: dict[str, Any],
@@ -239,10 +407,20 @@ async def _run_agent_node(
     task = context.get('task', {})
     action = node.get('action', '')
     role = node.get('role', 'developer')
-    model = node.get('model', 'gpt-4o')
+    user_id = context.get('user_id', 0)
+    resolved_model, _resolved_provider = await _resolve_agent_model(
+        db, user_id, role, node.get('model', ''), default='gpt-4o',
+    )
+    model = resolved_model
     action_text = str(action or '').lower()
+    role_lower = str(role).strip().lower()
+
+    # Product Review node → gerçek LLM spec üretimi
+    if role_lower in ('product_review', 'pm', 'product_manager'):
+        return await _run_product_review_node(node, context, db, organization_id)
+
     execute_task_pipeline = _bool_val(node.get('execute_task_pipeline'), False) or (
-        str(role).strip().lower() == 'developer' and 'pr' in action_text
+        role_lower == 'developer' and ('pr' in action_text or not action_text)
     )
     create_pr = _bool_val(node.get('create_pr'), True)
 
@@ -255,6 +433,23 @@ async def _run_agent_node(
         )
         if task_id is None:
             return {'status': 'error', 'message': 'Task id could not be resolved for pipeline execution'}
+
+        # Product Review çıktısı varsa task record'a yaz
+        review: dict[str, Any] = context.get('product_review_output') or {}
+        if review:
+            task_row = await db.get(TaskRecord, task_id)
+            if task_row is not None:
+                if review.get('story_context') and not task_row.story_context:
+                    task_row.story_context = str(review['story_context'])
+                if review.get('acceptance_criteria'):
+                    criteria = review['acceptance_criteria']
+                    formatted = '\n'.join(f'- {c}' for c in criteria) if isinstance(criteria, list) else str(criteria)
+                    task_row.acceptance_criteria = formatted
+                if review.get('edge_cases'):
+                    edges = review['edge_cases']
+                    formatted_edges = '\n'.join(f'- {e}' for e in edges) if isinstance(edges, list) else str(edges)
+                    task_row.edge_cases = formatted_edges
+                await db.commit()
 
         service = OrchestrationService(db)
         result = await service.run_task_record(
@@ -277,7 +472,7 @@ async def _run_agent_node(
             'message': 'Task pipeline executed from flow agent node',
         }
 
-    if str(role).strip().lower() == 'lead_developer' and (
+    if role_lower == 'lead_developer' and (
         'review pr' in action_text
         or _bool_val(node.get('review_pr'), False)
         or _bool_val(node.get('review_only'), False)
@@ -289,14 +484,43 @@ async def _run_agent_node(
             organization_id=organization_id,
         )
 
-    # TODO: gerçek LLM çağrısı buraya
-    result = (
-        f"[{role.upper()}] '{task.get('title', 'Task')}' için analiz tamamlandı.\n"
-        f"Görev: {action}\n"
-        f"Model: {model}\n"
-        f"Sonuç: İş kalemi incelendi, gerekli adımlar belirlendi."
+    # Diğer roller için LLM çağrısı
+    provider = (str(node.get('provider') or '') or 'openai').strip().lower()
+    if provider not in {'openai', 'gemini'}:
+        provider = 'openai'
+    cfg = await IntegrationConfigService(db).get_config(organization_id, provider)
+    api_key = (cfg.secret if cfg else '') or ''
+    base_url = (cfg.base_url if cfg else '') or ''
+    if not api_key or api_key.startswith('your_'):
+        fallback = await IntegrationConfigService(db).get_config(organization_id, 'openai')
+        api_key = (fallback.secret if fallback else '') or ''
+        base_url = (fallback.base_url if fallback else '') or ''
+        provider = 'openai'
+
+    llm = LLMProvider(
+        provider=provider,
+        api_key=api_key or None,
+        base_url=base_url or None,
+        small_model=model,
+        large_model=model,
     )
-    return {'status': 'ok', 'output': result, 'role': role, 'model': model}
+    system_prompt = f'You are a {role}. Complete the following task clearly and concisely.'
+    user_prompt = (
+        f"Task: {task.get('title', '')}\n"
+        f"Description: {task.get('description', '')}\n"
+        f"Action: {action}\n"
+    )
+    try:
+        output, usage_meta, used_model, _ = await llm.generate(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            complexity_hint='normal',
+            max_output_tokens=1200,
+        )
+        return {'status': 'ok', 'output': output, 'role': role, 'model': used_model, 'usage': usage_meta}
+    except Exception as exc:
+        logger.warning('Agent node LLM call failed role=%s: %s', role, exc)
+        return {'status': 'error', 'role': role, 'message': str(exc)}
 
 
 async def _run_http_node(node: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:

@@ -54,21 +54,13 @@ class RepoProfileScanRequest(BaseModel):
     local_path: str
     azure_repo_name: str | None = None
     preferred_provider: str | None = None
+    analyze_prompt: str | None = None
 
 
 class RepoProfileScanResponse(BaseModel):
     mapping_id: str
     profile: dict[str, Any]
 
-
-class RepoAgentsDocResponse(BaseModel):
-    mapping_id: str
-    agents_md_path: str
-    content: str
-
-
-class RepoAgentsDocUpdateRequest(BaseModel):
-    content: str
 
 
 def _parse_json(val: str | None) -> list[dict[str, Any]]:
@@ -263,131 +255,6 @@ def _extract_json_object(text: str) -> dict[str, Any] | None:
     return None
 
 
-def _build_agents_md_from_profile(profile: dict[str, Any]) -> str:
-    stack = profile.get('stack') or ['Unknown/Custom']
-    tests = profile.get('suggested_test_commands') or []
-    lint = profile.get('suggested_lint_commands') or []
-    top_dirs = profile.get('top_directories') or []
-    top_files = profile.get('top_files') or []
-    return '\n'.join([
-        '# AGENTS.md (Auto-Generated)',
-        '',
-        '## Repository Summary',
-        f"- Stack: {', '.join(stack)}",
-        f"- Package Manager: {profile.get('package_manager') or 'unknown'}",
-        '',
-        '## Recommended Workflow',
-        '- Prefer editing existing modules over adding isolated mock/demo files.',
-        '- Keep changes minimal and targeted to the requested task scope.',
-        '- Validate via repository-native lint/test commands before finalizing.',
-        '',
-        '## Suggested Commands',
-        *(f'- Test: `{c}`' for c in tests[:3]),
-        *(f'- Lint: `{c}`' for c in lint[:3]),
-        '',
-        '## Structure Hints',
-        f"- Top directories: {', '.join(top_dirs[:16]) if top_dirs else '(none)'}",
-        f"- Top files: {', '.join(top_files[:16]) if top_files else '(none)'}",
-        '',
-        '## Output Contract',
-        '- Generate real code changes, not markdown-only placeholder output.',
-        '- Respect existing project conventions and naming.',
-        '- If context is insufficient, add assumptions explicitly in task log output.',
-        '',
-    ])
-
-
-def _build_managed_agents_path(
-    organization_id: int,
-    mapping_id: str,
-    scan_id: str,
-    local_path: str | None = None,
-) -> Path:
-    safe_mapping = ''.join(ch if ch.isalnum() or ch in {'-', '_'} else '_' for ch in mapping_id)[:80] or 'mapping'
-    if local_path:
-        try:
-            root = Path(local_path).expanduser().resolve()
-            if root.exists() and root.is_dir():
-                # Primary storage: keep AGENTS docs inside mapped repo (durable and editable by user).
-                out_dir = root / '.tiqr' / 'agents' / safe_mapping
-                out_dir.mkdir(parents=True, exist_ok=True)
-                return out_dir / f'{scan_id}.md'
-        except Exception:
-            pass
-
-    # Fallback storage (legacy): app-local managed data directory.
-    app_root = Path(__file__).resolve().parents[2]
-    out_dir = app_root / 'data' / 'repo_agents' / f'org_{organization_id}' / safe_mapping
-    out_dir.mkdir(parents=True, exist_ok=True)
-    return out_dir / f'{scan_id}.md'
-
-
-def _safe_mapping_key(mapping_id: str) -> str:
-    return ''.join(ch if ch.isalnum() or ch in {'-', '_'} else '_' for ch in mapping_id)[:80] or 'mapping'
-
-
-def _find_latest_agents_doc(
-    organization_id: int,
-    mapping_id: str,
-    local_path: str | None = None,
-) -> Path | None:
-    safe_mapping = _safe_mapping_key(mapping_id)
-    candidates: list[Path] = []
-    if local_path:
-        try:
-            root = Path(local_path).expanduser().resolve()
-            repo_dir = root / '.tiqr' / 'agents' / safe_mapping
-            if repo_dir.exists() and repo_dir.is_dir():
-                candidates.extend(p for p in repo_dir.glob('*.md') if p.is_file())
-        except Exception:
-            pass
-    app_root = Path(__file__).resolve().parents[2]
-    legacy_dir = app_root / 'data' / 'repo_agents' / f'org_{organization_id}' / safe_mapping
-    if legacy_dir.exists() and legacy_dir.is_dir():
-        candidates.extend(p for p in legacy_dir.glob('*.md') if p.is_file())
-    if not candidates:
-        return None
-    return max(candidates, key=lambda p: p.stat().st_mtime)
-
-
-def _recover_repo_profiles_from_files(
-    organization_id: int,
-    repo_mappings: list[dict[str, Any]],
-    existing_profiles: dict[str, Any] | None,
-) -> dict[str, Any]:
-    profiles: dict[str, Any] = dict(existing_profiles or {})
-    for m in repo_mappings:
-        if not isinstance(m, dict):
-            continue
-        mapping_id = str(m.get('id') or '').strip()
-        if not mapping_id:
-            continue
-        if isinstance(profiles.get(mapping_id), dict):
-            continue
-        local_path = str(m.get('local_path') or '').strip()
-        latest = _find_latest_agents_doc(organization_id, mapping_id, local_path=local_path)
-        if latest is None:
-            continue
-        scanned_at = datetime.utcfromtimestamp(latest.stat().st_mtime).isoformat() + 'Z'
-        profiles[mapping_id] = {
-            'mapping_name': str(m.get('name') or mapping_id),
-            'azure_repo_name': str(m.get('azure_repo_name') or '') or None,
-            'local_path': local_path,
-            'stack': ['Recovered'],
-            'package_manager': None,
-            'suggested_test_commands': [],
-            'suggested_lint_commands': [],
-            'top_directories': [],
-            'top_files': [],
-            'profile_version': 1,
-            'scanned_at': scanned_at,
-            'scan_id': latest.stem,
-            'agents_md_path': str(latest),
-            'scanned_by_provider': 'recovered',
-            'scanned_model': None,
-        }
-    return profiles
-
 
 async def _get_or_create_pref(db: AsyncSession, user_id: int) -> UserPreference:
     result = await db.execute(select(UserPreference).where(UserPreference.user_id == user_id))
@@ -444,18 +311,6 @@ async def get_preferences(
         )
     profile_settings = _parse_json_obj(pref.profile_settings_json)
     repo_mappings = _parse_json(pref.repo_mappings_json)
-    repo_profiles_raw = profile_settings.get('repo_profiles')
-    recovered_profiles = _recover_repo_profiles_from_files(
-        tenant.organization_id,
-        repo_mappings,
-        repo_profiles_raw if isinstance(repo_profiles_raw, dict) else {},
-    )
-    if recovered_profiles and recovered_profiles != (repo_profiles_raw if isinstance(repo_profiles_raw, dict) else {}):
-        profile_settings['repo_profiles'] = recovered_profiles
-        pref.profile_settings_json = json.dumps(profile_settings, ensure_ascii=False)
-        await db.commit()
-        await db.refresh(pref)
-        profile_settings = _parse_json_obj(pref.profile_settings_json)
 
     legacy_team = _parse_json(pref.my_team_json)
     my_team_source = str(profile_settings.get('my_team_source') or 'azure').strip().lower()
@@ -611,7 +466,6 @@ async def scan_repo_profile(
     total_tokens = 0
     cost_usd = 0.0
     used_model: str | None = None
-    agents_md_content = ''
     if llm is not None:
         system_prompt = (
             'You are a principal software architect and technical writer.\n'
@@ -624,34 +478,23 @@ async def scan_repo_profile(
             '- top_directories: string[]\n'
             '- top_files: string[]\n'
             '- repo_rules: string[]\n'
-            '- agents_md: string (full markdown)\n\n'
-            'agents_md must be detailed and actionable, minimum ~1800 words,\n'
-            'with these sections in exact order:\n'
-            '1) System Overview\n'
-            '2) Services & Responsibilities\n'
-            '3) Data Flow\n'
-            '4) Deployment Notes\n'
-            '5) Key Decisions\n'
-            '6) Future Improvements\n\n'
             'Rules:\n'
             '- No placeholders, no "etc", no "..."\n'
             '- Include concrete file/path references wherever possible\n'
-            '- If uncertain, write "Assumption:" with rationale\n'
-            '- Make AGENTS.md production-grade for engineers'
         )
         user_prompt = (
             f"Mapping Name: {payload.mapping_name}\n"
             f"Azure Repo: {payload.azure_repo_name or ''}\n"
             f"Local Path: {root}\n\n"
             f"{_build_repo_snapshot_text(root)}\n\n"
-            "Generate comprehensive AGENTS.md based on repository evidence."
+            "Analyze the repository and return JSON."
         )
         try:
             output, usage_meta, model, _ = await llm.generate(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
                 complexity_hint='high',
-                max_output_tokens=4500,
+                max_output_tokens=1500,
             )
             used_model = model
             prompt_tokens = int(usage_meta.get('prompt_tokens', 0))
@@ -673,26 +516,10 @@ async def scan_repo_profile(
                 profile['suggested_lint_commands'] = [str(x) for x in parsed.get('suggested_lint_commands', [])[:4]]
             if isinstance(parsed.get('repo_rules'), list):
                 profile['repo_rules'] = [str(x) for x in parsed.get('repo_rules', [])[:12]]
-            raw_agents_md = str(parsed.get('agents_md') or '').strip()
-            agents_md_content = raw_agents_md if raw_agents_md else ''
         except Exception:
-            # Keep deterministic local profile fallback.
             llm = None
 
-    if not agents_md_content:
-        agents_md_content = _build_agents_md_from_profile(profile)
-
-    scan_id = str(uuid4())
-    agents_file = _build_managed_agents_path(
-        tenant.organization_id,
-        payload.mapping_id,
-        scan_id,
-        local_path=payload.local_path,
-    )
-    agents_file.write_text(agents_md_content, encoding='utf-8')
-    profile['scan_id'] = scan_id
-    profile['agents_md_path'] = str(agents_file)
-    profile['agents_md_last_content'] = agents_md_content
+    profile['scan_id'] = str(uuid4())
     profile['scanned_by_provider'] = llm_provider
     profile['scanned_model'] = used_model
 
@@ -740,64 +567,3 @@ async def scan_repo_profile(
     return RepoProfileScanResponse(mapping_id=payload.mapping_id, profile=profile)
 
 
-@router.get('/repo-profile/agents/{mapping_id}', response_model=RepoAgentsDocResponse)
-async def get_repo_agents_doc(
-    mapping_id: str,
-    tenant: CurrentTenant = Depends(get_current_tenant),
-    db: AsyncSession = Depends(get_db_session),
-) -> RepoAgentsDocResponse:
-    pref, settings, repo_profiles, profile = await _get_pref_settings_profile(db, tenant.user_id, mapping_id)
-    agents_md_path = str(profile.get('agents_md_path') or '').strip()
-    p = Path(agents_md_path).expanduser() if agents_md_path else None
-    if p is None or not p.exists() or not p.is_file():
-        content = str(profile.get('agents_md_last_content') or '').strip()
-        if not content:
-            content = _build_agents_md_from_profile(profile)
-        scan_id = str(profile.get('scan_id') or uuid4())
-        rebuilt = _build_managed_agents_path(
-            tenant.organization_id,
-            mapping_id,
-            scan_id,
-            local_path=str(profile.get('local_path') or ''),
-        )
-        rebuilt.write_text(content, encoding='utf-8')
-        profile['scan_id'] = scan_id
-        profile['agents_md_path'] = str(rebuilt)
-        profile['agents_md_last_content'] = content
-        repo_profiles[mapping_id] = profile
-        settings['repo_profiles'] = repo_profiles
-        pref.profile_settings_json = json.dumps(settings, ensure_ascii=False)
-        await db.commit()
-        p = rebuilt
-    content = p.read_text(encoding='utf-8', errors='ignore')
-    return RepoAgentsDocResponse(mapping_id=mapping_id, agents_md_path=str(p), content=content)
-
-
-@router.put('/repo-profile/agents/{mapping_id}', response_model=RepoAgentsDocResponse)
-async def save_repo_agents_doc(
-    mapping_id: str,
-    payload: RepoAgentsDocUpdateRequest,
-    tenant: CurrentTenant = Depends(get_current_tenant),
-    db: AsyncSession = Depends(get_db_session),
-) -> RepoAgentsDocResponse:
-    pref, settings, repo_profiles, profile = await _get_pref_settings_profile(db, tenant.user_id, mapping_id)
-    agents_md_path = str(profile.get('agents_md_path') or '').strip()
-    p = Path(agents_md_path).expanduser() if agents_md_path else None
-    if p is None or (not p.exists()) or (not p.is_file()):
-        scan_id = str(profile.get('scan_id') or uuid4())
-        p = _build_managed_agents_path(
-            tenant.organization_id,
-            mapping_id,
-            scan_id,
-            local_path=str(profile.get('local_path') or ''),
-        )
-        profile['scan_id'] = scan_id
-        profile['agents_md_path'] = str(p)
-    content = payload.content or ''
-    p.write_text(content, encoding='utf-8')
-    profile['agents_md_last_content'] = content
-    repo_profiles[mapping_id] = profile
-    settings['repo_profiles'] = repo_profiles
-    pref.profile_settings_json = json.dumps(settings, ensure_ascii=False)
-    await db.commit()
-    return RepoAgentsDocResponse(mapping_id=mapping_id, agents_md_path=str(p), content=content)

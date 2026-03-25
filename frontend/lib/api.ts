@@ -122,6 +122,7 @@ export type RepoMapping = {
   github_owner?: string;
   github_repo?: string;
   github_repo_full_name?: string;
+  analyze_prompt?: string;
 };
 
 export interface UserPrefs {
@@ -220,25 +221,11 @@ export async function scanRepoProfile(mapping: RepoMapping): Promise<{ mapping_i
       mapping_name: mapping.name,
       local_path: mapping.local_path,
       azure_repo_name: mapping.azure_repo_name ?? null,
+      analyze_prompt: mapping.analyze_prompt ?? null,
     }),
   });
 }
 
-export async function getRepoAgentsDoc(mappingId: string): Promise<{ mapping_id: string; agents_md_path: string; content: string }> {
-  return await apiFetch<{ mapping_id: string; agents_md_path: string; content: string }>(
-    `/preferences/repo-profile/agents/${encodeURIComponent(mappingId)}`,
-  );
-}
-
-export async function saveRepoAgentsDoc(mappingId: string, content: string): Promise<{ mapping_id: string; agents_md_path: string; content: string }> {
-  return await apiFetch<{ mapping_id: string; agents_md_path: string; content: string }>(
-    `/preferences/repo-profile/agents/${encodeURIComponent(mappingId)}`,
-    {
-      method: 'PUT',
-      body: JSON.stringify({ content }),
-    },
-  );
-}
 
 // ── Flow Run helpers ─────────────────────────────────────────────────────────
 

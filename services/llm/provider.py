@@ -10,6 +10,17 @@ from openai import AsyncOpenAI
 from core.settings import get_settings
 from services.llm.cache import PromptCache
 
+# Reasoning models that do not support the temperature parameter
+_NO_TEMP_PATTERNS = {'o1', 'o1-mini', 'o1-preview', 'o3', 'o3-mini', 'o3-pro', 'codex'}
+
+
+def _skip_temperature(model: str) -> bool:
+    m = model.lower()
+    for pat in _NO_TEMP_PATTERNS:
+        if pat in m:
+            return True
+    return False
+
 
 class LLMProvider:
     def __init__(
@@ -27,8 +38,10 @@ class LLMProvider:
         self.base_url = (base_url if base_url is not None else self.settings.openai_base_url).strip()
         self.small_model = (small_model if small_model is not None else self.settings.llm_small_model).strip()
         self.large_model = (large_model if large_model is not None else self.settings.llm_large_model).strip()
+        import os
+        _ssl_verify = os.getenv('SSL_VERIFY', 'true').strip().lower() not in ('false', '0', 'no')
         self.client = (
-            AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
+            AsyncOpenAI(api_key=self.api_key, base_url=self.base_url, http_client=httpx.AsyncClient(verify=_ssl_verify))
             if self.provider == 'openai'
             else None
         )
@@ -66,27 +79,32 @@ class LLMProvider:
         else:
             if self.client is None:
                 raise RuntimeError('OpenAI client is not initialized')
-            response = await self.client.responses.create(
-                model=model,
-                input=[
+            kwargs: dict[str, Any] = {
+                'model': model,
+                'input': [
                     {'role': 'system', 'content': system_prompt},
                     {'role': 'user', 'content': truncated_user},
                 ],
-                max_output_tokens=max_output_tokens,
-                temperature=0.2,
-            )
+                'max_output_tokens': max_output_tokens,
+            }
+            if not _skip_temperature(model):
+                kwargs['temperature'] = 0.2
+            response = await self.client.responses.create(**kwargs)
             output = self._extract_openai_output_text(response)
             usage = self._parse_usage(response)
             if not output.strip():
-                fallback_output, fallback_usage = await self._generate_openai_chat_fallback(
-                    model=model,
-                    system_prompt=system_prompt,
-                    user_prompt=truncated_user,
-                    max_output_tokens=max_output_tokens,
-                )
-                if fallback_output.strip():
-                    output = fallback_output
-                    usage = fallback_usage
+                try:
+                    fallback_output, fallback_usage = await self._generate_openai_chat_fallback(
+                        model=model,
+                        system_prompt=system_prompt,
+                        user_prompt=truncated_user,
+                        max_output_tokens=max_output_tokens,
+                    )
+                    if fallback_output.strip():
+                        output = fallback_output
+                        usage = fallback_usage
+                except Exception:
+                    pass  # chat completions not available for this model
         await self.cache.set(cache_key, {'output': output, 'usage': usage})
         return output, usage, model, False
 
@@ -173,15 +191,17 @@ class LLMProvider:
     ) -> tuple[str, dict[str, int]]:
         if self.client is None:
             return '', {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0}
-        chat = await self.client.chat.completions.create(
-            model=model,
-            messages=[
+        chat_kwargs: dict[str, Any] = {
+            'model': model,
+            'messages': [
                 {'role': 'system', 'content': system_prompt},
                 {'role': 'user', 'content': user_prompt},
             ],
-            max_tokens=max_output_tokens,
-            temperature=0.2,
-        )
+            'max_tokens': max_output_tokens,
+        }
+        if not _skip_temperature(model):
+            chat_kwargs['temperature'] = 0.2
+        chat = await self.client.chat.completions.create(**chat_kwargs)
         text = ''
         if chat.choices:
             msg = chat.choices[0].message

@@ -15,6 +15,7 @@ from models.ai_usage_event import AIUsageEvent
 from models.run_record import RunRecord
 from models.task_dependency import TaskDependency
 from models.task_record import TaskRecord
+from models.user import User
 from models.user_preference import UserPreference
 from schemas.task import ExternalTask
 from services.integration_config_service import IntegrationConfigService
@@ -425,6 +426,32 @@ class TaskService:
         if task.source != 'internal' and not has_local_mapping:
             create_pr = False
 
+        # Inject developer agent model/provider into description if not already set.
+        if 'Preferred Agent Model:' not in (task.description or ''):
+            pref_result = await self.db.execute(
+                select(UserPreference).where(UserPreference.user_id == task.created_by_user_id)
+            )
+            pref = pref_result.scalar_one_or_none()
+            if pref is not None and pref.agents_json:
+                try:
+                    agents = json.loads(pref.agents_json)
+                    dev_agent = next(
+                        (a for a in agents if str(a.get('role', '')).lower() == 'developer' and a.get('enabled', True)),
+                        None,
+                    )
+                    if dev_agent:
+                        agent_model = str(dev_agent.get('custom_model') or dev_agent.get('model') or '').strip()
+                        agent_provider = str(dev_agent.get('provider') or '').strip()
+                        inject_lines: list[str] = []
+                        if agent_model:
+                            inject_lines.append(f'Preferred Agent Model: {agent_model}')
+                        if agent_provider:
+                            inject_lines.append(f'Preferred Agent Provider: {agent_provider}')
+                        if inject_lines:
+                            task.description = (task.description or '').rstrip() + '\n' + '\n'.join(inject_lines)
+                except Exception:
+                    pass
+
         was_queued = task.status == 'queued'
         was_terminal = task.status in {'failed', 'completed', 'cancelled'}
         if was_queued:
@@ -450,10 +477,41 @@ class TaskService:
             await self.db.commit()
             await self.add_log(task.id, organization_id, 'failed', task.failure_reason)
             raise
-        if was_queued or was_terminal:
-            await self.add_log(task.id, organization_id, 'queued', 'Task re-queued for AI processing')
-        else:
-            await self.add_log(task.id, organization_id, 'queued', 'Task queued for AI processing')
+        # Build rich queue log with who started, model, params
+        user_result = await self.db.execute(select(User).where(User.id == task.created_by_user_id))
+        starter_user = user_result.scalar_one_or_none()
+        starter_name = starter_user.full_name if starter_user else f'user#{task.created_by_user_id}'
+
+        agent_model_name = ''
+        agent_provider_name = ''
+        pref_for_log = await self.db.execute(
+            select(UserPreference).where(UserPreference.user_id == task.created_by_user_id)
+        )
+        pref_log = pref_for_log.scalar_one_or_none()
+        if pref_log and pref_log.agents_json:
+            try:
+                agents_cfg = json.loads(pref_log.agents_json)
+                dev = next((a for a in agents_cfg if str(a.get('role', '')).lower() == 'developer' and a.get('enabled', True)), None)
+                if dev:
+                    agent_model_name = str(dev.get('custom_model') or dev.get('model') or '').strip()
+                    agent_provider_name = str(dev.get('provider') or '').strip()
+            except Exception:
+                pass
+
+        queue_msg_parts = [
+            f'{"Re-queued" if (was_queued or was_terminal) else "Queued"} by {starter_name}',
+            f'source={task.source}',
+            f'create_pr={create_pr}',
+        ]
+        if agent_model_name:
+            queue_msg_parts.append(f'model={agent_model_name}')
+        if agent_provider_name:
+            queue_msg_parts.append(f'provider={agent_provider_name}')
+        if local_repo_path:
+            queue_msg_parts.append(f'repo={local_repo_path}')
+        if blockers:
+            queue_msg_parts.append(f'was_blocked_by={blockers}')
+        await self.add_log(task.id, organization_id, 'queued', ' | '.join(queue_msg_parts))
         if mapping_auto_attached:
             await self.add_log(task.id, organization_id, 'repo_mapping', 'Default repo mapping auto-attached from preferences')
         elif task.source != 'internal' and not has_local_mapping:
@@ -562,6 +620,16 @@ class TaskService:
             select(AIUsageEvent)
             .where(AIUsageEvent.organization_id == organization_id, AIUsageEvent.task_id == task_id)
             .order_by(AIUsageEvent.created_at.desc())
+        )
+        return list(result.scalars().all())
+
+    async def get_runs(self, organization_id: int, task_id: int) -> list[RunRecord]:
+        if self.db is None:
+            raise ValueError('DB session required')
+        result = await self.db.execute(
+            select(RunRecord)
+            .where(RunRecord.organization_id == organization_id, RunRecord.task_id == task_id)
+            .order_by(RunRecord.created_at.asc())
         )
         return list(result.scalars().all())
 
