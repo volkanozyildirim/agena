@@ -6,8 +6,8 @@ import { useLocale } from '@/lib/i18n';
 
 const box: React.CSSProperties = {
   borderRadius: 14,
-  border: '1px solid rgba(255,255,255,0.08)',
-  background: 'rgba(255,255,255,0.02)',
+  border: '1px solid var(--panel-border-2)',
+  background: 'var(--panel)',
 };
 
 export default function UsagePage() {
@@ -62,8 +62,8 @@ export default function UsagePage() {
     <div style={{ display: 'grid', gap: 16 }}>
       <div>
         <div className='section-label'>{t('nav.usage')}</div>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: 'rgba(255,255,255,0.94)', marginTop: 6 }}>{t('usage.title')}</h1>
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>{t('usage.subtitle')}</p>
+        <h1 style={{ fontSize: 26, fontWeight: 800, color: 'var(--ink-90)', marginTop: 6 }}>{t('usage.title')}</h1>
+        <p style={{ fontSize: 13, color: 'var(--ink-35)', marginTop: 4 }}>{t('usage.subtitle')}</p>
       </div>
 
       <div style={{ ...box, padding: 12, display: 'grid', gridTemplateColumns: 'repeat(7, minmax(120px, 1fr))', gap: 8 }}>
@@ -88,7 +88,7 @@ export default function UsagePage() {
         <input value={createdFrom} onChange={(e) => setCreatedFrom(e.target.value)} type='date' style={field} />
         <input value={createdTo} onChange={(e) => setCreatedTo(e.target.value)} type='date' style={field} />
         <button onClick={() => void load(1)} className='button button-primary' style={{ height: 40 }}>{t('usage.refresh')}</button>
-        <label style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 8, color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
+        <label style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ink-72)', fontSize: 12 }}>
           <input type='checkbox' checked={mineOnly} onChange={(e) => setMineOnly(e.target.checked)} />
           {t('usage.mineOnly')}
         </label>
@@ -102,7 +102,7 @@ export default function UsagePage() {
       </div>
 
       <div style={{ ...box, overflow: 'hidden' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '140px 190px 180px 100px 80px 110px 90px 1fr', gap: 8, padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.08)', fontSize: 10, fontWeight: 800, letterSpacing: 1, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '140px 190px 180px 100px 80px 110px 90px 1fr', gap: 8, padding: '10px 12px', borderBottom: '1px solid var(--panel-border-2)', fontSize: 10, fontWeight: 800, letterSpacing: 1, color: 'var(--ink-45)', textTransform: 'uppercase' }}>
           <span>{t('usage.colWhen')}</span>
           <span>{t('usage.colOperation')}</span>
           <span>{t('usage.colProvider')}</span>
@@ -113,22 +113,22 @@ export default function UsagePage() {
           <span>{t('usage.colDetails')}</span>
         </div>
         {loading ? (
-          <div style={{ padding: 14, color: 'rgba(255,255,255,0.5)' }}>Loading...</div>
+          <div style={{ padding: 14, color: 'var(--ink-50)' }}>Loading...</div>
         ) : error ? (
           <div style={{ padding: 14, color: '#f87171' }}>{error}</div>
         ) : !data || data.items.length === 0 ? (
-          <div style={{ padding: 14, color: 'rgba(255,255,255,0.5)' }}>{t('usage.empty')}</div>
+          <div style={{ padding: 14, color: 'var(--ink-50)' }}>{t('usage.empty')}</div>
         ) : (
           data.items.map((x) => (
-            <div key={x.id} style={{ display: 'grid', gridTemplateColumns: '140px 190px 180px 100px 80px 110px 90px 1fr', gap: 8, padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 12, alignItems: 'center' }}>
-              <span style={{ color: 'rgba(255,255,255,0.55)' }}>{new Date(x.created_at).toLocaleString()}</span>
+            <div key={x.id} style={{ display: 'grid', gridTemplateColumns: '140px 190px 180px 100px 80px 110px 90px 1fr', gap: 8, padding: '10px 12px', borderBottom: '1px solid var(--panel-alt)', fontSize: 12, alignItems: 'center' }}>
+              <span style={{ color: 'var(--ink-50)' }}>{new Date(x.created_at).toLocaleString()}</span>
               <span style={{ color: '#93c5fd', fontFamily: 'monospace' }}>{x.operation_type}</span>
-              <span style={{ color: 'rgba(255,255,255,0.75)' }}>{x.provider} / {x.model || '-'}</span>
+              <span style={{ color: 'var(--ink-78)' }}>{x.provider} / {x.model || '-'}</span>
               <span style={{ color: x.status === 'failed' ? '#ef4444' : '#22c55e' }}>{x.status}</span>
-              <span style={{ color: 'rgba(255,255,255,0.75)' }}>{x.task_id ?? '-'}</span>
-              <span style={{ color: 'rgba(255,255,255,0.75)' }}>{x.total_tokens}</span>
-              <span style={{ color: 'rgba(255,255,255,0.75)' }}>${x.cost_usd.toFixed(4)}</span>
-              <span style={{ color: 'rgba(255,255,255,0.55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ color: 'var(--ink-78)' }}>{x.task_id ?? '-'}</span>
+              <span style={{ color: 'var(--ink-78)' }}>{x.total_tokens}</span>
+              <span style={{ color: 'var(--ink-78)' }}>${x.cost_usd.toFixed(4)}</span>
+              <span style={{ color: 'var(--ink-50)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {x.error_message || x.local_repo_path || '-'}
               </span>
             </div>
@@ -138,7 +138,7 @@ export default function UsagePage() {
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, alignItems: 'center' }}>
         <button onClick={() => void load(Math.max(1, page - 1))} disabled={page <= 1 || loading} className='button button-outline'>{t('usage.prev')}</button>
-        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>{t('usage.page')} {page} / {totalPages}</span>
+        <span style={{ fontSize: 12, color: 'var(--ink-50)' }}>{t('usage.page')} {page} / {totalPages}</span>
         <button onClick={() => void load(Math.min(totalPages, page + 1))} disabled={page >= totalPages || loading} className='button button-outline'>{t('usage.next')}</button>
       </div>
     </div>
@@ -148,8 +148,8 @@ export default function UsagePage() {
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ ...box, padding: '10px 12px' }}>
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: 1 }}>{label}</div>
-      <div style={{ marginTop: 4, fontSize: 16, fontWeight: 800, color: 'rgba(255,255,255,0.9)' }}>{value}</div>
+      <div style={{ fontSize: 10, color: 'var(--ink-45)', textTransform: 'uppercase', letterSpacing: 1 }}>{label}</div>
+      <div style={{ marginTop: 4, fontSize: 16, fontWeight: 800, color: 'var(--ink-90)' }}>{value}</div>
     </div>
   );
 }
@@ -158,9 +158,9 @@ const field: React.CSSProperties = {
   width: '100%',
   height: 40,
   borderRadius: 10,
-  border: '1px solid rgba(255,255,255,0.14)',
-  background: 'rgba(255,255,255,0.04)',
-  color: 'rgba(255,255,255,0.9)',
+  border: '1px solid var(--panel-border-3)',
+  background: 'var(--glass)',
+  color: 'var(--ink-90)',
   padding: '0 10px',
   fontSize: 12,
   outline: 'none',

@@ -639,7 +639,7 @@ export default function SprintsPage() {
       {/* Header */}
       <div>
         <div className="section-label">{t('sprints.section')}</div>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: 'rgba(255,255,255,0.95)', marginTop: 6, marginBottom: 4 }}>
+        <h1 style={{ fontSize: 26, fontWeight: 800, color: 'var(--ink-90)', marginTop: 6, marginBottom: 4 }}>
           {t('sprints.title')}
         </h1>
         {((provider === 'azure' && !hasAzure) || (provider === 'jira' && !hasJira)) && !lpj ? (
@@ -648,7 +648,7 @@ export default function SprintsPage() {
             <a href="/dashboard/integrations" style={{ color: '#fbbf24', textDecoration: 'underline' }}>{t('sprints.goIntegrations')}</a>
           </p>
         ) : (
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', margin: 0 }}>{breadcrumb}</p>
+          <p style={{ fontSize: 13, color: 'var(--ink-35)', margin: 0 }}>{breadcrumb}</p>
         )}
       </div>
 
@@ -659,9 +659,9 @@ export default function SprintsPage() {
             style={{
               padding: '6px 12px',
               borderRadius: 999,
-              border: provider === 'azure' ? '1px solid rgba(56,189,248,0.45)' : '1px solid rgba(255,255,255,0.12)',
-              background: provider === 'azure' ? 'rgba(56,189,248,0.12)' : 'rgba(255,255,255,0.03)',
-              color: provider === 'azure' ? '#7dd3fc' : 'rgba(255,255,255,0.58)',
+              border: provider === 'azure' ? '1px solid rgba(56,189,248,0.45)' : '1px solid var(--panel-border-3)',
+              background: provider === 'azure' ? 'rgba(56,189,248,0.12)' : 'var(--panel-alt)',
+              color: provider === 'azure' ? '#7dd3fc' : 'var(--ink-58)',
               fontSize: 12,
               fontWeight: 700,
               cursor: 'pointer',
@@ -676,9 +676,9 @@ export default function SprintsPage() {
             style={{
               padding: '6px 12px',
               borderRadius: 999,
-              border: provider === 'jira' ? '1px solid rgba(129,140,248,0.45)' : '1px solid rgba(255,255,255,0.12)',
-              background: provider === 'jira' ? 'rgba(129,140,248,0.12)' : 'rgba(255,255,255,0.03)',
-              color: provider === 'jira' ? '#a5b4fc' : 'rgba(255,255,255,0.58)',
+              border: provider === 'jira' ? '1px solid rgba(129,140,248,0.45)' : '1px solid var(--panel-border-3)',
+              background: provider === 'jira' ? 'rgba(129,140,248,0.12)' : 'var(--panel-alt)',
+              color: provider === 'jira' ? '#a5b4fc' : 'var(--ink-58)',
               fontSize: 12,
               fontWeight: 700,
               cursor: 'pointer',
@@ -690,7 +690,7 @@ export default function SprintsPage() {
       </div>
 
       {/* Selectors */}
-      <div style={{ position: 'sticky', top: 72, zIndex: 40, borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(3,7,18,0.92)', backdropFilter: 'blur(24px)', padding: '16px 20px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+      <div style={{ position: 'sticky', top: 72, zIndex: 40, borderRadius: 16, border: '1px solid var(--panel-border-2)', background: 'var(--surface)', backdropFilter: 'blur(24px)', padding: '16px 20px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
         <Sel step={1} t={t} label={t('sprints.projectLabel')} value={project} onChange={setProject}
           options={projects.map((p: Opt) => ({ id: provider === 'jira' ? (p.id ?? p.name) : p.name, name: p.name }))}
           loading={lpj} placeholder={t('sprints.selectProject')} active={true} />
@@ -726,7 +726,7 @@ export default function SprintsPage() {
         {sprint ? (
           <div style={{ flex: 1, display: 'flex', gap: 10, alignItems: 'flex-start', overflowX: 'auto', paddingBottom: 8, minWidth: 0 }}>
             {(lbd ? states : visibleStates).length === 0 && !lbd ? (
-              <div style={{ flex: 1, textAlign: 'center', padding: '60px 0', color: 'rgba(255,255,255,0.2)', fontSize: 14 }}>
+              <div style={{ flex: 1, textAlign: 'center', padding: '60px 0', color: 'var(--ink-25)', fontSize: 14 }}>
                 {t('sprints.noItems')}
               </div>
             ) : (lbd ? states : visibleStates).map((state, idx) => {
@@ -763,7 +763,7 @@ export default function SprintsPage() {
         ) : (
           <div style={{ flex: 1, textAlign: 'center', padding: '80px 0' }}>
             <div style={{ fontSize: 48, marginBottom: 14, opacity: 0.1 }}>◎</div>
-            <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 14 }}>{t('sprints.selectPrompt')}</div>
+            <div style={{ color: 'var(--ink-25)', fontSize: 14 }}>{t('sprints.selectPrompt')}</div>
           </div>
         )}
 
@@ -812,9 +812,9 @@ export default function SprintsPage() {
 
 function SkeletonCard({ opacity = 1 }: { opacity?: number }) {
   return (
-    <div style={{ borderRadius: 9, border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.03)', padding: '10px 11px', opacity }}>
-      <div style={{ height: 11, borderRadius: 4, background: 'rgba(255,255,255,0.07)', width: '80%', marginBottom: 7 }} />
-      <div style={{ height: 9, borderRadius: 4, background: 'rgba(255,255,255,0.04)', width: '50%' }} />
+    <div style={{ borderRadius: 9, border: '1px solid var(--panel-alt)', background: 'var(--panel-alt)', padding: '10px 11px', opacity }}>
+      <div style={{ height: 11, borderRadius: 4, background: 'var(--panel-border)', width: '80%', marginBottom: 7 }} />
+      <div style={{ height: 9, borderRadius: 4, background: 'var(--glass)', width: '50%' }} />
     </div>
   );
 }
@@ -835,8 +835,8 @@ function BoardCard({ item, stateColor, selected, onClick }: {
     <div
       onClick={onClick}
       style={{
-        borderRadius: 9, border: '1px solid ' + (active ? stateColor + '60' : 'rgba(255,255,255,0.06)'),
-        background: selected ? stateColor + '10' : 'rgba(3,7,18,0.7)',
+        borderRadius: 9, border: '1px solid ' + (active ? stateColor + '60' : 'var(--panel-border)'),
+        background: selected ? stateColor + '10' : 'var(--panel)',
         padding: '10px 11px', transition: 'all 0.15s',
         transform: hovered ? 'translateY(-1px)' : 'none',
         boxShadow: active ? '0 3px 16px ' + stateColor + '18' : 'none',
@@ -845,9 +845,9 @@ function BoardCard({ item, stateColor, selected, onClick }: {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.88)', lineHeight: 1.4, marginBottom: 6 }}>{item.title}</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-90)', lineHeight: 1.4, marginBottom: 6 }}>{item.title}</div>
       {descriptionPreview && (
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.42)', lineHeight: 1.45, marginBottom: 6 }}>
+        <div style={{ fontSize: 10, color: 'var(--ink-42)', lineHeight: 1.45, marginBottom: 6 }}>
           {descriptionPreview}
         </div>
       )}
@@ -858,16 +858,16 @@ function BoardCard({ item, stateColor, selected, onClick }: {
           <div style={{ width: 16, height: 16, borderRadius: '50%', background: 'linear-gradient(135deg, #0d9488, #22c55e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 800, color: '#fff', flexShrink: 0 }}>
             {item.assigned_to[0]?.toUpperCase()}
           </div>
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: 10, color: 'var(--ink-45)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {shortName(item.assigned_to)}
           </span>
         </div>
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.18)', fontFamily: 'monospace' }}>#{item.id}</span>
+        <span style={{ fontSize: 9, color: 'var(--panel-border-3)', fontFamily: 'monospace' }}>#{item.id}</span>
         {timeLabel && (
-          <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 999, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.35)' }}>
+          <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 999, background: 'var(--panel-alt)', border: '1px solid var(--panel-border-3)', color: 'var(--ink-35)' }}>
             ⏱ {timeLabel}
           </span>
         )}
@@ -919,8 +919,8 @@ function DetailPanel({ item, onClose, project, integrations, aiLoading, aiResult
   return (
     <div style={{
       width: 340, flexShrink: 0, borderRadius: 18,
-      border: '1px solid rgba(255,255,255,0.1)',
-      background: 'rgba(8,14,30,0.98)',
+      border: '1px solid var(--panel-border-3)',
+      background: 'var(--surface)',
       overflow: 'hidden',
       boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
       display: 'flex', flexDirection: 'column',
@@ -930,14 +930,14 @@ function DetailPanel({ item, onClose, project, integrations, aiLoading, aiResult
       <div style={{ height: 2, background: 'linear-gradient(90deg, ' + stateInfo.color + ', #7c3aed)' }} />
 
       {/* Header */}
-      <div style={{ padding: '16px 18px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+      <div style={{ padding: '16px 18px 12px', borderBottom: '1px solid var(--panel-border)', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: stateInfo.color, boxShadow: '0 0 6px ' + stateInfo.color, flexShrink: 0 }} />
             <span style={{ fontSize: 10, fontWeight: 700, color: stateInfo.color, textTransform: 'uppercase', letterSpacing: 0.8 }}>{item.state}</span>
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace', marginLeft: 'auto' }}>#{item.id}</span>
+            <span style={{ fontSize: 10, color: 'var(--ink-25)', fontFamily: 'monospace', marginLeft: 'auto' }}>#{item.id}</span>
           </div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.92)', lineHeight: 1.4 }}>{item.title}</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink-90)', lineHeight: 1.4 }}>{item.title}</div>
         </div>
         {externalUrl && (
           <a
@@ -964,7 +964,7 @@ function DetailPanel({ item, onClose, project, integrations, aiLoading, aiResult
             ↗
           </a>
         )}
-        <button onClick={onClose} style={{ width: 26, height: 26, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>×</button>
+        <button onClick={onClose} style={{ width: 26, height: 26, borderRadius: '50%', border: '1px solid var(--panel-border-3)', background: 'var(--panel-alt)', color: 'var(--ink-35)', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>×</button>
       </div>
 
       {/* Body */}
@@ -974,22 +974,22 @@ function DetailPanel({ item, onClose, project, integrations, aiLoading, aiResult
         {item.created_date && (
           <DetailRow icon="📅" label={t('sprints.opened')}>
             {new Date(item.created_date).toLocaleDateString(lang === 'tr' ? 'tr-TR' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
-            {openDuration && <span style={{ marginLeft: 6, fontSize: 10, color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.05)', padding: '1px 6px', borderRadius: 999 }}>{openDuration} {t('sprints.ago')}</span>}
+            {openDuration && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--ink-30)', background: 'var(--panel-alt)', padding: '1px 6px', borderRadius: 999 }}>{openDuration} {t('sprints.ago')}</span>}
           </DetailRow>
         )}
         {toActiveDuration && <DetailRow icon="⚡" label={t('sprints.openToInProgress')}><span style={{ color: '#38bdf8', fontWeight: 700 }}>{toActiveDuration}</span></DetailRow>}
         {!toActiveDuration && item.created_date && <DetailRow icon="⏳" label={t('sprints.openDuration')}><span style={{ color: '#f59e0b', fontWeight: 700 }}>{openDuration}</span></DetailRow>}
 
         <div>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)', marginBottom: 6 }}>{t('sprints.description')}</div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6, background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '10px 12px', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-25)', marginBottom: 6 }}>{t('sprints.description')}</div>
+          <div style={{ fontSize: 12, color: 'var(--ink-50)', lineHeight: 1.6, background: 'var(--panel-alt)', borderRadius: 8, padding: '10px 12px', border: '1px solid var(--panel-border)' }}>
             {plainDescription || t('sprints.noDescriptionFound')}
           </div>
         </div>
 
         {/* ── AI Ayarları ── */}
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)' }}>{t('sprints.aiAssignSettings')}</div>
+        <div style={{ borderTop: '1px solid var(--panel-border)', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-25)' }}>{t('sprints.aiAssignSettings')}</div>
 
           {/* Repo Mapping */}
           <div>
@@ -997,18 +997,18 @@ function DetailPanel({ item, onClose, project, integrations, aiLoading, aiResult
             {repoMappings.length > 0 ? (
               <select value={selLocalRepoMappingId} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelLocalRepoMappingId(e.target.value)}
                 style={{ ...dpSelectStyle, marginBottom: 6 }}>
-                <option value="" style={{ background: '#0d1117' }}>{t('sprints.selectMapping')}</option>
-                {repoMappings.map((m) => <option key={m.id} value={m.id} style={{ background: '#0d1117' }}>{m.azure_project} · {m.azure_repo_name || m.name}</option>)}
+                <option value="" style={{ background: 'var(--surface)' }}>{t('sprints.selectMapping')}</option>
+                {repoMappings.map((m) => <option key={m.id} value={m.id} style={{ background: 'var(--surface)' }}>{m.azure_project} · {m.azure_repo_name || m.name}</option>)}
               </select>
             ) : (
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)' }}>{t('sprints.noMappingYet')}</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-25)' }}>{t('sprints.noMappingYet')}</div>
             )}
             {selectedLocalMapping && (
-              <div style={{ marginTop: 4, fontSize: 10, color: 'rgba(255,255,255,0.25)', lineHeight: 1.5 }}>
+              <div style={{ marginTop: 4, fontSize: 10, color: 'var(--ink-25)', lineHeight: 1.5 }}>
                 <div>{t('sprints.azure')}: {selectedLocalMapping.azure_project || '-'} · {selectedLocalMapping.azure_repo_name || selectedLocalMapping.name}</div>
                 <div style={{ wordBreak: 'break-all' }}>{t('sprints.local')}: {selectedLocalMapping.local_path}</div>
                 {selectedLocalMapping.repo_playbook && (
-                  <div style={{ marginTop: 5, color: 'rgba(255,255,255,0.4)' }}>
+                  <div style={{ marginTop: 5, color: 'var(--ink-35)' }}>
                     {t('sprints.playbook')}: {selectedLocalMapping.repo_playbook.length > 140 ? selectedLocalMapping.repo_playbook.slice(0, 140).trimEnd() + '…' : selectedLocalMapping.repo_playbook}
                   </div>
                 )}
@@ -1028,11 +1028,11 @@ function DetailPanel({ item, onClose, project, integrations, aiLoading, aiResult
               <div style={{ display: 'grid', gap: 6 }}>
                 {enabledAgents.map((a) => (
                   <button key={a.role} onClick={() => setSelAgent(selAgent === a.role ? '' : a.role)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 9, border: '1px solid ' + (selAgent === a.role ? 'rgba(13,148,136,0.4)' : 'rgba(255,255,255,0.07)'), background: selAgent === a.role ? 'rgba(13,148,136,0.1)' : 'rgba(255,255,255,0.02)', cursor: 'pointer', textAlign: 'left' }}>
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 9, border: '1px solid ' + (selAgent === a.role ? 'rgba(13,148,136,0.4)' : 'var(--panel-border)'), background: selAgent === a.role ? 'rgba(13,148,136,0.1)' : 'var(--panel)', cursor: 'pointer', textAlign: 'left' }}>
                     <span style={{ fontSize: 14 }}>{a.icon ?? '🤖'}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>{a.label}</div>
-                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{a.provider} · {a.model || a.custom_model}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-78)' }}>{a.label}</div>
+                      <div style={{ fontSize: 10, color: 'var(--ink-30)' }}>{a.provider} · {a.model || a.custom_model}</div>
                     </div>
                     {selAgent === a.role && <span style={{ fontSize: 12, color: '#5eead4' }}>✓</span>}
                   </button>
@@ -1052,9 +1052,9 @@ function DetailPanel({ item, onClose, project, integrations, aiLoading, aiResult
                 width: '100%',
                 padding: '9px 10px',
                 borderRadius: 9,
-                border: '1px solid rgba(255,255,255,0.1)',
-                background: 'rgba(255,255,255,0.03)',
-                color: 'rgba(255,255,255,0.85)',
+                border: '1px solid var(--panel-border-3)',
+                background: 'var(--panel-alt)',
+                color: 'var(--ink-78)',
                 fontSize: 12,
                 lineHeight: 1.45,
                 resize: 'vertical',
@@ -1072,11 +1072,11 @@ function DetailPanel({ item, onClose, project, integrations, aiLoading, aiResult
 
         {/* ── Flow Çalıştır ── */}
         {savedFlows.length > 0 && (
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)' }}>{t('sprints.runFlow')}</div>
+          <div style={{ borderTop: '1px solid var(--panel-border)', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-25)' }}>{t('sprints.runFlow')}</div>
             <select value={selFlow} onChange={(e) => setSelFlow(e.target.value)} style={dpSelectStyle}>
-              <option value="" style={{ background: '#0d1117' }}>{t('sprints.selectFlow')}</option>
-              {savedFlows.map((f) => <option key={f.id} value={f.id} style={{ background: '#0d1117' }}>{f.name}</option>)}
+              <option value="" style={{ background: 'var(--surface)' }}>{t('sprints.selectFlow')}</option>
+              {savedFlows.map((f) => <option key={f.id} value={f.id} style={{ background: 'var(--surface)' }}>{f.name}</option>)}
             </select>
             {flowResult && (
               <div style={{ padding: '8px 10px', borderRadius: 9, background: flowResult.status === 'completed' ? 'rgba(34,197,94,0.08)' : 'rgba(248,113,113,0.08)', border: '1px solid ' + (flowResult.status === 'completed' ? 'rgba(34,197,94,0.25)' : 'rgba(248,113,113,0.25)'), fontSize: 11, color: flowResult.status === 'completed' ? '#22c55e' : '#f87171' }}>
@@ -1096,18 +1096,18 @@ function DetailPanel({ item, onClose, project, integrations, aiLoading, aiResult
       </div>
 
       {/* Footer */}
-      <div style={{ padding: '12px 18px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ padding: '12px 18px', borderTop: '1px solid var(--panel-border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {savedFlows.length > 0 && (
           <button onClick={() => selFlow && onRunFlow(selFlow, { project: selectedLocalMapping?.azure_project || project || undefined, azureRepo: selectedLocalMapping?.azure_repo_url || undefined, localRepoMapping: selectedLocalMapping?.name || undefined, localRepoPath: selectedLocalMapping?.local_path || undefined, repoPlaybook: selectedLocalMapping?.repo_playbook || undefined, executionPrompt: executionPrompt.trim() || undefined })} disabled={flowRunning || !selFlow}
-            style={{ width: '100%', padding: '10px', borderRadius: 12, border: 'none', background: flowRunning ? 'rgba(167,139,250,0.3)' : selFlow ? 'linear-gradient(135deg, #7c3aed, #a78bfa)' : 'rgba(255,255,255,0.06)', color: selFlow ? '#fff' : 'rgba(255,255,255,0.3)', fontWeight: 700, fontSize: 13, cursor: flowRunning || !selFlow ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            style={{ width: '100%', padding: '10px', borderRadius: 12, border: 'none', background: flowRunning ? 'rgba(167,139,250,0.3)' : selFlow ? 'linear-gradient(135deg, #7c3aed, #a78bfa)' : 'var(--panel-border)', color: selFlow ? '#fff' : 'var(--ink-30)', fontWeight: 700, fontSize: 13, cursor: flowRunning || !selFlow ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
             {flowRunning ? <><span style={{ fontSize: 14 }}>⟳</span> {t('sprints.flowRunning')}</> : <><span style={{ fontSize: 14 }}>▶</span> {selFlow ? t('sprints.runFlow') : t('sprints.selectFlow')}</>}
           </button>
         )}
         <button onClick={() => onAssignAI({ project: selectedLocalMapping?.azure_project, azureRepo: selectedLocalMapping?.azure_repo_url, localRepoMapping: selectedLocalMapping?.name, localRepoPath: selectedLocalMapping?.local_path, repoPlaybook: selectedLocalMapping?.repo_playbook, agentRole: selAgent || undefined, agentProvider: selectedAgent?.provider, agentModel: selectedAgent?.custom_model || selectedAgent?.model, executionPrompt: executionPrompt.trim() || undefined })} disabled={aiLoading || !selAgent || !selectedLocalMapping}
-          style={{ width: '100%', padding: '11px', borderRadius: 12, border: 'none', background: aiLoading ? 'rgba(13,148,136,0.3)' : selAgent ? 'linear-gradient(135deg, #0d9488, #7c3aed)' : 'rgba(255,255,255,0.06)', color: selAgent ? '#fff' : 'rgba(255,255,255,0.3)', fontWeight: 700, fontSize: 13, cursor: aiLoading || !selAgent ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          style={{ width: '100%', padding: '11px', borderRadius: 12, border: 'none', background: aiLoading ? 'rgba(13,148,136,0.3)' : selAgent ? 'linear-gradient(135deg, #0d9488, #7c3aed)' : 'var(--panel-border)', color: selAgent ? '#fff' : 'var(--ink-30)', fontWeight: 700, fontSize: 13, cursor: aiLoading || !selAgent ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           {aiLoading ? <><span style={{ fontSize: 14 }}>⟳</span> {t('sprints.aiRunning')}</> : <><span style={{ fontSize: 14 }}>🤖</span> {selAgent ? (selectedLocalMapping ? t('sprints.assignAi') : t('sprints.selectMappingShort')) : t('sprints.selectAgent')}</>}
         </button>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', textAlign: 'center' }}>{t('sprints.aiHint')}</div>
+        <div style={{ fontSize: 10, color: 'var(--ink-25)', textAlign: 'center' }}>{t('sprints.aiHint')}</div>
       </div>
     </div>
   );
@@ -1115,12 +1115,12 @@ function DetailPanel({ item, onClose, project, integrations, aiLoading, aiResult
 
 const dpLabelStyle: React.CSSProperties = {
   fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase',
-  color: 'rgba(255,255,255,0.3)', display: 'block', marginBottom: 5,
+  color: 'var(--ink-30)', display: 'block', marginBottom: 5,
 };
 const dpSelectStyle: React.CSSProperties = {
   width: '100%', padding: '8px 10px', borderRadius: 9,
-  border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)',
-  color: 'rgba(255,255,255,0.85)', fontSize: 12, outline: 'none', appearance: 'none', cursor: 'pointer',
+  border: '1px solid var(--panel-border-3)', background: 'var(--glass)',
+  color: 'var(--ink-78)', fontSize: 12, outline: 'none', appearance: 'none', cursor: 'pointer',
 };
 
 function DetailRow({ icon, label, children }: { icon: string; label: string; children: React.ReactNode }) {
@@ -1128,8 +1128,8 @@ function DetailRow({ icon, label, children }: { icon: string; label: string; chi
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
       <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>{icon}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)', marginBottom: 3 }}>{label}</div>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4 }}>{children}</div>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', color: 'var(--ink-25)', marginBottom: 3 }}>{label}</div>
+        <div style={{ fontSize: 12, color: 'var(--ink-72)', lineHeight: 1.4 }}>{children}</div>
       </div>
     </div>
   );
@@ -1143,15 +1143,15 @@ function Sel({ step, t, label, value, onChange, options, loading, placeholder, a
   return (
     <div style={{ opacity: active ? 1 : 0.4, transition: 'opacity 0.2s' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 7 }}>
-        <span style={{ width: 18, height: 18, borderRadius: '50%', fontSize: 9, fontWeight: 800, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: value ? 'linear-gradient(135deg, #0d9488, #22c55e)' : 'rgba(255,255,255,0.08)', color: value ? '#fff' : 'rgba(255,255,255,0.4)' }}>{step}</span>
-        <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.1, textTransform: 'uppercase', color: value ? '#5eead4' : 'rgba(255,255,255,0.35)' }}>{label}</label>
-        {loading ? <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{t('sprints.loadingShort')}</span> : null}
+        <span style={{ width: 18, height: 18, borderRadius: '50%', fontSize: 9, fontWeight: 800, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: value ? 'linear-gradient(135deg, #0d9488, #22c55e)' : 'var(--panel-border-2)', color: value ? '#fff' : 'var(--ink-35)' }}>{step}</span>
+        <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.1, textTransform: 'uppercase', color: value ? '#5eead4' : 'var(--ink-35)' }}>{label}</label>
+        {loading ? <span style={{ fontSize: 10, color: 'var(--ink-30)' }}>{t('sprints.loadingShort')}</span> : null}
       </div>
       <select value={value} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onChange(e.target.value)} disabled={!active || loading}
-        style={{ width: '100%', border: '1px solid ' + (value ? 'rgba(13,148,136,0.4)' : 'rgba(255,255,255,0.1)'), borderRadius: 10, padding: '9px 12px', font: 'inherit', fontSize: 12, background: value ? 'rgba(13,148,136,0.08)' : 'rgba(255,255,255,0.04)', color: value ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.4)', cursor: active && !loading ? 'pointer' : 'not-allowed', appearance: 'none', outline: 'none' }}>
-        <option value="" style={{ background: '#0d1117' }}>{placeholder}</option>
+        style={{ width: '100%', border: '1px solid ' + (value ? 'rgba(13,148,136,0.4)' : 'var(--panel-border-3)'), borderRadius: 10, padding: '9px 12px', font: 'inherit', fontSize: 12, background: value ? 'rgba(13,148,136,0.08)' : 'var(--glass)', color: value ? 'var(--ink-90)' : 'var(--ink-35)', cursor: active && !loading ? 'pointer' : 'not-allowed', appearance: 'none', outline: 'none' }}>
+        <option value="" style={{ background: 'var(--surface)' }}>{placeholder}</option>
       {options.map((o) => (
-          <option key={o.id} value={o.id} style={{ background: '#0d1117' }}>
+          <option key={o.id} value={o.id} style={{ background: 'var(--surface)' }}>
             {o.is_current ? `● ${o.name} (${t('sprints.current')})` : o.name}
           </option>
         ))}

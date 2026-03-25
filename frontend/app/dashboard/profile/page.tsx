@@ -241,24 +241,24 @@ export default function ProfilePage() {
     <div style={{ display: 'grid', gap: 18, maxWidth: 1100 }}>
       <div>
         <div className='section-label'>{t('profile.section')}</div>
-        <h1 style={{ fontSize: 28, fontWeight: 800, color: 'rgba(255,255,255,0.95)', marginTop: 8, marginBottom: 4 }}>
+        <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--ink-90)', marginTop: 8, marginBottom: 4 }}>
           {t('profile.title')}
         </h1>
-        <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.3)', margin: 0 }}>{t('profile.subtitle')}</p>
+        <p style={{ fontSize: 14, color: 'var(--ink-30)', margin: 0 }}>{t('profile.subtitle')}</p>
       </div>
 
       {user && (
-        <div style={{ borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', padding: 18, display: 'flex', alignItems: 'center', gap: 16, position: 'relative', overflow: 'hidden' }}>
+        <div style={{ borderRadius: 16, border: '1px solid var(--panel-border-2)', background: 'var(--panel-alt)', padding: 18, display: 'flex', alignItems: 'center', gap: 16, position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg, transparent, rgba(13,148,136,0.4), transparent)' }} />
           <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'linear-gradient(135deg, #0d9488, #22c55e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontWeight: 900, color: '#fff', flexShrink: 0 }}>
             {(user.full_name?.[0] || user.email[0]).toUpperCase()}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginBottom: 3 }}>{user.full_name || '—'}</div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>{user.email}</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink-90)', marginBottom: 3 }}>{user.full_name || '—'}</div>
+            <div style={{ fontSize: 13, color: 'var(--ink-35)' }}>{user.email}</div>
             <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
               <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: 'rgba(13,148,136,0.15)', border: '1px solid rgba(13,148,136,0.3)', color: '#5eead4' }}>Pro Plan</span>
-              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', padding: '3px 10px' }}>Org #{user.organization_id}</span>
+              <span style={{ fontSize: 11, color: 'var(--ink-25)', padding: '3px 10px' }}>Org #{user.organization_id}</span>
             </div>
           </div>
           <button onClick={logout} style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid rgba(248,113,113,0.2)', background: 'rgba(248,113,113,0.06)', color: '#f87171', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
@@ -269,12 +269,12 @@ export default function ProfilePage() {
 
       <div style={{ display: 'grid', gap: 14, alignItems: 'start' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14, alignItems: 'start' }}>
-          <div style={{ borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', padding: 18, display: 'grid', gap: 12 }}>
+          <div style={{ borderRadius: 16, border: '1px solid var(--panel-border-2)', background: 'var(--panel-alt)', padding: 18, display: 'grid', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>◎</div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 700, color: 'rgba(255,255,255,0.9)', fontSize: 14 }}>{t('profile.azureActiveSprint')}</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ fontWeight: 700, color: 'var(--ink-90)', fontSize: 14 }}>{t('profile.azureActiveSprint')}</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-35)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {sprint && selS ? selS.name : sprint ? sprint.split('\\').pop() : t('profile.noSprint')}
               </div>
             </div>
@@ -293,18 +293,18 @@ export default function ProfilePage() {
 
           <div style={{ marginTop: 2 }}>
             <button onClick={() => router.push('/dashboard/sprints')} disabled={!sprint}
-              style={{ padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(13,148,136,0.3)', background: 'rgba(13,148,136,0.08)', color: sprint ? '#5eead4' : 'rgba(255,255,255,0.2)', fontWeight: 700, fontSize: 12, cursor: sprint ? 'pointer' : 'not-allowed' }}>
+              style={{ padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(13,148,136,0.3)', background: 'rgba(13,148,136,0.08)', color: sprint ? '#5eead4' : 'var(--ink-25)', fontWeight: 700, fontSize: 12, cursor: sprint ? 'pointer' : 'not-allowed' }}>
               {t('profile.sprintBoard')}
             </button>
           </div>
         </div>
 
-          <div style={{ borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', padding: 18, display: 'grid', gap: 12 }}>
+          <div style={{ borderRadius: 16, border: '1px solid var(--panel-border-2)', background: 'var(--panel-alt)', padding: 18, display: 'grid', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(129,140,248,0.15)', border: '1px solid rgba(129,140,248,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>◉</div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 700, color: 'rgba(255,255,255,0.9)', fontSize: 14 }}>{t('profile.jiraActiveSprint')}</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ fontWeight: 700, color: 'var(--ink-90)', fontSize: 14 }}>{t('profile.jiraActiveSprint')}</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-35)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {jiraSprint && selJs ? selJs.name : jiraSprint || t('profile.noSprint')}
               </div>
             </div>
@@ -323,17 +323,17 @@ export default function ProfilePage() {
 
           <div style={{ marginTop: 2 }}>
             <button onClick={() => router.push('/dashboard/sprints')} disabled={!jiraSprint}
-              style={{ padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(99,102,241,0.3)', background: 'rgba(99,102,241,0.08)', color: jiraSprint ? '#a5b4fc' : 'rgba(255,255,255,0.2)', fontWeight: 700, fontSize: 12, cursor: jiraSprint ? 'pointer' : 'not-allowed' }}>
+              style={{ padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(99,102,241,0.3)', background: 'rgba(99,102,241,0.08)', color: jiraSprint ? '#a5b4fc' : 'var(--ink-25)', fontWeight: 700, fontSize: 12, cursor: jiraSprint ? 'pointer' : 'not-allowed' }}>
               {t('profile.sprintBoard')}
             </button>
           </div>
         </div>
         </div>
 
-        <div style={{ borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', padding: 18, display: 'grid', gap: 10 }}>
+        <div style={{ borderRadius: 16, border: '1px solid var(--panel-border-2)', background: 'var(--panel-alt)', padding: 18, display: 'grid', gap: 10 }}>
           <div>
-            <div style={{ fontWeight: 700, color: 'rgba(255,255,255,0.9)', fontSize: 14 }}>Workspace Preferences</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>DB-backed defaults used during AI assignment.</div>
+            <div style={{ fontWeight: 700, color: 'var(--ink-90)', fontSize: 14 }}>Workspace Preferences</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-35)', marginTop: 2 }}>DB-backed defaults used during AI assignment.</div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -374,16 +374,16 @@ export default function ProfilePage() {
             }}
             placeholder='5'
           />
-          <div style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 10, background: 'rgba(255,255,255,0.02)' }}>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', fontWeight: 700, marginBottom: 8 }}>Event Notification Matrix</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 0.6fr 0.6fr 0.7fr', gap: 8, fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>
+          <div style={{ border: '1px solid var(--panel-border-2)', borderRadius: 12, padding: 10, background: 'var(--panel)' }}>
+            <div style={{ fontSize: 12, color: 'var(--ink-78)', fontWeight: 700, marginBottom: 8 }}>Event Notification Matrix</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 0.6fr 0.6fr 0.7fr', gap: 8, fontSize: 11, color: 'var(--ink-35)', marginBottom: 6 }}>
               <div>Event</div><div>In-App</div><div>Email</div><div>Web Push</div>
             </div>
             {Object.keys(EVENT_PREF_DEFAULTS).map((eventKey) => {
               const channels = profileSettings.notification_preferences[eventKey] || EVENT_PREF_DEFAULTS[eventKey];
               return (
-                <div key={eventKey} style={{ display: 'grid', gridTemplateColumns: '1.5fr 0.6fr 0.6fr 0.7fr', gap: 8, alignItems: 'center', padding: '6px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>{eventKey.replace(/_/g, ' ')}</div>
+                <div key={eventKey} style={{ display: 'grid', gridTemplateColumns: '1.5fr 0.6fr 0.6fr 0.7fr', gap: 8, alignItems: 'center', padding: '6px 0', borderTop: '1px solid var(--panel-alt)' }}>
+                  <div style={{ fontSize: 11, color: 'var(--ink-78)' }}>{eventKey.replace(/_/g, ' ')}</div>
                   <MiniToggle checked={channels.in_app} onChange={(v) => { setProfileSettings((p) => ({ ...p, notification_preferences: { ...p.notification_preferences, [eventKey]: { ...channels, in_app: v } } })); setSaved(false); }} />
                   <MiniToggle checked={channels.email} onChange={(v) => { setProfileSettings((p) => ({ ...p, notification_preferences: { ...p.notification_preferences, [eventKey]: { ...channels, email: v } } })); setSaved(false); }} />
                   <MiniToggle checked={channels.web_push} onChange={(v) => { setProfileSettings((p) => ({ ...p, notification_preferences: { ...p.notification_preferences, [eventKey]: { ...channels, web_push: v } } })); setSaved(false); }} />
@@ -403,12 +403,12 @@ export default function ProfilePage() {
         </button>
       </div>
 
-      <div style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ borderRadius: 14, border: '1px solid var(--panel-border)', background: 'var(--panel)', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>{t('profile.integrations')}</div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>{t('profile.integrationsDesc')}</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-72)' }}>{t('profile.integrations')}</div>
+          <div style={{ fontSize: 12, color: 'var(--ink-30)', marginTop: 2 }}>{t('profile.integrationsDesc')}</div>
         </div>
-        <a href='/dashboard/integrations' style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
+        <a href='/dashboard/integrations' style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--panel-border-3)', background: 'transparent', color: 'var(--ink-50)', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
           {t('profile.settings')}
         </a>
       </div>
@@ -421,10 +421,10 @@ function ToggleRow({ label, checked, onChange }: { label: string; checked: boole
     <button
       type='button'
       onClick={() => onChange(!checked)}
-      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '9px 10px', background: checked ? 'rgba(13,148,136,0.12)' : 'rgba(255,255,255,0.02)', cursor: 'pointer' }}
+      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid var(--panel-border-2)', borderRadius: 10, padding: '9px 10px', background: checked ? 'rgba(13,148,136,0.12)' : 'var(--panel)', cursor: 'pointer' }}
     >
-      <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', textAlign: 'left' }}>{label}</span>
-      <span style={{ width: 34, height: 18, borderRadius: 999, background: checked ? 'rgba(13,148,136,0.9)' : 'rgba(255,255,255,0.2)', padding: 2, display: 'inline-flex', alignItems: 'center', justifyContent: checked ? 'flex-end' : 'flex-start', transition: 'all 0.2s' }}>
+      <span style={{ fontSize: 12, color: 'var(--ink-78)', textAlign: 'left' }}>{label}</span>
+      <span style={{ width: 34, height: 18, borderRadius: 999, background: checked ? 'rgba(13,148,136,0.9)' : 'var(--ink-25)', padding: 2, display: 'inline-flex', alignItems: 'center', justifyContent: checked ? 'flex-end' : 'flex-start', transition: 'all 0.2s' }}>
         <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#fff' }} />
       </span>
     </button>
@@ -434,14 +434,14 @@ function ToggleRow({ label, checked, onChange }: { label: string; checked: boole
 function ProfileInput({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder: string }) {
   return (
     <div>
-      <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 6 }}>
+      <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', display: 'block', marginBottom: 6 }}>
         {label}
       </label>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.9)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+        style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--panel-border-3)', background: 'var(--glass)', color: 'var(--ink-90)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
       />
     </div>
   );
@@ -450,7 +450,7 @@ function ProfileInput({ label, value, onChange, placeholder }: { label: string; 
 function MiniToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <button type='button' onClick={() => onChange(!checked)}
-      style={{ width: 34, height: 18, borderRadius: 999, background: checked ? 'rgba(13,148,136,0.9)' : 'rgba(255,255,255,0.2)', padding: 2, border: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: checked ? 'flex-end' : 'flex-start', cursor: 'pointer' }}>
+      style={{ width: 34, height: 18, borderRadius: 999, background: checked ? 'rgba(13,148,136,0.9)' : 'var(--ink-25)', padding: 2, border: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: checked ? 'flex-end' : 'flex-start', cursor: 'pointer' }}>
       <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#fff' }} />
     </button>
   );
@@ -462,13 +462,13 @@ function ProfileSel({ label, value, onChange, options, placeholder, loading, dis
 }) {
   return (
     <div>
-      <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 6 }}>
-        {label} {loading ? <span style={{ color: 'rgba(255,255,255,0.2)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>loading…</span> : null}
+      <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', display: 'block', marginBottom: 6 }}>
+        {label} {loading ? <span style={{ color: 'var(--ink-25)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>loading…</span> : null}
       </label>
       <select value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled || loading}
-        style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid ' + (value ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.1)'), background: value ? 'rgba(139,92,246,0.08)' : 'rgba(255,255,255,0.04)', color: value ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.4)', fontSize: 13, outline: 'none', appearance: 'none', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.4 : 1 }}>
-        <option value='' style={{ background: '#0d1117' }}>{placeholder}</option>
-        {options.map((o) => <option key={o.id} value={o.id} style={{ background: '#0d1117' }}>{o.name}</option>)}
+        style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid ' + (value ? 'rgba(139,92,246,0.4)' : 'var(--panel-border-3)'), background: value ? 'rgba(139,92,246,0.08)' : 'var(--glass)', color: value ? 'var(--ink-90)' : 'var(--ink-35)', fontSize: 13, outline: 'none', appearance: 'none', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.4 : 1 }}>
+        <option value='' style={{ background: 'var(--surface)' }}>{placeholder}</option>
+        {options.map((o) => <option key={o.id} value={o.id} style={{ background: 'var(--surface)' }}>{o.name}</option>)}
       </select>
     </div>
   );

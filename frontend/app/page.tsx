@@ -138,12 +138,12 @@ export default function HomePage() {
             <h1 style={{ fontSize: 'clamp(38px, 5vw, 68px)', lineHeight: 1.05, fontWeight: 800, marginBottom: 24 }}>
               <span className='gradient-text'>{t('landing.heroTitleMain')}</span>
               <br />
-              <span style={{ color: 'rgba(255,255,255,0.9)' }}>{t('landing.heroTitleLine2')}</span>
+              <span style={{ color: 'var(--ink-90)' }}>{t('landing.heroTitleLine2')}</span>
               <br />
-              <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 300 }}>{t('landing.heroTitleLine3')}</span>
+              <span style={{ color: 'var(--ink-35)', fontWeight: 300 }}>{t('landing.heroTitleLine3')}</span>
             </h1>
 
-            <p style={{ fontSize: 18, color: 'rgba(255,255,255,0.5)', maxWidth: 520, lineHeight: 1.7, marginBottom: 36 }}>
+            <p style={{ fontSize: 18, color: 'var(--ink-50)', maxWidth: 520, lineHeight: 1.7, marginBottom: 36 }}>
               {t('landing.heroDesc')}
             </p>
 
@@ -159,8 +159,8 @@ export default function HomePage() {
             {/* Trust badges */}
             <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
               {['Jira', 'Azure DevOps', 'GitHub', 'OpenAI'].map((b) => (
-                <span key={b} style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'inline-block' }} />
+                <span key={b} style={{ fontSize: 12, color: 'var(--ink-30)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--ink-25)', display: 'inline-block' }} />
                   {b}
                 </span>
               ))}
@@ -175,7 +175,7 @@ export default function HomePage() {
 
             <div style={{ marginBottom: 16 }}>
               <span className='chip' style={{ fontSize: 11 }}>● {t('landing.live')}</span>
-              <span style={{ marginLeft: 10, fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>{t('landing.pulse')}</span>
+              <span style={{ marginLeft: 10, fontSize: 13, color: 'var(--ink-50)' }}>{t('landing.pulse')}</span>
             </div>
 
             {/* Fake chart with bars */}
@@ -217,13 +217,13 @@ export default function HomePage() {
 
         {/* ── INTEGRATIONS MARQUEE ── */}
         <section style={{ padding: '0 0 2px' }}>
-          <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 9, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(2,6,23,0.56)', maxHeight: 64 }}>
-            <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(90deg, rgba(2,6,23,0.95), rgba(2,6,23,0) 10%, rgba(2,6,23,0) 90%, rgba(2,6,23,0.95))', zIndex: 2 }} />
+          <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 9, border: '1px solid var(--panel-border)', background: 'var(--panel)', maxHeight: 64 }}>
+            <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(90deg, var(--bg), transparent 10%, transparent 90%, var(--bg))', zIndex: 2 }} />
             <div style={{ display: 'flex', width: 'max-content', animation: 'integrationMarqueeSingle 34s linear infinite', padding: '7px 0' }}>
               {integrations.map((item) => (
-                <div key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 9, margin: '0 7px', padding: '5px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', whiteSpace: 'nowrap' }}>
+                <div key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 9, margin: '0 7px', padding: '5px 10px', borderRadius: 8, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', whiteSpace: 'nowrap' }}>
                   <img src={item.logo} alt={item.name} loading='lazy' style={{ width: 18, height: 18, borderRadius: 4, objectFit: 'contain', flexShrink: 0 }} />
-                  <span style={{ color: 'rgba(255,255,255,0.76)', fontSize: 11, fontWeight: 600, lineHeight: 1 }}>{item.name}</span>
+                  <span style={{ color: 'var(--ink-78)', fontSize: 11, fontWeight: 600, lineHeight: 1 }}>{item.name}</span>
                 </div>
               ))}
             </div>
@@ -266,10 +266,10 @@ export default function HomePage() {
         <section style={{ padding: '8px 0 56px' }}>
           <div style={{ marginBottom: 20 }}>
             <div className='section-label'>{t('landing.vectorLabel')}</div>
-            <h2 style={{ fontSize: 'clamp(24px, 2.5vw, 36px)', fontWeight: 800, color: 'rgba(255,255,255,0.92)', marginBottom: 10 }}>
+            <h2 style={{ fontSize: 'clamp(24px, 2.5vw, 36px)', fontWeight: 800, color: 'var(--ink-90)', marginBottom: 10 }}>
               {t('landing.vectorTitle')}
             </h2>
-            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, maxWidth: 820, lineHeight: 1.7 }}>
+            <p style={{ color: 'var(--ink-50)', fontSize: 14, maxWidth: 820, lineHeight: 1.7 }}>
               {t('landing.vectorSubtitle')}
             </p>
           </div>
@@ -344,7 +344,7 @@ export default function HomePage() {
         <section className='section-wrapper' style={{ padding: '60px 0' }}>
           <div style={{ marginBottom: 48 }}>
             <div className='section-label'>{t('landing.featuresLabel')}</div>
-            <h2 style={{ fontSize: 'clamp(28px, 3vw, 42px)', fontWeight: 800, color: 'rgba(255,255,255,0.9)', maxWidth: 500 }}>
+            <h2 style={{ fontSize: 'clamp(28px, 3vw, 42px)', fontWeight: 800, color: 'var(--ink-90)', maxWidth: 500 }}>
               {t('landing.featuresTitle')}
             </h2>
           </div>
@@ -369,7 +369,7 @@ export default function HomePage() {
         <section style={{ padding: '60px 0' }}>
           <div style={{ marginBottom: 48, textAlign: 'center' }}>
             <div className='section-label' style={{ justifyContent: 'center' }}>{t('landing.howLabel')}</div>
-            <h2 style={{ fontSize: 'clamp(28px, 3vw, 42px)', fontWeight: 800, color: 'rgba(255,255,255,0.9)' }}>
+            <h2 style={{ fontSize: 'clamp(28px, 3vw, 42px)', fontWeight: 800, color: 'var(--ink-90)' }}>
               {t('landing.howTitle')}
             </h2>
           </div>
@@ -393,22 +393,22 @@ export default function HomePage() {
         <section style={{ padding: '60px 0' }}>
           <div style={{ marginBottom: 32 }}>
             <div className='section-label'>{t('landing.demoPreview')}</div>
-            <h2 style={{ fontSize: 'clamp(24px, 2.5vw, 36px)', fontWeight: 800, color: 'rgba(255,255,255,0.9)' }}>
+            <h2 style={{ fontSize: 'clamp(24px, 2.5vw, 36px)', fontWeight: 800, color: 'var(--ink-90)' }}>
               {t('landing.seeInAction')}
             </h2>
           </div>
           <div className='grid-2'>
             <div className='ai-panel'>
               <div style={{ fontSize: 28, marginBottom: 12 }}>📋</div>
-              <h3 style={{ color: 'rgba(255,255,255,0.9)', marginBottom: 8, fontSize: 18 }}>{t('landing.liveTaskBoardTitle')}</h3>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, lineHeight: 1.6 }}>
+              <h3 style={{ color: 'var(--ink-90)', marginBottom: 8, fontSize: 18 }}>{t('landing.liveTaskBoardTitle')}</h3>
+              <p style={{ color: 'var(--ink-35)', fontSize: 14, lineHeight: 1.6 }}>
                 {t('landing.liveTaskBoardDesc')}
               </p>
             </div>
             <div className='ai-panel'>
               <div style={{ fontSize: 28, marginBottom: 12 }}>🎯</div>
-              <h3 style={{ color: 'rgba(255,255,255,0.9)', marginBottom: 8, fontSize: 18 }}>{t('landing.aiAssignmentTitle')}</h3>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, lineHeight: 1.6 }}>
+              <h3 style={{ color: 'var(--ink-90)', marginBottom: 8, fontSize: 18 }}>{t('landing.aiAssignmentTitle')}</h3>
+              <p style={{ color: 'var(--ink-35)', fontSize: 14, lineHeight: 1.6 }}>
                 {t('landing.aiAssignmentDesc')}
               </p>
             </div>
@@ -419,10 +419,10 @@ export default function HomePage() {
         <section style={{ padding: '60px 0' }}>
           <div style={{ marginBottom: 32 }}>
             <div className='section-label'>{t('landing.widgetsLabel')}</div>
-            <h2 style={{ fontSize: 'clamp(24px, 2.5vw, 36px)', fontWeight: 800, color: 'rgba(255,255,255,0.9)', marginBottom: 10 }}>
+            <h2 style={{ fontSize: 'clamp(24px, 2.5vw, 36px)', fontWeight: 800, color: 'var(--ink-90)', marginBottom: 10 }}>
               {t('landing.widgetsTitle')}
             </h2>
-            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, maxWidth: 680 }}>
+            <p style={{ color: 'var(--ink-45)', fontSize: 14, maxWidth: 680 }}>
               {t('landing.widgetsSubtitle')}
             </p>
           </div>
@@ -475,8 +475,8 @@ export default function HomePage() {
                 ].map((a) => (
                   <div key={a.role} className='agent-row'>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                      <span style={{ color: 'rgba(255,255,255,0.82)', fontSize: 13, fontWeight: 600 }}>{a.role}</span>
-                      <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>{a.model}</span>
+                      <span style={{ color: 'var(--ink-90)', fontSize: 13, fontWeight: 600 }}>{a.role}</span>
+                      <span style={{ color: 'var(--ink-35)', fontSize: 11 }}>{a.model}</span>
                     </div>
                     <div className='agent-bar'>
                       <div className='agent-fill' style={{ width: `${a.pct}%`, background: `linear-gradient(90deg, ${a.color}, #5eead4)` }} />
@@ -485,7 +485,7 @@ export default function HomePage() {
                 ))}
               </div>
 
-              <div style={{ marginTop: 14, color: 'rgba(255,255,255,0.35)', fontSize: 12 }}>
+              <div style={{ marginTop: 14, color: 'var(--ink-35)', fontSize: 12 }}>
                 {t('landing.agentShareLabel')}
               </div>
             </div>
@@ -496,10 +496,10 @@ export default function HomePage() {
         <section style={{ padding: '60px 0' }}>
           <div style={{ marginBottom: 32 }}>
             <div className='section-label'>{t('landing.capabilitiesLabel')}</div>
-            <h2 style={{ fontSize: 'clamp(24px, 2.5vw, 38px)', fontWeight: 800, color: 'rgba(255,255,255,0.92)', marginBottom: 10 }}>
+            <h2 style={{ fontSize: 'clamp(24px, 2.5vw, 38px)', fontWeight: 800, color: 'var(--ink-90)', marginBottom: 10 }}>
               {t('landing.capabilitiesTitle')}
             </h2>
-            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, maxWidth: 760 }}>
+            <p style={{ color: 'var(--ink-45)', fontSize: 14, maxWidth: 760 }}>
               {t('landing.capabilitiesSubtitle')}
             </p>
           </div>
@@ -591,10 +591,10 @@ export default function HomePage() {
         <section style={{ padding: '60px 0' }}>
           <div style={{ marginBottom: 28 }}>
             <div className='section-label'>{t('landing.chatopsLabel')}</div>
-            <h2 style={{ fontSize: 'clamp(24px, 2.5vw, 36px)', fontWeight: 800, color: 'rgba(255,255,255,0.92)', marginBottom: 10 }}>
+            <h2 style={{ fontSize: 'clamp(24px, 2.5vw, 36px)', fontWeight: 800, color: 'var(--ink-90)', marginBottom: 10 }}>
               {t('landing.chatopsTitle')}
             </h2>
-            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, maxWidth: 780 }}>
+            <p style={{ color: 'var(--ink-45)', fontSize: 14, maxWidth: 780 }}>
               {t('landing.chatopsSubtitle')}
             </p>
           </div>
@@ -606,14 +606,14 @@ export default function HomePage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
                   <img src='/media/slack-logo.svg' alt='Slack' style={{ width: 48, height: 48 }} loading='lazy' />
                   <div>
-                    <div style={{ color: 'rgba(255,255,255,0.94)', fontWeight: 700, fontSize: 17 }}>{t('landing.slackTitle')}</div>
-                    <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>{t('landing.chatopsSlackSub')}</div>
+                    <div style={{ color: 'var(--ink-90)', fontWeight: 700, fontSize: 17 }}>{t('landing.slackTitle')}</div>
+                    <div style={{ color: 'var(--ink-35)', fontSize: 12 }}>{t('landing.chatopsSlackSub')}</div>
                   </div>
                 </div>
-                <p style={{ color: 'rgba(255,255,255,0.48)', fontSize: 14, lineHeight: 1.65 }}>
+                <p style={{ color: 'var(--ink-45)', fontSize: 14, lineHeight: 1.65 }}>
                   {t('landing.slackDesc')}
                 </p>
-                <div style={{ marginTop: 12, height: 4, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                <div style={{ marginTop: 12, height: 4, borderRadius: 999, background: 'var(--panel-border-2)', overflow: 'hidden' }}>
                   <div style={{ width: '76%', height: '100%', background: 'linear-gradient(90deg, #e01e5a, #2eb67d, #36c5f0)', animation: 'progressPulse 2.8s ease-in-out infinite' }} />
                 </div>
               </div>
@@ -625,14 +625,14 @@ export default function HomePage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
                   <img src='/media/teams-logo.svg' alt='Microsoft Teams' style={{ width: 48, height: 48 }} loading='lazy' />
                   <div>
-                    <div style={{ color: 'rgba(255,255,255,0.94)', fontWeight: 700, fontSize: 17 }}>{t('landing.teamsTitle')}</div>
-                    <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>{t('landing.chatopsTeamsSub')}</div>
+                    <div style={{ color: 'var(--ink-90)', fontWeight: 700, fontSize: 17 }}>{t('landing.teamsTitle')}</div>
+                    <div style={{ color: 'var(--ink-35)', fontSize: 12 }}>{t('landing.chatopsTeamsSub')}</div>
                   </div>
                 </div>
-                <p style={{ color: 'rgba(255,255,255,0.48)', fontSize: 14, lineHeight: 1.65 }}>
+                <p style={{ color: 'var(--ink-45)', fontSize: 14, lineHeight: 1.65 }}>
                   {t('landing.teamsDesc')}
                 </p>
-                <div style={{ marginTop: 12, height: 4, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                <div style={{ marginTop: 12, height: 4, borderRadius: 999, background: 'var(--panel-border-2)', overflow: 'hidden' }}>
                   <div style={{ width: '84%', height: '100%', background: 'linear-gradient(90deg, #4f46e5, #22d3ee)', animation: 'progressPulse 3.2s ease-in-out infinite' }} />
                 </div>
               </div>
@@ -641,7 +641,7 @@ export default function HomePage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
             {[t('landing.chatopsPoint1'), t('landing.chatopsPoint2'), t('landing.chatopsPoint3'), t('landing.chatopsPoint4')].map((point, i) => (
-              <div key={point} style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(2,8,23,0.72)', padding: '10px 12px', color: 'rgba(255,255,255,0.63)', fontSize: 12, animation: 'fade-up 0.45s ease both', animationDelay: `${i * 0.09}s` }}>
+              <div key={point} style={{ borderRadius: 12, border: '1px solid var(--panel-border-2)', background: 'rgba(2,8,23,0.72)', padding: '10px 12px', color: 'var(--ink-65)', fontSize: 12, animation: 'fade-up 0.45s ease both', animationDelay: `${i * 0.09}s` }}>
                 {point}
               </div>
             ))}
@@ -652,10 +652,10 @@ export default function HomePage() {
         <section style={{ padding: '60px 0' }}>
           <div style={{ marginBottom: 28 }}>
             <div className='section-label'>{t('landing.newLabel')}</div>
-            <h2 style={{ fontSize: 'clamp(24px, 2.5vw, 36px)', fontWeight: 800, color: 'rgba(255,255,255,0.92)', marginBottom: 10 }}>
+            <h2 style={{ fontSize: 'clamp(24px, 2.5vw, 36px)', fontWeight: 800, color: 'var(--ink-90)', marginBottom: 10 }}>
               {t('landing.newTitle')}
             </h2>
-            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, maxWidth: 760 }}>
+            <p style={{ color: 'var(--ink-45)', fontSize: 14, maxWidth: 760 }}>
               {t('landing.newSubtitle')}
             </p>
           </div>
@@ -686,7 +686,7 @@ export default function HomePage() {
         <section style={{ padding: '60px 0' }}>
           <div style={{ marginBottom: 48, textAlign: 'center' }}>
             <div className='section-label' style={{ justifyContent: 'center' }}>{t('landing.pricingLabel')}</div>
-            <h2 style={{ fontSize: 'clamp(28px, 3vw, 42px)', fontWeight: 800, color: 'rgba(255,255,255,0.9)' }}>
+            <h2 style={{ fontSize: 'clamp(28px, 3vw, 42px)', fontWeight: 800, color: 'var(--ink-90)' }}>
               {t('landing.pricingTitle')}
             </h2>
           </div>
@@ -708,9 +708,9 @@ export default function HomePage() {
           <h2 style={{ fontSize: 'clamp(32px, 4vw, 56px)', fontWeight: 800, marginBottom: 20, lineHeight: 1.1 }}>
             <span className='gradient-text'>{t('landing.ctaTitle1')}</span>
             <br />
-            <span style={{ color: 'rgba(255,255,255,0.9)' }}>{t('landing.ctaTitle2')}</span>
+            <span style={{ color: 'var(--ink-90)' }}>{t('landing.ctaTitle2')}</span>
           </h2>
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 18, marginBottom: 40, maxWidth: 480, margin: '0 auto 40px' }}>
+          <p style={{ color: 'var(--ink-35)', fontSize: 18, marginBottom: 40, maxWidth: 480, margin: '0 auto 40px' }}>
             {t('landing.ctaDesc')}
           </p>
           <Link href='/signup' className='button button-primary' style={{ fontSize: 16, padding: '16px 40px' }}>

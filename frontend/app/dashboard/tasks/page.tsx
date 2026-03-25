@@ -233,10 +233,10 @@ export default function DashboardTasksPage() {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
         <div>
           <div className='section-label'>{t('nav.tasks')}</div>
-          <h1 style={{ fontSize: 28, fontWeight: 800, color: 'rgba(255,255,255,0.95)', marginTop: 8, marginBottom: 4 }}>
+          <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--ink-90)', marginTop: 8, marginBottom: 4 }}>
             {t('tasks.title')}
           </h1>
-          <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 14 }}>{t('tasks.total', { n: total.toLocaleString() })}</p>
+          <p style={{ color: 'var(--ink-35)', fontSize: 14 }}>{t('tasks.total', { n: total.toLocaleString() })}</p>
         </div>
         <button
           className='button button-primary'
@@ -255,7 +255,7 @@ export default function DashboardTasksPage() {
           position: 'relative', overflow: 'hidden',
         }}>
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg, transparent, rgba(13,148,136,0.6), transparent)' }} />
-          <h3 style={{ color: 'rgba(255,255,255,0.9)', marginTop: 0, marginBottom: 16 }}>{t('tasks.createTitle')}</h3>
+          <h3 style={{ color: 'var(--ink-90)', marginTop: 0, marginBottom: 16 }}>{t('tasks.createTitle')}</h3>
           <form onSubmit={onCreate} style={{ display: 'grid', gap: 12 }}>
             <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('tasks.titlePlaceholder')} required />
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('tasks.descriptionPlaceholder')} rows={3} required />
@@ -304,7 +304,7 @@ export default function DashboardTasksPage() {
       )}
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 10, background: 'rgba(255,255,255,0.02)' }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', border: '1px solid var(--panel-border-2)', borderRadius: 12, padding: 10, background: 'var(--panel)' }}>
         <input
           value={search}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setSearch(e.target.value); setPage(1); }}
@@ -318,9 +318,9 @@ export default function DashboardTasksPage() {
               onClick={() => { setFilter(s); setPage(1); }}
               style={{
                 padding: '6px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600,
-                border: filter === s ? `1px solid ${s === 'all' ? '#5eead4' : statusColor(s)}` : '1px solid rgba(255,255,255,0.1)',
+                border: filter === s ? `1px solid ${s === 'all' ? '#5eead4' : statusColor(s)}` : '1px solid var(--panel-border-2)',
                 background: filter === s ? (s === 'all' ? 'rgba(94,234,212,0.12)' : `${statusColor(s)}18`) : 'transparent',
-                color: filter === s ? (s === 'all' ? '#5eead4' : statusColor(s)) : 'rgba(255,255,255,0.4)',
+                color: filter === s ? (s === 'all' ? '#5eead4' : statusColor(s)) : 'var(--ink-42)',
                 cursor: 'pointer', textTransform: 'capitalize',
               }}
             >
@@ -335,9 +335,9 @@ export default function DashboardTasksPage() {
               onClick={() => { setSourceFilter(s); setPage(1); }}
               style={{
                 padding: '6px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700,
-                border: sourceFilter === s ? '1px solid rgba(129,140,248,0.5)' : '1px solid rgba(255,255,255,0.1)',
+                border: sourceFilter === s ? '1px solid rgba(129,140,248,0.5)' : '1px solid var(--panel-border-2)',
                 background: sourceFilter === s ? 'rgba(129,140,248,0.16)' : 'transparent',
-                color: sourceFilter === s ? '#c4b5fd' : 'rgba(255,255,255,0.45)',
+                color: sourceFilter === s ? '#c4b5fd' : 'var(--ink-45)',
                 cursor: 'pointer', textTransform: 'capitalize',
               }}
             >
@@ -357,8 +357,8 @@ export default function DashboardTasksPage() {
             </button>
           ))}
         </div>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)' }}>
-          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>{t('tasks.from')}</span>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 10, border: '1px solid var(--panel-border-2)' }}>
+          <span style={{ fontSize: 11, color: 'var(--ink-45)' }}>{t('tasks.from')}</span>
         <input
           type='date'
           value={dateFrom}
@@ -366,8 +366,8 @@ export default function DashboardTasksPage() {
             style={{ padding: '4px 6px', fontSize: 11, minWidth: 130 }}
         />
         </div>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)' }}>
-          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>{t('tasks.to')}</span>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 10, border: '1px solid var(--panel-border-2)' }}>
+          <span style={{ fontSize: 11, color: 'var(--ink-45)' }}>{t('tasks.to')}</span>
         <input
           type='date'
           value={dateTo}
@@ -404,19 +404,19 @@ export default function DashboardTasksPage() {
           <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: '#f59e0b' }}>
             {t('tasks.col.queue')}
           </div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>{t('tasks.waiting', { n: queueItems.length })}</div>
+          <div style={{ fontSize: 12, color: 'var(--ink-58)' }}>{t('tasks.waiting', { n: queueItems.length })}</div>
         </div>
         {queueItems.length === 0 ? (
-          <div style={{ padding: '12px 14px', fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>{t('tasks.noQueued')}</div>
+          <div style={{ padding: '12px 14px', fontSize: 13, color: 'var(--ink-42)' }}>{t('tasks.noQueued')}</div>
         ) : (
           queueItems.map((q) => (
-            <div key={q.task_id} style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'grid', gridTemplateColumns: '52px minmax(0,1fr) auto auto', gap: 10, alignItems: 'center' }}>
+            <div key={q.task_id} style={{ padding: '10px 14px', borderBottom: '1px solid var(--panel-border)', display: 'grid', gridTemplateColumns: '52px minmax(0,1fr) auto auto', gap: 10, alignItems: 'center' }}>
               <div style={{ fontSize: 12, color: '#f59e0b', fontWeight: 800 }}>#{q.position}</div>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.9)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: 13, color: 'var(--ink-90)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {q.title}
                 </div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
+                <div style={{ fontSize: 11, color: 'var(--ink-45)' }}>
                   {t('tasks.taskWithId', { id: q.task_id })} • {q.source}
                 </div>
               </div>
@@ -432,30 +432,30 @@ export default function DashboardTasksPage() {
       </div>
 
       {/* Task list */}
-      <div style={{ borderRadius: 20, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', overflowX: 'auto' }}>
+      <div style={{ borderRadius: 20, border: '1px solid var(--panel-border)', background: 'var(--panel)', overflowX: 'auto' }}>
         <div style={{ minWidth: 1040 }}>
-        <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'grid', gridTemplateColumns: 'minmax(0,1.45fr) 80px 98px 88px 88px 70px 92px 78px minmax(180px,0.85fr)', gap: 10 }}>
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--panel-border)', display: 'grid', gridTemplateColumns: 'minmax(0,1.45fr) 80px 98px 88px 88px 70px 92px 78px minmax(180px,0.85fr)', gap: 10 }}>
           {[t('tasks.col.task'), t('tasks.col.source'), t('tasks.col.status'), t('tasks.col.run'), t('tasks.col.queue'), t('tasks.col.retry'), t('tasks.col.tokens'), t('tasks.col.pr'), t('tasks.col.actions')].map((h) => (
-            <span key={h} style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: 1 }}>{h}</span>
+            <span key={h} style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-25)', textTransform: 'uppercase', letterSpacing: 1 }}>{h}</span>
           ))}
         </div>
 
         {tasks.length === 0 ? (
-          <div style={{ padding: '40px 24px', textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: 14 }}>
+          <div style={{ padding: '40px 24px', textAlign: 'center', color: 'var(--ink-25)', fontSize: 14 }}>
             {t('tasks.empty')}
           </div>
         ) : (
           tasks.map((task) => (
             <div key={task.id} style={{
-              padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.04)',
+              padding: '14px 20px', borderBottom: '1px solid var(--panel-border)',
               display: 'grid', gridTemplateColumns: 'minmax(0,1.45fr) 80px 98px 88px 88px 70px 92px 78px minmax(180px,0.85fr)', gap: 10, alignItems: 'center',
               transition: 'background 0.2s',
             }}>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 600, color: 'rgba(255,255,255,0.85)', fontSize: 14, marginBottom: 2 }}>{task.title}</div>
+                <div style={{ fontWeight: 600, color: 'var(--ink-78)', fontSize: 14, marginBottom: 2 }}>{task.title}</div>
                 <div style={{
                   fontSize: 12,
-                  color: 'rgba(255,255,255,0.3)',
+                  color: 'var(--ink-30)',
                   overflow: 'hidden',
                   display: '-webkit-box',
                   WebkitLineClamp: 2,
@@ -467,7 +467,7 @@ export default function DashboardTasksPage() {
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: 5,
                 padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 600,
-                background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)',
+                background: 'var(--glass)', color: 'var(--ink-50)',
                 textTransform: 'capitalize', width: 'fit-content',
               }}>{task.source}</span>
               <span style={{
@@ -481,16 +481,16 @@ export default function DashboardTasksPage() {
                 {statusLabel(task.status, t)}
               </span>
               <div>
-                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', fontWeight: 600 }}>{fmtDuration(task.run_duration_sec ?? task.duration_sec)}</span>
+                <span style={{ fontSize: 12, color: 'var(--ink-65)', fontWeight: 600 }}>{fmtDuration(task.run_duration_sec ?? task.duration_sec)}</span>
               </div>
               <div>
-                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', fontWeight: 600 }}>{fmtDuration(task.queue_wait_sec)}</span>
+                <span style={{ fontSize: 12, color: 'var(--ink-65)', fontWeight: 600 }}>{fmtDuration(task.queue_wait_sec)}</span>
               </div>
               <div>
-                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', fontWeight: 600 }}>{task.retry_count ?? 0}</span>
+                <span style={{ fontSize: 12, color: 'var(--ink-65)', fontWeight: 600 }}>{task.retry_count ?? 0}</span>
               </div>
               <div>
-                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', fontWeight: 600 }}>
+                <span style={{ fontSize: 12, color: 'var(--ink-65)', fontWeight: 600 }}>
                   {task.total_tokens !== null && task.total_tokens !== undefined ? task.total_tokens.toLocaleString() : '—'}
                 </span>
               </div>
@@ -498,7 +498,7 @@ export default function DashboardTasksPage() {
                 {task.pr_url ? (
                   <a href={task.pr_url} target='_blank' rel='noreferrer' style={{ fontSize: 12, color: '#5eead4', textDecoration: 'none' }}>{t('tasks.viewPr')} ↗</a>
                 ) : (
-                  <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)' }}>—</span>
+                  <span style={{ fontSize: 12, color: 'var(--ink-25)' }}>—</span>
                 )}
               </div>
               <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
@@ -530,7 +530,7 @@ export default function DashboardTasksPage() {
 
       {/* Pagination */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
+        <div style={{ fontSize: 12, color: 'var(--ink-45)' }}>
           {t('tasks.showing', { from: (currentPage - 1) * pageSize + (tasks.length > 0 ? 1 : 0), to: (currentPage - 1) * pageSize + tasks.length, total })}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -542,7 +542,7 @@ export default function DashboardTasksPage() {
           >
             {t('tasks.prev')}
           </button>
-          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>{t('tasks.page')} {currentPage} / {totalPages}</span>
+          <span style={{ fontSize: 12, color: 'var(--ink-58)' }}>{t('tasks.page')} {currentPage} / {totalPages}</span>
           <button
             className='button button-outline'
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}

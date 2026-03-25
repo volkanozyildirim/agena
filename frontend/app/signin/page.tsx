@@ -56,16 +56,16 @@ export default function SignInPage() {
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
           <Link href='/' style={{ display: 'inline-flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
             <span style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #0d9488, #22c55e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 900, color: '#fff' }}>T</span>
-            <span style={{ fontSize: 22, fontWeight: 800, color: 'rgba(255,255,255,0.95)' }}>Tiqr</span>
+            <span style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink-90)' }}>Tiqr</span>
           </Link>
-          <p style={{ marginTop: 16, fontSize: 14, color: 'rgba(255,255,255,0.35)' }}>AI-powered sprint management</p>
+          <p style={{ marginTop: 16, fontSize: 14, color: 'var(--ink-35)' }}>AI-powered sprint management</p>
         </div>
 
-        <div style={{ borderRadius: 24, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(20px)', padding: '36px 32px', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ borderRadius: 24, border: '1px solid var(--panel-border-2)', background: 'var(--panel-alt)', backdropFilter: 'blur(20px)', padding: '36px 32px', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg, transparent, rgba(13,148,136,0.5), transparent)' }} />
 
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'rgba(255,255,255,0.95)', marginBottom: 6 }}>{t('signin.title')}</h1>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', marginBottom: 28 }}>{t('signin.subtitle')}</p>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink-90)', marginBottom: 6 }}>{t('signin.title')}</h1>
+          <p style={{ fontSize: 13, color: 'var(--ink-30)', marginBottom: 28 }}>{t('signin.subtitle')}</p>
 
           <form onSubmit={(e) => void onSubmit(e)} style={{ display: 'grid', gap: 14 }}>
             <AuthInput label={t('signup.email')} type='email' value={email} onChange={setEmail} placeholder='you@company.com' />
@@ -80,7 +80,7 @@ export default function SignInPage() {
             </button>
           </form>
 
-          <p style={{ textAlign: 'center', marginTop: 24, fontSize: 13, color: 'rgba(255,255,255,0.3)' }}>
+          <p style={{ textAlign: 'center', marginTop: 24, fontSize: 13, color: 'var(--ink-30)' }}>
             {t('signin.noAccount')}{' '}
             <Link href={`/signup${searchParams.get('next') ? `?next=${encodeURIComponent(searchParams.get('next') || '')}` : ''}`} style={{ color: '#5eead4', fontWeight: 600, textDecoration: 'none' }}>{t('signin.startFree')}</Link>
           </p>
@@ -95,13 +95,13 @@ function AuthInput({ label, type, value, onChange, placeholder }: {
 }) {
   return (
     <div>
-      <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 6 }}>{label}</label>
+      <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', display: 'block', marginBottom: 6 }}>{label}</label>
       <input
         type={type} value={value} onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder} required
-        style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.9)', fontSize: 14, outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s' }}
+        style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: '1px solid var(--panel-border-3)', background: 'var(--glass)', color: 'var(--ink-90)', fontSize: 14, outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s' }}
         onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(13,148,136,0.5)'; }}
-        onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}
+        onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--panel-border-3)'; }}
       />
     </div>
   );

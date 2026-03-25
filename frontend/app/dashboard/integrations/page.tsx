@@ -467,10 +467,10 @@ export default function IntegrationsPage() {
       {/* Header */}
       <div>
         <div className='section-label'>{t('integrations.section')}</div>
-        <h1 style={{ fontSize: 28, fontWeight: 800, color: 'rgba(255,255,255,0.95)', marginTop: 8, marginBottom: 4 }}>
+        <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--ink-90)', marginTop: 8, marginBottom: 4 }}>
           {t('integrations.title')}
         </h1>
-        <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 14 }}>
+        <p style={{ color: 'var(--ink-35)', fontSize: 14 }}>
           {t('integrations.subtitle')}
         </p>
       </div>
@@ -523,9 +523,9 @@ export default function IntegrationsPage() {
           className='button'
           onClick={() => setActiveTab('ai')}
           style={{
-            borderColor: activeTab === 'ai' ? 'rgba(52,211,153,0.45)' : 'rgba(255,255,255,0.12)',
-            background: activeTab === 'ai' ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.03)',
-            color: activeTab === 'ai' ? '#6ee7b7' : 'rgba(255,255,255,0.58)',
+            borderColor: activeTab === 'ai' ? 'rgba(52,211,153,0.45)' : 'var(--panel-border-3)',
+            background: activeTab === 'ai' ? 'rgba(52,211,153,0.12)' : 'var(--panel-alt)',
+            color: activeTab === 'ai' ? '#6ee7b7' : 'var(--ink-58)',
           }}
         >
           {t('integrations.tabAi')}
@@ -535,9 +535,9 @@ export default function IntegrationsPage() {
           className='button'
           onClick={() => setActiveTab('task')}
           style={{
-            borderColor: activeTab === 'task' ? 'rgba(96,165,250,0.45)' : 'rgba(255,255,255,0.12)',
-            background: activeTab === 'task' ? 'rgba(96,165,250,0.12)' : 'rgba(255,255,255,0.03)',
-            color: activeTab === 'task' ? '#93c5fd' : 'rgba(255,255,255,0.58)',
+            borderColor: activeTab === 'task' ? 'rgba(96,165,250,0.45)' : 'var(--panel-border-3)',
+            background: activeTab === 'task' ? 'rgba(96,165,250,0.12)' : 'var(--panel-alt)',
+            color: activeTab === 'task' ? '#93c5fd' : 'var(--ink-58)',
           }}
         >
           {t('integrations.tabTask')}
@@ -547,9 +547,9 @@ export default function IntegrationsPage() {
           className='button'
           onClick={() => setActiveTab('notifications')}
           style={{
-            borderColor: activeTab === 'notifications' ? 'rgba(251,146,60,0.45)' : 'rgba(255,255,255,0.12)',
-            background: activeTab === 'notifications' ? 'rgba(251,146,60,0.12)' : 'rgba(255,255,255,0.03)',
-            color: activeTab === 'notifications' ? '#fdba74' : 'rgba(255,255,255,0.58)',
+            borderColor: activeTab === 'notifications' ? 'rgba(251,146,60,0.45)' : 'var(--panel-border-3)',
+            background: activeTab === 'notifications' ? 'rgba(251,146,60,0.12)' : 'var(--panel-alt)',
+            color: activeTab === 'notifications' ? '#fdba74' : 'var(--ink-58)',
           }}
         >
           {t('integrations.tabNotifications')}
@@ -711,7 +711,7 @@ export default function IntegrationsPage() {
           <button className='button button-primary' onClick={() => void savePlaybook()} style={{ width: '100%', justifyContent: 'center', marginTop: 4 }}>
             {isPlaybookSaving ? t('integrations.saving') : t('integrations.savePlaybook')}
           </button>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 6 }}>
+          <div style={{ fontSize: 12, color: 'var(--ink-45)', marginTop: 6 }}>
             {t('integrations.playbookStored')} ({playbookConfig?.updated_at ? `${t('integrations.updated')} ${new Date(playbookConfig.updated_at).toLocaleString()}` : t('integrations.notSavedYet')}).
           </div>
         </IntegrationCard>}
@@ -764,7 +764,7 @@ export default function IntegrationsPage() {
           color='#fb923c'
           connected={Boolean(slackConfig?.has_secret || teamsConfig?.has_secret)}
         >
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
+          <div style={{ fontSize: 12, color: 'var(--ink-50)', lineHeight: 1.5 }}>
             {t('integrations.notificationRouterDesc')}
           </div>
           <button
@@ -783,7 +783,7 @@ export default function IntegrationsPage() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(2,6,23,0.62)',
+            background: 'rgba(0,0,0,0.5)',
             backdropFilter: 'blur(4px)',
             zIndex: 60,
             display: 'flex',
@@ -797,24 +797,24 @@ export default function IntegrationsPage() {
             style={{
               width: 'min(680px, 100%)',
               borderRadius: 14,
-              border: '1px solid rgba(255,255,255,0.12)',
-              background: 'rgba(15,23,42,0.95)',
+              border: '1px solid var(--panel-border-3)',
+              background: 'var(--surface)',
               padding: 18,
-              color: 'rgba(255,255,255,0.92)',
+              color: 'var(--ink-90)',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
               <div style={{ fontSize: 16, fontWeight: 800 }}>{help.title}</div>
               <button
                 onClick={() => setHelp(null)}
-                style={{ marginLeft: 'auto', background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.7)', fontSize: 18, cursor: 'pointer' }}
+                style={{ marginLeft: 'auto', background: 'transparent', border: 'none', color: 'var(--ink-72)', fontSize: 18, cursor: 'pointer' }}
               >
                 ×
               </button>
             </div>
             <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
               {help.steps.map((step, idx) => (
-                <div key={step} style={{ fontSize: 13, color: 'rgba(255,255,255,0.82)' }}>
+                <div key={step} style={{ fontSize: 13, color: 'var(--ink-90)' }}>
                   {idx + 1}. {step}
                 </div>
               ))}
@@ -893,10 +893,10 @@ function IntegrationCard({
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>{icon}</div>
         <div>
-          <div style={{ fontWeight: 700, color: 'rgba(255,255,255,0.9)', fontSize: 14 }}>{title}</div>
+          <div style={{ fontWeight: 700, color: 'var(--ink-90)', fontSize: 14 }}>{title}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
-            <span className={connected ? 'connected-dot' : ''} style={{ width: 6, height: 6, borderRadius: '50%', background: connected ? '#22c55e' : 'rgba(255,255,255,0.2)' }} />
-            <span style={{ fontSize: 11, color: connected ? '#22c55e' : 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
+            <span className={connected ? 'connected-dot' : ''} style={{ width: 6, height: 6, borderRadius: '50%', background: connected ? '#22c55e' : 'var(--ink-25)' }} />
+            <span style={{ fontSize: 11, color: connected ? '#22c55e' : 'var(--ink-30)', fontWeight: 600 }}>
               {connected ? t('integrations.connected') : t('integrations.notConfigured')}
             </span>
           </div>
@@ -911,9 +911,9 @@ function IntegrationCard({
               width: 24,
               height: 24,
               borderRadius: '50%',
-              border: '1px solid rgba(255,255,255,0.2)',
-              background: 'rgba(255,255,255,0.06)',
-              color: 'rgba(255,255,255,0.88)',
+              border: '1px solid var(--ink-25)',
+              background: 'var(--panel-border)',
+              color: 'var(--ink-90)',
               fontSize: 13,
               fontWeight: 800,
               cursor: 'pointer',
@@ -923,7 +923,7 @@ function IntegrationCard({
           </button>
         )}
         {updatedAt && (
-          <span style={{ marginLeft: onHelp ? 0 : 'auto', fontSize: 11, color: 'rgba(255,255,255,0.2)' }}>
+          <span style={{ marginLeft: onHelp ? 0 : 'auto', fontSize: 11, color: 'var(--ink-25)' }}>
             {new Date(updatedAt).toLocaleDateString()}
           </span>
         )}
@@ -936,7 +936,7 @@ function IntegrationCard({
 function FieldGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+      <label style={{ fontSize: 11, color: 'var(--ink-35)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
         {label}
       </label>
       {children}

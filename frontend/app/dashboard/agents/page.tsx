@@ -279,10 +279,10 @@ export default function AgentsPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <div>
         <div className="section-label">{t('agents.section')}</div>
-        <h1 style={{ fontSize: 24, fontWeight: 800, color: 'rgba(255,255,255,0.95)', marginTop: 6, marginBottom: 2, lineHeight: 1.15 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--ink-90)', marginTop: 6, marginBottom: 2, lineHeight: 1.15 }}>
           {t('agents.title')}
         </h1>
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', margin: 0 }}>
+        <p style={{ fontSize: 13, color: 'var(--ink-35)', margin: 0 }}>
           {t('agents.subtitle')}
         </p>
         </div>
@@ -292,21 +292,21 @@ export default function AgentsPage() {
       </div>
 
       {/* Agent Cards */}
-      <div style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,0.07)', background: 'linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015))', padding: 10 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>
+      <div style={{ borderRadius: 14, border: '1px solid var(--panel-border)', background: 'linear-gradient(180deg, var(--panel-alt), var(--panel))', padding: 10 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', marginBottom: 6 }}>
           {t('agents.analyticsTitle')}
         </div>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 10 }}>
+        <div style={{ fontSize: 12, color: 'var(--ink-35)', marginBottom: 10 }}>
           {t('agents.analyticsDesc')}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(185px, 1fr))', gap: 8, alignItems: 'stretch' }}>
           {agents.map((a) => {
             const m = analytics[a.role] ?? { coveragePct: 0, activityPct: 0, latencySec: 0, successPct: 0 };
             return (
-              <div key={a.role} style={{ borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', padding: 8, minHeight: 128 }}>
+              <div key={a.role} style={{ borderRadius: 10, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', padding: 8, minHeight: 128 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                   <span>{a.icon}</span>
-                  <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.88)', fontSize: 12 }}>{a.label}</span>
+                  <span style={{ fontWeight: 700, color: 'var(--ink-90)', fontSize: 12 }}>{a.label}</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 11 }}>
                   <MetricChip label={t('agents.analyticsCoverage')} value={`${m.coveragePct}%`} />
@@ -345,22 +345,22 @@ export default function AgentsPage() {
       </div>
 
       {/* CLI hint */}
-      <div style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', padding: '12px 14px' }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.4)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>{t('agents.cliUsage')}</div>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+      <div style={{ borderRadius: 14, border: '1px solid var(--panel-border)', background: 'var(--panel)', padding: '12px 14px' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-35)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>{t('agents.cliUsage')}</div>
+        <div style={{ fontSize: 12, color: 'var(--ink-50)', lineHeight: 1.6 }}>
           {t('agents.cliDesc')}
         </div>
-        <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.08)', fontFamily: 'monospace', fontSize: 11, color: '#5eead4', overflowX: 'auto' }}>
+        <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(0,0,0,0.4)', border: '1px solid var(--panel-border-2)', fontFamily: 'monospace', fontSize: 11, color: '#5eead4', overflowX: 'auto' }}>
           tiqr agent run --role lead_developer --task &lt;task-id&gt; --model {agents.find(a => a.role === 'lead_developer')?.model || 'gpt-4o'}
         </div>
       </div>
 
       {showNewAgent && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(2,6,23,0.75)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ width: 'min(640px, 100%)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(7,13,24,0.98)', boxShadow: '0 24px 80px rgba(0,0,0,0.5)', padding: 16, display: 'grid', gap: 12 }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ width: 'min(640px, 100%)', borderRadius: 16, border: '1px solid var(--panel-border-3)', background: 'var(--surface)', boxShadow: '0 24px 80px rgba(0,0,0,0.5)', padding: 16, display: 'grid', gap: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: 14, fontWeight: 800, color: 'rgba(255,255,255,0.92)' }}>{t('agents.createTitle')}</div>
-              <button onClick={() => setShowNewAgent(false)} style={{ border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.45)', fontSize: 18, cursor: 'pointer' }}>×</button>
+              <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--ink-90)' }}>{t('agents.createTitle')}</div>
+              <button onClick={() => setShowNewAgent(false)} style={{ border: 'none', background: 'transparent', color: 'var(--ink-45)', fontSize: 18, cursor: 'pointer' }}>×</button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <input value={draft.label} onChange={(e) => setDraft((d) => ({ ...d, label: e.target.value }))} placeholder={t('agents.newLabelPlaceholder')} style={inputStyle} />
@@ -401,7 +401,7 @@ function AgentCard({ agent, isEditing, onEdit, onUpdate }: {
   const models = agent.provider === 'openai' ? OPENAI_MODELS : agent.provider === 'gemini' ? GEMINI_MODELS : [];
 
   return (
-    <div style={{ width: '100%', minWidth: 0, minHeight: isEditing ? 'auto' : 118, borderRadius: 14, border: '1px solid ' + (isEditing ? agent.color + '40' : 'rgba(255,255,255,0.07)'), background: isEditing ? agent.color + '08' : 'rgba(255,255,255,0.02)', overflow: 'hidden', transition: 'all 0.2s' }}>
+    <div style={{ width: '100%', minWidth: 0, minHeight: isEditing ? 'auto' : 118, borderRadius: 14, border: '1px solid ' + (isEditing ? agent.color + '40' : 'var(--panel-border)'), background: isEditing ? agent.color + '08' : 'var(--panel)', overflow: 'hidden', transition: 'all 0.2s' }}>
       {/* Card header */}
       <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', minWidth: 0 }} onClick={onEdit}>
         <div style={{ width: 36, height: 36, borderRadius: 10, background: agent.color + '18', border: '1px solid ' + agent.color + '30', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
@@ -409,37 +409,37 @@ function AgentCard({ agent, isEditing, onEdit, onUpdate }: {
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, minWidth: 0, flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 700, fontSize: 14, color: 'rgba(255,255,255,0.9)' }}>{agent.label}</span>
+            <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink-90)' }}>{agent.label}</span>
             {agent.provider && agent.model ? (
               <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 999, background: agent.color + '18', border: '1px solid ' + agent.color + '35', color: agent.color, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {agent.provider === 'openai' ? '⚡' : agent.provider === 'gemini' ? '✦' : agent.provider === 'codex_cli' ? '⌘' : '✎'} {agent.model || agent.custom_model}
               </span>
             ) : (
-              <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 999, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.3)' }}>
+              <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 999, background: 'var(--panel-alt)', border: '1px solid var(--panel-border-3)', color: 'var(--ink-30)' }}>
                 {t('agents.noModel')}
               </span>
             )}
-            <span style={{ marginLeft: 'auto', fontSize: 12, color: 'rgba(255,255,255,0.2)', transform: isEditing ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block', flexShrink: 0 }}>⌄</span>
+            <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ink-25)', transform: isEditing ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block', flexShrink: 0 }}>⌄</span>
           </div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: 30 }}>{agent.description}</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-35)', lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: 30 }}>{agent.description}</div>
         </div>
         {/* Toggle */}
         <div onClick={(e) => { e.stopPropagation(); onUpdate({ enabled: !agent.enabled }); }}
-          style={{ width: 34, height: 18, borderRadius: 999, background: agent.enabled ? agent.color : 'rgba(255,255,255,0.1)', position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 }}>
+          style={{ width: 34, height: 18, borderRadius: 999, background: agent.enabled ? agent.color : 'var(--panel-border-3)', position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 }}>
           <div style={{ position: 'absolute', top: 2, left: agent.enabled ? 18 : 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
         </div>
       </div>
 
       {/* Expanded editor */}
       {isEditing && (
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: '10px 12px 12px', display: 'grid', gap: 10 }}>
+        <div style={{ borderTop: '1px solid var(--panel-border)', padding: '10px 12px 12px', display: 'grid', gap: 10 }}>
           {/* Provider seçimi */}
           <div>
             <label style={labelStyle}>{t('agents.provider')}</label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
               {(['openai', 'gemini', 'custom', 'codex_cli'] as const).map((p) => (
                 <button key={p} onClick={() => onUpdate({ provider: p, model: '', custom_model: '' })}
-                  style={{ padding: '8px 9px', borderRadius: 10, border: '1px solid ' + (agent.provider === p ? agent.color + '60' : 'rgba(255,255,255,0.08)'), background: agent.provider === p ? agent.color + '12' : 'rgba(255,255,255,0.02)', color: agent.provider === p ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.4)', fontWeight: agent.provider === p ? 700 : 500, fontSize: 12, cursor: 'pointer', transition: 'all 0.15s' }}>
+                  style={{ padding: '8px 9px', borderRadius: 10, border: '1px solid ' + (agent.provider === p ? agent.color + '60' : 'var(--panel-border-2)'), background: agent.provider === p ? agent.color + '12' : 'var(--panel)', color: agent.provider === p ? 'var(--ink-90)' : 'var(--ink-35)', fontWeight: agent.provider === p ? 700 : 500, fontSize: 12, cursor: 'pointer', transition: 'all 0.15s' }}>
                   {p === 'openai' ? '⚡ OpenAI' : p === 'gemini' ? '✦ Gemini' : p === 'codex_cli' ? '⌘ Codex CLI' : '✎ Custom'}
                 </button>
               ))}
@@ -453,7 +453,7 @@ function AgentCard({ agent, isEditing, onEdit, onUpdate }: {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
                 {models.map((m) => (
                   <button key={m.id} onClick={() => onUpdate({ model: m.id })}
-                    style={{ padding: '8px 10px', borderRadius: 10, border: '1px solid ' + (agent.model === m.id ? agent.color + '60' : 'rgba(255,255,255,0.08)'), background: agent.model === m.id ? agent.color + '12' : 'rgba(255,255,255,0.02)', color: agent.model === m.id ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.4)', fontWeight: agent.model === m.id ? 700 : 500, fontSize: 12, cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s' }}>
+                    style={{ padding: '8px 10px', borderRadius: 10, border: '1px solid ' + (agent.model === m.id ? agent.color + '60' : 'var(--panel-border-2)'), background: agent.model === m.id ? agent.color + '12' : 'var(--panel)', color: agent.model === m.id ? 'var(--ink-90)' : 'var(--ink-35)', fontWeight: agent.model === m.id ? 700 : 500, fontSize: 12, cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s' }}>
                     {agent.model === m.id && <span style={{ color: agent.color, marginRight: 6 }}>✓</span>}
                     {m.name}
                   </button>
@@ -493,21 +493,21 @@ function AgentCard({ agent, isEditing, onEdit, onUpdate }: {
 
 const labelStyle: React.CSSProperties = {
   fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase',
-  color: 'rgba(255,255,255,0.35)', display: 'block', marginBottom: 6,
+  color: 'var(--ink-35)', display: 'block', marginBottom: 6,
 };
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '9px 11px', borderRadius: 10,
-  border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)',
-  color: 'rgba(255,255,255,0.9)', fontSize: 12, outline: 'none', boxSizing: 'border-box',
+  border: '1px solid var(--panel-border-3)', background: 'var(--glass)',
+  color: 'var(--ink-90)', fontSize: 12, outline: 'none', boxSizing: 'border-box',
   fontFamily: 'inherit',
 };
 
 function MetricChip({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ borderRadius: 8, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.03)', padding: '5px 7px' }}>
-      <div style={{ color: 'rgba(255,255,255,0.35)', marginBottom: 2, fontSize: 10 }}>{label}</div>
-      <div style={{ color: 'rgba(255,255,255,0.9)', fontWeight: 700, fontSize: 11 }}>{value}</div>
+    <div style={{ borderRadius: 8, border: '1px solid var(--panel-border)', background: 'var(--panel-alt)', padding: '5px 7px' }}>
+      <div style={{ color: 'var(--ink-35)', marginBottom: 2, fontSize: 10 }}>{label}</div>
+      <div style={{ color: 'var(--ink-90)', fontWeight: 700, fontSize: 11 }}>{value}</div>
     </div>
   );
 }

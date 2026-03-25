@@ -466,6 +466,13 @@ async def scan_repo_profile(
     total_tokens = 0
     cost_usd = 0.0
     used_model: str | None = None
+    # Skip LLM scan if agents.md already exists (saves tokens)
+    agents_md_exists = (root / 'agents.md').is_file() and (root / 'agents.md').stat().st_size > 500
+    if agents_md_exists:
+        profile['agents_md_path'] = str(root / 'agents.md')
+        profile['agents_md_size'] = (root / 'agents.md').stat().st_size
+        llm = None  # skip LLM call
+
     if llm is not None:
         system_prompt = (
             'You are a principal software architect and technical writer.\n'
@@ -523,6 +530,21 @@ async def scan_repo_profile(
     profile['scanned_by_provider'] = llm_provider
     profile['scanned_model'] = used_model
 
+    # Auto-generate agents.md from deep repo scan
+    try:
+        from services.repo_scanner import scan_repo, generate_agents_md
+        scan_data = scan_repo(payload.local_path)
+        agents_md_content = generate_agents_md(scan_data, payload.mapping_name)
+        # Save agents.md to repo root
+        agents_md_path = Path(payload.local_path).expanduser().resolve() / 'agents.md'
+        agents_md_path.write_text(agents_md_content, encoding='utf-8')
+        profile['agents_md_path'] = str(agents_md_path)
+        profile['agents_md_size'] = len(agents_md_content)
+        profile['agents_md_signatures'] = len(scan_data.get('signatures', []))
+        profile['agents_md_files'] = len(scan_data.get('source_files', []))
+    except Exception as agents_exc:
+        profile['agents_md_error'] = str(agents_exc)[:200]
+
     pref = await _get_or_create_pref(db, tenant.user_id)
     settings = _parse_json_obj(pref.profile_settings_json)
     repo_profiles = settings.get('repo_profiles')
@@ -565,5 +587,75 @@ async def scan_repo_profile(
         details_json={'mapping_id': payload.mapping_id, 'mapping_name': payload.mapping_name},
     )
     return RepoProfileScanResponse(mapping_id=payload.mapping_id, profile=profile)
+
+
+class GenerateAgentsMdRequest(BaseModel):
+    mapping_id: str
+    local_path: str
+    mapping_name: str
+
+
+class AgentsMdResponse(BaseModel):
+    mapping_id: str
+    path: str
+    size: int
+    signatures: int
+    files: int
+
+
+@router.post('/repo-profile/agents-md', response_model=AgentsMdResponse)
+async def generate_agents_md_endpoint(
+    payload: GenerateAgentsMdRequest,
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> AgentsMdResponse:
+    """Generate agents.md for a repo mapping."""
+    from services.repo_scanner import scan_repo, generate_agents_md
+    scan_data = scan_repo(payload.local_path)
+    content = generate_agents_md(scan_data, payload.mapping_name)
+    agents_path = Path(payload.local_path).expanduser().resolve() / 'agents.md'
+    agents_path.write_text(content, encoding='utf-8')
+
+    # Update profile
+    pref = await _get_or_create_pref(db, tenant.user_id)
+    settings = _parse_json_obj(pref.profile_settings_json)
+    repo_profiles = settings.get('repo_profiles', {})
+    if isinstance(repo_profiles, dict) and payload.mapping_id in repo_profiles:
+        repo_profiles[payload.mapping_id]['agents_md_path'] = str(agents_path)
+        repo_profiles[payload.mapping_id]['agents_md_size'] = len(content)
+        repo_profiles[payload.mapping_id]['agents_md_signatures'] = len(scan_data.get('signatures', []))
+        repo_profiles[payload.mapping_id]['agents_md_files'] = len(scan_data.get('source_files', []))
+        settings['repo_profiles'] = repo_profiles
+        pref.profile_settings_json = json.dumps(settings, ensure_ascii=False)
+        await db.commit()
+
+    return AgentsMdResponse(
+        mapping_id=payload.mapping_id,
+        path=str(agents_path),
+        size=len(content),
+        signatures=len(scan_data.get('signatures', [])),
+        files=len(scan_data.get('source_files', [])),
+    )
+
+
+@router.get('/repo-profile/agents-md/{mapping_id}')
+async def get_agents_md(
+    mapping_id: str,
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Get agents.md content for a repo mapping."""
+    pref = await _get_or_create_pref(db, tenant.user_id)
+    settings = _parse_json_obj(pref.profile_settings_json)
+    repo_profiles = settings.get('repo_profiles', {})
+    profile = repo_profiles.get(mapping_id, {}) if isinstance(repo_profiles, dict) else {}
+    md_path = profile.get('agents_md_path', '')
+    if not md_path:
+        raise HTTPException(status_code=404, detail='agents.md not found for this mapping')
+    p = Path(md_path)
+    if not p.is_file():
+        raise HTTPException(status_code=404, detail='agents.md file not found on disk')
+    content = p.read_text(errors='replace')
+    return {'mapping_id': mapping_id, 'path': md_path, 'content': content, 'size': len(content)}
 
 

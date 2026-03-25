@@ -64,7 +64,6 @@ class OrchestrationService:
         self.local_repo_service = LocalRepoService()
         self.cost_tracker = CostTracker()
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=8), reraise=True)
     async def run_task_record(self, organization_id: int, task_id: int, create_pr: bool = True, mode: str = 'flow') -> AgentRunResult:
         task = await self.db_session.get(TaskRecord, task_id)
         if task is None or task.organization_id != organization_id:
@@ -192,6 +191,7 @@ class OrchestrationService:
                 # Run flow step-by-step with logging
                 flow_state: dict[str, Any] = {
                     'task': payload,
+                    'mode': mode,
                     'usage': {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0},
                     'model_usage': [],
                 }
@@ -294,7 +294,7 @@ class OrchestrationService:
                     f'Step 3/3: Developer generating code...\n'
                     f'  spec_goal: {str(spec.get("goal",spec.get("summary","")))[:150]}\n'
                     f'  target_files_context: {len(dev_ctx)} chars | has_source: {dev_has_source} | files: {dev_source_files[:10]}\n'
-                    f'  system_prompt: DEV_SYSTEM_PROMPT (implementation agent)\n'
+                    f'  system_prompt: {"DEV_DIRECT (ai mode)" if mode == "ai" else "DEV_SYSTEM (flow mode)"}\n'
                     f'  model: {routing.preferred_agent_model or "default"} | max_output_tokens: 32000'
                 )
                 u_before = _get_usage(flow_state)
@@ -1094,48 +1094,47 @@ class OrchestrationService:
             if not root.exists() or not root.is_dir():
                 return f'Local repo path is configured but not reachable: {repo_path}'
 
-            top_dirs: list[str] = []
-            top_files: list[str] = []
-            for entry in sorted(root.iterdir(), key=lambda e: e.name.lower()):
-                if entry.name.startswith('.'):
-                    continue
-                if entry.is_dir():
-                    top_dirs.append(entry.name)
-                elif entry.is_file():
-                    top_files.append(entry.name)
-                if len(top_dirs) + len(top_files) >= 28:
-                    break
+            # Check for agents.md first — if exists, use it as primary context
+            agents_md = root / 'agents.md'
+            if agents_md.is_file():
+                try:
+                    agents_content = agents_md.read_text(errors='replace')
+                    if len(agents_content) > 500:  # valid agents.md
+                        lines = [
+                            f'Repo Root: {root}',
+                            '',
+                            '=== AGENTS.MD (Repository Guide) ===',
+                            agents_content,
+                            '=== END AGENTS.MD ===',
+                            '',
+                            '=== RELEVANT SOURCE FILES ===',
+                        ]
+                        # Still include source files but agents.md gives structure
+                        relevant_files = self._find_relevant_source_files(root, task_title, task_description)
+                        total_chars = len(agents_content)
+                        for rel_path, content in relevant_files:
+                            if total_chars + len(content) > 2000000:
+                                continue
+                            lines.append(f'\n--- {rel_path} ---')
+                            lines.append(content)
+                            total_chars += len(content)
+                        lines.append('=== END SOURCE FILES ===')
+                        lines.append('')
+                        lines.append('You have agents.md AND the full source files. Use agents.md to understand the architecture, then modify source files.')
+                        lines.append('Return **File: path** blocks with code.')
+                        return '\n'.join(lines)
+                except Exception:
+                    pass
 
-            tech_markers: list[str] = []
-            if (root / 'package.json').exists():
-                tech_markers.append('Node.js/TypeScript (package.json)')
-            if (root / 'requirements.txt').exists() or (root / 'pyproject.toml').exists():
-                tech_markers.append('Python (requirements/pyproject)')
-            if (root / 'go.mod').exists():
-                tech_markers.append('Go (go.mod)')
-            if (root / 'pom.xml').exists() or (root / 'build.gradle').exists():
-                tech_markers.append('JVM (Maven/Gradle)')
-            if (root / 'Dockerfile').exists():
-                tech_markers.append('Dockerfile present')
-
-            lines = [f'Repo Root: {root}']
-            if tech_markers:
-                lines.append('Detected Stack: ' + ', '.join(tech_markers))
-            if top_dirs:
-                lines.append('Top-level Directories: ' + ', '.join(top_dirs[:16]))
-            if top_files:
-                lines.append('Top-level Files: ' + ', '.join(top_files[:12]))
-
-            # Scan relevant source files based on task keywords
+            # No agents.md — full repo scan
             relevant_files = self._find_relevant_source_files(root, task_title, task_description)
+            lines = [f'Repo Root: {root}']
             if relevant_files:
                 lines.append('')
                 lines.append('=== RELEVANT SOURCE FILES ===')
                 total_chars = 0
-                max_chars = 500000  # large budget — modern models handle 200K+ tokens
                 for rel_path, content in relevant_files:
-                    if total_chars + len(content) > max_chars:
-                        lines.append(f'\n--- {rel_path} (skipped, context budget reached) ---')
+                    if total_chars + len(content) > 2000000:
                         continue
                     lines.append(f'\n--- {rel_path} ---')
                     lines.append(content)
@@ -1143,14 +1142,7 @@ class OrchestrationService:
                 lines.append('=== END SOURCE FILES ===')
 
             lines.append('')
-            lines.append('Instruction: prioritize editing existing project files shown above; avoid placeholder markdown-only outputs.')
-            lines.append('Hard Rule: keep repository language/framework; do not rewrite feature in a different stack.')
-            lines.append('Hard Rule: return repository-relative file paths only; never absolute paths.')
-            lines.append('Hard Rule: you MUST return actual code changes using **File: path** format with fenced code blocks.')
-            lines.append('Hard Rule: ONLY output files with extensions matching the detected stack. Do NOT create .md, .txt, .java or other unrelated files.')
-            if tech_markers:
-                stack_str = ', '.join(tech_markers)
-                lines.append(f'Hard Rule: this repository uses {stack_str}. All output files MUST match this stack.')
+            lines.append('Return **File: path** blocks with code. Do NOT create .md or .txt files.')
             return '\n'.join(lines)
         except Exception as exc:
             return f'Repo context unavailable for {repo_path}: {str(exc)[:180]}'
@@ -1161,105 +1153,55 @@ class OrchestrationService:
         task_title: str,
         task_description: str,
     ) -> list[tuple[str, str]]:
-        """Search repo for source files relevant to the task using keyword grep."""
-        import subprocess
+        """Collect ALL source files from the repository. Language agnostic."""
+        source_exts = {
+            '.go', '.py', '.ts', '.tsx', '.js', '.jsx', '.java', '.rs', '.rb', '.cs',
+            '.php', '.swift', '.kt', '.scala', '.c', '.cpp', '.h', '.hpp', '.vue',
+            '.svelte', '.dart', '.ex', '.exs', '.lua', '.sql', '.graphql', '.proto',
+        }
+        ignore_dirs = {
+            'vendor', 'node_modules', '.git', 'dist', 'build', '__pycache__', '.next',
+            '.idea', '.vscode', 'target', 'bin', 'obj', '.gradle', 'Pods', 'coverage',
+        }
+        ignore_files = {'go.sum', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml'}
 
-        # Extract meaningful keywords from title and first line of description
-        raw_text = f'{task_title} {task_description}'.lower()
-        # Remove HTML tags and common metadata lines
-        clean = re.sub(r'<[^>]+>', ' ', raw_text)
-        clean = re.sub(r'(external source|project|azure repo|local repo|preferred agent):[^\n]*', '', clean)
-        # Extract words that look like identifiers (snake_case, camelCase, etc.)
-        words = set(re.findall(r'[a-z_][a-z0-9_]{2,}', clean))
-        # Remove very common words
-        stop = {'the', 'and', 'for', 'with', 'from', 'that', 'this', 'not', 'are', 'was', 'has', 'have',
-                'been', 'will', 'can', 'should', 'would', 'could', 'into', 'also', 'its'}
-        keywords = [w for w in words if w not in stop and len(w) > 2][:12]
-
-        if not keywords:
+        all_files: list[tuple[Path, int]] = []
+        try:
+            for f in sorted(root.rglob('*')):
+                if not f.is_file():
+                    continue
+                if f.suffix not in source_exts:
+                    continue
+                if f.name in ignore_files:
+                    continue
+                rel_parts = f.relative_to(root).parts
+                if any(part in ignore_dirs for part in rel_parts):
+                    continue
+                try:
+                    size = f.stat().st_size
+                    if size > 300000 or size == 0:
+                        continue
+                    all_files.append((f, size))
+                except Exception:
+                    continue
+        except Exception:
             return []
 
-        # Determine source file extensions
-        source_exts = {'*.go', '*.py', '*.ts', '*.tsx', '*.js', '*.jsx', '*.java', '*.rs', '*.rb', '*.cs'}
-        ignore_dirs = {'vendor', 'node_modules', '.git', 'dist', 'build', '__pycache__', '.next'}
-
-        # Use grep to find files containing keywords
-        matched_files: dict[str, int] = {}  # path -> hit count
-        for kw in keywords:
-            try:
-                result = subprocess.run(
-                    ['grep', '-rl', '--include=*.go', '--include=*.py', '--include=*.ts',
-                     '--include=*.js', '--include=*.java', '--include=*.rs',
-                     '-i', kw, str(root)],
-                    capture_output=True, text=True, timeout=5,
-                )
-                for line in result.stdout.strip().splitlines():
-                    rel = line.replace(str(root) + '/', '', 1)
-                    # Skip ignored dirs
-                    if any(f'/{d}/' in f'/{rel}' or rel.startswith(f'{d}/') for d in ignore_dirs):
-                        continue
-                    matched_files[rel] = matched_files.get(rel, 0) + 1
-            except Exception:
-                continue
-
-        if not matched_files:
-            # Fallback: just list key source files in common dirs
-            return self._collect_tree_files(root, max_files=8, max_chars=32000)
-
-        # Sort by relevance (hit count), take top files
-        sorted_files = sorted(matched_files.items(), key=lambda x: -x[1])
+        # Read all files — no sorting, no filtering, just read everything that fits
         result: list[tuple[str, str]] = []
-        # Skip test files — they add noise without helping implementation
-        sorted_files = [(p, h) for p, h in sorted_files if '_test.' not in p and '/test' not in p]
-        for rel_path, _hits in sorted_files[:8]:
-            full = root / rel_path
-            if not full.is_file():
-                continue
-            try:
-                content = full.read_text(errors='replace')
-                if len(content) > 200000:
-                    content = content[:200000] + '\n... (truncated)'
-                result.append((rel_path, content))
-            except Exception:
-                continue
-        return result
-
-    def _collect_tree_files(self, root: Path, max_files: int = 8, max_chars: int = 32000) -> list[tuple[str, str]]:
-        """Fallback: collect key source files from common project directories."""
-        source_dirs = ['src', 'pkg', 'cmd', 'internal', 'lib', 'app', 'api', 'services', 'handlers', 'controllers']
-        source_exts = {'.go', '.py', '.ts', '.tsx', '.js', '.jsx', '.java', '.rs', '.rb', '.cs'}
-        ignore_dirs = {'vendor', 'node_modules', '.git', 'dist', 'build', '__pycache__', '.next', 'test', 'tests'}
-
-        candidates: list[Path] = []
-        for d in source_dirs:
-            dir_path = root / d
-            if not dir_path.is_dir():
-                continue
-            for f in sorted(dir_path.rglob('*')):
-                if not f.is_file() or f.suffix not in source_exts:
-                    continue
-                if any(part in ignore_dirs for part in f.parts):
-                    continue
-                candidates.append(f)
-                if len(candidates) >= max_files * 3:
-                    break
-
-        # Take smaller files first (more likely to be relevant models/types)
-        candidates.sort(key=lambda f: f.stat().st_size)
-        result: list[tuple[str, str]] = []
-        total = 0
-        for f in candidates[:max_files]:
+        total_chars = 0
+        max_total = 2000000  # ~500K tokens — use the full context window
+        for f, _size in all_files:
             try:
                 content = f.read_text(errors='replace')
-                if total + len(content) > max_chars:
-                    break
+                if total_chars + len(content) > max_total:
+                    continue
                 rel = str(f.relative_to(root))
-                if len(content) > 200000:
-                    content = content[:200000] + '\n... (truncated)'
                 result.append((rel, content))
-                total += len(content)
+                total_chars += len(content)
             except Exception:
                 continue
+
         return result
 
     def _validate_cost_guardrails(

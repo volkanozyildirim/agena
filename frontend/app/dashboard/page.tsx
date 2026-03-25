@@ -113,10 +113,10 @@ export default function DashboardOverview() {
       {/* Header */}
       <div>
         <div className='section-label'>{t('dashboard.section')}</div>
-        <h1 style={{ fontSize: 32, fontWeight: 800, color: 'rgba(255,255,255,0.95)', marginTop: 8, marginBottom: 4 }}>
+        <h1 style={{ fontSize: 32, fontWeight: 800, color: 'var(--ink-90)', marginTop: 8, marginBottom: 4 }}>
           {t('dashboard.title')}
         </h1>
-        <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 14 }}>
+        <p style={{ color: 'var(--ink-35)', fontSize: 14 }}>
           {t('dashboard.plan')}: <span style={{ color: '#5eead4', fontWeight: 600 }}>{billing?.plan_name ?? '—'}</span>
           &nbsp;·&nbsp; {t('dashboard.tasksUsed')}: <span style={{ color: '#5eead4' }}>{billing?.tasks_used ?? 0}</span>
         </p>
@@ -127,8 +127,8 @@ export default function DashboardOverview() {
         {kpis.map((k) => (
           <div key={k.label} style={{
             borderRadius: 18,
-            border: '1px solid rgba(255,255,255,0.06)',
-            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid var(--panel-border)',
+            background: 'var(--panel-alt)',
             padding: '20px 24px',
             display: 'flex',
             alignItems: 'center',
@@ -144,7 +144,7 @@ export default function DashboardOverview() {
             }}>{k.icon}</div>
             <div>
               <div style={{ fontSize: 28, fontWeight: 800, color: k.color, lineHeight: 1 }}>{k.value}</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>{k.label}</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-35)', marginTop: 4 }}>{k.label}</div>
             </div>
           </div>
         ))}
@@ -154,11 +154,11 @@ export default function DashboardOverview() {
       <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.6fr', gap: 20 }}>
         {/* Operations Radar */}
         <div style={{
-          borderRadius: 20, border: '1px solid rgba(255,255,255,0.06)',
-          background: 'rgba(255,255,255,0.03)', overflow: 'hidden', padding: 20,
+          borderRadius: 20, border: '1px solid var(--panel-border)',
+          background: 'var(--panel-alt)', overflow: 'hidden', padding: 20,
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>{t('dashboard.operationsRadar')}</span>
+            <span style={{ fontWeight: 700, color: 'var(--ink-90)' }}>{t('dashboard.operationsRadar')}</span>
             <Link href='/dashboard/tasks' style={{ fontSize: 12, color: '#5eead4' }}>{t('dashboard.openTasks')} →</Link>
           </div>
 
@@ -169,25 +169,25 @@ export default function DashboardOverview() {
               { label: t('dashboard.slaBreaches'), value: String(slaBreached), tone: slaBreached > 0 ? '#f87171' : '#5eead4' },
               { label: t('dashboard.repoContention'), value: String(blocked), tone: blocked > 0 ? '#f59e0b' : '#5eead4' },
             ].map((item) => (
-              <div key={item.label} style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '10px 12px', background: 'rgba(255,255,255,0.015)' }}>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: 0.7 }}>{item.label}</div>
+              <div key={item.label} style={{ border: '1px solid var(--panel-border-2)', borderRadius: 12, padding: '10px 12px', background: 'var(--panel)' }}>
+                <div style={{ fontSize: 11, color: 'var(--ink-35)', textTransform: 'uppercase', letterSpacing: 0.7 }}>{item.label}</div>
                 <div style={{ fontSize: 20, fontWeight: 800, color: item.tone, marginTop: 4 }}>{item.value}</div>
               </div>
             ))}
           </div>
 
-          <div style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, background: 'rgba(255,255,255,0.015)', overflow: 'hidden' }}>
-            <div style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: 700 }}>
+          <div style={{ border: '1px solid var(--panel-border-2)', borderRadius: 12, background: 'var(--panel)', overflow: 'hidden' }}>
+            <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--panel-border)', fontSize: 12, color: 'var(--ink-78)', fontWeight: 700 }}>
               {t('dashboard.queueForecast')}
             </div>
             {activeWithEta.length === 0 ? (
-              <div style={{ padding: '12px', color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>{t('dashboard.noQueuedEta')}</div>
+              <div style={{ padding: '12px', color: 'var(--ink-35)', fontSize: 13 }}>{t('dashboard.noQueuedEta')}</div>
             ) : (
               activeWithEta.map((task) => (
-                <Link key={task.id} href={`/tasks/${task.id}`} style={{ textDecoration: 'none', color: 'inherit', display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, padding: '10px 12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                <Link key={task.id} href={`/tasks/${task.id}`} style={{ textDecoration: 'none', color: 'inherit', display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, padding: '10px 12px', borderTop: '1px solid var(--panel-alt)' }}>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.82)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)', marginTop: 2 }}>#{task.queue_position ?? '—'} {t('dashboard.inQueue')}</div>
+                    <div style={{ fontSize: 13, color: 'var(--ink-90)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-42)', marginTop: 2 }}>#{task.queue_position ?? '—'} {t('dashboard.inQueue')}</div>
                   </div>
                   <div style={{ fontSize: 12, color: '#5eead4', fontWeight: 700 }}>~{Math.max(0, Math.round((task.estimated_start_sec ?? 0) / 60))}{t('dashboard.unit.min')}</div>
                 </Link>
@@ -214,9 +214,9 @@ export default function DashboardOverview() {
               <div key={s.stage} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: i < 3 ? 0 : 0 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                   <div style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, boxShadow: `0 0 8px ${s.color}` }} />
-                  {i < 3 && <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.08)' }} />}
+                  {i < 3 && <div style={{ width: 1, height: 20, background: 'var(--panel-border-2)' }} />}
                 </div>
-                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', fontFamily: 'monospace', paddingBottom: i < 3 ? 20 : 0 }}>{s.stage}</span>
+                <span style={{ fontSize: 13, color: 'var(--ink-50)', fontFamily: 'monospace', paddingBottom: i < 3 ? 20 : 0 }}>{s.stage}</span>
               </div>
             ))}
           </div>
@@ -245,15 +245,15 @@ export default function DashboardOverview() {
               </span>
             </div>
             <div style={{ display: 'grid', gap: 6 }}>
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.78)' }}>
+              <div style={{ fontSize: 13, color: 'var(--ink-78)' }}>
                 {t('dashboard.memory.backend')}: <span style={{ color: '#7dd3fc', fontWeight: 700 }}>{memory?.backend ?? 'qdrant'}</span>
               </div>
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.78)' }}>
-                {t('dashboard.memory.collection')}: <span style={{ color: 'rgba(255,255,255,0.92)' }}>{memory?.collection ?? '—'}</span>
+              <div style={{ fontSize: 13, color: 'var(--ink-78)' }}>
+                {t('dashboard.memory.collection')}: <span style={{ color: 'var(--ink-90)' }}>{memory?.collection ?? '—'}</span>
               </div>
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.78)' }}>
+              <div style={{ fontSize: 13, color: 'var(--ink-78)' }}>
                 {t('dashboard.memory.points')}: <span style={{ color: '#5eead4', fontWeight: 700 }}>{memory?.points_count ?? 0}</span>
-                &nbsp;·&nbsp; {t('dashboard.memory.mode')}: <span style={{ color: 'rgba(255,255,255,0.92)' }}>{memory?.embedding_mode ?? 'deterministic'}</span>
+                &nbsp;·&nbsp; {t('dashboard.memory.mode')}: <span style={{ color: 'var(--ink-90)' }}>{memory?.embedding_mode ?? 'deterministic'}</span>
               </div>
             </div>
             <button
@@ -288,13 +288,13 @@ export default function DashboardOverview() {
           { href: '/dashboard/integrations', label: t('dashboard.quick.integrations'), desc: t('dashboard.quick.integrationsDesc'), icon: '⬡' },
         ].map((l) => (
           <Link key={l.href} href={l.href} style={{
-            borderRadius: 18, border: '1px solid rgba(255,255,255,0.06)',
-            background: 'rgba(255,255,255,0.03)', padding: '20px 22px',
+            borderRadius: 18, border: '1px solid var(--panel-border)',
+            background: 'var(--panel-alt)', padding: '20px 22px',
             transition: 'all 0.2s', textDecoration: 'none', display: 'block',
           }}>
             <div style={{ fontSize: 22, marginBottom: 10, color: '#5eead4' }}>{l.icon}</div>
-            <div style={{ fontWeight: 700, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>{l.label}</div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>{l.desc}</div>
+            <div style={{ fontWeight: 700, color: 'var(--ink-78)', marginBottom: 4 }}>{l.label}</div>
+            <div style={{ fontSize: 13, color: 'var(--ink-35)' }}>{l.desc}</div>
           </Link>
         ))}
       </div>
@@ -306,7 +306,7 @@ export default function DashboardOverview() {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(2,6,23,0.78)',
+            background: 'rgba(0,0,0,0.5)',
             backdropFilter: 'blur(4px)',
             display: 'flex',
             alignItems: 'center',
@@ -323,7 +323,7 @@ export default function DashboardOverview() {
               overflowY: 'auto',
               borderRadius: 16,
               border: '1px solid rgba(125,211,252,0.35)',
-              background: 'linear-gradient(180deg, rgba(15,23,42,0.96), rgba(2,6,23,0.96))',
+              background: 'linear-gradient(180deg, var(--surface), var(--surface))',
               padding: 18,
             }}
             onClick={(e) => e.stopPropagation()}
@@ -334,9 +334,9 @@ export default function DashboardOverview() {
                 type='button'
                 onClick={() => setSchemaOpen(false)}
                 style={{
-                  border: '1px solid rgba(255,255,255,0.18)',
-                  background: 'rgba(255,255,255,0.06)',
-                  color: 'rgba(255,255,255,0.9)',
+                  border: '1px solid var(--panel-border-3)',
+                  background: 'var(--panel-border)',
+                  color: 'var(--ink-90)',
                   borderRadius: 8,
                   padding: '4px 8px',
                   cursor: 'pointer',
@@ -345,48 +345,48 @@ export default function DashboardOverview() {
                 {t('dashboard.schema.close')}
               </button>
             </div>
-            {schemaLoading && <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>{t('dashboard.schema.loading')}</div>}
+            {schemaLoading && <div style={{ color: 'var(--ink-72)', fontSize: 13 }}>{t('dashboard.schema.loading')}</div>}
             {!schemaLoading && !schema && (
               <div style={{ color: '#fca5a5', fontSize: 13 }}>{t('dashboard.schema.loadError')}</div>
             )}
             {!schemaLoading && schema && (
               <div style={{ display: 'grid', gap: 14 }}>
-                <div style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 12 }}>
+                <div style={{ border: '1px solid var(--panel-border-2)', borderRadius: 12, padding: 12 }}>
                   <div style={{ color: '#7dd3fc', fontSize: 11, letterSpacing: 0.7, textTransform: 'uppercase' }}>{t('dashboard.schema.purpose')}</div>
-                  <div style={{ color: 'rgba(255,255,255,0.88)', marginTop: 6, fontSize: 14 }}>{schema.purpose}</div>
+                  <div style={{ color: 'var(--ink-90)', marginTop: 6, fontSize: 14 }}>{schema.purpose}</div>
                 </div>
 
-                <div style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 12 }}>
+                <div style={{ border: '1px solid var(--panel-border-2)', borderRadius: 12, padding: 12 }}>
                   <div style={{ color: '#7dd3fc', fontSize: 11, letterSpacing: 0.7, textTransform: 'uppercase', marginBottom: 8 }}>{t('dashboard.schema.storedFields')}</div>
                   {Object.entries(schema.what_is_stored).map(([k, v]) => (
-                    <div key={k} style={{ display: 'grid', gridTemplateColumns: '170px 1fr', gap: 8, padding: '6px 0', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div key={k} style={{ display: 'grid', gridTemplateColumns: '170px 1fr', gap: 8, padding: '6px 0', borderTop: '1px solid var(--panel-alt)' }}>
                       <div style={{ color: '#5eead4', fontFamily: 'monospace', fontSize: 12 }}>{k}</div>
-                      <div style={{ color: 'rgba(255,255,255,0.82)', fontSize: 13 }}>{v}</div>
+                      <div style={{ color: 'var(--ink-90)', fontSize: 13 }}>{v}</div>
                     </div>
                   ))}
                 </div>
 
-                <div style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 12 }}>
+                <div style={{ border: '1px solid var(--panel-border-2)', borderRadius: 12, padding: 12 }}>
                   <div style={{ color: '#7dd3fc', fontSize: 11, letterSpacing: 0.7, textTransform: 'uppercase', marginBottom: 8 }}>{t('dashboard.schema.retrievalFlow')}</div>
                   {schema.retrieval_flow.map((step, idx) => (
-                    <div key={`${idx}-${step}`} style={{ color: 'rgba(255,255,255,0.82)', fontSize: 13, padding: '4px 0' }}>
+                    <div key={`${idx}-${step}`} style={{ color: 'var(--ink-90)', fontSize: 13, padding: '4px 0' }}>
                       {idx + 1}. {step}
                     </div>
                   ))}
                 </div>
 
-                <div style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 12 }}>
+                <div style={{ border: '1px solid var(--panel-border-2)', borderRadius: 12, padding: 12 }}>
                   <div style={{ color: '#7dd3fc', fontSize: 11, letterSpacing: 0.7, textTransform: 'uppercase', marginBottom: 8 }}>{t('dashboard.schema.constraints')}</div>
                   {schema.constraints.map((item, idx) => (
-                    <div key={`${idx}-${item}`} style={{ color: 'rgba(255,255,255,0.82)', fontSize: 13, padding: '4px 0' }}>
+                    <div key={`${idx}-${item}`} style={{ color: 'var(--ink-90)', fontSize: 13, padding: '4px 0' }}>
                       - {item}
                     </div>
                   ))}
                 </div>
 
-                <div style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 12 }}>
+                <div style={{ border: '1px solid var(--panel-border-2)', borderRadius: 12, padding: 12 }}>
                   <div style={{ color: '#7dd3fc', fontSize: 11, letterSpacing: 0.7, textTransform: 'uppercase' }}>{t('dashboard.schema.privacyScope')}</div>
-                  <div style={{ color: 'rgba(255,255,255,0.88)', marginTop: 6, fontSize: 14 }}>{schema.privacy_scope}</div>
+                  <div style={{ color: 'var(--ink-90)', marginTop: 6, fontSize: 14 }}>{schema.privacy_scope}</div>
                 </div>
               </div>
             )}

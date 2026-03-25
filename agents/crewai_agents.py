@@ -5,6 +5,7 @@ import logging
 from typing import Any
 
 from agents.prompts import (
+    DEV_DIRECT_SYSTEM_PROMPT,
     DEV_SYSTEM_PROMPT,
     FETCH_CONTEXT_SYSTEM_PROMPT,
     FINALIZE_SYSTEM_PROMPT,
@@ -56,25 +57,39 @@ class CrewAIAgentRunner:
         spec = self._safe_json(content)
         return spec, usage, model
 
-    async def run_developer(self, spec: dict[str, Any], context_summary: str, task_description: str = '', target_files_context: str = '') -> tuple[str, dict[str, int], str]:
-        prompt = (
-            'Use this specification to generate code:\n'
-            f'{json.dumps(spec, indent=2)}\n\n'
-        )
-        # Target files from PM spec — full file contents for modification
-        if target_files_context:
-            prompt += f'{target_files_context}\n\n'
+    async def run_developer(self, spec: dict[str, Any], context_summary: str, task_description: str = '', target_files_context: str = '', direct_mode: bool = False) -> tuple[str, dict[str, int], str]:
+        if direct_mode:
+            # AI mode: no PM, developer works directly with task + source files
+            prompt = (
+                f'TASK: {spec.get("goal", "")}\n'
+                f'DESCRIPTION: {spec.get("summary", "")}\n\n'
+                'SOURCE FILES (these are the ACTUAL repository files — they are NOT missing):\n\n'
+                f'{target_files_context}\n\n'
+                'INSTRUCTIONS:\n'
+                '- Read the source files above. Find the relevant structs, functions, types.\n'
+                '- Implement the task by modifying existing code.\n'
+                '- Also update or add tests.\n'
+                '- Return **File: path** blocks with code.\n'
+            )
+            sys_prompt = DEV_DIRECT_SYSTEM_PROMPT
+        else:
+            # Flow mode: PM already analyzed, use spec
+            prompt = (
+                'Use this specification to generate code:\n'
+                f'{json.dumps(spec, indent=2)}\n\n'
+            )
+            if target_files_context:
+                prompt += f'{target_files_context}\n\n'
+            prompt += (
+                'IMPORTANT: Modify the EXISTING source files shown above. '
+                'Return **File: relative/path.ext** blocks with fenced code.\n'
+            )
+            sys_prompt = DEV_SYSTEM_PROMPT
 
-        prompt += (
-            'IMPORTANT: You must modify the EXISTING source files shown above. '
-            'Do NOT create placeholder markdown files. Return actual code changes.\n'
-            'Return complete file outputs using **File: relative/path.ext** format with fenced code blocks.\n'
-            'Output the FULL updated file content, not just changed parts.'
-        )
         return await self._run_with_crewai_or_llm(
             role='Developer Agent',
             goal='Generate production-ready code from a specification.',
-            system_prompt=DEV_SYSTEM_PROMPT,
+            system_prompt=sys_prompt,
             user_prompt=prompt,
             complexity_hint='high',
             max_output_tokens=32000,

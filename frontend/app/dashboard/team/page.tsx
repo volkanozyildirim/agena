@@ -276,7 +276,7 @@ export default function TeamPage() {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
         <div>
           <div className="section-label">{t('team.section')}</div>
-          <h1 style={{ fontSize: 28, fontWeight: 800, color: 'rgba(255,255,255,0.95)', marginTop: 8, marginBottom: 4 }}>
+          <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--ink-90)', marginTop: 8, marginBottom: 4 }}>
             {t('team.title')}
           </h1>
           <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
@@ -292,9 +292,9 @@ export default function TeamPage() {
                 style={{
                   padding: '6px 12px',
                   borderRadius: 999,
-                  border: provider === 'azure' ? '1px solid rgba(56,189,248,0.45)' : '1px solid rgba(255,255,255,0.12)',
-                  background: provider === 'azure' ? 'rgba(56,189,248,0.12)' : 'rgba(255,255,255,0.03)',
-                  color: provider === 'azure' ? '#7dd3fc' : 'rgba(255,255,255,0.58)',
+                  border: provider === 'azure' ? '1px solid rgba(56,189,248,0.45)' : '1px solid var(--panel-border-3)',
+                  background: provider === 'azure' ? 'rgba(56,189,248,0.12)' : 'var(--panel-alt)',
+                  color: provider === 'azure' ? '#7dd3fc' : 'var(--ink-58)',
                   fontSize: 12,
                   fontWeight: 700,
                   cursor: 'pointer',
@@ -315,9 +315,9 @@ export default function TeamPage() {
                 style={{
                   padding: '6px 12px',
                   borderRadius: 999,
-                  border: provider === 'jira' ? '1px solid rgba(129,140,248,0.45)' : '1px solid rgba(255,255,255,0.12)',
-                  background: provider === 'jira' ? 'rgba(129,140,248,0.12)' : 'rgba(255,255,255,0.03)',
-                  color: provider === 'jira' ? '#a5b4fc' : 'rgba(255,255,255,0.58)',
+                  border: provider === 'jira' ? '1px solid rgba(129,140,248,0.45)' : '1px solid var(--panel-border-3)',
+                  background: provider === 'jira' ? 'rgba(129,140,248,0.12)' : 'var(--panel-alt)',
+                  color: provider === 'jira' ? '#a5b4fc' : 'var(--ink-58)',
                   fontSize: 12,
                   fontWeight: 700,
                   cursor: 'pointer',
@@ -327,7 +327,7 @@ export default function TeamPage() {
               </button>
             )}
           </div>
-          <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 14, margin: 0 }}>
+          <p style={{ color: 'var(--ink-35)', fontSize: 14, margin: 0 }}>
             {myTeam.length > 0
               ? myTeam.length + ' · ' + (sprintPath ? t('team.sprintLabel') : t('team.noConfig'))
               : t('team.addEdit')}
@@ -347,7 +347,7 @@ export default function TeamPage() {
             <div style={{ fontWeight: 600, color: '#fbbf24', fontSize: 14 }}>
               {provider === 'jira' ? t('team.noConfigJira') : t('team.noConfig')}
             </div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>
+            <div style={{ fontSize: 12, color: 'var(--ink-35)', marginTop: 4 }}>
               {provider === 'jira' ? t('team.noConfigDescJira') : t('team.noConfigDesc')}
             </div>
           </div>
@@ -369,18 +369,18 @@ export default function TeamPage() {
             const items = workItems[member.id];
             const isLoadingItems = loadingItems === member.id;
             return (
-              <div key={member.id} style={{ borderRadius: 16, border: '1px solid ' + (isExpanded ? 'rgba(94,234,212,0.2)' : 'rgba(255,255,255,0.06)'), background: isExpanded ? 'rgba(13,148,136,0.04)' : 'rgba(255,255,255,0.02)', overflow: 'hidden', transition: 'border-color 0.2s' }}>
+              <div key={member.id} style={{ borderRadius: 16, border: '1px solid ' + (isExpanded ? 'rgba(94,234,212,0.2)' : 'var(--panel-border)'), background: isExpanded ? 'rgba(13,148,136,0.04)' : 'var(--panel)', overflow: 'hidden', transition: 'border-color 0.2s' }}>
                 <button onClick={() => void loadWorkItems(member)}
                   style={{ width: '100%', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
                   <div style={{ width: 42, height: 42, borderRadius: '50%', background: grad(member.displayName), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 800, color: '#fff', flexShrink: 0 }}>
                     {initials(member.displayName)}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, color: 'rgba(255,255,255,0.9)', fontSize: 14 }}>{member.displayName}</div>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.uniqueName}</div>
+                    <div style={{ fontWeight: 700, color: 'var(--ink-90)', fontSize: 14 }}>{member.displayName}</div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-30)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.uniqueName}</div>
                   </div>
                   {sprintPath && items !== undefined && (
-                    <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: items.length > 0 ? 'rgba(94,234,212,0.1)' : 'rgba(255,255,255,0.05)', border: '1px solid ' + (items.length > 0 ? 'rgba(94,234,212,0.25)' : 'rgba(255,255,255,0.08)'), color: items.length > 0 ? '#5eead4' : 'rgba(255,255,255,0.3)' }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: items.length > 0 ? 'rgba(94,234,212,0.1)' : 'var(--panel-alt)', border: '1px solid ' + (items.length > 0 ? 'rgba(94,234,212,0.25)' : 'var(--panel-border-2)'), color: items.length > 0 ? '#5eead4' : 'var(--ink-30)' }}>
                       {items.length} {t('team.itemsShort')}
                     </span>
                   )}
@@ -405,24 +405,24 @@ export default function TeamPage() {
                     {t('team.remove')}
                   </button>
                   {sprintPath && (
-                    <span style={{ fontSize: 16, color: 'rgba(255,255,255,0.2)', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block' }}>⌄</span>
+                    <span style={{ fontSize: 16, color: 'var(--ink-25)', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block' }}>⌄</span>
                   )}
                 </button>
 
                 {isExpanded && sprintPath && (
-                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', padding: '10px 20px 14px' }}>
+                  <div style={{ borderTop: '1px solid var(--panel-alt)', padding: '10px 20px 14px' }}>
                     {isLoadingItems ? (
                       <div style={{ display: 'grid', gap: 6 }}><Skel /><Skel /><Skel opacity={0.4} /></div>
                     ) : !items || items.length === 0 ? (
-                      <div style={{ padding: '14px 0', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>{t('team.noItems')}</div>
+                      <div style={{ padding: '14px 0', textAlign: 'center', color: 'var(--ink-25)', fontSize: 13 }}>{t('team.noItems')}</div>
                     ) : (
                       <div style={{ display: 'grid', gap: 6 }}>
                         {items.map((item) => (
-                          <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                          <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, background: 'var(--panel-alt)', border: '1px solid var(--panel-alt)' }}>
                             <span style={{ width: 7, height: 7, borderRadius: '50%', background: sc(item.state), boxShadow: '0 0 5px ' + sc(item.state), flexShrink: 0 }} />
-                            <span style={{ flex: 1, fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>{item.title}</span>
+                            <span style={{ flex: 1, fontSize: 13, color: 'var(--ink-78)' }}>{item.title}</span>
                             <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: sc(item.state) + '18', border: '1px solid ' + sc(item.state) + '35', color: sc(item.state), whiteSpace: 'nowrap' }}>{item.state}</span>
-                            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace' }}>#{item.id}</span>
+                            <span style={{ fontSize: 10, color: 'var(--ink-25)', fontFamily: 'monospace' }}>#{item.id}</span>
                           </div>
                         ))}
                       </div>
@@ -436,7 +436,7 @@ export default function TeamPage() {
       ) : hasConfig && !loadingAll ? (
         <div style={{ textAlign: 'center', padding: '60px 0' }}>
           <div style={{ fontSize: 48, opacity: 0.1, marginBottom: 16 }}>◉</div>
-          <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 14, marginBottom: 20 }}>{t('team.noMembers')}</div>
+          <div style={{ color: 'var(--ink-25)', fontSize: 14, marginBottom: 20 }}>{t('team.noMembers')}</div>
           <button onClick={() => setShowPicker(true)}
             style={{ padding: '10px 20px', borderRadius: 12, border: '1px solid rgba(13,148,136,0.3)', background: 'rgba(13,148,136,0.1)', color: '#5eead4', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
             {t('team.addMember')}
@@ -447,29 +447,29 @@ export default function TeamPage() {
       {/* Picker Modal */}
       {showPicker && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(3,7,18,0.85)', backdropFilter: 'blur(12px)' }} onClick={() => setShowPicker(false)} />
-          <div style={{ position: 'relative', width: '100%', maxWidth: 480, borderRadius: 24, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(8,14,30,0.98)', overflow: 'hidden', boxShadow: '0 40px 100px rgba(0,0,0,0.6)', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(12px)' }} onClick={() => setShowPicker(false)} />
+          <div style={{ position: 'relative', width: '100%', maxWidth: 480, borderRadius: 24, border: '1px solid var(--panel-border-3)', background: 'var(--surface)', overflow: 'hidden', boxShadow: '0 40px 100px rgba(0,0,0,0.6)', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
             <div style={{ height: 2, background: 'linear-gradient(90deg, #0d9488, #7c3aed, #22c55e)', flexShrink: 0 }} />
 
             <div style={{ padding: '24px 24px 16px', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'rgba(255,255,255,0.95)' }}>{t('team.selectTitle')}</h3>
-                  <p style={{ margin: '4px 0 0', fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--ink-90)' }}>{t('team.selectTitle')}</h3>
+                  <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--ink-30)' }}>
                     {t('team.selectedSummary', { selected: myTeam.length, total: allMembers.length })}
                   </p>
                 </div>
-                <button onClick={() => setShowPicker(false)} style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                <button onClick={() => setShowPicker(false)} style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid var(--panel-border-3)', background: 'var(--panel-alt)', color: 'var(--ink-50)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
               </div>
 
               {/* Search */}
               <div style={{ position: 'relative' }}>
-                <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: 'rgba(255,255,255,0.25)' }}>⌕</span>
+                <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: 'var(--ink-25)' }}>⌕</span>
                 <input
                   value={search} onChange={(e) => setSearch(e.target.value)}
                   placeholder={t('team.searchPlaceholder')}
                   autoFocus
-                  style={{ width: '100%', padding: '10px 14px 10px 34px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.9)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '10px 14px 10px 34px', borderRadius: 10, border: '1px solid var(--panel-border-3)', background: 'var(--panel-alt)', color: 'var(--ink-90)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
                 />
               </div>
             </div>
@@ -477,24 +477,24 @@ export default function TeamPage() {
             {/* Liste */}
             <div style={{ overflowY: 'auto', flex: 1, padding: '0 16px 16px' }}>
               {loadingAll ? (
-                <div style={{ padding: '32px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>{t('team.loading')}</div>
+                <div style={{ padding: '32px', textAlign: 'center', color: 'var(--ink-30)', fontSize: 13 }}>{t('team.loading')}</div>
               ) : filtered.length === 0 ? (
-                <div style={{ padding: '32px', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>{t('team.noResults')}</div>
+                <div style={{ padding: '32px', textAlign: 'center', color: 'var(--ink-25)', fontSize: 13 }}>{t('team.noResults')}</div>
               ) : (
                 <div style={{ display: 'grid', gap: 4 }}>
                   {filtered.map((m) => {
                     const selected = myTeam.some((x) => x.id === m.id);
                     return (
                       <button key={m.id} onClick={() => toggleMember(m)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 12, border: '1px solid ' + (selected ? 'rgba(13,148,136,0.35)' : 'rgba(255,255,255,0.05)'), background: selected ? 'rgba(13,148,136,0.1)' : 'rgba(255,255,255,0.02)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s' }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 12, border: '1px solid ' + (selected ? 'rgba(13,148,136,0.35)' : 'var(--panel-alt)'), background: selected ? 'rgba(13,148,136,0.1)' : 'var(--panel)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s' }}>
                         <div style={{ width: 36, height: 36, borderRadius: '50%', background: grad(m.displayName), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#fff', flexShrink: 0 }}>
                           {initials(m.displayName)}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>{m.displayName}</div>
-                          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.uniqueName}</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-90)' }}>{m.displayName}</div>
+                          <div style={{ fontSize: 11, color: 'var(--ink-30)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.uniqueName}</div>
                         </div>
-                        <div style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid ' + (selected ? '#0d9488' : 'rgba(255,255,255,0.15)'), background: selected ? '#0d9488' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
+                        <div style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid ' + (selected ? '#0d9488' : 'var(--panel-border-4)'), background: selected ? '#0d9488' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' }}>
                           {selected && <span style={{ fontSize: 10, color: '#fff', fontWeight: 800 }}>✓</span>}
                         </div>
                       </button>
@@ -504,7 +504,7 @@ export default function TeamPage() {
               )}
             </div>
 
-            <div style={{ padding: '14px 24px', borderTop: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+            <div style={{ padding: '14px 24px', borderTop: '1px solid var(--panel-border)', flexShrink: 0 }}>
               <button onClick={() => setShowPicker(false)}
                 style={{ width: '100%', padding: '12px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #0d9488, #22c55e)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
                 {t('team.done', { n: myTeam.length })}
@@ -519,10 +519,10 @@ export default function TeamPage() {
 
 function Skel({ opacity = 1 }: { opacity?: number }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', opacity }}>
-      <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', flexShrink: 0 }} />
-      <div style={{ flex: 1, height: 11, borderRadius: 4, background: 'rgba(255,255,255,0.06)' }} />
-      <div style={{ width: 55, height: 18, borderRadius: 999, background: 'rgba(255,255,255,0.04)' }} />
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, background: 'var(--panel)', opacity }}>
+      <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--panel-border-2)', flexShrink: 0 }} />
+      <div style={{ flex: 1, height: 11, borderRadius: 4, background: 'var(--panel-border)' }} />
+      <div style={{ width: 55, height: 18, borderRadius: 999, background: 'var(--glass)' }} />
     </div>
   );
 }

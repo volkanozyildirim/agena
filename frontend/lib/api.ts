@@ -152,6 +152,9 @@ export interface RepoProfileSummary {
   scanned_at: string;
   scan_id?: string;
   agents_md_path?: string;
+  agents_md_size?: number;
+  agents_md_signatures?: number;
+  agents_md_files?: number;
   scanned_by_provider?: string;
   scanned_model?: string | null;
   repo_rules?: string[];

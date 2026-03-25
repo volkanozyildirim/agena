@@ -141,7 +141,7 @@ export default function TemplatesPage() {
     <div style={{ display: 'grid', gap: 22 }}>
       <div>
         <div className='section-label'>{t('nav.templates')}</div>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: 'rgba(255,255,255,0.94)', marginTop: 6 }}>{t('flows.templateMarketplace')}</h1>
+        <h1 style={{ fontSize: 26, fontWeight: 800, color: 'var(--ink-90)', marginTop: 6 }}>{t('flows.templateMarketplace')}</h1>
       </div>
 
       <div style={{ display: 'flex', gap: 10 }}>
@@ -160,16 +160,16 @@ export default function TemplatesPage() {
       )}
 
       {empty && (
-        <div style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', padding: 18, color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>
+        <div style={{ borderRadius: 14, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', padding: 18, color: 'var(--ink-50)', fontSize: 13 }}>
           {t('flows.templatesEmpty')}
         </div>
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(260px, 1fr))', gap: 12 }}>
         {templates.map((tp) => (
-          <div key={tp.id} style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', padding: 14 }}>
-            <div style={{ fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginBottom: 6 }}>{tp.name}</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.42)', marginBottom: 12 }}>{tp.description || '-'}</div>
+          <div key={tp.id} style={{ borderRadius: 14, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', padding: 14 }}>
+            <div style={{ fontWeight: 700, color: 'var(--ink-90)', marginBottom: 6 }}>{tp.name}</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-42)', marginBottom: 12 }}>{tp.description || '-'}</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => void importToFlows(tp)} style={{ padding: '7px 11px', borderRadius: 8, border: '1px solid rgba(56,189,248,0.35)', background: 'rgba(56,189,248,0.1)', color: '#38bdf8', fontSize: 12, cursor: 'pointer', fontWeight: 700 }}>
                 {t('flows.importTemplate')}

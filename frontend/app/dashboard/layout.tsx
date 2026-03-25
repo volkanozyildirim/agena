@@ -262,8 +262,8 @@ function DashboardInner({ children }: { children: ReactNode }) {
       {/* Sidebar */}
       <aside style={{
         width: sidebarWidth, flexShrink: 0,
-        borderRight: '1px solid rgba(255,255,255,0.06)',
-        background: 'rgba(3,7,18,0.6)', backdropFilter: 'blur(20px)',
+        borderRight: '1px solid var(--panel-border)',
+        background: 'var(--glass)', backdropFilter: 'blur(20px)',
         position: 'fixed', top: 72, bottom: 0, left: 0,
         display: 'flex', flexDirection: 'column',
         padding: '24px 12px', zIndex: 50,
@@ -278,7 +278,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
             width: 28,
             height: 28,
             borderRadius: 8,
-            border: '1px solid rgba(255,255,255,0.12)',
+            border: '1px solid var(--panel-border-3)',
             background: 'var(--glass)',
             color: 'var(--ink)',
             cursor: 'pointer',
@@ -290,9 +290,9 @@ function DashboardInner({ children }: { children: ReactNode }) {
         {/* User info */}
         {userName && (
           <a href="/dashboard/profile" title={userName}
-            style={{ textDecoration: 'none', padding: sidebarCollapsed ? '8px 6px' : '10px 12px', marginBottom: 16, borderRadius: 12, background: 'var(--glass)', border: '1px solid rgba(255,255,255,0.06)', display: 'block', transition: 'border-color 0.2s' }}
+            style={{ textDecoration: 'none', padding: sidebarCollapsed ? '8px 6px' : '10px 12px', marginBottom: 16, borderRadius: 12, background: 'var(--glass)', border: '1px solid var(--panel-border)', display: 'block', transition: 'border-color 0.2s' }}
             onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(139,92,246,0.3)'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(255,255,255,0.06)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = 'var(--panel-border)'; }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: sidebarCollapsed ? 0 : 10, justifyContent: sidebarCollapsed ? 'center' : 'flex-start' }}>
               <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg, #0d9488, #22c55e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: '#fff', flexShrink: 0 }}>
@@ -331,7 +331,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
           })}
         </nav>
 
-        <div style={{ marginTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <div style={{ marginTop: 10, borderTop: '1px solid var(--panel-border)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 2 }}>
           {SECONDARY_NAV_KEYS.map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href);
             const isNotificationItem = item.href === '/dashboard/notifications';
@@ -375,7 +375,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
           })}
         </div>
 
-        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 8, padding: '16px 0', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 8, padding: '16px 0', borderTop: '1px solid var(--panel-border)' }}>
           <button
             onClick={openNotifications}
             title={t('notifications.section')}
@@ -384,7 +384,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
               justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
               padding: sidebarCollapsed ? '8px 8px' : '8px 12px', borderRadius: 10, fontSize: 13,
               background: notifPermission === 'granted' ? 'rgba(34,197,94,0.12)' : 'var(--glass)',
-              border: notifPermission === 'granted' ? '1px solid rgba(34,197,94,0.28)' : '1px solid rgba(255,255,255,0.06)',
+              border: notifPermission === 'granted' ? '1px solid rgba(34,197,94,0.28)' : '1px solid var(--panel-border)',
               color: notifPermission === 'granted' ? '#22c55e' : 'var(--muted)',
               cursor: 'pointer', width: '100%',
             }}
@@ -414,7 +414,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
             {!sidebarCollapsed && t('notifications.section')}
           </button>
           {notifOpen && !sidebarCollapsed && (
-            <div style={{ border: '1px solid var(--border)', background: 'rgba(2,6,23,0.92)', borderRadius: 12, padding: 10, display: 'grid', gap: 8, maxHeight: 250, overflow: 'auto' }}>
+            <div style={{ border: '1px solid var(--border)', background: 'var(--surface)', borderRadius: 12, padding: 10, display: 'grid', gap: 8, maxHeight: 250, overflow: 'auto' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 12, color: 'var(--ink)', fontWeight: 700 }}>{t('notifications.recent')}</span>
                 <button onClick={() => void markAllReadAndRefresh()} style={{ border: 'none', background: 'transparent', color: '#5eead4', fontSize: 11, cursor: 'pointer' }}>{t('notifications.markAllRead')}</button>
@@ -470,14 +470,14 @@ function DashboardInner({ children }: { children: ReactNode }) {
                     });
                     void markNotificationRead(n.id).finally(() => void refreshNotifications(12));
                   }}
-                  style={{ textDecoration: 'none', border: `1px solid ${notifColor(n)}44`, borderLeft: `3px solid ${notifColor(n)}`, borderRadius: 10, padding: '7px 8px', display: 'grid', gap: 3, background: n.is_read ? 'rgba(255,255,255,0.01)' : `${notifColor(n)}18` }}>
+                  style={{ textDecoration: 'none', border: `1px solid ${notifColor(n)}44`, borderLeft: `3px solid ${notifColor(n)}`, borderRadius: 10, padding: '7px 8px', display: 'grid', gap: 3, background: n.is_read ? 'var(--panel)' : `${notifColor(n)}18` }}>
                   <div style={{ fontSize: 11, color: 'var(--ink)', fontWeight: 700 }}>{n.title}</div>
                   <div style={{ fontSize: 10, color: notifColor(n), textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 700 }}>{n.event_type.replace(/_/g, ' ')}</div>
                   <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.3 }}>{n.message}</div>
                   <div style={{ fontSize: 10, color: 'var(--muted)' }}>{new Date(n.created_at).toLocaleString()}</div>
                 </Link>
               ))}
-              <Link href='/dashboard/notifications' style={{ textDecoration: 'none', textAlign: 'center', padding: '7px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', color: '#39ff88', fontSize: 12, fontWeight: 700 }}>
+              <Link href='/dashboard/notifications' style={{ textDecoration: 'none', textAlign: 'center', padding: '7px 8px', borderRadius: 8, border: '1px solid var(--panel-border-3)', color: '#39ff88', fontSize: 12, fontWeight: 700 }}>
                 {t('notifications.viewAll')}
               </Link>
             </div>
@@ -489,9 +489,9 @@ function DashboardInner({ children }: { children: ReactNode }) {
               display: 'flex', alignItems: 'center', gap: 8,
               justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
               padding: sidebarCollapsed ? '8px 8px' : '8px 12px', borderRadius: 10, fontSize: 13,
-              background: webPushEnabled ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.03)',
-              border: webPushEnabled ? '1px solid rgba(34,197,94,0.28)' : '1px solid rgba(255,255,255,0.06)',
-              color: webPushEnabled ? '#22c55e' : 'rgba(255,255,255,0.65)',
+              background: webPushEnabled ? 'rgba(34,197,94,0.12)' : 'var(--panel-alt)',
+              border: webPushEnabled ? '1px solid rgba(34,197,94,0.28)' : '1px solid var(--panel-border)',
+              color: webPushEnabled ? '#22c55e' : 'var(--ink-65)',
               cursor: 'pointer', width: '100%',
             }}
           >
@@ -501,8 +501,8 @@ function DashboardInner({ children }: { children: ReactNode }) {
             display: 'flex', alignItems: 'center', gap: 8,
             justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
             padding: sidebarCollapsed ? '8px 8px' : '8px 12px', borderRadius: 10, fontSize: 13,
-            background: 'transparent', border: '1px solid rgba(255,255,255,0.06)',
-            color: 'rgba(255,255,255,0.3)', cursor: 'pointer', width: '100%',
+            background: 'transparent', border: '1px solid var(--panel-border)',
+            color: 'var(--ink-30)', cursor: 'pointer', width: '100%',
           }}>
             {sidebarCollapsed ? '↩' : t('nav.logout')}
           </button>

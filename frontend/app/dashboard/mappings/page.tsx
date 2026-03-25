@@ -14,9 +14,9 @@ const fieldStyle: React.CSSProperties = {
   height: 40,
   padding: '0 12px',
   borderRadius: 10,
-  border: '1px solid rgba(255,255,255,0.14)',
-  background: 'rgba(255,255,255,0.04)',
-  color: 'rgba(255,255,255,0.9)',
+  border: '1px solid var(--panel-border-3)',
+  background: 'var(--glass)',
+  color: 'var(--ink-90)',
   fontSize: 13,
   outline: 'none',
 };
@@ -26,7 +26,7 @@ const fieldLabelStyle: React.CSSProperties = {
   fontWeight: 700,
   letterSpacing: 1,
   textTransform: 'uppercase',
-  color: 'rgba(255,255,255,0.35)',
+  color: 'var(--ink-35)',
   marginBottom: 6,
 };
 
@@ -72,6 +72,8 @@ export default function RepoMappingsPage() {
   const [hasGithubIntegration, setHasGithubIntegration] = useState(false);
   const [repoProfiles, setRepoProfiles] = useState<Record<string, RepoProfileSummary>>({});
   const [scanningId, setScanningId] = useState<string | null>(null);
+  const [agentsMdContent, setAgentsMdContent] = useState<string | null>(null);
+  const [agentsMdViewId, setAgentsMdViewId] = useState<string | null>(null);
   const githubFetchRef = useRef(0);
 
   useEffect(() => {
@@ -407,28 +409,28 @@ export default function RepoMappingsPage() {
     <div style={{ display: 'grid', gap: 20, maxWidth: 1180 }}>
       <div>
         <div className='section-label'>{t('nav.mappings')}</div>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: 'rgba(255,255,255,0.94)', marginTop: 6 }}>
+        <h1 style={{ fontSize: 26, fontWeight: 800, color: 'var(--ink-90)', marginTop: 6 }}>
           {t('mappings.title')}
         </h1>
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.36)', marginTop: 6 }}>
+        <p style={{ fontSize: 13, color: 'var(--ink-35)', marginTop: 6 }}>
           {t('mappings.subtitle')}
         </p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 420px) 1fr', gap: 14, alignItems: 'start' }}>
-        <div style={{ borderRadius: 16, border: '1px solid rgba(56,189,248,0.24)', background: 'linear-gradient(165deg, rgba(8,20,40,0.95), rgba(7,14,28,0.95))', padding: 14, display: 'grid', gap: 10 }}>
+        <div style={{ borderRadius: 16, border: '1px solid rgba(56,189,248,0.24)', background: 'var(--surface)', padding: 14, display: 'grid', gap: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: '#7dd3fc' }}>{t('mappings.createMapping')}</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>{t('mappings.totalCount', { n: items.length })}</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-35)' }}>{t('mappings.totalCount', { n: items.length })}</div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <button type='button' onClick={() => setSourceProvider('azure')} className='button'
-              style={{ borderColor: sourceProvider === 'azure' ? 'rgba(56,189,248,0.45)' : 'rgba(255,255,255,0.12)', background: sourceProvider === 'azure' ? 'rgba(56,189,248,0.12)' : 'rgba(255,255,255,0.03)', color: sourceProvider === 'azure' ? '#7dd3fc' : 'rgba(255,255,255,0.58)' }}>
+              style={{ borderColor: sourceProvider === 'azure' ? 'rgba(56,189,248,0.45)' : 'var(--panel-border-3)', background: sourceProvider === 'azure' ? 'rgba(56,189,248,0.12)' : 'var(--panel-alt)', color: sourceProvider === 'azure' ? '#7dd3fc' : 'var(--ink-58)' }}>
               {t('mappings.providerAzure')}
             </button>
             <button type='button' onClick={() => setSourceProvider('github')} className='button'
-              style={{ borderColor: sourceProvider === 'github' ? 'rgba(167,139,250,0.45)' : 'rgba(255,255,255,0.12)', background: sourceProvider === 'github' ? 'rgba(167,139,250,0.12)' : 'rgba(255,255,255,0.03)', color: sourceProvider === 'github' ? '#c4b5fd' : 'rgba(255,255,255,0.58)' }}>
+              style={{ borderColor: sourceProvider === 'github' ? 'rgba(167,139,250,0.45)' : 'var(--panel-border-3)', background: sourceProvider === 'github' ? 'rgba(167,139,250,0.12)' : 'var(--panel-alt)', color: sourceProvider === 'github' ? '#c4b5fd' : 'var(--ink-58)' }}>
               {t('mappings.providerGithub')}
             </button>
           </div>
@@ -438,15 +440,15 @@ export default function RepoMappingsPage() {
               <div>
                 <div style={fieldLabelStyle}>{t('mappings.azureProject')}</div>
                 <select value={selProject} onChange={(e) => setSelProject(e.target.value)} style={fieldStyle}>
-                  <option value='' style={{ background: '#0d1117' }}>{loadingProjects ? t('mappings.loadingProjects') : t('mappings.selectProject')}</option>
-                  {projects.map((p) => <option key={p.id} value={p.name} style={{ background: '#0d1117' }}>{p.name}</option>)}
+                  <option value='' style={{ background: 'var(--surface)' }}>{loadingProjects ? t('mappings.loadingProjects') : t('mappings.selectProject')}</option>
+                  {projects.map((p) => <option key={p.id} value={p.name} style={{ background: 'var(--surface)' }}>{p.name}</option>)}
                 </select>
               </div>
               <div>
                 <div style={fieldLabelStyle}>{t('mappings.azureRepo')}</div>
                 <select value={selRepoUrl} onChange={(e) => setSelRepoUrl(e.target.value)} disabled={!selProject || loadingRepos} style={fieldStyle}>
-                  <option value='' style={{ background: '#0d1117' }}>{loadingRepos ? t('mappings.loadingRepos') : t('mappings.selectRepo')}</option>
-                  {repos.map((r) => <option key={r.id} value={r.remote_url} style={{ background: '#0d1117' }}>{r.name}</option>)}
+                  <option value='' style={{ background: 'var(--surface)' }}>{loadingRepos ? t('mappings.loadingRepos') : t('mappings.selectRepo')}</option>
+                  {repos.map((r) => <option key={r.id} value={r.remote_url} style={{ background: 'var(--surface)' }}>{r.name}</option>)}
                 </select>
               </div>
             </>
@@ -455,17 +457,17 @@ export default function RepoMappingsPage() {
               <div>
                 <div style={fieldLabelStyle}>{t('mappings.githubOwner')}</div>
                 <input value={githubOwner} onChange={(e) => setGithubOwner(e.target.value)} placeholder={t('mappings.githubOwnerPlaceholder')} style={fieldStyle} />
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>{t('mappings.githubOwnerHint')}</div>
+                <div style={{ fontSize: 10, color: 'var(--ink-35)', marginTop: 4 }}>{t('mappings.githubOwnerHint')}</div>
               </div>
               <div>
                 <div style={fieldLabelStyle}>{t('mappings.githubRepo')}</div>
                 <select value={selGithubRepo} onChange={(e) => setSelGithubRepo(e.target.value)} disabled={loadingGithubRepos || !hasGithubIntegration} style={fieldStyle}>
-                  <option value='' style={{ background: '#0d1117' }}>
+                  <option value='' style={{ background: 'var(--surface)' }}>
                     {!hasGithubIntegration ? t('mappings.connectGithubFirst') : (loadingGithubRepos ? t('mappings.loadingGithubRepos') : t('mappings.selectGithubRepo'))}
                   </option>
-                  {githubSelectOptions.map((r) => <option key={r.id} value={r.full_name} style={{ background: '#0d1117' }}>{r.full_name}{r.private ? ' 🔒' : ''}</option>)}
+                  {githubSelectOptions.map((r) => <option key={r.id} value={r.full_name} style={{ background: 'var(--surface)' }}>{r.full_name}{r.private ? ' 🔒' : ''}</option>)}
                 </select>
-                <div style={{ fontSize: 10, color: githubRepoError ? '#fda4af' : 'rgba(255,255,255,0.45)', marginTop: 4 }}>
+                <div style={{ fontSize: 10, color: githubRepoError ? '#fda4af' : 'var(--ink-45)', marginTop: 4 }}>
                   {githubRepoError || `${t('mappings.githubRepoCount')}: ${githubRepoCount}`}
                 </div>
               </div>
@@ -475,13 +477,13 @@ export default function RepoMappingsPage() {
           {sourceProvider === 'azure' && selectedRepo && (
             <div style={{ borderRadius: 10, border: '1px solid rgba(56,189,248,0.3)', background: 'rgba(56,189,248,0.08)', padding: '8px 10px', minWidth: 0 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: '#7dd3fc' }}>{selectedRepo.name}</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 2, wordBreak: 'break-all' }}>{selectedRepo.remote_url}</div>
+              <div style={{ fontSize: 10, color: 'var(--ink-45)', marginTop: 2, wordBreak: 'break-all' }}>{selectedRepo.remote_url}</div>
             </div>
           )}
           {sourceProvider === 'github' && selectedGithubRepo && (
             <div style={{ borderRadius: 10, border: '1px solid rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.08)', padding: '8px 10px', minWidth: 0 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: '#c4b5fd' }}>{selectedGithubRepo.full_name}</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>{selectedGithubRepo.private ? t('mappings.private') : t('mappings.public')}</div>
+              <div style={{ fontSize: 10, color: 'var(--ink-45)', marginTop: 2 }}>{selectedGithubRepo.private ? t('mappings.private') : t('mappings.public')}</div>
             </div>
           )}
 
@@ -551,43 +553,43 @@ export default function RepoMappingsPage() {
             )}
           </div>
 
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>
+          <div style={{ fontSize: 11, color: 'var(--ink-35)' }}>
             {t('mappings.selectedRepoMappings')}: <span style={{ color: '#7dd3fc', fontWeight: 700 }}>{selectedRepoMappings.length}</span>
           </div>
         </div>
 
-        <div style={{ borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', overflow: 'hidden' }}>
-          <div style={{ padding: '12px 14px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'grid', gridTemplateColumns: '1fr 1.05fr 0.75fr 0.95fr 0.85fr 130px', gap: 10 }}>
-            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>{t('mappings.col.source')}</span>
-            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>{t('mappings.col.localPath')}</span>
-            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>{t('mappings.col.notes')}</span>
-            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>{t('mappings.col.repoPlaybook')}</span>
-            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>{t('mappings.col.repoProfile')}</span>
-            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>{t('mappings.col.action')}</span>
+        <div style={{ borderRadius: 16, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', overflow: 'hidden' }}>
+          <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--panel-border-2)', display: 'grid', gridTemplateColumns: '1fr 1.05fr 0.75fr 0.95fr 0.85fr 130px', gap: 10 }}>
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)' }}>{t('mappings.col.source')}</span>
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)' }}>{t('mappings.col.localPath')}</span>
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)' }}>{t('mappings.col.notes')}</span>
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)' }}>{t('mappings.col.repoPlaybook')}</span>
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)' }}>{t('mappings.col.repoProfile')}</span>
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)' }}>{t('mappings.col.action')}</span>
           </div>
 
               {empty ? (
-            <div style={{ padding: 20, color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>
+            <div style={{ padding: 20, color: 'var(--ink-50)', fontSize: 13 }}>
               {t('mappings.empty')}
             </div>
           ) : (
             items.map((m) => (
-              <div key={m.id} style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'grid', gridTemplateColumns: '1fr 1.05fr 0.75fr 0.95fr 0.85fr 130px', gap: 10, alignItems: 'center' }}>
+              <div key={m.id} style={{ padding: '10px 14px', borderBottom: '1px solid var(--panel-alt)', display: 'grid', gridTemplateColumns: '1fr 1.05fr 0.75fr 0.95fr 0.85fr 130px', gap: 10, alignItems: 'center' }}>
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 700, color: (m.provider === 'github') ? '#c4b5fd' : '#7dd3fc' }}>
                     {(m.provider === 'github') ? 'GitHub' : (m.azure_project || t('mappings.azure'))}
                   </div>
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.82)' }}>
+                  <div style={{ fontSize: 12, color: 'var(--ink-90)' }}>
                     {(m.provider === 'github') ? (m.github_repo_full_name || m.name) : (m.azure_repo_name || m.name)}
                   </div>
                 </div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.58)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: 12, color: 'var(--ink-58)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {m.local_path}
                 </div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>
+                <div style={{ fontSize: 12, color: 'var(--ink-45)' }}>
                   {m.notes || '-'}
                 </div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.45 }}>
+                <div style={{ fontSize: 12, color: 'var(--ink-45)', lineHeight: 1.45 }}>
                   {m.repo_playbook ? (m.repo_playbook.length > 110 ? m.repo_playbook.slice(0, 110).trimEnd() + '…' : m.repo_playbook) : '-'}
                 </div>
                 <div style={{ display: 'grid', gap: 4 }}>
@@ -603,24 +605,62 @@ export default function RepoMappingsPage() {
                       </div>
                     </>
                   ) : (
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{t('mappings.notScanned')}</div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-35)' }}>{t('mappings.notScanned')}</div>
                   )}
-                  <button
-                    onClick={() => void runProfileScan(m)}
-                    disabled={scanningId === m.id}
-                    style={{
-                      padding: '4px 8px',
-                      borderRadius: 8,
-                      border: '1px solid rgba(34,197,94,0.35)',
-                      background: 'rgba(34,197,94,0.12)',
-                      color: '#86efac',
-                      fontSize: 11,
-                      cursor: scanningId === m.id ? 'not-allowed' : 'pointer',
-                      fontWeight: 700,
-                    }}
-                  >
-                    {scanningId === m.id ? t('mappings.scanning') : t('mappings.scan')}
-                  </button>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => void runProfileScan(m)}
+                      disabled={scanningId === m.id}
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: 8,
+                        border: '1px solid rgba(34,197,94,0.35)',
+                        background: 'rgba(34,197,94,0.12)',
+                        color: '#86efac',
+                        fontSize: 11,
+                        cursor: scanningId === m.id ? 'not-allowed' : 'pointer',
+                        fontWeight: 700,
+                      }}
+                    >
+                      {scanningId === m.id ? t('mappings.scanning') : t('mappings.scan')}
+                    </button>
+                    {repoProfiles[m.id]?.agents_md_path && (repoProfiles[m.id]?.agents_md_size || 0) > 0 ? (
+                      <button
+                        onClick={() => {
+                          setAgentsMdViewId(m.id);
+                          setAgentsMdContent(null);
+                          apiFetch<{ content: string }>(`/preferences/repo-profile/agents-md/${m.id}`)
+                            .then((r) => setAgentsMdContent(r.content))
+                            .catch(() => setAgentsMdContent('Yuklenemedi'));
+                        }}
+                        style={{ padding: '4px 8px', borderRadius: 8, border: '1px solid rgba(168,85,247,0.35)', background: 'rgba(168,85,247,0.12)', color: '#c084fc', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        agents.md ({Math.round((repoProfiles[m.id]?.agents_md_size || 0) / 1024)}KB · {repoProfiles[m.id]?.agents_md_signatures || 0} sig)
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setScanningId(m.id);
+                          apiFetch('/preferences/repo-profile/agents-md', {
+                            method: 'POST',
+                            body: JSON.stringify({ mapping_id: m.id, local_path: m.local_path, mapping_name: m.name }),
+                          }).then(() => loadPrefs().then((prefs) => {
+                            const fromSettings = (prefs.profile_settings?.repo_profiles ?? {}) as Record<string, RepoProfileSummary>;
+                            setRepoProfiles(fromSettings);
+                            setMsg('agents.md oluşturuldu');
+                          })).catch((e) => setErr(e instanceof Error ? e.message : 'agents.md oluşturulamadı')).finally(() => setScanningId(null));
+                        }}
+                        disabled={scanningId === m.id}
+                        style={{
+                          padding: '4px 8px', borderRadius: 8,
+                          border: '1px solid rgba(168,85,247,0.35)', background: 'rgba(168,85,247,0.12)',
+                          color: '#c084fc', fontSize: 11, cursor: 'pointer', fontWeight: 700,
+                        }}
+                      >
+                        agents.md oluştur
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                   <button onClick={() => startEdit(m)} style={{ padding: '6px 0', width: '100%', borderRadius: 8, border: '1px solid rgba(56,189,248,0.35)', background: 'rgba(56,189,248,0.12)', color: '#7dd3fc', fontSize: 12, cursor: 'pointer', fontWeight: 700 }}>
@@ -642,6 +682,54 @@ export default function RepoMappingsPage() {
         </div>
       )}
 
+      {/* agents.md Viewer Modal */}
+      {agentsMdViewId !== null && (
+        <div
+          onClick={() => { setAgentsMdViewId(null); setAgentsMdContent(null); }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 20 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, width: '90vw', maxWidth: 900, maxHeight: '85vh', display: 'grid', gridTemplateRows: 'auto 1fr auto', overflow: 'hidden' }}
+          >
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: 16, color: 'var(--ink)' }}>agents.md</h3>
+              <button onClick={() => { setAgentsMdViewId(null); setAgentsMdContent(null); }} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 20, cursor: 'pointer' }}>✕</button>
+            </div>
+            <div style={{ overflow: 'auto', padding: '16px 20px' }}>
+              {agentsMdContent === null ? (
+                <div style={{ color: 'var(--muted)', padding: 20 }}>Yukleniyor...</div>
+              ) : (
+                <pre style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: 'var(--ink)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+                  {agentsMdContent}
+                </pre>
+              )}
+            </div>
+            <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                className='button button-outline'
+                onClick={() => {
+                  setScanningId(agentsMdViewId);
+                  const mapping = mappings.find((m) => m.id === agentsMdViewId);
+                  if (!mapping) return;
+                  apiFetch('/preferences/repo-profile/agents-md', {
+                    method: 'POST',
+                    body: JSON.stringify({ mapping_id: mapping.id, local_path: mapping.local_path, mapping_name: mapping.name }),
+                  }).then(() => loadPrefs().then((prefs) => {
+                    const fromSettings = (prefs.profile_settings?.repo_profiles ?? {}) as Record<string, RepoProfileSummary>;
+                    setRepoProfiles(fromSettings);
+                    return apiFetch<{ content: string }>(`/preferences/repo-profile/agents-md/${mapping.id}`);
+                  }).then((r) => setAgentsMdContent(r.content))).catch((e) => setErr(e instanceof Error ? e.message : 'Hata')).finally(() => setScanningId(null));
+                }}
+                style={{ fontSize: 12 }}
+              >
+                Yeniden Olustur
+              </button>
+              <button className='button button-outline' onClick={() => { setAgentsMdViewId(null); setAgentsMdContent(null); }} style={{ fontSize: 12 }}>Kapat</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

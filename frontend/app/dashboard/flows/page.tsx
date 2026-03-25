@@ -342,14 +342,14 @@ export default function FlowsPage() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 0 16px', flexShrink: 0 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="section-label">{t('nav.flows')}</div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'rgba(255,255,255,0.95)', margin: '4px 0 0' }}>{t('flows.title')}</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink-90)', margin: '4px 0 0' }}>{t('flows.title')}</h1>
         </div>
         {/* Flow tabs */}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           {flows.map((f) => (
             <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
               <button onClick={() => setActiveFlow(f.id)}
-                style={{ padding: '7px 14px', borderRadius: activeFlow === f.id ? '10px 0 0 10px' : 10, border: '1px solid ' + (activeFlow === f.id ? 'rgba(13,148,136,0.5)' : 'rgba(255,255,255,0.1)'), borderRight: activeFlow === f.id ? 'none' : undefined, background: activeFlow === f.id ? 'rgba(13,148,136,0.15)' : 'rgba(255,255,255,0.03)', color: activeFlow === f.id ? '#5eead4' : 'rgba(255,255,255,0.5)', fontWeight: activeFlow === f.id ? 700 : 400, fontSize: 13, cursor: 'pointer' }}>
+                style={{ padding: '7px 14px', borderRadius: activeFlow === f.id ? '10px 0 0 10px' : 10, border: '1px solid ' + (activeFlow === f.id ? 'rgba(13,148,136,0.5)' : 'var(--panel-border-3)'), borderRight: activeFlow === f.id ? 'none' : undefined, background: activeFlow === f.id ? 'rgba(13,148,136,0.15)' : 'var(--panel-alt)', color: activeFlow === f.id ? '#5eead4' : 'var(--ink-50)', fontWeight: activeFlow === f.id ? 700 : 400, fontSize: 13, cursor: 'pointer' }}>
                 {f.name}
               </button>
               {activeFlow === f.id && (
@@ -363,39 +363,39 @@ export default function FlowsPage() {
               <input value={newFlowName} onChange={(e) => setNewFlowName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && createFlow()}
                 placeholder={t('flows.newPlaceholder')} autoFocus
-                style={{ padding: '7px 12px', borderRadius: 10, border: '1px solid rgba(13,148,136,0.4)', background: 'rgba(13,148,136,0.08)', color: 'rgba(255,255,255,0.9)', fontSize: 13, outline: 'none', width: 140 }} />
+                style={{ padding: '7px 12px', borderRadius: 10, border: '1px solid rgba(13,148,136,0.4)', background: 'rgba(13,148,136,0.08)', color: 'var(--ink-90)', fontSize: 13, outline: 'none', width: 140 }} />
               <button onClick={createFlow} style={{ padding: '7px 12px', borderRadius: 10, border: 'none', background: '#0d9488', color: '#fff', fontSize: 13, cursor: 'pointer', fontWeight: 700 }}>+</button>
-              <button onClick={() => setCreating(false)} style={{ padding: '7px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer' }}>×</button>
+              <button onClick={() => setCreating(false)} style={{ padding: '7px 10px', borderRadius: 10, border: '1px solid var(--panel-border-3)', background: 'transparent', color: 'var(--ink-35)', fontSize: 13, cursor: 'pointer' }}>×</button>
             </div>
           ) : (
               <button onClick={() => setCreating(true)}
-              style={{ padding: '7px 14px', borderRadius: 10, border: '1px dashed rgba(255,255,255,0.2)', background: 'transparent', color: 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer' }}>
+              style={{ padding: '7px 14px', borderRadius: 10, border: '1px dashed var(--ink-25)', background: 'transparent', color: 'var(--ink-35)', fontSize: 13, cursor: 'pointer' }}>
               {t('flows.new')}
             </button>
           )}
           <button onClick={toggleRuns}
-            style={{ padding: '7px 14px', borderRadius: 10, border: '1px solid ' + (showRuns ? 'rgba(167,139,250,0.5)' : 'rgba(255,255,255,0.1)'), background: showRuns ? 'rgba(167,139,250,0.12)' : 'rgba(255,255,255,0.03)', color: showRuns ? '#a78bfa' : 'rgba(255,255,255,0.4)', fontSize: 13, cursor: 'pointer', fontWeight: showRuns ? 700 : 400 }}>
+            style={{ padding: '7px 14px', borderRadius: 10, border: '1px solid ' + (showRuns ? 'rgba(167,139,250,0.5)' : 'var(--panel-border-3)'), background: showRuns ? 'rgba(167,139,250,0.12)' : 'var(--panel-alt)', color: showRuns ? '#a78bfa' : 'var(--ink-35)', fontSize: 13, cursor: 'pointer', fontWeight: showRuns ? 700 : 400 }}>
             {t('flows.runHistory')}
           </button>
           <Link href='/dashboard/templates'
-            style={{ padding: '7px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(56,189,248,0.08)', color: '#38bdf8', fontSize: 13, textDecoration: 'none' }}>
+            style={{ padding: '7px 14px', borderRadius: 10, border: '1px solid var(--panel-border-3)', background: 'rgba(56,189,248,0.08)', color: '#38bdf8', fontSize: 13, textDecoration: 'none' }}>
             {t('flows.templates')}
           </Link>
           <button onClick={saveManualVersion}
-            style={{ padding: '7px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.5)', fontSize: 13, cursor: 'pointer' }}>
+            style={{ padding: '7px 14px', borderRadius: 10, border: '1px solid var(--panel-border-3)', background: 'var(--panel-alt)', color: 'var(--ink-50)', fontSize: 13, cursor: 'pointer' }}>
             {t('flows.saveVersion')}
           </button>
           <select value={selectedVersionId} onChange={(e) => setSelectedVersionId(e.target.value)}
-            style={{ padding: '7px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.75)', fontSize: 12 }}>
+            style={{ padding: '7px 10px', borderRadius: 10, border: '1px solid var(--panel-border-3)', background: 'var(--panel-alt)', color: 'var(--ink-78)', fontSize: 12 }}>
             <option value=''>{t('flows.selectVersion')}</option>
             {(versionsByFlow[activeFlow] ?? []).map((v) => (
-              <option key={v.id} value={v.id} style={{ background: '#0d1117' }}>
+              <option key={v.id} value={v.id} style={{ background: 'var(--surface)' }}>
                 {new Date(v.createdAt).toLocaleString()} - {v.label}
               </option>
             ))}
           </select>
           <button onClick={rollbackToVersion} disabled={!selectedVersionId}
-            style={{ padding: '7px 14px', borderRadius: 10, border: '1px solid rgba(248,113,113,0.25)', background: selectedVersionId ? 'rgba(248,113,113,0.08)' : 'rgba(255,255,255,0.03)', color: selectedVersionId ? '#f87171' : 'rgba(255,255,255,0.25)', fontSize: 13, cursor: selectedVersionId ? 'pointer' : 'not-allowed' }}>
+            style={{ padding: '7px 14px', borderRadius: 10, border: '1px solid rgba(248,113,113,0.25)', background: selectedVersionId ? 'rgba(248,113,113,0.08)' : 'var(--panel-alt)', color: selectedVersionId ? '#f87171' : 'var(--ink-25)', fontSize: 13, cursor: selectedVersionId ? 'pointer' : 'not-allowed' }}>
             {t('flows.rollback')}
           </button>
           <button onClick={() => void runDrySimulation()} disabled={runningDryRun || !current}
@@ -429,17 +429,17 @@ export default function FlowsPage() {
       )}
 
       {dryRunOpen && (
-        <div style={{ marginBottom: 12, borderRadius: 14, border: '1px solid rgba(34,197,94,0.2)', background: 'rgba(8,14,30,0.85)', padding: 12, display: 'grid', gap: 8 }}>
+        <div style={{ marginBottom: 12, borderRadius: 14, border: '1px solid rgba(34,197,94,0.2)', background: 'var(--panel)', padding: 12, display: 'grid', gap: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: '#22c55e' }}>{t('flows.dryRunResult')}</div>
-            <button onClick={() => setDryRunOpen(false)} style={{ border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.45)', cursor: 'pointer' }}>×</button>
+            <button onClick={() => setDryRunOpen(false)} style={{ border: 'none', background: 'transparent', color: 'var(--ink-45)', cursor: 'pointer' }}>×</button>
           </div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>{dryRunSummary}</div>
+          <div style={{ fontSize: 12, color: 'var(--ink-35)' }}>{dryRunSummary}</div>
           <div style={{ display: 'grid', gap: 6 }}>
             {dryRunSteps.map((s) => (
-              <div key={s.id} style={{ borderRadius: 9, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', padding: '8px 10px', fontSize: 12, color: 'rgba(255,255,255,0.78)', display: 'flex', justifyContent: 'space-between' }}>
+              <div key={s.id} style={{ borderRadius: 9, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', padding: '8px 10px', fontSize: 12, color: 'var(--ink-78)', display: 'flex', justifyContent: 'space-between' }}>
                 <span>{s.label}</span>
-                <span style={{ color: s.status === 'done' ? '#22c55e' : s.status === 'waiting' ? '#f59e0b' : 'rgba(255,255,255,0.35)' }}>
+                <span style={{ color: s.status === 'done' ? '#22c55e' : s.status === 'waiting' ? '#f59e0b' : 'var(--ink-35)' }}>
                   {s.status === 'done' ? `${s.durationMs}ms` : s.status}
                 </span>
               </div>
@@ -449,15 +449,15 @@ export default function FlowsPage() {
       )}
 
       {deleteCandidate && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 260, background: 'rgba(2,6,23,0.7)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div style={{ width: 'min(500px, 100%)', borderRadius: 16, border: '1px solid rgba(248,113,113,0.28)', background: 'linear-gradient(180deg, rgba(15,23,42,0.97), rgba(2,6,23,0.97))', boxShadow: '0 30px 80px rgba(0,0,0,0.55)', overflow: 'hidden' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 260, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ width: 'min(500px, 100%)', borderRadius: 16, border: '1px solid rgba(248,113,113,0.28)', background: 'linear-gradient(180deg, var(--surface), var(--surface))', boxShadow: '0 30px 80px rgba(0,0,0,0.55)', overflow: 'hidden' }}>
             <div style={{ height: 2, background: 'linear-gradient(90deg, transparent, rgba(248,113,113,0.9), transparent)' }} />
             <div style={{ padding: 18, display: 'grid', gap: 10 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <div style={{ fontSize: 16, fontWeight: 800, color: 'rgba(255,255,255,0.95)' }}>{t('flows.deleteConfirmTitle')}</div>
-                <button onClick={() => setDeleteCandidate(null)} style={{ width: 26, height: 26, borderRadius: 8, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.45)', cursor: 'pointer', fontSize: 13 }}>×</button>
+                <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--ink-90)' }}>{t('flows.deleteConfirmTitle')}</div>
+                <button onClick={() => setDeleteCandidate(null)} style={{ width: 26, height: 26, borderRadius: 8, border: '1px solid var(--panel-border-3)', background: 'var(--glass)', color: 'var(--ink-45)', cursor: 'pointer', fontSize: 13 }}>×</button>
               </div>
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.58)', lineHeight: 1.6 }}>
+              <div style={{ fontSize: 13, color: 'var(--ink-58)', lineHeight: 1.6 }}>
                 {t('flows.deleteConfirmDesc')}
               </div>
               <div style={{ borderRadius: 10, border: '1px solid rgba(248,113,113,0.28)', background: 'rgba(248,113,113,0.08)', color: '#fecaca', padding: '8px 10px', fontSize: 12, fontWeight: 700 }}>
@@ -482,7 +482,7 @@ export default function FlowsPage() {
           {current ? (
             <FlowCanvas flow={current} onChange={updateFlow} />
           ) : (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 14, borderRadius: 20, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(3,7,18,0.6)' }}>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-25)', fontSize: 14, borderRadius: 20, border: '1px solid var(--panel-border)', background: 'var(--panel)' }}>
               {t('flows.empty')}
             </div>
           )}
@@ -740,10 +740,10 @@ function FlowCanvas({ flow, onChange }: { flow: Flow; onChange: (f: Flow) => voi
   const canvasH = Math.max(400, ...flow.nodes.map((n) => n.y + NODE_H + 80));
 
   return (
-    <div style={{ flex: 1, display: 'flex', gap: 0, minHeight: 0, borderRadius: 20, border: '1px solid rgba(255,255,255,0.07)', overflow: 'hidden', background: 'rgba(3,7,18,0.6)', position: 'relative', height: '100%' }}>
+    <div style={{ flex: 1, display: 'flex', gap: 0, minHeight: 0, borderRadius: 20, border: '1px solid var(--panel-border)', overflow: 'hidden', background: 'var(--panel)', position: 'relative', height: '100%' }}>
 
       {/* Left toolbar */}
-      <div style={{ width: 52, flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px 0', gap: 8, background: 'rgba(0,0,0,0.2)' }}>
+      <div style={{ width: 52, flexShrink: 0, borderRight: '1px solid var(--panel-border)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px 0', gap: 8, background: 'rgba(0,0,0,0.2)' }}>
         <ToolBtn title={t('flows.toolbarAddNode')} onClick={() => setShowPicker(true)}>+</ToolBtn>
         <div style={{ flex: 1 }} />
         <ToolBtn title={t('flows.toolbarReset')} onClick={() => setCanvasOffset({ x: 0, y: 0 })}>⊙</ToolBtn>
@@ -758,7 +758,7 @@ function FlowCanvas({ flow, onChange }: { flow: Flow; onChange: (f: Flow) => voi
           <defs>
             <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse"
               patternTransform={`translate(${canvasOffset.x % 28},${canvasOffset.y % 28})`}>
-              <circle cx="1" cy="1" r="1" fill="rgba(255,255,255,0.06)" />
+              <circle cx="1" cy="1" r="1" fill="var(--panel-border)" />
             </pattern>
           </defs>
           <rect width="100%" height="100%" fill="url(#grid)" />
@@ -792,7 +792,7 @@ function FlowCanvas({ flow, onChange }: { flow: Flow; onChange: (f: Flow) => voi
                     onMouseDown={(e) => handleDeleteEdgeEvent(e, edge.from, edge.to)}
                     onClick={(e) => handleDeleteEdgeEvent(e, edge.from, edge.to)} />
                   {/* delete dot */}
-                  <circle cx={midX} cy={midY} r={12} fill="rgba(8,14,30,0.92)" stroke="rgba(248,113,113,0.58)" strokeWidth={1.6}
+                  <circle cx={midX} cy={midY} r={12} fill="var(--surface)" stroke="rgba(248,113,113,0.58)" strokeWidth={1.6}
                     style={{ cursor: 'pointer', pointerEvents: 'all' }}
                     onMouseDown={(e) => handleDeleteEdgeEvent(e, edge.from, edge.to)}
                     onClick={(e) => handleDeleteEdgeEvent(e, edge.from, edge.to)} />
@@ -860,7 +860,7 @@ function FlowCanvas({ flow, onChange }: { flow: Flow; onChange: (f: Flow) => voi
         {flow.nodes.length === 0 && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
             <div style={{ fontSize: 40, opacity: 0.08, marginBottom: 12 }}>⟳</div>
-            <div style={{ color: 'rgba(255,255,255,0.15)', fontSize: 13 }}>{t('flows.addNodeHint')}</div>
+            <div style={{ color: 'var(--panel-border-4)', fontSize: 13 }}>{t('flows.addNodeHint')}</div>
           </div>
         )}
 
@@ -874,34 +874,34 @@ function FlowCanvas({ flow, onChange }: { flow: Flow; onChange: (f: Flow) => voi
 
       {/* Node picker panel */}
       {showPicker && (
-        <div style={{ position: 'absolute', left: 60, top: 12, zIndex: 100, borderRadius: 16, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(8,14,30,0.98)', padding: 16, width: 230, boxShadow: '0 20px 60px rgba(0,0,0,0.6)', maxHeight: 'calc(100% - 24px)', overflowY: 'auto' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', marginBottom: 8 }}>{t('flows.agentRoles')}</div>
+        <div style={{ position: 'absolute', left: 60, top: 12, zIndex: 100, borderRadius: 16, border: '1px solid var(--panel-border-3)', background: 'var(--surface)', padding: 16, width: 230, boxShadow: '0 20px 60px rgba(0,0,0,0.6)', maxHeight: 'calc(100% - 24px)', overflowY: 'auto' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: 'var(--ink-30)', textTransform: 'uppercase', marginBottom: 8 }}>{t('flows.agentRoles')}</div>
           <div style={{ display: 'grid', gap: 5, marginBottom: 12 }}>
             {AGENT_PRESETS.map((p) => (
               <button key={p.role} onClick={() => addNode(p)}
                 style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 10, border: '1px solid ' + p.color + '30', background: p.color + '0a', cursor: 'pointer', textAlign: 'left' }}>
                 <span style={{ fontSize: 16 }}>{p.icon}</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>{p.label}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-78)' }}>{p.label}</span>
               </button>
             ))}
             <button onClick={addCustomNode}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 10, border: '1px dashed rgba(255,255,255,0.15)', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 10, border: '1px dashed var(--panel-border-4)', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
               <span style={{ fontSize: 16 }}>🤖</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.4)' }}>{t('flows.customAgent')}</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-35)' }}>{t('flows.customAgent')}</span>
             </button>
           </div>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', marginBottom: 8 }}>{t('flows.nodeTypes')}</div>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: 'var(--ink-30)', textTransform: 'uppercase', marginBottom: 8 }}>{t('flows.nodeTypes')}</div>
           <div style={{ display: 'grid', gap: 5 }}>
             {NODE_TYPE_PRESETS.map((p) => (
               <button key={p.type} onClick={() => addTypeNode(p)}
                 style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 10, border: '1px solid ' + p.color + '30', background: p.color + '0a', cursor: 'pointer', textAlign: 'left' }}>
                 <span style={{ fontSize: 16 }}>{p.icon}</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>{p.label}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-78)' }}>{p.label}</span>
               </button>
             ))}
           </div>
           <button onClick={() => setShowPicker(false)}
-            style={{ marginTop: 10, width: '100%', padding: '7px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: 'rgba(255,255,255,0.3)', fontSize: 12, cursor: 'pointer' }}>
+            style={{ marginTop: 10, width: '100%', padding: '7px', borderRadius: 9, border: '1px solid var(--panel-border-2)', background: 'transparent', color: 'var(--ink-30)', fontSize: 12, cursor: 'pointer' }}>
             {t('flows.close')}
           </button>
         </div>
@@ -933,7 +933,7 @@ function FlowNodeCard({ node, index, selected, connecting, isDropTarget, onMouse
   const borderColor = isDropTarget ? '#5eead4'
     : selected ? node.color
     : hovered ? node.color + '60'
-    : 'rgba(255,255,255,0.1)';
+    : 'var(--panel-border-3)';
 
   return (
     <div
@@ -943,7 +943,7 @@ function FlowNodeCard({ node, index, selected, connecting, isDropTarget, onMouse
         width: NODE_W, height: NODE_H,
         borderRadius: 16,
         border: '2px solid ' + borderColor,
-        background: isDropTarget ? 'rgba(94,234,212,0.08)' : selected ? node.color + '14' : 'rgba(8,14,30,0.95)',
+        background: isDropTarget ? 'rgba(94,234,212,0.08)' : selected ? node.color + '14' : 'var(--surface)',
         boxShadow: isDropTarget ? '0 0 20px rgba(94,234,212,0.3)' : selected ? '0 0 24px ' + node.color + '30' : hovered ? '0 4px 20px rgba(0,0,0,0.4)' : '0 2px 8px rgba(0,0,0,0.3)',
         cursor: connecting ? 'crosshair' : 'grab',
         userSelect: 'none',
@@ -965,12 +965,12 @@ function FlowNodeCard({ node, index, selected, connecting, isDropTarget, onMouse
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 20 }}>{node.icon}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.9)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{node.label}</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-90)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{node.label}</div>
             <div style={{ fontSize: 10, color: node.color, fontWeight: 600, marginTop: 1 }}>{node.role}</div>
           </div>
         </div>
         {node.action && (
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 4 }}>{node.action}</div>
+          <div style={{ fontSize: 10, color: 'var(--ink-35)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 4 }}>{node.action}</div>
         )}
         {node.waitForApproval && (
           <div style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b', marginTop: 2 }}>⏸ Onay bekler</div>
@@ -984,7 +984,7 @@ function FlowNodeCard({ node, index, selected, connecting, isDropTarget, onMouse
         style={{
           position: 'absolute', right: -8, top: '50%', transform: 'translateY(-50%)',
           width: 16, height: 16, borderRadius: '50%',
-          background: node.color, border: '2px solid rgba(8,14,30,0.9)',
+          background: node.color, border: '2px solid var(--surface)',
           cursor: 'crosshair', zIndex: 10,
           opacity: hovered || selected ? 1 : 0,
           transition: 'opacity 0.15s',
@@ -998,7 +998,7 @@ function FlowNodeCard({ node, index, selected, connecting, isDropTarget, onMouse
       <div style={{
         position: 'absolute', left: -8, top: '50%', transform: 'translateY(-50%)',
         width: 16, height: 16, borderRadius: '50%',
-        background: isDropTarget ? '#5eead4' : 'rgba(8,14,30,0.9)',
+        background: isDropTarget ? '#5eead4' : 'var(--surface)',
         border: '2px solid ' + (isDropTarget ? '#5eead4' : node.color),
         zIndex: 10,
         opacity: hovered || selected || isDropTarget ? 1 : 0,
@@ -1010,9 +1010,9 @@ function FlowNodeCard({ node, index, selected, connecting, isDropTarget, onMouse
       {(hovered || selected) && (
         <div style={{ position: 'absolute', top: -10, right: 8, display: 'flex', gap: 4 }}>
           <button onClick={(e) => { e.stopPropagation(); onEdit(); }}
-            style={{ width: 22, height: 22, borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(8,14,30,0.95)', color: 'rgba(255,255,255,0.6)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✎</button>
+            style={{ width: 22, height: 22, borderRadius: 6, border: '1px solid var(--panel-border-4)', background: 'var(--surface)', color: 'var(--ink-58)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✎</button>
           <button onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            style={{ width: 22, height: 22, borderRadius: 6, border: '1px solid rgba(248,113,113,0.3)', background: 'rgba(8,14,30,0.95)', color: '#f87171', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+            style={{ width: 22, height: 22, borderRadius: 6, border: '1px solid rgba(248,113,113,0.3)', background: 'var(--surface)', color: '#f87171', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
         </div>
       )}
     </div>
@@ -1027,11 +1027,11 @@ function NodeEditPanel({ node, onChange, onClose }: {
   node: FlowNode; onChange: (p: Partial<FlowNode>) => void; onClose: () => void;
 }) {
   return (
-    <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 300, borderLeft: '1px solid rgba(255,255,255,0.08)', background: 'rgba(8,14,30,0.98)', display: 'flex', flexDirection: 'column', zIndex: 50 }}>
+    <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 300, borderLeft: '1px solid var(--panel-border-2)', background: 'var(--surface)', display: 'flex', flexDirection: 'column', zIndex: 50 }}>
       <div style={{ height: 2, background: 'linear-gradient(90deg, ' + node.color + ', #7c3aed)' }} />
-      <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontWeight: 700, fontSize: 14, color: 'rgba(255,255,255,0.9)' }}>Node Düzenle</span>
-        <button onClick={onClose} style={{ width: 26, height: 26, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 14 }}>×</button>
+      <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--panel-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink-90)' }}>Node Düzenle</span>
+        <button onClick={onClose} style={{ width: 26, height: 26, borderRadius: '50%', border: '1px solid var(--panel-border-3)', background: 'var(--panel-alt)', color: 'var(--ink-50)', cursor: 'pointer', fontSize: 14 }}>×</button>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
@@ -1062,7 +1062,7 @@ function NodeEditPanel({ node, onChange, onClose }: {
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {ICON_OPTIONS.map((ic) => (
               <button key={ic} onClick={() => onChange({ icon: ic })}
-                style={{ width: 34, height: 34, borderRadius: 8, border: '1px solid ' + (node.icon === ic ? node.color : 'rgba(255,255,255,0.1)'), background: node.icon === ic ? node.color + '20' : 'rgba(255,255,255,0.03)', fontSize: 16, cursor: 'pointer' }}>
+                style={{ width: 34, height: 34, borderRadius: 8, border: '1px solid ' + (node.icon === ic ? node.color : 'var(--panel-border-3)'), background: node.icon === ic ? node.color + '20' : 'var(--panel-alt)', fontSize: 16, cursor: 'pointer' }}>
                 {ic}
               </button>
             ))}
@@ -1097,26 +1097,26 @@ function NodeEditPanel({ node, onChange, onClose }: {
           </div>
           <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
             <div onClick={() => onChange({ waitForApproval: !node.waitForApproval })}
-              style={{ width: 36, height: 20, borderRadius: 999, background: node.waitForApproval ? '#f59e0b' : 'rgba(255,255,255,0.1)', position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 }}>
+              style={{ width: 36, height: 20, borderRadius: 999, background: node.waitForApproval ? '#f59e0b' : 'var(--panel-border-3)', position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 }}>
               <div style={{ position: 'absolute', top: 2, left: node.waitForApproval ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
             </div>
-            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Onay bekle</span>
+            <span style={{ fontSize: 13, color: 'var(--ink-58)' }}>Onay bekle</span>
           </label>
           {String(node.role || '').trim().toLowerCase() === 'lead_developer' && (
             <>
               <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
                 <div onClick={() => onChange({ review_only: !node.review_only })}
-                  style={{ width: 36, height: 20, borderRadius: 999, background: node.review_only ? '#38bdf8' : 'rgba(255,255,255,0.1)', position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 }}>
+                  style={{ width: 36, height: 20, borderRadius: 999, background: node.review_only ? '#38bdf8' : 'var(--panel-border-3)', position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 }}>
                   <div style={{ position: 'absolute', top: 2, left: node.review_only ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
                 </div>
-                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Review only</span>
+                <span style={{ fontSize: 13, color: 'var(--ink-58)' }}>Review only</span>
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
                 <div onClick={() => onChange({ auto_fix_from_comments: !node.auto_fix_from_comments })}
-                  style={{ width: 36, height: 20, borderRadius: 999, background: node.auto_fix_from_comments !== false ? '#22c55e' : 'rgba(255,255,255,0.1)', position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 }}>
+                  style={{ width: 36, height: 20, borderRadius: 999, background: node.auto_fix_from_comments !== false ? '#22c55e' : 'var(--panel-border-3)', position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 }}>
                   <div style={{ position: 'absolute', top: 2, left: node.auto_fix_from_comments !== false ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
                 </div>
-                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>Auto-fix from PR comments</span>
+                <span style={{ fontSize: 13, color: 'var(--ink-58)' }}>Auto-fix from PR comments</span>
               </label>
             </>
           )}
@@ -1256,14 +1256,14 @@ function ToolBtn({ children, onClick, title, active }: {
 }) {
   return (
     <button title={title} onClick={onClick}
-      style={{ width: 36, height: 36, borderRadius: 10, border: '1px solid ' + (active ? 'rgba(13,148,136,0.5)' : 'rgba(255,255,255,0.1)'), background: active ? 'rgba(13,148,136,0.2)' : 'rgba(255,255,255,0.04)', color: active ? '#5eead4' : 'rgba(255,255,255,0.5)', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+      style={{ width: 36, height: 36, borderRadius: 10, border: '1px solid ' + (active ? 'rgba(13,148,136,0.5)' : 'var(--panel-border-3)'), background: active ? 'rgba(13,148,136,0.2)' : 'var(--glass)', color: active ? '#5eead4' : 'var(--ink-50)', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
       {children}
     </button>
   );
 }
 
-const pLbl: React.CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', display: 'block', marginBottom: 6 };
-const pInp: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 9, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.9)', fontSize: 13, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' };
+const pLbl: React.CSSProperties = { fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-30)', display: 'block', marginBottom: 6 };
+const pInp: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 9, border: '1px solid var(--panel-border-3)', background: 'var(--glass)', color: 'var(--ink-90)', fontSize: 13, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' };
 
 // ── RunHistoryPanel ───────────────────────────────────────────────────────────
 const STATUS_COLOR: Record<string, string> = {
@@ -1302,28 +1302,28 @@ function RunHistoryPanel({ runs, loading, selected, onSelect, onRefresh, onClose
   }
 
   return (
-    <div style={{ width: 320, flexShrink: 0, borderRadius: 20, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(3,7,18,0.7)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-        <span style={{ fontWeight: 700, fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>{t('flows.runHistory')}</span>
+    <div style={{ width: 320, flexShrink: 0, borderRadius: 20, border: '1px solid var(--panel-border)', background: 'var(--panel)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--panel-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--ink-78)' }}>{t('flows.runHistory')}</span>
         <div style={{ display: 'flex', gap: 6 }}>
           <button onClick={onRefresh} title="Yenile"
-            style={{ width: 26, height: 26, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 12 }}>↻</button>
+            style={{ width: 26, height: 26, borderRadius: 8, border: '1px solid var(--panel-border-3)', background: 'var(--glass)', color: 'var(--ink-50)', cursor: 'pointer', fontSize: 12 }}>↻</button>
           <button onClick={onClose}
-            style={{ width: 26, height: 26, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 14 }}>×</button>
+            style={{ width: 26, height: 26, borderRadius: 8, border: '1px solid var(--panel-border-3)', background: 'var(--glass)', color: 'var(--ink-50)', cursor: 'pointer', fontSize: 14 }}>×</button>
         </div>
       </div>
 
       {selected ? (
         <div style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
           <button onClick={() => onSelect(null as unknown as FlowRunResult)}
-            style={{ alignSelf: 'flex-start', padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.4)', fontSize: 11, cursor: 'pointer' }}>
+            style={{ alignSelf: 'flex-start', padding: '4px 10px', borderRadius: 8, border: '1px solid var(--panel-border-3)', background: 'transparent', color: 'var(--ink-35)', fontSize: 11, cursor: 'pointer' }}>
             ← Geri
           </button>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>{selected.flow_name}</div>
-          {selected.task_title && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Görev: {selected.task_title}</div>}
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-90)' }}>{selected.flow_name}</div>
+          {selected.task_title && <div style={{ fontSize: 11, color: 'var(--ink-35)' }}>Görev: {selected.task_title}</div>}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: STATUS_COLOR[selected.status] ?? '#fff', padding: '2px 8px', borderRadius: 999, background: (STATUS_COLOR[selected.status] ?? '#fff') + '18', border: '1px solid ' + (STATUS_COLOR[selected.status] ?? '#fff') + '40' }}>{selected.status}</span>
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{fmt(selected.started_at)}</span>
+            <span style={{ fontSize: 10, color: 'var(--ink-30)' }}>{fmt(selected.started_at)}</span>
             {getFeedbackFlags(selected).found && (
               <span style={{ fontSize: 10, fontWeight: 700, color: '#fbbf24', padding: '2px 8px', borderRadius: 999, background: 'rgba(251,191,36,0.14)', border: '1px solid rgba(251,191,36,0.35)' }}>
                 PR feedback bulundu
@@ -1337,15 +1337,15 @@ function RunHistoryPanel({ runs, loading, selected, onSelect, onRefresh, onClose
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {selected.steps.map((step) => (
-              <div key={step.id} style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)' }}>
+              <div key={step.id} style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--panel-border)', background: 'var(--panel)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.8)' }}>{step.node_label ?? step.node_id}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-78)' }}>{step.node_label ?? step.node_id}</span>
                   <span style={{ fontSize: 10, fontWeight: 700, color: STATUS_COLOR[step.status] ?? '#fff' }}>{step.status}</span>
                 </div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginBottom: step.output ? 6 : 0 }}>{step.node_type}</div>
+                <div style={{ fontSize: 10, color: 'var(--ink-30)', marginBottom: step.output ? 6 : 0 }}>{step.node_type}</div>
                 {step.error_msg && <div style={{ fontSize: 11, color: '#f87171', marginTop: 4 }}>{step.error_msg}</div>}
                 {Boolean(step.output) && typeof step.output === 'object' && Boolean((step.output as Record<string, unknown>).output) && (
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 4, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 80, overflow: 'hidden' }}>
+                  <div style={{ fontSize: 10, color: 'var(--ink-45)', marginTop: 4, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 80, overflow: 'hidden' }}>
                     {String((step.output as Record<string, unknown>).output).slice(0, 200)}
                   </div>
                 )}
@@ -1355,18 +1355,18 @@ function RunHistoryPanel({ runs, loading, selected, onSelect, onRefresh, onClose
         </div>
       ) : (
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
-          {loading && <div style={{ padding: '20px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>Yükleniyor...</div>}
+          {loading && <div style={{ padding: '20px', textAlign: 'center', color: 'var(--ink-30)', fontSize: 12 }}>Yükleniyor...</div>}
           {!loading && runs.length === 0 && (
-            <div style={{ padding: '20px', textAlign: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 12 }}>Henüz run yok</div>
+            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--ink-25)', fontSize: 12 }}>Henüz run yok</div>
           )}
           {runs.map((run) => (
             <button key={run.id} onClick={() => onSelect(run)}
-              style={{ width: '100%', padding: '10px 16px', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'transparent', cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              style={{ width: '100%', padding: '10px 16px', border: 'none', borderBottom: '1px solid var(--glass)', background: 'transparent', cursor: 'pointer', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 4 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>{run.flow_name}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-78)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>{run.flow_name}</span>
                 <span style={{ fontSize: 10, fontWeight: 700, color: STATUS_COLOR[run.status] ?? '#fff' }}>{run.status}</span>
               </div>
-              {run.task_title && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{run.task_title}</div>}
+              {run.task_title && <div style={{ fontSize: 10, color: 'var(--ink-35)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{run.task_title}</div>}
               {getFeedbackFlags(run).found && (
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 10, fontWeight: 700, color: '#fbbf24', padding: '2px 7px', borderRadius: 999, background: 'rgba(251,191,36,0.14)', border: '1px solid rgba(251,191,36,0.35)' }}>
@@ -1379,7 +1379,7 @@ function RunHistoryPanel({ runs, loading, selected, onSelect, onRefresh, onClose
                   )}
                 </div>
               )}
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>{fmt(run.started_at)} · {run.steps.length} adım</div>
+              <div style={{ fontSize: 10, color: 'var(--ink-25)' }}>{fmt(run.started_at)} · {run.steps.length} adım</div>
             </button>
           ))}
         </div>

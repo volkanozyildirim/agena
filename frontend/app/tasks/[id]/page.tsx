@@ -1006,7 +1006,7 @@ export default function TaskDetailPage() {
           </section>
 
           {/* Memory impact */}
-          <section style={{ borderRadius: 16, border: '1px solid rgba(94,234,212,0.18)', background: 'rgba(10,20,32,0.46)', padding: 12 }}>
+          <section style={{ borderRadius: 16, border: '1px solid rgba(94,234,212,0.18)', background: 'var(--panel)', padding: 12 }}>
             <h3 style={{ marginTop: 0, marginBottom: 10, color: '#5eead4', fontSize: 15 }}>{t('taskDetail.memoryImpact')}</h3>
             {!memoryImpact ? (
               <div style={{ fontSize: 12, color: 'var(--ink-45)' }}>{t('taskDetail.memoryImpactEmpty')}</div>

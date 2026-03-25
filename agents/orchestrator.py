@@ -73,13 +73,14 @@ class AgentOrchestrator:
         spec = state.get('spec', {})
         desc = state.get('task', {}).get('description', '')
         ctx = state.get('context_summary', '')
+        run_mode = state.get('mode', 'flow')
 
-        # Pass full context_summary (includes source files) to developer
         generated_code, usage, model = await self.agents.run_developer(
             spec=spec,
             context_summary='',
             task_description=desc,
             target_files_context=ctx,
+            direct_mode=(run_mode == 'ai'),
         )
         self._merge_usage(state, usage)
         state['generated_code'] = generated_code
