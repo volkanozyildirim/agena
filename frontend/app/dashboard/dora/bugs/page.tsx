@@ -6,6 +6,7 @@ import { fetchDoraBugs, type DoraBugsResponse } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
 import LineChart from '@/components/charts/LineChart';
 import BarChart from '@/components/charts/BarChart';
+import RepoSelector from '@/components/RepoSelector';
 
 const box: React.CSSProperties = {
   borderRadius: 14,
@@ -25,12 +26,15 @@ export default function DoraBugsPage() {
   const [data, setData] = useState<DoraBugsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [repoId, setRepoId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
+    setError('');
     (async () => {
       try {
-        const res = await fetchDoraBugs(30);
+        const res = await fetchDoraBugs(30, repoId);
         if (active) setData(res);
       } catch (e) {
         if (active) setError(e instanceof Error ? e.message : 'Failed');
@@ -39,7 +43,7 @@ export default function DoraBugsPage() {
       }
     })();
     return () => { active = false; };
-  }, []);
+  }, [repoId]);
 
   return (
     <div style={{ display: 'grid', gap: 24 }}>
@@ -54,6 +58,7 @@ export default function DoraBugsPage() {
         <p style={{ fontSize: 14, color: 'var(--muted)', marginTop: 6 }}>
           {t('dora.bugs.subtitle')}
         </p>
+        <RepoSelector value={repoId} onSelect={setRepoId} />
         <span style={{
           display: 'inline-block', marginTop: 8, fontSize: 11,
           color: 'var(--muted)', background: 'var(--glass)',

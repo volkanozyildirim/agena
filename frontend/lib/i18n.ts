@@ -1159,6 +1159,14 @@ const translations = {
     'dora.project.hours': 'saat',
     'dora.project.tasks': 'gorev',
     'dora.project.noData': 'Bu donem icin veri bulunamadi.',
+    // DORA Repo Selector
+    'dora.repoSelector.label': 'Repo',
+    'dora.repoSelector.allRepos': 'Tum Repolar',
+    'dora.repoSelector.sync': 'Senkronize Et',
+    'dora.repoSelector.syncing': 'Senkronize ediliyor...',
+    'dora.repoSelector.lastSync': 'Son senkronizasyon',
+    'dora.repoSelector.dataSourceGit': 'Git verisi',
+    'dora.repoSelector.dataSourceTasks': 'Gorev verisi',
     // Invite
     'invite.title': 'Organizasyona Katil',
     'invite.subtitle': 'Asagidaki organizasyona katilmak icin davet edildiniz.',
@@ -2350,6 +2358,14 @@ const translations = {
     'dora.project.hours': 'hours',
     'dora.project.tasks': 'tasks',
     'dora.project.noData': 'No data found for this period.',
+    // DORA Repo Selector
+    'dora.repoSelector.label': 'Repo',
+    'dora.repoSelector.allRepos': 'All Repos',
+    'dora.repoSelector.sync': 'Sync',
+    'dora.repoSelector.syncing': 'Syncing...',
+    'dora.repoSelector.lastSync': 'Last sync',
+    'dora.repoSelector.dataSourceGit': 'Git data',
+    'dora.repoSelector.dataSourceTasks': 'Task data',
     // Invite
     'invite.title': 'Join Organization',
     'invite.subtitle': 'You have been invited to join the organization below.',

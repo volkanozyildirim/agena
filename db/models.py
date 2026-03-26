@@ -1,5 +1,8 @@
 from models.agent_log import AgentLog
 from models.ai_usage_event import AIUsageEvent
+from models.git_commit import GitCommit
+from models.git_deployment import GitDeployment
+from models.git_pull_request import GitPullRequest
 from models.flow_assets import AgentAnalyticsSnapshot, FlowTemplate, FlowVersion
 from models.flow_run import FlowRun, FlowRunStep
 from models.integration_config import IntegrationConfig
@@ -37,4 +40,7 @@ __all__ = [
     'IntegrationConfig',
     'NotificationRecord',
     'UserPreference',
+    'GitCommit',
+    'GitPullRequest',
+    'GitDeployment',
 ]

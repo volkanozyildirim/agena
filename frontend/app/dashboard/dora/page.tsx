@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { apiFetch } from '@/lib/api';
+import { fetchDoraOverview } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
+import RepoSelector from '@/components/RepoSelector';
 
 const box: React.CSSProperties = {
   borderRadius: 14,
@@ -97,12 +98,15 @@ export default function DoraOverviewPage() {
   const [data, setData] = useState<DoraSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [repoId, setRepoId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
+    setError('');
     (async () => {
       try {
-        const res = await apiFetch<DoraSummary>('/analytics/dora');
+        const res = await fetchDoraOverview(30, repoId);
         if (active) setData(res);
       } catch (e) {
         if (active) setError(e instanceof Error ? e.message : 'Failed to load DORA metrics');
@@ -111,7 +115,7 @@ export default function DoraOverviewPage() {
       }
     })();
     return () => { active = false; };
-  }, []);
+  }, [repoId]);
 
   const metrics = [
     {
@@ -170,9 +174,12 @@ export default function DoraOverviewPage() {
       <div style={{ marginBottom: 32 }}>
         <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--ink)', margin: 0 }}>{t('dora.title')}</h1>
         <p style={{ fontSize: 14, color: 'var(--muted)', marginTop: 6 }}>{t('dora.subtitle')}</p>
-        <span style={{ display: 'inline-block', marginTop: 8, fontSize: 11, color: 'var(--muted)', background: 'var(--glass)', border: '1px solid var(--panel-border)', borderRadius: 999, padding: '3px 10px' }}>
-          {t('dora.last30')}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, color: 'var(--muted)', background: 'var(--glass)', border: '1px solid var(--panel-border)', borderRadius: 999, padding: '3px 10px' }}>
+            {t('dora.last30')}
+          </span>
+          <RepoSelector value={repoId} onSelect={setRepoId} />
+        </div>
       </div>
 
       {error && (

@@ -165,7 +165,7 @@ class AnalyticsService:
     # ── DORA Project Analytics ─────────────────────────────────────────────
 
     async def project_analytics(
-        self, organization_id: int, days: int = 30,
+        self, organization_id: int, days: int = 30, repo_mapping_id: str | None = None,
     ) -> dict:
         now = datetime.utcnow()
         since = now - timedelta(days=days)
@@ -341,7 +341,7 @@ class AnalyticsService:
     # ── DORA Development Analytics ─────────────────────────────────────────────
 
     async def dora_development(
-        self, organization_id: int, days: int = 30,
+        self, organization_id: int, days: int = 30, repo_mapping_id: str | None = None,
     ) -> dict:
         since = datetime.utcnow() - timedelta(days=days)
 
@@ -526,7 +526,7 @@ class AnalyticsService:
     # ── DORA Quality metrics ───────────────────────────────────────────────────
 
     async def dora_quality(
-        self, organization_id: int, days: int = 30,
+        self, organization_id: int, days: int = 30, repo_mapping_id: str | None = None,
     ) -> dict:
         since = datetime.utcnow() - timedelta(days=days)
 
@@ -651,7 +651,7 @@ class AnalyticsService:
     # ── DORA Bug Report metrics ────────────────────────────────────────────────
 
     async def dora_bugs(
-        self, organization_id: int, days: int = 30, stale_minutes: int = 30,
+        self, organization_id: int, days: int = 30, stale_minutes: int = 30, repo_mapping_id: str | None = None,
     ) -> dict:
         since = datetime.utcnow() - timedelta(days=days)
         now = datetime.utcnow()

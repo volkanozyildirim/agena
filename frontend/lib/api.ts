@@ -605,8 +605,10 @@ export interface ProjectAnalyticsResponse {
   throughput_trend: ThroughputTrendItem[];
 }
 
-export async function fetchProjectAnalytics(days = 30): Promise<ProjectAnalyticsResponse> {
-  return apiFetch<ProjectAnalyticsResponse>(`/analytics/dora/project?days=${days}`);
+export async function fetchProjectAnalytics(days = 30, repoMappingId?: string | null): Promise<ProjectAnalyticsResponse> {
+  const qs = new URLSearchParams({ days: String(days) });
+  if (repoMappingId) qs.set('repo_mapping_id', repoMappingId);
+  return apiFetch<ProjectAnalyticsResponse>(`/analytics/dora/project?${qs.toString()}`);
 }
 
 // ── DORA Development Analytics ───────────────────────────────────────────────
@@ -652,8 +654,10 @@ export interface DoraDevelopmentResponse {
   token_usage_trend: TokenUsageTrendItem[];
 }
 
-export async function fetchDoraDevelopment(days = 30): Promise<DoraDevelopmentResponse> {
-  return apiFetch<DoraDevelopmentResponse>(`/analytics/dora/development?days=${days}`);
+export async function fetchDoraDevelopment(days = 30, repoMappingId?: string | null): Promise<DoraDevelopmentResponse> {
+  const qs = new URLSearchParams({ days: String(days) });
+  if (repoMappingId) qs.set('repo_mapping_id', repoMappingId);
+  return apiFetch<DoraDevelopmentResponse>(`/analytics/dora/development?${qs.toString()}`);
 }
 
 // ── DORA Quality ──────────────────────────────────────────────────────────────
@@ -680,8 +684,10 @@ export interface DoraQualityResponse {
   failure_categories: FailureCategoryItem[];
 }
 
-export async function fetchDoraQuality(days = 30): Promise<DoraQualityResponse> {
-  return apiFetch<DoraQualityResponse>(`/analytics/dora/quality?days=${days}`);
+export async function fetchDoraQuality(days = 30, repoMappingId?: string | null): Promise<DoraQualityResponse> {
+  const qs = new URLSearchParams({ days: String(days) });
+  if (repoMappingId) qs.set('repo_mapping_id', repoMappingId);
+  return apiFetch<DoraQualityResponse>(`/analytics/dora/quality?${qs.toString()}`);
 }
 
 // ── DORA Bug Report ───────────────────────────────────────────────────────────
@@ -726,6 +732,36 @@ export interface DoraBugsResponse {
   stale_tasks: StaleTaskItem[];
 }
 
-export async function fetchDoraBugs(days = 30): Promise<DoraBugsResponse> {
-  return apiFetch<DoraBugsResponse>(`/analytics/dora/bugs?days=${days}`);
+export async function fetchDoraBugs(days = 30, repoMappingId?: string | null): Promise<DoraBugsResponse> {
+  const qs = new URLSearchParams({ days: String(days) });
+  if (repoMappingId) qs.set('repo_mapping_id', repoMappingId);
+  return apiFetch<DoraBugsResponse>(`/analytics/dora/bugs?${qs.toString()}`);
+}
+
+// ── DORA Sync ─────────────────────────────────────────────────────────────────
+
+export async function syncDoraRepo(repoMappingId: string): Promise<{ status: string }> {
+  return apiFetch<{ status: string }>('/analytics/dora/sync', {
+    method: 'POST',
+    body: JSON.stringify({ repo_mapping_id: repoMappingId }),
+  });
+}
+
+export async function fetchDoraOverview(days = 30, repoMappingId?: string | null): Promise<{
+  lead_time_hours: number | null;
+  deploy_frequency: number | null;
+  change_failure_rate: number | null;
+  mttr_hours: number | null;
+  data_source: string;
+  daily: Array<{
+    date: string;
+    completed: number;
+    failed: number;
+    lead_time_hours: number | null;
+    mttr_hours: number | null;
+  }>;
+}> {
+  const qs = new URLSearchParams({ days: String(days) });
+  if (repoMappingId) qs.set('repo_mapping_id', repoMappingId);
+  return apiFetch(`/analytics/dora?${qs.toString()}`);
 }

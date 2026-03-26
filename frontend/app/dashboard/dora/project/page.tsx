@@ -9,6 +9,7 @@ import {
 import { useLocale } from '@/lib/i18n';
 import BarChart from '@/components/charts/BarChart';
 import LineChart from '@/components/charts/LineChart';
+import RepoSelector from '@/components/RepoSelector';
 
 const box: React.CSSProperties = {
   borderRadius: 14,
@@ -177,6 +178,7 @@ export default function DoraProjectPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [days, setDays] = useState(30);
+  const [repoId, setRepoId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -184,7 +186,7 @@ export default function DoraProjectPage() {
     setError('');
     (async () => {
       try {
-        const res = await fetchProjectAnalytics(days);
+        const res = await fetchProjectAnalytics(days, repoId);
         if (active) setData(res);
       } catch (e) {
         if (active) setError(e instanceof Error ? e.message : 'Failed to load project analytics');
@@ -193,7 +195,7 @@ export default function DoraProjectPage() {
       }
     })();
     return () => { active = false; };
-  }, [days]);
+  }, [days, repoId]);
 
   const periodOptions = [7, 14, 30, 60, 90];
 
@@ -208,6 +210,7 @@ export default function DoraProjectPage() {
           </div>
           <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--ink)', margin: 0 }}>{t('dora.project.pageTitle')}</h1>
           <p style={{ fontSize: 14, color: 'var(--muted)', marginTop: 6 }}>{t('dora.projectDesc')}</p>
+          <RepoSelector value={repoId} onSelect={setRepoId} />
         </div>
         <div style={{ display: 'flex', gap: 4 }}>
           {periodOptions.map((d) => (

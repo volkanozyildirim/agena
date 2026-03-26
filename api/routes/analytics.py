@@ -1,13 +1,18 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+import json
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.dependencies import CurrentTenant, get_current_tenant
+from api.dependencies import CurrentTenant, get_current_tenant, require_permission
 from core.database import get_db_session
+from models.user_preference import UserPreference
 from services.analytics_service import AnalyticsService
 from services.dora_service import DoraService
+from services.git_sync_service import GitSyncService
 
 router = APIRouter(prefix='/analytics', tags=['analytics'])
 
@@ -156,6 +161,7 @@ class DoraOverviewResponse(BaseModel):
     deploy_frequency: float | None
     change_failure_rate: float | None
     mttr_hours: float | None
+    data_source: str = 'tasks'
     daily: list[DoraDailyItem]
 
 
@@ -269,53 +275,143 @@ async def get_model_breakdown(
 @router.get('/dora/project', response_model=ProjectAnalyticsResponse)
 async def get_project_analytics(
     days: int = Query(default=30, ge=1, le=365),
+    repo_mapping_id: str | None = Query(default=None),
     tenant: CurrentTenant = Depends(get_current_tenant),
     db: AsyncSession = Depends(get_db_session),
 ) -> ProjectAnalyticsResponse:
     service = AnalyticsService(db)
-    data = await service.project_analytics(tenant.organization_id, days=days)
+    data = await service.project_analytics(tenant.organization_id, days=days, repo_mapping_id=repo_mapping_id)
     return ProjectAnalyticsResponse(**data)
 
 
 @router.get('/dora/development', response_model=DoraDevelopmentResponse)
 async def get_dora_development(
     days: int = Query(default=30, ge=1, le=365),
+    repo_mapping_id: str | None = Query(default=None),
     tenant: CurrentTenant = Depends(get_current_tenant),
     db: AsyncSession = Depends(get_db_session),
 ) -> DoraDevelopmentResponse:
     service = AnalyticsService(db)
-    data = await service.dora_development(tenant.organization_id, days=days)
+    data = await service.dora_development(tenant.organization_id, days=days, repo_mapping_id=repo_mapping_id)
     return DoraDevelopmentResponse(**data)
 
 
 @router.get('/dora/quality', response_model=DoraQualityResponse)
 async def get_dora_quality(
     days: int = Query(default=30, ge=1, le=365),
+    repo_mapping_id: str | None = Query(default=None),
     tenant: CurrentTenant = Depends(get_current_tenant),
     db: AsyncSession = Depends(get_db_session),
 ) -> DoraQualityResponse:
     service = AnalyticsService(db)
-    data = await service.dora_quality(tenant.organization_id, days=days)
+    data = await service.dora_quality(tenant.organization_id, days=days, repo_mapping_id=repo_mapping_id)
     return DoraQualityResponse(**data)
 
 
 @router.get('/dora/bugs', response_model=DoraBugsResponse)
 async def get_dora_bugs(
     days: int = Query(default=30, ge=1, le=365),
+    repo_mapping_id: str | None = Query(default=None),
     tenant: CurrentTenant = Depends(get_current_tenant),
     db: AsyncSession = Depends(get_db_session),
 ) -> DoraBugsResponse:
     service = AnalyticsService(db)
-    data = await service.dora_bugs(tenant.organization_id, days=days)
+    data = await service.dora_bugs(tenant.organization_id, days=days, repo_mapping_id=repo_mapping_id)
     return DoraBugsResponse(**data)
 
 
 @router.get('/dora', response_model=DoraOverviewResponse)
 async def get_dora_overview(
     days: int = Query(default=30, ge=1, le=365),
+    repo_mapping_id: str | None = Query(default=None),
     tenant: CurrentTenant = Depends(get_current_tenant),
     db: AsyncSession = Depends(get_db_session),
 ) -> DoraOverviewResponse:
     service = DoraService(db)
-    data = await service.overview(tenant.organization_id, days=days)
+    data = await service.overview(tenant.organization_id, days=days, repo_mapping_id=repo_mapping_id)
     return DoraOverviewResponse(**data)
+
+
+# ── DORA Git Sync schemas ───────────────────────────────────────────────────
+
+
+class DoraSyncRequest(BaseModel):
+    repo_mapping_id: str
+
+
+class DoraSyncResponse(BaseModel):
+    commits_synced: int
+    prs_synced: int
+    deployments_synced: int
+
+
+class SyncStatusItem(BaseModel):
+    repo_mapping_id: str
+    commits: int
+    prs: int
+    deployments: int
+    last_sync: str | None
+
+
+class DoraSyncStatusResponse(BaseModel):
+    repos: list[SyncStatusItem]
+
+
+# ── DORA Git Sync endpoints ─────────────────────────────────────────────────
+
+
+def _parse_repo_mappings_json(val: str | None) -> list[dict]:
+    if not val:
+        return []
+    try:
+        parsed = json.loads(val)
+        return parsed if isinstance(parsed, list) else []
+    except Exception:
+        return []
+
+
+@router.post('/dora/sync', response_model=DoraSyncResponse)
+async def sync_dora_data(
+    payload: DoraSyncRequest,
+    tenant: CurrentTenant = Depends(require_permission('tasks:write')),
+    db: AsyncSession = Depends(get_db_session),
+) -> DoraSyncResponse:
+    """Trigger a data sync for a specific repo mapping.  Fetches commits, PRs,
+    and deployments from GitHub or Azure and stores them in the database."""
+
+    # Find the repo mapping from user preferences
+    result = await db.execute(
+        select(UserPreference).where(UserPreference.user_id == tenant.user_id)
+    )
+    pref = result.scalar_one_or_none()
+    if pref is None:
+        raise HTTPException(status_code=404, detail='User preferences not found')
+
+    repo_mappings = _parse_repo_mappings_json(pref.repo_mappings_json)
+    repo_mapping = None
+    for m in repo_mappings:
+        if str(m.get('id') or '') == payload.repo_mapping_id:
+            repo_mapping = m
+            break
+
+    if repo_mapping is None:
+        raise HTTPException(status_code=404, detail='Repo mapping not found')
+
+    service = GitSyncService(db)
+    try:
+        counts = await service.sync_repo(tenant.organization_id, repo_mapping)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return DoraSyncResponse(**counts)
+
+
+@router.get('/dora/sync-status', response_model=DoraSyncStatusResponse)
+async def get_dora_sync_status(
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> DoraSyncStatusResponse:
+    """Return last sync time and record counts per repo mapping."""
+    service = GitSyncService(db)
+    items = await service.get_sync_status(tenant.organization_id)
+    return DoraSyncStatusResponse(repos=[SyncStatusItem(**item) for item in items])
