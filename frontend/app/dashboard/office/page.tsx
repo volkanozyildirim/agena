@@ -93,22 +93,21 @@ function usePixelOfficeBridge(
         for (const a of agents) {
           send({ type: 'agentCreated', id: a.pixelId, folderName: a.label });
           spawnedRef.current.add(a.pixelId);
-          // Active agents: start tool animation immediately
-          if (a.status === 'active') {
-            stageRef.current[a.pixelId] = a.currentStage || 'active';
-          } else {
-            stageRef.current[a.pixelId] = 'idle';
-          }
+          stageRef.current[a.pixelId] = a.status === 'active' ? (a.currentStage || 'active') : 'idle';
         }
-        // After agents walk to their seats, send tool animations for active ones
+        // After agents reach their seats (~3s), set final states
         setTimeout(() => {
           const curr = agentsRef.current;
           for (const a of curr) {
             if (a.status === 'active') {
+              // Active: start tool animation (typing/reading)
               send({ type: 'agentToolStart', id: a.pixelId, toolId: `t-${a.pixelId}-${Date.now()}`, status: stepToToolName(a.currentStage || '') });
+            } else {
+              // Idle: end turn → sit briefly (3-8s) then start wandering
+              send({ type: 'agentStatus', id: a.pixelId, status: 'waiting' });
             }
           }
-        }, 1000);
+        }, 3000);
       }
 
       // Sync loop: detect status changes every second
@@ -321,6 +320,37 @@ export default function OfficePage() {
   const [agentConfigs, setAgentConfigs] = useState<AgentConfig[]>([]);
   const [officeAgents, setOfficeAgents] = useState<OfficeAgent[]>([]);
   const [iframeLoaded, setIframeLoaded] = useState(false);
+  const LS_LAYOUT_KEY = 'tiqr_pixel_office_layout';
+
+  // Listen for saveLayout from iframe and persist to localStorage
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.source === 'pixel-office' && e.data.payload?.type === 'saveLayout') {
+        try {
+          localStorage.setItem(LS_LAYOUT_KEY, JSON.stringify(e.data.payload.layout));
+        } catch { /* silent */ }
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  // After iframe loads, restore saved layout
+  useEffect(() => {
+    if (!iframeLoaded) return;
+    const timer = setTimeout(() => {
+      try {
+        const saved = localStorage.getItem(LS_LAYOUT_KEY);
+        if (saved) {
+          const layout = JSON.parse(saved);
+          iframeRef.current?.contentWindow?.postMessage(
+            { source: 'tiqr-bridge', payload: { type: 'layoutLoaded', layout } }, '*',
+          );
+        }
+      } catch { /* silent */ }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [iframeLoaded]);
   const [viewMode, setViewMode] = useState<'office' | 'split'>('split');
   const [assignAgent, setAssignAgent] = useState<OfficeAgent | null>(null);
   const officeAgentsRef = useRef<OfficeAgent[]>([]);
