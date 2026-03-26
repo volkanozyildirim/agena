@@ -393,6 +393,178 @@ class DoraService:
             'daily': daily,
         }
 
+    # ── Deployments analytics (DORA tab) ────────────────────────────────────
+
+    async def deployments_analytics(
+        self,
+        organization_id: int,
+        days: int = 30,
+        repo_mapping_id: str | None = None,
+    ) -> dict:
+        since = datetime.utcnow() - timedelta(days=days)
+
+        filters = [
+            GitDeployment.organization_id == organization_id,
+            GitDeployment.deployed_at >= since,
+        ]
+        if repo_mapping_id:
+            filters.append(GitDeployment.repo_mapping_id == repo_mapping_id)
+
+        # ── KPI: Lead Time for Changes ────────────────────────────────────
+        lt_q = select(
+            func.avg(
+                func.unix_timestamp(GitPullRequest.merged_at) -
+                func.unix_timestamp(GitPullRequest.first_commit_at)
+            ).label('avg_seconds'),
+        ).where(
+            GitPullRequest.organization_id == organization_id,
+            GitPullRequest.merged_at >= since,
+            GitPullRequest.merged_at.isnot(None),
+            GitPullRequest.first_commit_at.isnot(None),
+        )
+        if repo_mapping_id:
+            lt_q = lt_q.where(GitPullRequest.repo_mapping_id == repo_mapping_id)
+        lt_result = await self.db.execute(lt_q)
+        lt_row = lt_result.one()
+        avg_lt_sec = float(lt_row.avg_seconds) if lt_row.avg_seconds else None
+        lead_time_hours = round(avg_lt_sec / 3600, 2) if avg_lt_sec else 0.0
+
+        # ── KPI: Deployment Frequency ─────────────────────────────────────
+        dep_count_q = select(func.count(GitDeployment.id)).where(
+            *filters,
+            GitDeployment.status == 'success',
+        )
+        dep_count_result = await self.db.execute(dep_count_q)
+        success_count = dep_count_result.scalar() or 0
+        deploy_frequency = round(success_count / max(days, 1), 2)
+
+        # ── KPI: Change Failure Rate ──────────────────────────────────────
+        total_dep_q = select(
+            func.count(GitDeployment.id).label('total'),
+            func.sum(case((GitDeployment.status == 'failure', 1), else_=0)).label('failed'),
+        ).where(*filters)
+        total_dep_result = await self.db.execute(total_dep_q)
+        total_dep_row = total_dep_result.one()
+        total_deployments = int(total_dep_row.total or 0)
+        failed_deployments = int(total_dep_row.failed or 0)
+        change_failure_rate = round((failed_deployments / total_deployments) * 100, 2) if total_deployments > 0 else 0.0
+
+        # ── KPI: MTTR ────────────────────────────────────────────────────
+        mttr_hours = 0.0
+        if failed_deployments > 0:
+            all_dep_q = select(
+                GitDeployment.status,
+                GitDeployment.deployed_at,
+            ).where(*filters).order_by(GitDeployment.deployed_at)
+            all_dep_result = await self.db.execute(all_dep_q)
+            deployments = all_dep_result.all()
+
+            recovery_times: list[float] = []
+            i = 0
+            while i < len(deployments):
+                if deployments[i].status == 'failure':
+                    fail_time = deployments[i].deployed_at
+                    j = i + 1
+                    while j < len(deployments):
+                        if deployments[j].status == 'success':
+                            recovery_sec = (deployments[j].deployed_at - fail_time).total_seconds()
+                            recovery_times.append(recovery_sec)
+                            break
+                        j += 1
+                i += 1
+
+            if recovery_times:
+                avg_mttr_sec = sum(recovery_times) / len(recovery_times)
+                mttr_hours = round(avg_mttr_sec / 3600, 2)
+
+        # ── Daily trends ─────────────────────────────────────────────────
+        day_col = cast(GitDeployment.deployed_at, Date).label('day')
+
+        # Lead time daily (from PRs)
+        pr_day_col = cast(GitPullRequest.merged_at, Date).label('day')
+        daily_lt_q = select(
+            pr_day_col,
+            func.avg(
+                func.unix_timestamp(GitPullRequest.merged_at) -
+                func.unix_timestamp(GitPullRequest.first_commit_at)
+            ).label('avg_seconds'),
+        ).where(
+            GitPullRequest.organization_id == organization_id,
+            GitPullRequest.merged_at >= since,
+            GitPullRequest.merged_at.isnot(None),
+            GitPullRequest.first_commit_at.isnot(None),
+        ).group_by(pr_day_col).order_by(pr_day_col)
+        if repo_mapping_id:
+            daily_lt_q = daily_lt_q.where(GitPullRequest.repo_mapping_id == repo_mapping_id)
+        daily_lt_result = await self.db.execute(daily_lt_q)
+        lead_time_trend = []
+        for row in daily_lt_result.all():
+            val = float(row.avg_seconds) / 3600 if row.avg_seconds else 0.0
+            lead_time_trend.append({
+                'date': str(row.day),
+                'hours': round(val, 2),
+            })
+
+        # Deploy frequency daily
+        daily_dep_q = select(
+            day_col,
+            func.count(GitDeployment.id).label('deploys'),
+        ).where(
+            *filters,
+            GitDeployment.status == 'success',
+        ).group_by(day_col).order_by(day_col)
+        daily_dep_result = await self.db.execute(daily_dep_q)
+        deploy_freq_trend = [
+            {'date': str(row.day), 'deploys': int(row.deploys)}
+            for row in daily_dep_result.all()
+        ]
+
+        # Change failure rate daily
+        daily_cfr_q = select(
+            day_col,
+            func.count(GitDeployment.id).label('total'),
+            func.sum(case((GitDeployment.status == 'failure', 1), else_=0)).label('failed'),
+        ).where(*filters).group_by(day_col).order_by(day_col)
+        daily_cfr_result = await self.db.execute(daily_cfr_q)
+        cfr_trend = []
+        for row in daily_cfr_result.all():
+            t = int(row.total or 0)
+            f = int(row.failed or 0)
+            rate = round((f / t) * 100, 2) if t > 0 else 0.0
+            cfr_trend.append({'date': str(row.day), 'rate': rate})
+
+        # ── Deployment list ──────────────────────────────────────────────
+        list_q = select(
+            GitDeployment.environment,
+            GitDeployment.status,
+            GitDeployment.sha,
+            GitDeployment.deployed_at,
+            GitDeployment.duration_sec,
+        ).where(*filters).order_by(GitDeployment.deployed_at.desc()).limit(100)
+        list_result = await self.db.execute(list_q)
+        deployment_list = []
+        for r in list_result.all():
+            deployment_list.append({
+                'environment': str(r.environment or 'production'),
+                'status': str(r.status or 'unknown'),
+                'sha': str(r.sha or '')[:8],
+                'deployed_at': r.deployed_at.isoformat() if r.deployed_at else '',
+                'duration_sec': int(r.duration_sec or 0),
+            })
+
+        return {
+            'kpi': {
+                'lead_time_hours': lead_time_hours,
+                'deploy_frequency': deploy_frequency,
+                'change_failure_rate': change_failure_rate,
+                'mttr_hours': mttr_hours,
+            },
+            'lead_time_trend': lead_time_trend,
+            'deploy_freq_trend': deploy_freq_trend,
+            'cfr_trend': cfr_trend,
+            'deployments': deployment_list,
+        }
+
     # ── Public entry point ────────────────────────────────────────────────────
 
     async def overview(

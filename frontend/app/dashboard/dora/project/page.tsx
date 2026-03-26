@@ -4,9 +4,12 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   fetchProjectAnalytics,
+  fetchSprintDetail,
   type ProjectAnalyticsResponse,
+  type SprintDetailResponse,
+  type SprintWorkItem,
 } from '@/lib/api';
-import { useLocale } from '@/lib/i18n';
+import { useLocale, type TranslationKey } from '@/lib/i18n';
 import BarChart from '@/components/charts/BarChart';
 import LineChart from '@/components/charts/LineChart';
 import RepoSelector from '@/components/RepoSelector';
@@ -170,15 +173,231 @@ function DualLineChart({
   );
 }
 
+// ── Status Badge ──────────────────────────────────────────────────────────────
+
+const statusColors: Record<string, { bg: string; fg: string }> = {
+  completed: { bg: 'rgba(34,197,94,0.15)', fg: '#22c55e' },
+  running: { bg: 'rgba(59,130,246,0.15)', fg: '#3b82f6' },
+  queued: { bg: 'rgba(148,163,184,0.15)', fg: '#94a3b8' },
+  failed: { bg: 'rgba(239,68,68,0.15)', fg: '#ef4444' },
+  cancelled: { bg: 'rgba(239,68,68,0.15)', fg: '#ef4444' },
+};
+
+function StatusBadge({ status }: { status: string }) {
+  const c = statusColors[status] || { bg: 'rgba(148,163,184,0.15)', fg: '#94a3b8' };
+  return (
+    <span style={{
+      fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
+      background: c.bg, color: c.fg, textTransform: 'capitalize',
+    }}>
+      {status}
+    </span>
+  );
+}
+
+// ── Tab Badge ─────────────────────────────────────────────────────────────────
+
+function TabBadge({ count, color }: { count: number; color: string }) {
+  return (
+    <span style={{
+      fontSize: 11, fontWeight: 700, padding: '1px 7px', borderRadius: 10,
+      background: color, color: '#fff', marginLeft: 6, minWidth: 20, textAlign: 'center',
+      display: 'inline-block',
+    }}>
+      {count}
+    </span>
+  );
+}
+
+// ── Donut Chart ───────────────────────────────────────────────────────────────
+
+function DonutChart({ data }: { data: Array<{ label: string; value: number; color: string }> }) {
+  const total = data.reduce((s, d) => s + d.value, 0);
+  if (total === 0) return null;
+  const size = 140;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = 50;
+  const strokeW = 24;
+  let cumAngle = -90;
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        {data.map((d, i) => {
+          const pct = d.value / total;
+          const angle = pct * 360;
+          const startRad = (cumAngle * Math.PI) / 180;
+          const endRad = ((cumAngle + angle) * Math.PI) / 180;
+          const largeArc = angle > 180 ? 1 : 0;
+          const x1 = cx + r * Math.cos(startRad);
+          const y1 = cy + r * Math.sin(startRad);
+          const x2 = cx + r * Math.cos(endRad);
+          const y2 = cy + r * Math.sin(endRad);
+          cumAngle += angle;
+          return (
+            <path
+              key={i}
+              d={`M ${x1},${y1} A ${r},${r} 0 ${largeArc},1 ${x2},${y2}`}
+              fill="none"
+              stroke={d.color}
+              strokeWidth={strokeW}
+            />
+          );
+        })}
+        <text x={cx} y={cy + 5} textAnchor="middle" fontSize={20} fontWeight={800} fill="var(--ink)">
+          {total}
+        </text>
+      </svg>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {data.map((d, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 2, background: d.color, flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color: 'var(--muted)' }}>{d.label}: <strong style={{ color: 'var(--ink)' }}>{d.value}</strong></span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Work Items Table ──────────────────────────────────────────────────────────
+
+const thStyle: React.CSSProperties = {
+  textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--muted)',
+  padding: '8px 10px', borderBottom: '1px solid var(--panel-border)', whiteSpace: 'nowrap',
+};
+const tdStyle: React.CSSProperties = {
+  fontSize: 12, padding: '7px 10px', borderBottom: '1px solid var(--panel-border-2)',
+  color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 260,
+};
+
+function WorkItemsTable({ items, t }: { items: SprintWorkItem[]; t: (k: TranslationKey) => string }) {
+  if (items.length === 0) {
+    return <div style={{ color: 'var(--muted)', fontSize: 12, padding: 16, textAlign: 'center' }}>{t('dora.project.noData')}</div>;
+  }
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr>
+            <th style={thStyle}>{t('dora.sprint.workItemKey')}</th>
+            <th style={thStyle}>{t('dora.sprint.assignee')}</th>
+            <th style={thStyle}>{t('dora.sprint.summary')}</th>
+            <th style={thStyle}>{t('dora.sprint.workItemType')}</th>
+            <th style={thStyle}>{t('dora.sprint.priority')}</th>
+            <th style={thStyle}>{t('dora.sprint.status')}</th>
+            <th style={thStyle}>{t('dora.sprint.reopenCount')}</th>
+            <th style={thStyle}>{t('dora.sprint.effort')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => (
+            <tr key={item.id}>
+              <td style={{ ...tdStyle, fontFamily: 'monospace', fontWeight: 600, fontSize: 11 }}>{item.key}</td>
+              <td style={tdStyle}>{item.assignee}</td>
+              <td style={{ ...tdStyle, maxWidth: 300 }} title={item.summary}>{item.summary}</td>
+              <td style={tdStyle}>
+                <span style={{
+                  fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
+                  background: item.work_item_type === 'Bug' ? 'rgba(239,68,68,0.12)' : 'rgba(59,130,246,0.12)',
+                  color: item.work_item_type === 'Bug' ? '#ef4444' : '#3b82f6',
+                }}>
+                  {item.work_item_type}
+                </span>
+              </td>
+              <td style={tdStyle}>{item.priority}</td>
+              <td style={tdStyle}><StatusBadge status={item.status} /></td>
+              <td style={{ ...tdStyle, textAlign: 'center' }}>{item.reopen_count}</td>
+              <td style={{ ...tdStyle, textAlign: 'right', fontFamily: 'monospace' }}>{item.effort.toFixed(1)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Scope Change Bar Chart ────────────────────────────────────────────────────
+
+function ScopeChangeChart({ data, addedLabel, removedLabel }: {
+  data: Array<{ date: string; added: number; removed: number }>;
+  addedLabel: string;
+  removedLabel: string;
+}) {
+  if (data.length === 0) return null;
+  const width = 480;
+  const height = 180;
+  const pad = { top: 12, right: 8, bottom: 32, left: 8 };
+  const chartW = width - pad.left - pad.right;
+  const chartH = height - pad.top - pad.bottom;
+  const maxVal = Math.max(...data.map((d) => Math.max(d.added, d.removed)), 1);
+  const barW = Math.min(chartW / data.length / 2.5, 16);
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 16, marginBottom: 8 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--muted)' }}>
+          <span style={{ width: 10, height: 3, borderRadius: 2, background: '#22c55e', display: 'inline-block' }} />
+          {addedLabel}
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--muted)' }}>
+          <span style={{ width: 10, height: 3, borderRadius: 2, background: '#ef4444', display: 'inline-block' }} />
+          {removedLabel}
+        </span>
+      </div>
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: 'block', width: '100%', height: 'auto' }}>
+        <line x1={pad.left} y1={pad.top + chartH} x2={pad.left + chartW} y2={pad.top + chartH} stroke="var(--panel-border)" strokeWidth={1} />
+        {data.map((d, i) => {
+          const x = pad.left + (i + 0.5) * (chartW / data.length);
+          const addedH = (d.added / maxVal) * chartH;
+          const removedH = (d.removed / maxVal) * chartH;
+          return (
+            <g key={i}>
+              <rect
+                x={x - barW - 1}
+                y={pad.top + chartH - addedH}
+                width={barW}
+                height={addedH}
+                fill="#22c55e"
+                rx={2}
+              >
+                <title>{`${d.date}: +${d.added}`}</title>
+              </rect>
+              <rect
+                x={x + 1}
+                y={pad.top + chartH - removedH}
+                width={barW}
+                height={removedH}
+                fill="#ef4444"
+                rx={2}
+              >
+                <title>{`${d.date}: -${d.removed}`}</title>
+              </rect>
+              {data.length <= 14 && (
+                <text x={x} y={height - 6} textAnchor="middle" fontSize={9} fill="var(--ink-35)" fontFamily="monospace">
+                  {d.date.slice(-5)}
+                </text>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DoraProjectPage() {
   const { t } = useLocale();
   const [data, setData] = useState<ProjectAnalyticsResponse | null>(null);
+  const [sprint, setSprint] = useState<SprintDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [days, setDays] = useState(30);
   const [repoId, setRepoId] = useState<string | null>(null);
+  const [workItemTab, setWorkItemTab] = useState<'completed' | 'incomplete' | 'removed'>('completed');
 
   useEffect(() => {
     let active = true;
@@ -186,8 +405,14 @@ export default function DoraProjectPage() {
     setError('');
     (async () => {
       try {
-        const res = await fetchProjectAnalytics(days, repoId);
-        if (active) setData(res);
+        const [res, sprintRes] = await Promise.all([
+          fetchProjectAnalytics(days, repoId),
+          fetchSprintDetail(days, repoId),
+        ]);
+        if (active) {
+          setData(res);
+          setSprint(sprintRes);
+        }
       } catch (e) {
         if (active) setError(e instanceof Error ? e.message : 'Failed to load project analytics');
       } finally {
@@ -326,6 +551,128 @@ export default function DoraProjectPage() {
               <div style={{ color: 'var(--muted)', fontSize: 12, padding: 20, textAlign: 'center' }}>{t('dora.project.noData')}</div>
             )}
           </div>
+
+          {/* ── Sprint Detail (Oobeya-style) ───────────────────────────── */}
+          {sprint && (
+            <>
+              {/* Divider */}
+              <div style={{ borderTop: '1px solid var(--panel-border)', margin: '32px 0 24px' }} />
+
+              {/* Sprint Assignee List */}
+              <div style={{ ...box, marginBottom: 24 }}>
+                <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', margin: '0 0 16px' }}>{t('dora.sprint.assigneeTitle')}</h2>
+                {sprint.assignees.length > 0 ? (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr>
+                          <th style={thStyle}>{t('dora.sprint.teamMember')}</th>
+                          <th style={thStyle}>{t('dora.sprint.assignedItems')}</th>
+                          <th style={thStyle}>{t('dora.sprint.totalEffort')}</th>
+                          <th style={thStyle}>{t('dora.sprint.deliveryRateCount')}</th>
+                          <th style={thStyle}>{t('dora.sprint.deliveryRateEffort')}</th>
+                          <th style={thStyle}>{t('dora.sprint.deliveredEffort')}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sprint.assignees.map((a, i) => (
+                          <tr key={i}>
+                            <td style={{ ...tdStyle, fontWeight: 600 }}>{a.name}</td>
+                            <td style={{ ...tdStyle, textAlign: 'center' }}>{a.assigned_count}</td>
+                            <td style={{ ...tdStyle, textAlign: 'right', fontFamily: 'monospace' }}>{a.total_effort.toFixed(1)} {t('dora.sprint.hours')}</td>
+                            <td style={tdStyle}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'var(--panel-border)', overflow: 'hidden' }}>
+                                  <div style={{ height: '100%', width: `${Math.min(a.delivery_rate_count, 100)}%`, background: '#22c55e', borderRadius: 2 }} />
+                                </div>
+                                <span style={{ fontSize: 11, fontFamily: 'monospace', minWidth: 40, textAlign: 'right' }}>{a.delivery_rate_count.toFixed(1)}%</span>
+                              </div>
+                            </td>
+                            <td style={tdStyle}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'var(--panel-border)', overflow: 'hidden' }}>
+                                  <div style={{ height: '100%', width: `${Math.min(a.delivery_rate_effort, 100)}%`, background: '#8b5cf6', borderRadius: 2 }} />
+                                </div>
+                                <span style={{ fontSize: 11, fontFamily: 'monospace', minWidth: 40, textAlign: 'right' }}>{a.delivery_rate_effort.toFixed(1)}%</span>
+                              </div>
+                            </td>
+                            <td style={{ ...tdStyle, textAlign: 'right', fontFamily: 'monospace' }}>{a.delivered_effort.toFixed(1)} {t('dora.sprint.hours')}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div style={{ color: 'var(--muted)', fontSize: 12, padding: 16, textAlign: 'center' }}>{t('dora.project.noData')}</div>
+                )}
+              </div>
+
+              {/* Work Item Tabs */}
+              <div style={{ ...box, marginBottom: 24 }}>
+                <div style={{ display: 'flex', gap: 4, marginBottom: 16, flexWrap: 'wrap' }}>
+                  {([
+                    { key: 'completed' as const, label: t('dora.sprint.completedItems'), count: sprint.completed_items.length, color: '#22c55e' },
+                    { key: 'incomplete' as const, label: t('dora.sprint.incompleteItems'), count: sprint.incomplete_items.length, color: '#f59e0b' },
+                    { key: 'removed' as const, label: t('dora.sprint.removedItems'), count: sprint.removed_items.length, color: '#ef4444' },
+                  ]).map((tab) => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setWorkItemTab(tab.key)}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: 8,
+                        border: workItemTab === tab.key ? '1.5px solid var(--accent)' : '1px solid var(--panel-border)',
+                        background: workItemTab === tab.key ? 'var(--accent-bg, rgba(99,102,241,0.08))' : 'transparent',
+                        color: workItemTab === tab.key ? 'var(--accent)' : 'var(--ink)',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {tab.label}
+                      <TabBadge count={tab.count} color={tab.color} />
+                    </button>
+                  ))}
+                </div>
+
+                {workItemTab === 'completed' && <WorkItemsTable items={sprint.completed_items} t={t} />}
+                {workItemTab === 'incomplete' && <WorkItemsTable items={sprint.incomplete_items} t={t} />}
+                {workItemTab === 'removed' && <WorkItemsTable items={sprint.removed_items} t={t} />}
+              </div>
+
+              {/* Work Item Distribution + Scope Change */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+                {/* Donut: Task vs Bug */}
+                <div style={box}>
+                  <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', margin: '0 0 16px' }}>{t('dora.sprint.typeDistribution')}</h2>
+                  <DonutChart
+                    data={sprint.type_distribution.map((d) => ({
+                      label: d.type,
+                      value: d.count,
+                      color: d.type === 'Bug' ? '#ef4444' : '#3b82f6',
+                    }))}
+                  />
+                </div>
+
+                {/* Scope Change */}
+                <div style={box}>
+                  <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', margin: '0 0 16px' }}>{t('dora.sprint.scopeChange')}</h2>
+                  {sprint.scope_change.length > 0 ? (
+                    <ScopeChangeChart
+                      data={sprint.scope_change}
+                      addedLabel={t('dora.sprint.added')}
+                      removedLabel={t('dora.sprint.removed')}
+                    />
+                  ) : (
+                    <div style={{ color: 'var(--muted)', fontSize: 12, padding: 20, textAlign: 'center' }}>{t('dora.project.noData')}</div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </>
       )}
 

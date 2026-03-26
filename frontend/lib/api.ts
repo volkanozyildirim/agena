@@ -611,6 +611,56 @@ export async function fetchProjectAnalytics(days = 30, repoMappingId?: string | 
   return apiFetch<ProjectAnalyticsResponse>(`/analytics/dora/project?${qs.toString()}`);
 }
 
+// ── Sprint Detail (Oobeya-style) ─────────────────────────────────────────────
+
+export interface SprintAssigneeItem {
+  name: string;
+  assigned_count: number;
+  total_effort: number;
+  delivery_rate_count: number;
+  delivery_rate_effort: number;
+  delivered_effort: number;
+}
+
+export interface SprintWorkItem {
+  id: number;
+  key: string;
+  assignee: string;
+  assignee_id: number;
+  summary: string;
+  work_item_type: string;
+  priority: string;
+  status: string;
+  reopen_count: number;
+  effort: number;
+}
+
+export interface SprintTypeDistItem {
+  type: string;
+  count: number;
+}
+
+export interface SprintScopeChangeItem {
+  date: string;
+  added: number;
+  removed: number;
+}
+
+export interface SprintDetailResponse {
+  assignees: SprintAssigneeItem[];
+  completed_items: SprintWorkItem[];
+  incomplete_items: SprintWorkItem[];
+  removed_items: SprintWorkItem[];
+  type_distribution: SprintTypeDistItem[];
+  scope_change: SprintScopeChangeItem[];
+}
+
+export async function fetchSprintDetail(days = 30, repoMappingId?: string | null): Promise<SprintDetailResponse> {
+  const qs = new URLSearchParams({ days: String(days) });
+  if (repoMappingId) qs.set('repo_mapping_id', repoMappingId);
+  return apiFetch<SprintDetailResponse>(`/analytics/dora/project/sprint?${qs.toString()}`);
+}
+
 // ── DORA Development Analytics ───────────────────────────────────────────────
 
 export interface AgentPerformanceItem {
@@ -658,6 +708,199 @@ export async function fetchDoraDevelopment(days = 30, repoMappingId?: string | n
   const qs = new URLSearchParams({ days: String(days) });
   if (repoMappingId) qs.set('repo_mapping_id', repoMappingId);
   return apiFetch<DoraDevelopmentResponse>(`/analytics/dora/development?${qs.toString()}`);
+}
+
+// ── Git Analytics ─────────────────────────────────────────────────────────────
+
+export interface GitKPI {
+  active_days: number;
+  total_commits: number;
+  contributors: number;
+  coding_days_per_week: number;
+  total_additions: number;
+  total_deletions: number;
+}
+
+export interface GitDailyStat {
+  date: string;
+  commits: number;
+  additions: number;
+  deletions: number;
+  files_changed: number;
+}
+
+export interface GitCommitsByDay {
+  day: string;
+  commits: number;
+}
+
+export interface GitCommitsByHour {
+  hour: number;
+  commits: number;
+}
+
+export interface GitContributor {
+  author: string;
+  email: string;
+  commits: number;
+  additions: number;
+  deletions: number;
+  files_changed: number;
+  efficiency: number;
+  impact: number;
+  new_pct: number;
+  refactor_pct: number;
+  help_others_pct: number;
+  churn_pct: number;
+}
+
+export interface GitRecentCommit {
+  sha: string;
+  date: string;
+  message: string;
+  author: string;
+  additions: number;
+  deletions: number;
+  files_changed: number;
+}
+
+export interface CodingDaysSparkline {
+  week: string;
+  days: number;
+}
+
+export interface GitAnalyticsResponse {
+  kpi: GitKPI;
+  coding_days_sparkline: CodingDaysSparkline[];
+  daily_stats: GitDailyStat[];
+  commits_by_day: GitCommitsByDay[];
+  commits_by_hour: GitCommitsByHour[];
+  contributors: GitContributor[];
+  recent_commits: GitRecentCommit[];
+}
+
+export async function fetchGitAnalytics(days = 30, repoMappingId?: string | null): Promise<GitAnalyticsResponse> {
+  const qs = new URLSearchParams({ days: String(days) });
+  if (repoMappingId) qs.set('repo_mapping_id', repoMappingId);
+  return apiFetch<GitAnalyticsResponse>(`/analytics/dora/development/git?${qs.toString()}`);
+}
+
+// ── DORA PR Analytics ─────────────────────────────────────────────────────────
+
+export interface PrKPI {
+  pct_merged_within_goal: number;
+  merge_goal_hours: number;
+  avg_merge_hours: number;
+  merged_count: number;
+}
+
+export interface PrTimeTrendItem {
+  date: string;
+  pr_title: string;
+  hours: number;
+}
+
+export interface PrSizeTrendItem {
+  date: string;
+  pr_title: string;
+  lines_changed: number;
+  additions: number;
+  deletions: number;
+}
+
+export interface PrOpenItem {
+  id: number;
+  title: string;
+  risks: string[];
+  author: string;
+  age_days: number;
+  comments: number;
+  coding_time_hours: number | null;
+  source_branch: string;
+  lines_changed: number;
+}
+
+export interface PrReviewerStatItem {
+  reviewer: string;
+  avg_review_hours: number;
+  max_review_hours: number;
+  reviewed_count: number;
+  reviewed_pct: number;
+}
+
+export interface PrListItem {
+  id: number;
+  title: string;
+  risks: string[];
+  status: string;
+  author: string;
+  source_branch: string;
+  target_branch: string;
+  approvals: number;
+  lines_changed: number;
+  created_at: string;
+}
+
+export interface PrAnalyticsResponse {
+  kpi: PrKPI;
+  merge_time_trend: PrTimeTrendItem[];
+  coding_time_trend: PrTimeTrendItem[];
+  pr_size_trend: PrSizeTrendItem[];
+  open_prs: PrOpenItem[];
+  reviewer_stats: PrReviewerStatItem[];
+  pr_list: PrListItem[];
+}
+
+export async function fetchPrAnalytics(days = 30, repoMappingId?: string | null, mergeGoalHours = 36): Promise<PrAnalyticsResponse> {
+  const qs = new URLSearchParams({ days: String(days), merge_goal_hours: String(mergeGoalHours) });
+  if (repoMappingId) qs.set('repo_mapping_id', repoMappingId);
+  return apiFetch<PrAnalyticsResponse>(`/analytics/dora/development/prs?${qs.toString()}`);
+}
+
+// ── DORA Deployments Analytics ────────────────────────────────────────────────
+
+export interface DeploymentsKPI {
+  lead_time_hours: number;
+  deploy_frequency: number;
+  change_failure_rate: number;
+  mttr_hours: number;
+}
+
+export interface LeadTimeTrendItem {
+  date: string;
+  hours: number;
+}
+
+export interface DeployFreqTrendItem {
+  date: string;
+  deploys: number;
+}
+
+export interface CfrTrendItem {
+  date: string;
+  rate: number;
+}
+
+export interface DeploymentListItem {
+  environment: string;
+  status: string;
+  sha: string;
+  deployed_at: string;
+  duration_sec: number;
+}
+
+export interface DeploymentsAnalyticsResponse {
+  kpi: DeploymentsKPI;
+  lead_time_trend: LeadTimeTrendItem[];
+  deploy_freq_trend: DeployFreqTrendItem[];
+  cfr_trend: CfrTrendItem[];
+  deployments: DeploymentListItem[];
+}
+
+export async function fetchDeploymentsAnalytics(days = 30, repoMappingId?: string | null): Promise<DeploymentsAnalyticsResponse> {
+  const qs = new URLSearchParams({ days: String(days) });
+  if (repoMappingId) qs.set('repo_mapping_id', repoMappingId);
+  return apiFetch<DeploymentsAnalyticsResponse>(`/analytics/dora/development/deployments?${qs.toString()}`);
 }
 
 // ── DORA Quality ──────────────────────────────────────────────────────────────

@@ -17,6 +17,117 @@ from services.git_sync_service import GitSyncService
 router = APIRouter(prefix='/analytics', tags=['analytics'])
 
 
+# ── Git Analytics (File Activities) response schemas ─────────────────────────
+
+
+class GitKPI(BaseModel):
+    active_days: int
+    total_commits: int
+    contributors: int
+    coding_days_per_week: float
+    total_additions: int
+    total_deletions: int
+
+
+class GitDailyStatItem(BaseModel):
+    date: str
+    commits: int
+    additions: int
+    deletions: int
+    files_changed: int
+
+
+class GitCommitsByDayItem(BaseModel):
+    day: str
+    commits: int
+
+
+class GitCommitsByHourItem(BaseModel):
+    hour: int
+    commits: int
+
+
+class GitContributorItem(BaseModel):
+    author: str
+    email: str
+    commits: int
+    additions: int
+    deletions: int
+    files_changed: int
+    efficiency: float
+    impact: float
+    new_pct: float
+    refactor_pct: float
+    help_others_pct: float
+    churn_pct: float
+
+
+class GitRecentCommitItem(BaseModel):
+    sha: str
+    date: str
+    message: str
+    author: str
+    additions: int
+    deletions: int
+    files_changed: int
+
+
+class GitCodingDaysSparklineItem(BaseModel):
+    week: str
+    days: int
+
+
+class GitAnalyticsResponse(BaseModel):
+    kpi: GitKPI
+    coding_days_sparkline: list[GitCodingDaysSparklineItem]
+    daily_stats: list[GitDailyStatItem]
+    commits_by_day: list[GitCommitsByDayItem]
+    commits_by_hour: list[GitCommitsByHourItem]
+    contributors: list[GitContributorItem]
+    recent_commits: list[GitRecentCommitItem]
+
+
+# ── Deployments (DORA) response schemas ──────────────────────────────────────
+
+
+class DeploymentsKPI(BaseModel):
+    lead_time_hours: float
+    deploy_frequency: float
+    change_failure_rate: float
+    mttr_hours: float
+
+
+class LeadTimeTrendItem(BaseModel):
+    date: str
+    hours: float
+
+
+class DeployFreqTrendItem(BaseModel):
+    date: str
+    deploys: int
+
+
+class CfrTrendItem(BaseModel):
+    date: str
+    rate: float
+
+
+class DeploymentListItem(BaseModel):
+    environment: str
+    status: str
+    sha: str
+    deployed_at: str
+    duration_sec: int
+
+
+class DeploymentsAnalyticsResponse(BaseModel):
+    kpi: DeploymentsKPI
+    lead_time_trend: list[LeadTimeTrendItem]
+    deploy_freq_trend: list[DeployFreqTrendItem]
+    cfr_trend: list[CfrTrendItem]
+    deployments: list[DeploymentListItem]
+
+
 # ── Response schemas ──────────────────────────────────────────────────────────
 
 
@@ -233,6 +344,188 @@ class DoraBugsResponse(BaseModel):
     stale_tasks: list[StaleTaskItem]
 
 
+# ── Sprint Detail (Oobeya-style) schemas ─────────────────────────────────────
+
+
+class SprintAssigneeItem(BaseModel):
+    name: str
+    assigned_count: int
+    total_effort: float
+    delivery_rate_count: float
+    delivery_rate_effort: float
+    delivered_effort: float
+
+
+class SprintWorkItem(BaseModel):
+    id: int
+    key: str
+    assignee: str
+    assignee_id: int
+    summary: str
+    work_item_type: str
+    priority: str
+    status: str
+    reopen_count: int
+    effort: float
+
+
+class SprintTypeDistItem(BaseModel):
+    type: str
+    count: int
+
+
+class SprintScopeChangeItem(BaseModel):
+    date: str
+    added: int
+    removed: int
+
+
+class SprintDetailResponse(BaseModel):
+    assignees: list[SprintAssigneeItem]
+    completed_items: list[SprintWorkItem]
+    incomplete_items: list[SprintWorkItem]
+    removed_items: list[SprintWorkItem]
+    type_distribution: list[SprintTypeDistItem]
+    scope_change: list[SprintScopeChangeItem]
+
+
+# ── Git Analytics schemas ────────────────────────────────────────────────────
+
+
+class GitKPI(BaseModel):
+    active_days: int
+    total_commits: int
+    contributors: int
+    coding_days_per_week: float
+    total_additions: int
+    total_deletions: int
+
+
+class GitDailyStat(BaseModel):
+    date: str
+    commits: int
+    additions: int
+    deletions: int
+    files_changed: int
+
+
+class GitCommitsByDay(BaseModel):
+    day: str
+    commits: int
+
+
+class GitCommitsByHour(BaseModel):
+    hour: int
+    commits: int
+
+
+class GitContributor(BaseModel):
+    author: str
+    email: str
+    commits: int
+    additions: int
+    deletions: int
+    files_changed: int
+    efficiency: float
+    impact: float
+    new_pct: float
+    refactor_pct: float
+    help_others_pct: float
+    churn_pct: float
+
+
+class GitRecentCommit(BaseModel):
+    sha: str
+    date: str
+    message: str
+    author: str
+    additions: int
+    deletions: int
+    files_changed: int
+
+
+class CodingDaysSparkline(BaseModel):
+    week: str
+    days: int
+
+
+class GitAnalyticsResponse(BaseModel):
+    kpi: GitKPI
+    coding_days_sparkline: list[CodingDaysSparkline]
+    daily_stats: list[GitDailyStat]
+    commits_by_day: list[GitCommitsByDay]
+    commits_by_hour: list[GitCommitsByHour]
+    contributors: list[GitContributor]
+    recent_commits: list[GitRecentCommit]
+
+
+# ── PR Analytics schemas ─────────────────────────────────────────────────────
+
+
+class PrKPI(BaseModel):
+    pct_merged_within_goal: float
+    merge_goal_hours: float
+    avg_merge_hours: float
+    merged_count: int
+
+
+class PrTimeTrendItem(BaseModel):
+    date: str
+    pr_title: str
+    hours: float
+
+
+class PrSizeTrendItem(BaseModel):
+    date: str
+    pr_title: str
+    lines_changed: int
+    additions: int
+    deletions: int
+
+
+class PrOpenItem(BaseModel):
+    id: int
+    title: str
+    risks: list[str]
+    author: str
+    age_days: float
+    comments: int
+    coding_time_hours: float | None
+    source_branch: str
+    lines_changed: int
+
+
+class PrReviewerStatItem(BaseModel):
+    reviewer: str
+    avg_review_hours: float
+    max_review_hours: float
+    reviewed_count: int
+    reviewed_pct: float
+
+
+class PrListItem(BaseModel):
+    id: int
+    title: str
+    risks: list[str]
+    status: str
+    author: str
+    source_branch: str
+    target_branch: str
+    approvals: int
+    lines_changed: int
+    created_at: str
+
+
+class PrAnalyticsResponse(BaseModel):
+    kpi: PrKPI
+    merge_time_trend: list[PrTimeTrendItem]
+    coding_time_trend: list[PrTimeTrendItem]
+    pr_size_trend: list[PrSizeTrendItem]
+    open_prs: list[PrOpenItem]
+    reviewer_stats: list[PrReviewerStatItem]
+    pr_list: list[PrListItem]
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 
@@ -296,6 +589,47 @@ async def get_dora_development(
     return DoraDevelopmentResponse(**data)
 
 
+@router.get('/dora/development/git', response_model=GitAnalyticsResponse)
+async def get_git_analytics(
+    days: int = Query(default=30, ge=1, le=365),
+    repo_mapping_id: str | None = Query(default=None),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> GitAnalyticsResponse:
+    service = AnalyticsService(db)
+    data = await service.git_analytics(tenant.organization_id, days=days, repo_mapping_id=repo_mapping_id)
+    return GitAnalyticsResponse(**data)
+
+
+@router.get('/dora/development/prs', response_model=PrAnalyticsResponse)
+async def get_pr_analytics(
+    days: int = Query(default=30, ge=1, le=365),
+    repo_mapping_id: str | None = Query(default=None),
+    merge_goal_hours: float = Query(default=36.0, ge=1, le=720),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> PrAnalyticsResponse:
+    service = AnalyticsService(db)
+    data = await service.pr_analytics(
+        tenant.organization_id, days=days,
+        repo_mapping_id=repo_mapping_id,
+        merge_goal_hours=merge_goal_hours,
+    )
+    return PrAnalyticsResponse(**data)
+
+
+@router.get('/dora/development/deployments', response_model=DeploymentsAnalyticsResponse)
+async def get_deployments_analytics(
+    days: int = Query(default=30, ge=1, le=365),
+    repo_mapping_id: str | None = Query(default=None),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> DeploymentsAnalyticsResponse:
+    service = DoraService(db)
+    data = await service.deployments_analytics(tenant.organization_id, days=days, repo_mapping_id=repo_mapping_id)
+    return DeploymentsAnalyticsResponse(**data)
+
+
 @router.get('/dora/quality', response_model=DoraQualityResponse)
 async def get_dora_quality(
     days: int = Query(default=30, ge=1, le=365),
@@ -318,6 +652,18 @@ async def get_dora_bugs(
     service = AnalyticsService(db)
     data = await service.dora_bugs(tenant.organization_id, days=days, repo_mapping_id=repo_mapping_id)
     return DoraBugsResponse(**data)
+
+
+@router.get('/dora/project/sprint', response_model=SprintDetailResponse)
+async def get_sprint_detail(
+    days: int = Query(default=30, ge=1, le=365),
+    repo_mapping_id: str | None = Query(default=None),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> SprintDetailResponse:
+    service = AnalyticsService(db)
+    data = await service.sprint_detail(tenant.organization_id, days=days, repo_mapping_id=repo_mapping_id)
+    return SprintDetailResponse(**data)
 
 
 @router.get('/dora', response_model=DoraOverviewResponse)

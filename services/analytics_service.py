@@ -6,8 +6,11 @@ from sqlalchemy import String as SAString, case, cast, Date, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.ai_usage_event import AIUsageEvent
+from models.git_commit import GitCommit
+from models.git_pull_request import GitPullRequest
 from models.run_record import RunRecord
 from models.task_record import TaskRecord
+from models.user import User
 
 
 class AnalyticsService:
@@ -369,7 +372,7 @@ class AnalyticsService:
         avg_time_result = await self.db.execute(
             select(
                 func.avg(
-                    extract('epoch', TaskRecord.updated_at) - extract('epoch', TaskRecord.created_at)
+                    func.unix_timestamp(TaskRecord.updated_at) - func.unix_timestamp(TaskRecord.created_at)
                 ).label('avg_seconds'),
             )
             .where(
@@ -797,4 +800,579 @@ class AnalyticsService:
             'failure_trend': failure_trend,
             'top_failure_reasons': top_failure_reasons,
             'stale_tasks': stale_tasks,
+        }
+
+    # ── Sprint Detail (Oobeya-style) ─────────────────────────────────────────
+
+    async def sprint_detail(
+        self, organization_id: int, days: int = 30, repo_mapping_id: str | None = None,
+    ) -> dict:
+        """Return Oobeya-style sprint detail metrics: assignee breakdown,
+        work items by status category, type distribution, and scope change."""
+        now = datetime.utcnow()
+        since = now - timedelta(days=days)
+
+        # ── 1) All tasks in the period ────────────────────────────────────
+        all_tasks_q = await self.db.execute(
+            select(
+                TaskRecord.id,
+                TaskRecord.external_id,
+                TaskRecord.title,
+                TaskRecord.status,
+                TaskRecord.created_by_user_id,
+                TaskRecord.created_at,
+                TaskRecord.updated_at,
+                TaskRecord.source,
+            ).where(
+                TaskRecord.organization_id == organization_id,
+                TaskRecord.created_at >= since,
+            ).order_by(TaskRecord.created_at.desc())
+        )
+        all_tasks = all_tasks_q.all()
+
+        # Collect user ids for name lookup
+        user_ids = list({t.created_by_user_id for t in all_tasks if t.created_by_user_id})
+        user_map: dict[int, str] = {}
+        if user_ids:
+            user_q = await self.db.execute(
+                select(User.id, User.full_name).where(User.id.in_(user_ids))
+            )
+            for u in user_q.all():
+                user_map[u.id] = u.full_name or f'User #{u.id}'
+
+        # ── 2) Categorise tasks ───────────────────────────────────────────
+        completed_items: list[dict] = []
+        incomplete_items: list[dict] = []
+        removed_items: list[dict] = []
+
+        for t in all_tasks:
+            is_bug = 'bug' in (t.title or '').lower()
+            item = {
+                'id': t.id,
+                'key': t.external_id or f'T-{t.id}',
+                'assignee': user_map.get(t.created_by_user_id, f'User #{t.created_by_user_id}'),
+                'assignee_id': t.created_by_user_id,
+                'summary': t.title or '',
+                'work_item_type': 'Bug' if is_bug else 'Task',
+                'priority': 'Medium',
+                'status': t.status or 'queued',
+                'reopen_count': 0,
+                'effort': round(
+                    (t.updated_at - t.created_at).total_seconds() / 3600, 1
+                ) if t.updated_at and t.created_at else 0,
+            }
+
+            if t.status == 'completed':
+                completed_items.append(item)
+            elif t.status == 'cancelled':
+                removed_items.append(item)
+            else:
+                # running, queued, failed -> incomplete
+                incomplete_items.append(item)
+
+        # ── 3) Assignee breakdown ─────────────────────────────────────────
+        assignee_stats: dict[int, dict] = {}
+        for t in all_tasks:
+            uid = t.created_by_user_id
+            if uid not in assignee_stats:
+                assignee_stats[uid] = {
+                    'name': user_map.get(uid, f'User #{uid}'),
+                    'assigned': 0,
+                    'delivered_count': 0,
+                    'total_effort': 0.0,
+                    'delivered_effort': 0.0,
+                }
+            assignee_stats[uid]['assigned'] += 1
+            effort = round(
+                (t.updated_at - t.created_at).total_seconds() / 3600, 1
+            ) if t.updated_at and t.created_at else 0
+            assignee_stats[uid]['total_effort'] += effort
+            if t.status == 'completed':
+                assignee_stats[uid]['delivered_count'] += 1
+                assignee_stats[uid]['delivered_effort'] += effort
+
+        assignees = []
+        for uid, s in assignee_stats.items():
+            assignees.append({
+                'name': s['name'],
+                'assigned_count': s['assigned'],
+                'total_effort': round(s['total_effort'], 1),
+                'delivery_rate_count': round(
+                    s['delivered_count'] / s['assigned'] * 100, 1
+                ) if s['assigned'] > 0 else 0.0,
+                'delivery_rate_effort': round(
+                    s['delivered_effort'] / s['total_effort'] * 100, 1
+                ) if s['total_effort'] > 0 else 0.0,
+                'delivered_effort': round(s['delivered_effort'], 1),
+            })
+        assignees.sort(key=lambda x: x['assigned_count'], reverse=True)
+
+        # ── 4) Work item type distribution ────────────────────────────────
+        bug_count = sum(1 for t in all_tasks if 'bug' in (t.title or '').lower())
+        task_count = len(all_tasks) - bug_count
+        type_distribution = [
+            {'type': 'Task', 'count': task_count},
+            {'type': 'Bug', 'count': bug_count},
+        ]
+
+        # ── 5) Scope change over time (added vs removed per day) ─────────
+        added_by_day: dict[str, int] = {}
+        removed_by_day: dict[str, int] = {}
+        for t in all_tasks:
+            day_str = str(t.created_at.date()) if t.created_at else ''
+            if day_str:
+                added_by_day[day_str] = added_by_day.get(day_str, 0) + 1
+            if t.status == 'cancelled' and t.updated_at:
+                r_day = str(t.updated_at.date())
+                removed_by_day[r_day] = removed_by_day.get(r_day, 0) + 1
+
+        all_days = sorted(set(list(added_by_day.keys()) + list(removed_by_day.keys())))
+        scope_change = [
+            {
+                'date': d,
+                'added': added_by_day.get(d, 0),
+                'removed': removed_by_day.get(d, 0),
+            }
+            for d in all_days
+        ]
+
+        return {
+            'assignees': assignees,
+            'completed_items': completed_items,
+            'incomplete_items': incomplete_items,
+            'removed_items': removed_items,
+            'type_distribution': type_distribution,
+            'scope_change': scope_change,
+        }
+
+    # ── Git Analytics (Oobeya-style) ──────────────────────────────────────────
+
+    async def git_analytics(
+        self, organization_id: int, days: int = 30, repo_mapping_id: str | None = None,
+    ) -> dict:
+        since = datetime.utcnow() - timedelta(days=days)
+
+        filters = [
+            GitCommit.organization_id == organization_id,
+            GitCommit.committed_at >= since,
+        ]
+        if repo_mapping_id:
+            filters.append(GitCommit.repo_mapping_id == repo_mapping_id)
+
+        # ── 1) KPI summary ────────────────────────────────────────────────────
+        kpi_result = await self.db.execute(
+            select(
+                func.count(GitCommit.id).label('total_commits'),
+                func.count(func.distinct(GitCommit.author_email)).label('contributors'),
+                func.count(func.distinct(cast(GitCommit.committed_at, Date))).label('active_days'),
+                func.coalesce(func.sum(GitCommit.additions), 0).label('total_additions'),
+                func.coalesce(func.sum(GitCommit.deletions), 0).label('total_deletions'),
+                func.coalesce(func.sum(GitCommit.files_changed), 0).label('total_files_changed'),
+            ).where(*filters)
+        )
+        kpi = kpi_result.one()
+        total_commits = int(kpi.total_commits or 0)
+        contributors = int(kpi.contributors or 0)
+        active_days = int(kpi.active_days or 0)
+        total_additions = int(kpi.total_additions or 0)
+        total_deletions = int(kpi.total_deletions or 0)
+
+        # Coding days per week: active_days / (days / 7)
+        weeks = max(days / 7, 1)
+        coding_days_per_week = round(active_days / weeks, 1)
+
+        # ── 2) Daily commit stats (for Active Days chart) ─────────────────────
+        day_col = cast(GitCommit.committed_at, Date).label('day')
+        daily_result = await self.db.execute(
+            select(
+                day_col,
+                func.count(GitCommit.id).label('commits'),
+                func.coalesce(func.sum(GitCommit.additions), 0).label('additions'),
+                func.coalesce(func.sum(GitCommit.deletions), 0).label('deletions'),
+                func.coalesce(func.sum(GitCommit.files_changed), 0).label('files_changed'),
+            ).where(*filters)
+            .group_by(day_col)
+            .order_by(day_col)
+        )
+        daily_stats = []
+        for r in daily_result.all():
+            daily_stats.append({
+                'date': str(r.day),
+                'commits': int(r.commits),
+                'additions': int(r.additions),
+                'deletions': int(r.deletions),
+                'files_changed': int(r.files_changed),
+            })
+
+        # ── 3) Commits by day of week (0=Mon .. 6=Sun) ───────────────────────
+        dow_col = func.dayofweek(GitCommit.committed_at).label('dow')  # MySQL: 1=Sun..7=Sat
+        dow_result = await self.db.execute(
+            select(
+                dow_col,
+                func.count(GitCommit.id).label('commits'),
+            ).where(*filters)
+            .group_by(dow_col)
+            .order_by(dow_col)
+        )
+        # Convert MySQL DAYOFWEEK (1=Sun..7=Sat) -> Mon-based labels
+        dow_labels = {2: 'Mon', 3: 'Tue', 4: 'Wed', 5: 'Thu', 6: 'Fri', 7: 'Sat', 1: 'Sun'}
+        dow_order = [2, 3, 4, 5, 6, 7, 1]
+        dow_map = {int(r.dow): int(r.commits) for r in dow_result.all()}
+        commits_by_day = [
+            {'day': dow_labels[d], 'commits': dow_map.get(d, 0)}
+            for d in dow_order
+        ]
+
+        # ── 4) Commits by hour of day ────────────────────────────────────────
+        hour_col = func.hour(GitCommit.committed_at).label('hour')
+        hour_result = await self.db.execute(
+            select(
+                hour_col,
+                func.count(GitCommit.id).label('commits'),
+            ).where(*filters)
+            .group_by(hour_col)
+            .order_by(hour_col)
+        )
+        hour_map = {int(r.hour): int(r.commits) for r in hour_result.all()}
+        commits_by_hour = [
+            {'hour': h, 'commits': hour_map.get(h, 0)}
+            for h in range(24)
+        ]
+
+        # ── 5) Contributor breakdown ─────────────────────────────────────────
+        contrib_result = await self.db.execute(
+            select(
+                func.coalesce(GitCommit.author_name, GitCommit.author_email).label('author'),
+                GitCommit.author_email,
+                func.count(GitCommit.id).label('commits'),
+                func.coalesce(func.sum(GitCommit.additions), 0).label('additions'),
+                func.coalesce(func.sum(GitCommit.deletions), 0).label('deletions'),
+                func.coalesce(func.sum(GitCommit.files_changed), 0).label('files_changed'),
+            ).where(*filters)
+            .group_by(GitCommit.author_email, func.coalesce(GitCommit.author_name, GitCommit.author_email))
+            .order_by(func.count(GitCommit.id).desc())
+            .limit(50)
+        )
+        contributor_list = []
+        for r in contrib_result.all():
+            adds = int(r.additions)
+            dels = int(r.deletions)
+            total_lines = adds + dels
+            # Approximate metrics (Oobeya-style)
+            efficiency = round(adds / total_lines * 100, 1) if total_lines > 0 else 0.0
+            new_pct = round(adds / max(total_lines, 1) * 100, 1)
+            refactor_pct = round(min(dels, adds) / max(total_lines, 1) * 100, 1)
+            churn_pct = round(dels / max(total_lines, 1) * 100, 1)
+            impact = round((adds - dels) / max(total_lines, 1) * 100, 1) if total_lines > 0 else 0.0
+
+            contributor_list.append({
+                'author': str(r.author),
+                'email': str(r.author_email or ''),
+                'commits': int(r.commits),
+                'additions': adds,
+                'deletions': dels,
+                'files_changed': int(r.files_changed),
+                'efficiency': efficiency,
+                'impact': impact,
+                'new_pct': new_pct,
+                'refactor_pct': refactor_pct,
+                'help_others_pct': 0.0,  # would need PR review data
+                'churn_pct': churn_pct,
+            })
+
+        # ── 6) Recent commits list ───────────────────────────────────────────
+        recent_result = await self.db.execute(
+            select(
+                GitCommit.sha,
+                GitCommit.committed_at,
+                GitCommit.message,
+                func.coalesce(GitCommit.author_name, GitCommit.author_email).label('author'),
+                GitCommit.additions,
+                GitCommit.deletions,
+                GitCommit.files_changed,
+            ).where(*filters)
+            .order_by(GitCommit.committed_at.desc())
+            .limit(100)
+        )
+        recent_commits = []
+        for r in recent_result.all():
+            recent_commits.append({
+                'sha': str(r.sha)[:8],
+                'date': r.committed_at.isoformat() if r.committed_at else '',
+                'message': str(r.message or '')[:120],
+                'author': str(r.author),
+                'additions': int(r.additions or 0),
+                'deletions': int(r.deletions or 0),
+                'files_changed': int(r.files_changed or 0),
+            })
+
+        # ── 7) Coding days per week sparkline data ───────────────────────────
+        week_label = func.concat(
+            func.year(GitCommit.committed_at),
+            '-W',
+            func.lpad(cast(func.week(GitCommit.committed_at), SAString), 2, '0'),
+        )
+        week_days_result = await self.db.execute(
+            select(
+                week_label.label('week'),
+                func.count(func.distinct(cast(GitCommit.committed_at, Date))).label('active_days'),
+            ).where(*filters)
+            .group_by(week_label)
+            .order_by(week_label)
+        )
+        coding_days_sparkline = [
+            {'week': str(r.week), 'days': int(r.active_days)}
+            for r in week_days_result.all()
+        ]
+
+        return {
+            'kpi': {
+                'active_days': active_days,
+                'total_commits': total_commits,
+                'contributors': contributors,
+                'coding_days_per_week': coding_days_per_week,
+                'total_additions': total_additions,
+                'total_deletions': total_deletions,
+            },
+            'coding_days_sparkline': coding_days_sparkline,
+            'daily_stats': daily_stats,
+            'commits_by_day': commits_by_day,
+            'commits_by_hour': commits_by_hour,
+            'contributors': contributor_list,
+            'recent_commits': recent_commits,
+        }
+
+    # ── PR Analytics ───────────────────────────────────────────────────────────
+
+    async def pr_analytics(
+        self, organization_id: int, days: int = 30, repo_mapping_id: str | None = None,
+        merge_goal_hours: float = 36.0,
+    ) -> dict:
+        now = datetime.utcnow()
+        since = now - timedelta(days=days)
+
+        filters = [
+            GitPullRequest.organization_id == organization_id,
+            GitPullRequest.created_at_ext >= since,
+        ]
+        if repo_mapping_id:
+            filters.append(GitPullRequest.repo_mapping_id == repo_mapping_id)
+
+        # ── 1) KPI summary ────────────────────────────────────────────────────
+        merged_filters = filters + [
+            GitPullRequest.status == 'merged',
+            GitPullRequest.merged_at.isnot(None),
+        ]
+
+        # Total merged PRs
+        merged_count_q = await self.db.execute(
+            select(func.count(GitPullRequest.id)).where(*merged_filters)
+        )
+        merged_count = int(merged_count_q.scalar() or 0)
+
+        # Avg time to merge (seconds)
+        avg_merge_q = await self.db.execute(
+            select(
+                func.avg(
+                    func.unix_timestamp(GitPullRequest.merged_at)
+                    - func.unix_timestamp(GitPullRequest.created_at_ext)
+                ).label('avg_seconds'),
+            ).where(*merged_filters)
+        )
+        avg_merge_seconds = float(avg_merge_q.scalar() or 0)
+        avg_merge_hours = round(avg_merge_seconds / 3600, 1)
+
+        # PRs merged within goal
+        goal_seconds = merge_goal_hours * 3600
+        within_goal_q = await self.db.execute(
+            select(func.count(GitPullRequest.id)).where(
+                *merged_filters,
+                (func.unix_timestamp(GitPullRequest.merged_at)
+                 - func.unix_timestamp(GitPullRequest.created_at_ext)) <= goal_seconds,
+            )
+        )
+        within_goal = int(within_goal_q.scalar() or 0)
+        pct_within_goal = round(within_goal / merged_count * 100, 1) if merged_count > 0 else 0.0
+
+        # ── 2) Time to merge trend (per PR) ──────────────────────────────────
+        merge_trend_q = await self.db.execute(
+            select(
+                GitPullRequest.id,
+                GitPullRequest.title,
+                GitPullRequest.created_at_ext,
+                GitPullRequest.merged_at,
+                (func.unix_timestamp(GitPullRequest.merged_at)
+                 - func.unix_timestamp(GitPullRequest.created_at_ext)).label('merge_seconds'),
+            ).where(*merged_filters)
+            .order_by(GitPullRequest.merged_at.asc())
+        )
+        merge_time_trend = []
+        for r in merge_trend_q.all():
+            merge_time_trend.append({
+                'date': r.merged_at.isoformat() if r.merged_at else '',
+                'pr_title': str(r.title or '')[:80],
+                'hours': round(float(r.merge_seconds or 0) / 3600, 1),
+            })
+
+        # ── 3) Coding time trend (first_commit_at -> created_at_ext) ─────────
+        coding_filters = filters + [
+            GitPullRequest.first_commit_at.isnot(None),
+        ]
+        coding_trend_q = await self.db.execute(
+            select(
+                GitPullRequest.id,
+                GitPullRequest.title,
+                GitPullRequest.created_at_ext,
+                GitPullRequest.first_commit_at,
+                (func.unix_timestamp(GitPullRequest.created_at_ext)
+                 - func.unix_timestamp(GitPullRequest.first_commit_at)).label('coding_seconds'),
+            ).where(*coding_filters)
+            .order_by(GitPullRequest.created_at_ext.asc())
+        )
+        coding_time_trend = []
+        for r in coding_trend_q.all():
+            secs = max(float(r.coding_seconds or 0), 0)
+            coding_time_trend.append({
+                'date': r.created_at_ext.isoformat() if r.created_at_ext else '',
+                'pr_title': str(r.title or '')[:80],
+                'hours': round(secs / 3600, 1),
+            })
+
+        # ── 4) PR size trend ─────────────────────────────────────────────────
+        size_q = await self.db.execute(
+            select(
+                GitPullRequest.id,
+                GitPullRequest.title,
+                GitPullRequest.created_at_ext,
+                (GitPullRequest.additions + GitPullRequest.deletions).label('lines_changed'),
+                GitPullRequest.additions,
+                GitPullRequest.deletions,
+            ).where(*filters)
+            .order_by(GitPullRequest.created_at_ext.asc())
+        )
+        pr_size_trend = []
+        for r in size_q.all():
+            pr_size_trend.append({
+                'date': r.created_at_ext.isoformat() if r.created_at_ext else '',
+                'pr_title': str(r.title or '')[:80],
+                'lines_changed': int(r.lines_changed or 0),
+                'additions': int(r.additions or 0),
+                'deletions': int(r.deletions or 0),
+            })
+
+        # ── 5) Open PRs (WIP) ───────────────────────────────────────────────
+        open_filters = [
+            GitPullRequest.organization_id == organization_id,
+            GitPullRequest.status == 'open',
+        ]
+        if repo_mapping_id:
+            open_filters.append(GitPullRequest.repo_mapping_id == repo_mapping_id)
+
+        open_q = await self.db.execute(
+            select(
+                GitPullRequest.id,
+                GitPullRequest.title,
+                GitPullRequest.author,
+                GitPullRequest.source_branch,
+                GitPullRequest.created_at_ext,
+                GitPullRequest.review_comments,
+                GitPullRequest.additions,
+                GitPullRequest.deletions,
+                GitPullRequest.first_commit_at,
+            ).where(*open_filters)
+            .order_by(GitPullRequest.created_at_ext.asc())
+        )
+        open_prs = []
+        for r in open_q.all():
+            age_days = round((now - r.created_at_ext).total_seconds() / 86400, 1) if r.created_at_ext else 0
+            lines = int(r.additions or 0) + int(r.deletions or 0)
+            coding_hours = None
+            if r.first_commit_at and r.created_at_ext:
+                coding_hours = round((r.created_at_ext - r.first_commit_at).total_seconds() / 3600, 1)
+
+            # Risks
+            risks = []
+            if lines > 500:
+                risks.append('oversized')
+            if age_days > 3:
+                risks.append('overdue')
+            if age_days > 7:
+                risks.append('stale')
+
+            open_prs.append({
+                'id': r.id,
+                'title': str(r.title or ''),
+                'risks': risks,
+                'author': str(r.author or ''),
+                'age_days': age_days,
+                'comments': int(r.review_comments or 0),
+                'coding_time_hours': coding_hours,
+                'source_branch': str(r.source_branch or ''),
+                'lines_changed': lines,
+            })
+
+        # ── 6) PR list (all PRs in period) ──────────────────────────────────
+        all_q = await self.db.execute(
+            select(
+                GitPullRequest.id,
+                GitPullRequest.title,
+                GitPullRequest.status,
+                GitPullRequest.author,
+                GitPullRequest.source_branch,
+                GitPullRequest.target_branch,
+                GitPullRequest.created_at_ext,
+                GitPullRequest.merged_at,
+                GitPullRequest.closed_at,
+                GitPullRequest.additions,
+                GitPullRequest.deletions,
+                GitPullRequest.review_comments,
+            ).where(*filters)
+            .order_by(GitPullRequest.created_at_ext.desc())
+            .limit(200)
+        )
+        pr_list = []
+        for r in all_q.all():
+            lines = int(r.additions or 0) + int(r.deletions or 0)
+            age_days = 0.0
+            if r.created_at_ext:
+                end = r.merged_at or r.closed_at or now
+                age_days = round((end - r.created_at_ext).total_seconds() / 86400, 1)
+            risks = []
+            if lines > 500:
+                risks.append('oversized')
+            if age_days > 3:
+                risks.append('overdue')
+            if r.status == 'open' and age_days > 7:
+                risks.append('stale')
+
+            pr_list.append({
+                'id': r.id,
+                'title': str(r.title or ''),
+                'risks': risks,
+                'status': str(r.status or 'open'),
+                'author': str(r.author or ''),
+                'source_branch': str(r.source_branch or ''),
+                'target_branch': str(r.target_branch or ''),
+                'approvals': 0,  # Not tracked in model
+                'lines_changed': lines,
+                'created_at': r.created_at_ext.isoformat() if r.created_at_ext else '',
+            })
+
+        # ── 7) Reviewer stats (approximated from author of merged PRs) ──────
+        # Since there's no separate review table, we approximate with PR data
+        reviewer_stats: list[dict] = []
+
+        return {
+            'kpi': {
+                'pct_merged_within_goal': pct_within_goal,
+                'merge_goal_hours': merge_goal_hours,
+                'avg_merge_hours': avg_merge_hours,
+                'merged_count': merged_count,
+            },
+            'merge_time_trend': merge_time_trend,
+            'coding_time_trend': coding_time_trend,
+            'pr_size_trend': pr_size_trend,
+            'open_prs': open_prs,
+            'reviewer_stats': reviewer_stats,
+            'pr_list': pr_list,
         }
