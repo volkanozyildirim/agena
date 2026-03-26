@@ -26,6 +26,7 @@ type AgentConfig = {
   custom_model?: string;
   description?: string;
   system_prompt?: string;
+  palette?: number;
 };
 
 type OfficeAgent = AgentConfig & {
@@ -38,11 +39,11 @@ type OfficeAgent = AgentConfig & {
 /* ── Load agents from same source as /dashboard/agents ───────────── */
 
 const DEFAULT_AGENTS: AgentConfig[] = [
-  { role: 'manager', label: 'Manager', icon: '👔', color: '#f59e0b', enabled: true },
-  { role: 'pm', label: 'Product Manager', icon: '📋', color: '#a78bfa', enabled: true },
-  { role: 'lead_developer', label: 'Lead Developer', icon: '🧑‍💻', color: '#38bdf8', enabled: true },
-  { role: 'developer', label: 'Developer', icon: '⚡', color: '#22c55e', enabled: true },
-  { role: 'qa', label: 'QA Engineer', icon: '🔍', color: '#f472b6', enabled: true },
+  { role: 'manager', label: 'Manager', icon: '👔', color: '#f59e0b', enabled: true, palette: 0 },
+  { role: 'pm', label: 'Product Manager', icon: '📋', color: '#a78bfa', enabled: true, palette: 1 },
+  { role: 'lead_developer', label: 'Lead Developer', icon: '🧑‍💻', color: '#38bdf8', enabled: true, palette: 2 },
+  { role: 'developer', label: 'Developer', icon: '⚡', color: '#22c55e', enabled: true, palette: 3 },
+  { role: 'qa', label: 'QA Engineer', icon: '🔍', color: '#f472b6', enabled: true, palette: 4 },
 ];
 
 const LS_AGENTS = 'tiqr_agent_configs';
@@ -53,7 +54,12 @@ function loadAgentConfigs(): AgentConfig[] {
     const saved = localStorage.getItem(LS_AGENTS);
     if (!saved) return DEFAULT_AGENTS;
     const parsed = JSON.parse(saved) as AgentConfig[];
-    return parsed.filter((a) => a.enabled !== false);
+    return parsed.filter((a) => a.enabled !== false).map((a, idx) => {
+      if (a.palette !== undefined) return a;
+      // Merge palette from default if missing
+      const def = DEFAULT_AGENTS.find((d) => d.role === a.role);
+      return { ...a, palette: def?.palette ?? (idx % PALETTE_COUNT) };
+    });
   } catch {
     return DEFAULT_AGENTS;
   }
@@ -118,7 +124,7 @@ function modelsForProvider(provider: string) {
 const COLOR_PICKS = ['#38bdf8', '#22c55e', '#f59e0b', '#a78bfa', '#f472b6', '#ef4444', '#14b8a6', '#6366f1', '#ec4899', '#84cc16'];
 
 // 6 pixel character palettes (char_0.png .. char_5.png)
-const PALETTE_COUNT = 6;
+const PALETTE_COUNT = 7;
 // Each PNG is 112×96: 7 frames × 16px wide, 3 direction rows × 32px tall
 // Walk2 (standing idle pose) = frame index 1, row 0 (down direction)
 const CHAR_FRAME_W = 16;
@@ -185,6 +191,32 @@ function PixelCharacterPicker({ selected, onSelect, accentColor }: {
   );
 }
 
+/* ── Small character avatar for side panel ────────────────────────── */
+
+function AgentCharIcon({ palette, color, size }: { palette: number; color: string; size: number }) {
+  const cRef = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    const img = new Image();
+    img.src = `/pixel-office/assets/characters/char_${(palette ?? 0) % PALETTE_COUNT}.png`;
+    img.onload = () => {
+      const c = cRef.current;
+      if (!c) return;
+      const ctx = c.getContext('2d');
+      if (!ctx) return;
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, CHAR_FRAME_W, 0, CHAR_FRAME_W, CHAR_FRAME_H, 0, 0, c.width, c.height);
+    };
+  }, [palette]);
+
+  return (
+    <div style={{ width: size, height: size, borderRadius: 8, background: `${color}20`, border: `1px solid ${color}35`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+      <canvas ref={cRef} width={CHAR_FRAME_W * 2} height={CHAR_FRAME_H * 2}
+        style={{ width: size - 2, height: (size - 2) * 2, imageRendering: 'pixelated', marginTop: 2 }} />
+    </div>
+  );
+}
+
 /* ── Pixel Office iframe bridge ──────────────────────────────────── */
 
 function usePixelOfficeBridge(
@@ -208,7 +240,7 @@ function usePixelOfficeBridge(
       const agents = agentsRef.current ?? [];
       if (!iframeRef.current?.contentWindow || !agents.length) return;
       for (const a of agents) {
-        safeSend(iframeRef, { type: 'agentCreated', id: a.pixelId, folderName: a.label });
+        safeSend(iframeRef, { type: 'agentCreated', id: a.pixelId, folderName: a.label, palette: a.palette ?? undefined });
         spawnedRef.current.add(a.pixelId);
         stageRef.current[a.pixelId] = a.status === 'active' ? (a.currentStage || 'active') : 'idle';
       }
@@ -308,7 +340,7 @@ function AssignTaskModal({
       <div style={{ width: 'min(500px, 100%)', borderRadius: 20, border: `1px solid ${agent.color}40`, background: 'var(--surface)', padding: 24, maxHeight: '80vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: `${agent.color}20`, border: `1px solid ${agent.color}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>{agent.icon}</div>
+          <AgentCharIcon palette={agent.palette ?? 0} color={agent.color} size={44} />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: agent.color }}>{agent.label}</div>
             <div style={{ fontSize: 12, color: 'var(--ink-35)' }}>
@@ -423,7 +455,7 @@ function AddAgentModal({
   const needsCustomInput = provider === 'custom' || provider === 'codex_cli' || provider === 'claude_cli';
 
   // Map palette index to a default icon for the agent config
-  const paletteIcons = ['👔', '📋', '🧑‍💻', '⚡', '🔍', '🤖'];
+  const paletteIcons = ['👔', '📋', '🧑‍💻', '⚡', '🔍', '🤖', '⚽'];
 
   const toRoleId = (s: string) =>
     s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || `agent_${Date.now()}`;
@@ -763,7 +795,7 @@ export default function OfficePage() {
 
         {/* Side Panel */}
         {viewMode === 'split' && (
-          <div style={{ display: 'grid', gap: 12, alignContent: 'start', overflow: 'auto' }}>
+          <div style={{ display: 'grid', gap: 12, alignContent: 'start', overflowY: 'auto', overflowX: 'hidden', minWidth: 0 }}>
 
             {/* Agent Cards */}
             <div style={{ borderRadius: 16, border: '1px solid var(--panel-border)', background: 'var(--panel-alt)', padding: 16 }}>
@@ -776,14 +808,11 @@ export default function OfficePage() {
                   return (
                     <div key={agent.pixelId} onClick={() => setAssignAgent(agent)}
                       style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 12, cursor: 'pointer', background: isActive ? `${agent.color}12` : 'var(--panel)', border: `1px solid ${isActive ? `${agent.color}35` : 'var(--panel-border-2)'}`, transition: 'all 0.15s' }}>
-                      <div style={{ width: 32, height: 32, borderRadius: 8, background: `${agent.color}20`, border: `1px solid ${agent.color}35`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>{agent.icon}</div>
+                      <AgentCharIcon palette={agent.palette ?? 0} color={agent.color} size={32} />
                       <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: agent.color, display: 'flex', alignItems: 'center', gap: 5 }}>
-                          {agent.label}
-                          {(agent.provider && (agent.model || agent.custom_model)) && (
-                            <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 5px', borderRadius: 999, background: `${agent.color}15`, color: `${agent.color}cc` }}>{agent.model || agent.custom_model}</span>
-                          )}
-                          <span style={{ width: 5, height: 5, borderRadius: '50%', background: isActive ? '#22c55e' : 'var(--ink-25)', boxShadow: isActive ? '0 0 6px #22c55e' : 'none' }} />
+                        <div style={{ fontSize: 12, fontWeight: 600, color: agent.color, display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 1 }}>{agent.label}</span>
+                          <span style={{ width: 5, height: 5, borderRadius: '50%', flexShrink: 0, background: isActive ? '#22c55e' : 'var(--ink-25)', boxShadow: isActive ? '0 0 6px #22c55e' : 'none' }} />
                         </div>
                         <div style={{ fontSize: 10, color: 'var(--ink-35)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {isActive ? `${agent.currentStage} · ${agent.currentTask?.slice(0, 20) || ''}` : t('office.agentIdle')}

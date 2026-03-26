@@ -22,7 +22,7 @@ interface AgentConfig {
 }
 
 // ── Pixel Character Picker ────────────────────────────────────────────────────
-const PALETTE_COUNT = 6;
+const PALETTE_COUNT = 7;
 const CHAR_FRAME_W = 16;
 const CHAR_FRAME_H = 32;
 
