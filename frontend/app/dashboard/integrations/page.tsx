@@ -560,7 +560,7 @@ export default function IntegrationsPage() {
           className='button'
           onClick={() => {
             setActiveTab('cli');
-            fetch('http://localhost:9876/health').then(r => r.json()).then(d => setCliBridgeStatus({ ok: true, codex: d.codex, claude: d.claude })).catch(() => setCliBridgeStatus({ ok: false, codex: false, claude: false }));
+            fetch('http://localhost:9876/health').then(r => r.json()).then(d => setCliBridgeStatus({ ok: true, codex: d.codex, claude: d.claude, codex_auth: d.codex_auth, claude_auth: d.claude_auth })).catch(() => setCliBridgeStatus({ ok: false, codex: false, claude: false, codex_auth: false, claude_auth: false }));
           }}
           style={{
             borderColor: activeTab === 'cli' ? 'rgba(168,85,247,0.45)' : 'var(--panel-border-3)',
@@ -972,7 +972,7 @@ export default function IntegrationsPage() {
                 className='button button-outline'
                 style={{ marginTop: 12, width: '100%', justifyContent: 'center' }}
                 onClick={() => {
-                  fetch('http://localhost:9876/health').then(r => r.json()).then(d => { setCliBridgeStatus({ ok: true, codex: d.codex, claude: d.claude }); setMsg('Bridge bagli!'); }).catch(() => { setCliBridgeStatus({ ok: false, codex: false, claude: false }); setError('Bridge bagli degil. Terminalde python3 cli_bridge.py calistirin.'); });
+                  fetch('http://localhost:9876/health').then(r => r.json()).then(d => { setCliBridgeStatus({ ok: true, codex: d.codex, claude: d.claude, codex_auth: d.codex_auth, claude_auth: d.claude_auth }); setMsg('Bridge bagli!'); }).catch(() => { setCliBridgeStatus({ ok: false, codex: false, claude: false, codex_auth: false, claude_auth: false }); setError('Bridge bagli degil.'); });
                 }}
               >
                 Bridge Durumunu Kontrol Et

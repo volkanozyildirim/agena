@@ -5,6 +5,8 @@
 import { createServer } from 'http';
 import { execFile, execSync, spawn } from 'child_process';
 import { promisify } from 'util';
+import { writeFileSync, readFileSync, unlinkSync, mkdirSync, createReadStream, existsSync } from 'fs';
+import { join } from 'path';
 
 const execFileAsync = promisify(execFile);
 const PORT = 9876;
@@ -54,7 +56,6 @@ const server = createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && url.pathname === '/health') {
-    const { existsSync } = await import('fs');
     const codexAuth = existsSync('/root/.codex/auth.json') || !!process.env.OPENAI_API_KEY;
     const claudeAuth = existsSync('/root/.claude/.credentials.json') || existsSync('/root/.claude/credentials.json');
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -105,31 +106,75 @@ async function runCLI(bin, name, data) {
   if (!bin) return { status: 'error', message: `${name} binary not found in container` };
 
   const { repo_path, prompt, model, timeout = 300 } = data;
-  let args;
+  // Write prompt to temp file to avoid E2BIG (arg too long)
+  mkdirSync('/tmp/cli-bridge', { recursive: true });
+  const promptFile = join('/tmp/cli-bridge', `${name}-${Date.now()}.txt`);
+  writeFileSync(promptFile, prompt);
 
+  // createReadStream already imported at top
+  let args;
   if (name === 'codex') {
-    args = ['--quiet', '--full-auto'];
-    if (model) args.push('--model', model);
-    args.push(prompt);
+    args = ['exec', '--skip-git-repo-check', '-C', repo_path, '--full-auto', '--sandbox', 'workspace-write'];
+    if (model) args.push('-m', model);
+    args.push('-o', promptFile + '.out');
+    args.push('-');  // read prompt from stdin
   } else {
     args = ['--print', '--dangerously-skip-permissions'];
     if (model) args.push('--model', model);
-    args.push('--prompt', prompt);
+    args.push('-p', prompt.slice(0, 10000));  // claude --prompt has limits, use shorter
   }
 
-  console.log(`[${name}] running in ${repo_path} (model=${model || 'default'}, timeout=${timeout}s)`);
+  console.log(`[${name}] running in ${repo_path} (model=${model || 'default'}, timeout=${timeout}s, prompt=${prompt.length} chars)`);
 
   try {
-    const { stdout, stderr } = await execFileAsync(bin, args, {
-      cwd: repo_path,
-      timeout: timeout * 1000,
-      maxBuffer: 10 * 1024 * 1024,
-      env: { ...process.env, NO_COLOR: '1' },
+    // Use spawn for stdin piping
+    // Load API key from auth file if not in env
+    let apiKey = process.env.OPENAI_API_KEY || '';
+    if (!apiKey && name === 'codex') {
+      try {
+        const auth = JSON.parse(readFileSync('/root/.codex/auth.json', 'utf8'));
+        apiKey = auth.api_key || auth.OPENAI_API_KEY || '';
+      } catch {}
+    }
+
+    const result = await new Promise((resolve, reject) => {
+      const proc = spawn(bin, args, {
+        cwd: repo_path,
+        env: { ...process.env, NO_COLOR: '1', NODE_EXTRA_CA_CERTS: '/etc/ssl/certs/ca-certificates.crt', ...(apiKey ? { OPENAI_API_KEY: apiKey } : {}) },
+      });
+      let stdout = '', stderr = '';
+      proc.stdout.on('data', (d) => { stdout += d.toString(); });
+      proc.stderr.on('data', (d) => { stderr += d.toString(); });
+
+      // Pipe prompt file to stdin for codex
+      if (name === 'codex') {
+        const stream = createReadStream(promptFile);
+        stream.pipe(proc.stdin);
+        stream.on('end', () => proc.stdin.end());
+      } else {
+        proc.stdin.end();
+      }
+
+      const timer = setTimeout(() => { proc.kill(); reject(new Error(`${name} timed out after ${timeout}s`)); }, timeout * 1000);
+      proc.on('close', (code) => {
+        clearTimeout(timer);
+        if (name === 'codex') {
+          // Read output file
+          try {
+            const outContent = readFileSync(promptFile + '.out', 'utf8');
+            if (outContent.trim()) stdout = outContent;
+          } catch {}
+        }
+        resolve({ stdout, stderr, code });
+      });
+      proc.on('error', (e) => { clearTimeout(timer); reject(e); });
     });
-    console.log(`[${name}] done — ${stdout.length} chars output`);
-    return { status: 'ok', stdout, stderr };
+    console.log(`[${name}] done — ${result.stdout.length} chars output`);
+    try { unlinkSync(promptFile); } catch {}
+    return { status: result.code === 0 ? 'ok' : 'error', stdout: result.stdout, stderr: result.stderr };
   } catch (e) {
     console.log(`[${name}] error: ${e.message.slice(0, 200)}`);
+    try { unlinkSync(promptFile); } catch {}
     return { status: 'error', message: e.message, stderr: e.stderr || '', stdout: e.stdout || '' };
   }
 }
@@ -234,7 +279,7 @@ async function startLogin(cli) {
 }
 
 async function setAuth(cli, data) {
-  const { writeFileSync, mkdirSync } = await import('fs');
+  // writeFileSync, mkdirSync already imported at top
   const { api_key } = data;
 
   if (!api_key || !api_key.trim()) {

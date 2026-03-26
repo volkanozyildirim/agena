@@ -1,5 +1,11 @@
 FROM node:20
 
+# Corporate SSL certificate
+COPY docker/InternalProxy.crt /usr/local/share/ca-certificates/InternalProxy.crt
+RUN update-ca-certificates
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
+
 # CLI tools
 RUN npm install -g @openai/codex@latest || true
 RUN npm install -g @anthropic-ai/claude-code@latest || true
