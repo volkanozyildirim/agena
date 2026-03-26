@@ -10,12 +10,15 @@ import { useLocale } from '@/lib/i18n';
 import { RoleContext, canAccess, type Role } from '@/lib/rbac';
 import { WebSocketProvider } from '@/lib/useWebSocket';
 
+type NavChild = { href: string; key: string; icon: string; permission?: string };
+type NavItem = { href: string; key: string; icon: string; permission?: string; children?: NavChild[] };
+
 const NOTIF_EVENT = 'tiqr:notification';
 const NOTIF_SYNC_EVENT = 'tiqr:notification-sync';
 const LS_UNREAD_KEY = 'tiqr_notification_unread_count';
 const LS_SIDEBAR_COLLAPSED = 'tiqr_sidebar_collapsed';
 
-const PRIMARY_NAV_KEYS = [
+const PRIMARY_NAV_KEYS: NavItem[] = [
   { href: '/dashboard', key: 'nav.overview', icon: '🧭' },
   { href: '/dashboard/office', key: 'nav.office', icon: '🏢' },
   { href: '/dashboard/tasks', key: 'nav.tasks', icon: '✅', permission: 'tasks:read' as const },
@@ -25,6 +28,13 @@ const PRIMARY_NAV_KEYS = [
   { href: '/dashboard/flows', key: 'nav.flows', icon: '🧠' },
   { href: '/dashboard/templates', key: 'nav.templates', icon: '🧩' },
   { href: '/dashboard/mappings', key: 'nav.mappings', icon: '🔗' },
+  { href: '/dashboard/dora', key: 'nav.dora', icon: '📈', children: [
+    { href: '/dashboard/dora', key: 'nav.doraOverview', icon: '📊' },
+    { href: '/dashboard/dora/project', key: 'nav.doraProject', icon: '📋' },
+    { href: '/dashboard/dora/development', key: 'nav.doraDev', icon: '⚡' },
+    { href: '/dashboard/dora/quality', key: 'nav.doraQuality', icon: '🛡' },
+    { href: '/dashboard/dora/bugs', key: 'nav.doraBugs', icon: '🐛' },
+  ]},
   { href: '/dashboard/integrations', key: 'nav.integrations', icon: '🔌', permission: 'integrations:manage' as const },
   { href: '/dashboard/permissions', key: 'nav.permissions', icon: '🛡', permission: 'roles:manage' as const },
 ];
@@ -55,6 +65,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
   const [userRole, setUserRole] = useState<Role>('viewer');
   const [orgSlug, setOrgSlugState] = useState('');
   const [orgNameDisplay, setOrgNameDisplay] = useState('');
+  const [expandedNav, setExpandedNav] = useState<string | null>(null);
   const shouldOpenOnboarding = searchParams.get('onboarding') === '1' || searchParams.get('welcome') === '1';
   const lastUnreadRef = useRef<number | null>(null);
   const sidebarWidth = sidebarCollapsed ? 76 : 220;
@@ -356,10 +367,59 @@ function DashboardInner({ children }: { children: ReactNode }) {
         </div>}
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {PRIMARY_NAV_KEYS.filter((item) => !item.permission || canAccess(userRole, item.permission)).map((item) => {
+          {PRIMARY_NAV_KEYS.filter((item) => !item.permission || canAccess(userRole, item.permission as Parameters<typeof canAccess>[1])).map((item) => {
+            if (item.children) {
+              const sectionActive = pathname.startsWith(item.href);
+              const isExpanded = sectionActive || expandedNav === item.key;
+              return (
+                <div key={item.href}>
+                  <button
+                    onClick={() => setExpandedNav(isExpanded && !sectionActive ? null : item.key)}
+                    title={t(item.key as Parameters<typeof t>[0])}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                      padding: sidebarCollapsed ? '9px 10px' : '9px 12px', borderRadius: 10, fontSize: 14,
+                      fontWeight: sectionActive ? 600 : 400,
+                      color: sectionActive ? 'var(--nav-active)' : 'var(--muted)',
+                      background: sectionActive ? 'var(--nav-active-bg)' : 'transparent',
+                      border: sectionActive ? '1px solid var(--nav-active-border)' : '1px solid transparent',
+                      transition: 'all 0.2s', cursor: 'pointer', justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                    }}
+                  >
+                    <span style={{ fontSize: 16, opacity: sectionActive ? 1 : 0.5 }}>{item.icon}</span>
+                    {!sidebarCollapsed && t(item.key as Parameters<typeof t>[0])}
+                    {!sidebarCollapsed && <span style={{ marginLeft: 'auto', fontSize: 10, transition: 'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>&#9654;</span>}
+                  </button>
+                  {isExpanded && !sidebarCollapsed && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 1, paddingLeft: 18, marginTop: 2 }}>
+                      {item.children.map((child) => {
+                        const childActive = child.href === '/dashboard/dora'
+                          ? pathname === '/dashboard/dora'
+                          : pathname.startsWith(child.href);
+                        return (
+                          <Link key={child.key} href={child.href} title={t(child.key as Parameters<typeof t>[0])} style={{
+                            display: 'flex', alignItems: 'center', gap: 8,
+                            padding: '7px 10px', borderRadius: 8, fontSize: 13,
+                            fontWeight: childActive ? 600 : 400,
+                            color: childActive ? 'var(--nav-active)' : 'var(--muted)',
+                            background: childActive ? 'var(--nav-active-bg)' : 'transparent',
+                            border: childActive ? '1px solid var(--nav-active-border)' : '1px solid transparent',
+                            transition: 'all 0.2s', textDecoration: 'none',
+                          }}>
+                            <span style={{ fontSize: 14, opacity: childActive ? 1 : 0.5 }}>{child.icon}</span>
+                            {t(child.key as Parameters<typeof t>[0])}
+                            {childActive && <span style={{ marginLeft: 'auto', width: 5, height: 5, borderRadius: '50%', background: 'var(--nav-active)' }} />}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
             const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
             return (
-              <Link key={item.href} href={item.href} title={t(item.key)} style={{
+              <Link key={item.href} href={item.href} title={t(item.key as Parameters<typeof t>[0])} style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: sidebarCollapsed ? '9px 10px' : '9px 12px', borderRadius: 10, fontSize: 14,
                 fontWeight: active ? 600 : 400,
@@ -369,7 +429,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
                 transition: 'all 0.2s', textDecoration: 'none', justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
               }}>
                 <span style={{ fontSize: 16, opacity: active ? 1 : 0.5 }}>{item.icon}</span>
-                {!sidebarCollapsed && t(item.key)}
+                {!sidebarCollapsed && t(item.key as Parameters<typeof t>[0])}
                 {active && !sidebarCollapsed && <span style={{ marginLeft: 'auto', width: 6, height: 6, borderRadius: '50%', background: 'var(--nav-active)' }} />}
               </Link>
             );

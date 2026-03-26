@@ -559,3 +559,173 @@ export async function fetchAnalyticsSummary(): Promise<AnalyticsSummaryResponse>
 export async function fetchAnalyticsModels(days = 30): Promise<AnalyticsModelResponse> {
   return apiFetch<AnalyticsModelResponse>(`/analytics/models?days=${days}`);
 }
+
+// ── DORA Project Analytics ───────────────────────────────────────────────────
+
+export interface ProjectKPI {
+  predictability: number;
+  productivity: number;
+  delivery_rate: number;
+  planning_accuracy: number;
+}
+
+export interface ProjectTotals {
+  planned: number;
+  completed: number;
+  failed: number;
+}
+
+export interface WeeklyTrendItem {
+  week: string;
+  planned: number;
+  completed: number;
+  failed: number;
+}
+
+export interface TimeTrendItem {
+  date: string;
+  avg_lead_time_hours: number;
+  avg_cycle_time_hours: number;
+}
+
+export interface ThroughputTrendItem {
+  week: string;
+  throughput: number;
+}
+
+export interface ProjectAnalyticsResponse {
+  period_days: number;
+  kpi: ProjectKPI;
+  totals: ProjectTotals;
+  avg_cycle_time_hours: number;
+  avg_lead_time_hours: number;
+  wip_count: number;
+  weekly_trend: WeeklyTrendItem[];
+  time_trend: TimeTrendItem[];
+  throughput_trend: ThroughputTrendItem[];
+}
+
+export async function fetchProjectAnalytics(days = 30): Promise<ProjectAnalyticsResponse> {
+  return apiFetch<ProjectAnalyticsResponse>(`/analytics/dora/project?days=${days}`);
+}
+
+// ── DORA Development Analytics ───────────────────────────────────────────────
+
+export interface AgentPerformanceItem {
+  role: string;
+  tasks: number;
+  success_rate: number;
+  avg_duration_ms: number;
+}
+
+export interface ModelPerformanceItem {
+  model: string;
+  tasks: number;
+  total_tokens: number;
+  cost_usd: number;
+  success_rate: number;
+  avg_duration_ms: number;
+}
+
+export interface CostPerTaskTrendItem {
+  date: string;
+  cost_per_task: number;
+}
+
+export interface TokenUsageTrendItem {
+  date: string;
+  total_tokens: number;
+}
+
+export interface DoraDevelopmentResponse {
+  coding_efficiency: number;
+  rework_rate: number;
+  avg_cost_per_task: number;
+  avg_completion_minutes: number;
+  total_tasks: number;
+  completed_tasks: number;
+  failed_tasks: number;
+  avg_tokens_per_task: number;
+  agent_performance: AgentPerformanceItem[];
+  model_performance: ModelPerformanceItem[];
+  cost_per_task_trend: CostPerTaskTrendItem[];
+  token_usage_trend: TokenUsageTrendItem[];
+}
+
+export async function fetchDoraDevelopment(days = 30): Promise<DoraDevelopmentResponse> {
+  return apiFetch<DoraDevelopmentResponse>(`/analytics/dora/development?days=${days}`);
+}
+
+// ── DORA Quality ──────────────────────────────────────────────────────────────
+
+export interface QualityDailyTrendItem {
+  date: string;
+  success_rate: number;
+  completed: number;
+  settled: number;
+}
+
+export interface FailureCategoryItem {
+  reason: string;
+  count: number;
+}
+
+export interface DoraQualityResponse {
+  success_rate: number;
+  first_time_rate: number;
+  completed: number;
+  failed: number;
+  benchmark: string;
+  daily_trend: QualityDailyTrendItem[];
+  failure_categories: FailureCategoryItem[];
+}
+
+export async function fetchDoraQuality(days = 30): Promise<DoraQualityResponse> {
+  return apiFetch<DoraQualityResponse>(`/analytics/dora/quality?days=${days}`);
+}
+
+// ── DORA Bug Report ───────────────────────────────────────────────────────────
+
+export interface FailedTaskItem {
+  id: number;
+  title: string;
+  failure_reason: string;
+  source: string;
+  created_at: string;
+  updated_at: string;
+  duration_sec: number;
+}
+
+export interface FailureTrendItem {
+  date: string;
+  failed: number;
+  failure_rate: number;
+}
+
+export interface FailureReasonItem {
+  reason: string;
+  count: number;
+}
+
+export interface StaleTaskItem {
+  id: number;
+  title: string;
+  source: string;
+  created_at: string;
+  running_minutes: number;
+}
+
+export interface DoraBugsResponse {
+  total_failed: number;
+  failure_rate: number;
+  mttr_minutes: number;
+  stale_count: number;
+  recent_failed: FailedTaskItem[];
+  failure_trend: FailureTrendItem[];
+  top_failure_reasons: FailureReasonItem[];
+  stale_tasks: StaleTaskItem[];
+}
+
+export async function fetchDoraBugs(days = 30): Promise<DoraBugsResponse> {
+  return apiFetch<DoraBugsResponse>(`/analytics/dora/bugs?days=${days}`);
+}
