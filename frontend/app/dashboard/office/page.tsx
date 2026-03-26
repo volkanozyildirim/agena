@@ -93,20 +93,22 @@ function usePixelOfficeBridge(
         for (const a of agents) {
           send({ type: 'agentCreated', id: a.pixelId, folderName: a.label });
           spawnedRef.current.add(a.pixelId);
+          // Active agents: start tool animation immediately
+          if (a.status === 'active') {
+            stageRef.current[a.pixelId] = a.currentStage || 'active';
+          } else {
+            stageRef.current[a.pixelId] = 'idle';
+          }
         }
-        // After 500ms, mark idle ones as waiting so they start wandering
+        // After agents walk to their seats, send tool animations for active ones
         setTimeout(() => {
           const curr = agentsRef.current;
           for (const a of curr) {
-            if (a.status !== 'active') {
-              send({ type: 'agentStatus', id: a.pixelId, status: 'waiting' });
-              stageRef.current[a.pixelId] = 'idle';
-            } else {
+            if (a.status === 'active') {
               send({ type: 'agentToolStart', id: a.pixelId, toolId: `t-${a.pixelId}-${Date.now()}`, status: stepToToolName(a.currentStage || '') });
-              stageRef.current[a.pixelId] = a.currentStage || 'active';
             }
           }
-        }, 500);
+        }, 1000);
       }
 
       // Sync loop: detect status changes every second
@@ -145,10 +147,20 @@ function AssignTaskModal({
   tasks: TaskItem[];
   onClose: () => void;
 }) {
+  const [tab, setTab] = useState<'assign' | 'new'>('assign');
   const [title, setTitle] = useState('');
   const [desc, setDesc] = useState('');
   const [creating, setCreating] = useState(false);
-  const queuedTasks = tasks.filter((t) => t.status === 'queued');
+  const [assigning, setAssigning] = useState<number | null>(null);
+  const assignable = tasks.filter((t) => t.status === 'queued' || t.status === 'failed');
+
+  const handleAssign = async (taskId: number) => {
+    setAssigning(taskId);
+    try {
+      await apiFetch(`/tasks/${taskId}/assign`, { method: 'POST' });
+      onClose();
+    } catch { /* silent */ } finally { setAssigning(null); }
+  };
 
   const handleCreate = async () => {
     if (!title.trim()) return;
@@ -158,20 +170,14 @@ function AssignTaskModal({
         method: 'POST',
         body: JSON.stringify({
           task: { title: title.trim(), description: desc.trim() || title.trim() },
-          async_mode: true,
-          create_pr: true,
+          async_mode: true, create_pr: true,
         }),
       });
       onClose();
     } catch { /* silent */ } finally { setCreating(false); }
   };
 
-  const handleAssign = async (taskId: number) => {
-    try {
-      await apiFetch(`/tasks/${taskId}/assign`, { method: 'POST' });
-      onClose();
-    } catch { /* silent */ }
-  };
+  const isActive = agent.status === 'active';
 
   return (
     <div
@@ -184,60 +190,122 @@ function AssignTaskModal({
     >
       <div
         style={{
-          width: 'min(480px, 100%)', borderRadius: 20,
+          width: 'min(500px, 100%)', borderRadius: 20,
           border: `1px solid ${agent.color}40`, background: 'var(--surface)',
           padding: 24, maxHeight: '80vh', overflowY: 'auto',
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
           <div style={{
             width: 44, height: 44, borderRadius: 12,
             background: `${agent.color}20`, border: `1px solid ${agent.color}40`,
             display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22,
           }}>{agent.icon}</div>
-          <div>
+          <div style={{ flex: 1 }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: agent.color }}>{agent.label}</div>
             <div style={{ fontSize: 12, color: 'var(--ink-35)' }}>
-              {agent.status === 'active' ? `${agent.currentStage} · ${agent.currentTask?.slice(0, 30)}` : 'Bos, is bekliyor'}
+              {isActive ? `${agent.currentStage} · ${agent.currentTask?.slice(0, 30)}` : 'Bos, gorev bekliyor'}
             </div>
           </div>
           <button onClick={onClose} style={{
-            marginLeft: 'auto', width: 32, height: 32, borderRadius: 8,
+            width: 32, height: 32, borderRadius: 8,
             border: '1px solid var(--panel-border)', background: 'var(--panel-alt)',
             color: 'var(--ink-50)', cursor: 'pointer', fontSize: 16,
           }}>✕</button>
         </div>
 
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: agent.color, marginBottom: 8 }}>
-            Yeni Task Olustur
+        {/* Active agent info */}
+        {isActive && (
+          <div style={{
+            padding: '10px 12px', borderRadius: 12, marginBottom: 16,
+            background: `${agent.color}10`, border: `1px solid ${agent.color}25`,
+            fontSize: 12, color: agent.color,
+          }}>
+            Su an calisiyor: <strong>{agent.currentTask}</strong>
+            <div style={{ fontSize: 11, color: 'var(--ink-35)', marginTop: 2 }}>
+              Asama: {agent.currentStage}
+            </div>
           </div>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Task basligi..."
-            style={{ width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 13, border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--ink-90)', outline: 'none', marginBottom: 8, boxSizing: 'border-box' }} />
-          <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Aciklama (opsiyonel)..." rows={3}
-            style={{ width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 13, border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--ink-90)', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
-          <button onClick={handleCreate} disabled={!title.trim() || creating}
-            style={{ marginTop: 8, width: '100%', padding: '10px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: title.trim() && !creating ? 'pointer' : 'default', background: title.trim() ? agent.color : 'var(--panel-alt)', color: title.trim() ? '#000' : 'var(--ink-25)', border: 'none' }}>
-            {creating ? 'Gonderiliyor...' : 'Goreve Gonder'}
-          </button>
+        )}
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
+          {([
+            { key: 'assign' as const, label: `Gorev Ata (${assignable.length})` },
+            { key: 'new' as const, label: 'Yeni Olustur' },
+          ]).map((t) => (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              style={{
+                flex: 1, padding: '8px', borderRadius: 10, fontSize: 12, fontWeight: 600,
+                cursor: 'pointer', border: 'none',
+                background: tab === t.key ? `${agent.color}20` : 'var(--panel)',
+                color: tab === t.key ? agent.color : 'var(--ink-35)',
+              }}>
+              {t.label}
+            </button>
+          ))}
         </div>
 
-        {queuedTasks.length > 0 && (
+        {/* Assign existing task */}
+        {tab === 'assign' && (
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--ink-35)', marginBottom: 8 }}>
-              veya Bekleyen Task Ata
-            </div>
-            <div style={{ display: 'grid', gap: 4 }}>
-              {queuedTasks.slice(0, 5).map((task) => (
-                <button key={task.id} onClick={() => handleAssign(task.id)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 10px', borderRadius: 10, fontSize: 12, background: 'var(--panel)', border: '1px solid var(--panel-border-2)', color: 'var(--ink-78)', cursor: 'pointer', textAlign: 'left' }}>
-                  <span style={{ color: '#f59e0b', fontWeight: 700 }}>⏳</span>
-                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</span>
-                  <span style={{ color: agent.color, fontSize: 11, fontWeight: 700, flexShrink: 0 }}>Ata →</span>
-                </button>
-              ))}
-            </div>
+            {assignable.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--ink-25)', fontSize: 13 }}>
+                Atanacak gorev yok. Yeni olusturun!
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: 6 }}>
+                {assignable.map((task) => (
+                  <button key={task.id} onClick={() => handleAssign(task.id)}
+                    disabled={assigning === task.id}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                      padding: '10px 12px', borderRadius: 12, fontSize: 13,
+                      background: 'var(--panel)', border: '1px solid var(--panel-border-2)',
+                      color: 'var(--ink-78)', cursor: 'pointer', textAlign: 'left',
+                      opacity: assigning === task.id ? 0.5 : 1,
+                    }}>
+                    <span style={{
+                      fontSize: 11, fontWeight: 700, flexShrink: 0,
+                      color: task.status === 'failed' ? '#f87171' : '#f59e0b',
+                    }}>
+                      {task.status === 'failed' ? '✕' : '⏳'}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>
+                        {task.title}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-25)', marginTop: 2 }}>
+                        #{task.id} · {task.status}
+                      </div>
+                    </div>
+                    <span style={{
+                      color: agent.color, fontSize: 12, fontWeight: 700, flexShrink: 0,
+                      padding: '4px 10px', borderRadius: 8,
+                      background: `${agent.color}15`, border: `1px solid ${agent.color}30`,
+                    }}>
+                      {assigning === task.id ? '...' : 'Calistir'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* New task */}
+        {tab === 'new' && (
+          <div>
+            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Task basligi..."
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 13, border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--ink-90)', outline: 'none', marginBottom: 8, boxSizing: 'border-box' }} />
+            <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Aciklama (opsiyonel)..." rows={3}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 13, border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--ink-90)', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
+            <button onClick={handleCreate} disabled={!title.trim() || creating}
+              style={{ marginTop: 8, width: '100%', padding: '10px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: title.trim() && !creating ? 'pointer' : 'default', background: title.trim() ? agent.color : 'var(--panel-alt)', color: title.trim() ? '#000' : 'var(--ink-25)', border: 'none' }}>
+              {creating ? 'Gonderiliyor...' : 'Olustur & Calistir'}
+            </button>
           </div>
         )}
       </div>
