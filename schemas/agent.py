@@ -5,7 +5,7 @@ from schemas.task import ExternalTask
 
 class AgentRunRequest(BaseModel):
     task: ExternalTask
-    create_pr: bool = True
+    create_pr: bool = False
     async_mode: bool = True
     agent_role: str | None = None
     agent_model: str | None = None
