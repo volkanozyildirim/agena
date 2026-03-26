@@ -9,6 +9,10 @@ from db.base import Base
 
 class Invite(Base):
     __tablename__ = 'invites'
+    __table_args__ = (
+        # Prevent duplicate invites for same email in same org
+        {'mysql_engine': 'InnoDB'},
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     organization_id: Mapped[int] = mapped_column(ForeignKey('organizations.id', ondelete='CASCADE'), index=True)

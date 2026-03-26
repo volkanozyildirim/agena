@@ -2,7 +2,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import CurrentTenant, get_current_tenant, require_permission
@@ -405,3 +405,63 @@ async def auto_sync_team(
         )
 
     return AutoSyncTeamResponse(**summary)
+
+
+class RemoveByEmailRequest(BaseModel):
+    email: str
+
+
+@router.post('/remove-by-email')
+async def remove_member_by_email(
+    payload: RemoveByEmailRequest,
+    tenant: CurrentTenant = Depends(require_permission('team:manage')),
+    db: AsyncSession = Depends(get_db_session),
+) -> dict[str, str]:
+    """Remove an org member or cancel pending invite by email.
+    Used when removing a team member from the sprint team."""
+    email = payload.email.strip().lower()
+    if not email:
+        raise HTTPException(status_code=400, detail='Email is required')
+
+    # Try to remove org member
+    result = await db.execute(
+        select(OrganizationMember, User)
+        .join(User, OrganizationMember.user_id == User.id)
+        .where(
+            OrganizationMember.organization_id == tenant.organization_id,
+            User.email == email,
+        )
+    )
+    row = result.first()
+    if row:
+        member, user = row
+        # Don't allow removing the last owner
+        if member.role == 'owner':
+            owner_count = await db.execute(
+                select(func.count(OrganizationMember.id)).where(
+                    OrganizationMember.organization_id == tenant.organization_id,
+                    OrganizationMember.role == 'owner',
+                )
+            )
+            if (owner_count.scalar() or 0) <= 1:
+                raise HTTPException(status_code=400, detail='Cannot remove the only owner')
+        await db.delete(member)
+        await db.commit()
+        return {'status': 'removed', 'email': email}
+
+    # Try to cancel pending invite
+    inv_result = await db.execute(
+        select(Invite).where(
+            Invite.organization_id == tenant.organization_id,
+            Invite.email == email,
+            Invite.status == 'pending',
+        )
+    )
+    invites = inv_result.scalars().all()
+    if invites:
+        for inv in invites:
+            await db.delete(inv)
+        await db.commit()
+        return {'status': 'invite_cancelled', 'email': email}
+
+    return {'status': 'not_found', 'email': email}

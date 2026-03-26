@@ -222,14 +222,30 @@ export default function TeamPage() {
 
   // Takıma ekle / çıkar — DB'ye de kaydet
   function toggleMember(m: AzureMember) {
+    const exists = myTeam.some((x) => x.id === m.id);
+
+    // Removing — confirm first
+    if (exists) {
+      const ok = window.confirm(`"${m.displayName}" takımdan çıkarılacak. Emin misiniz?`);
+      if (!ok) return;
+    }
+
     setMyTeam((prev) => {
-      const exists = prev.some((x) => x.id === m.id);
       const next = exists ? prev.filter((x) => x.id !== m.id) : [...prev, m];
       setMyTeamBySource((curr) => ({
         ...curr,
         [provider]: next,
       }));
       void savePrefs({ my_team: next, my_team_source: provider });
+
+      // If removing, also remove from org
+      if (exists && m.uniqueName) {
+        void apiFetch('/org/remove-by-email', {
+          method: 'POST',
+          body: JSON.stringify({ email: m.uniqueName }),
+        }).catch(() => {});
+      }
+
       return next;
     });
   }

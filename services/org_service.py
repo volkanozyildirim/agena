@@ -167,11 +167,16 @@ class OrgService:
         invited_emails: list[str] = []
 
         email_pattern = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+        seen_emails: set[str] = set()
 
         for member in members:
             email = (member.get('uniqueName') or '').strip().lower()
             if not email or not email_pattern.match(email):
                 continue
+            # Skip duplicates within same batch
+            if email in seen_emails:
+                continue
+            seen_emails.add(email)
 
             # Check if a registered user exists with this email
             user_result = await self.db.execute(
