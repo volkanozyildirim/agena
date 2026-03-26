@@ -123,8 +123,8 @@ function modelsForProvider(provider: string) {
 
 const COLOR_PICKS = ['#38bdf8', '#22c55e', '#f59e0b', '#a78bfa', '#f472b6', '#ef4444', '#14b8a6', '#6366f1', '#ec4899', '#84cc16'];
 
-// 6 pixel character palettes (char_0.png .. char_5.png)
-const PALETTE_COUNT = 7;
+// 9 pixel character palettes (char_0.png .. char_8.png)
+const PALETTE_COUNT = 10;
 // Each PNG is 112×96: 7 frames × 16px wide, 3 direction rows × 32px tall
 // Walk2 (standing idle pose) = frame index 1, row 0 (down direction)
 const CHAR_FRAME_W = 16;
@@ -159,30 +159,30 @@ function PixelCharacterPicker({ selected, onSelect, accentColor }: {
   }, []);
 
   return (
-    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 44px)', gap: 6, justifyContent: 'center', width: '100%' }}>
       {Array.from({ length: PALETTE_COUNT }, (_, i) => (
         <button key={i} onClick={() => onSelect(i)}
           style={{
-            width: 56, height: 72, borderRadius: 12, cursor: 'pointer', padding: 4,
+            width: 44, height: 60, borderRadius: 10, cursor: 'pointer', padding: 3,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             border: selected === i ? `2px solid ${accentColor}` : '2px solid var(--panel-border)',
             background: selected === i ? `${accentColor}15` : 'var(--panel)',
-            boxShadow: selected === i ? `0 0 12px ${accentColor}30` : 'none',
+            boxShadow: selected === i ? `0 0 10px ${accentColor}30` : 'none',
             transition: 'all 0.15s', position: 'relative',
           }}>
           <canvas
             ref={(el) => { canvasRefs.current[i] = el; }}
             width={CHAR_FRAME_W * 3}
             height={CHAR_FRAME_H * 3}
-            style={{ width: 48, height: 96, imageRendering: 'pixelated' }}
+            style={{ width: 38, height: 76, imageRendering: 'pixelated' }}
           />
           {selected === i && (
             <div style={{
-              position: 'absolute', bottom: -4, right: -4,
-              width: 16, height: 16, borderRadius: 99,
+              position: 'absolute', bottom: -3, right: -3,
+              width: 14, height: 14, borderRadius: 99,
               background: accentColor, color: '#000',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 10, fontWeight: 900,
+              fontSize: 9, fontWeight: 900,
             }}>✓</div>
           )}
         </button>
@@ -455,7 +455,7 @@ function AddAgentModal({
   const needsCustomInput = provider === 'custom' || provider === 'codex_cli' || provider === 'claude_cli';
 
   // Map palette index to a default icon for the agent config
-  const paletteIcons = ['👔', '📋', '🧑‍💻', '⚡', '🔍', '🤖', '⚽'];
+  const paletteIcons = ['👔', '📋', '🧑‍💻', '⚡', '🔍', '🤖', '⚽', '🖤', '🎄', '⬛'];
 
   const toRoleId = (s: string) =>
     s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || `agent_${Date.now()}`;

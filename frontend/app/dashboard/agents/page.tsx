@@ -22,7 +22,7 @@ interface AgentConfig {
 }
 
 // ── Pixel Character Picker ────────────────────────────────────────────────────
-const PALETTE_COUNT = 7;
+const PALETTE_COUNT = 10;
 const CHAR_FRAME_W = 16;
 const CHAR_FRAME_H = 32;
 
@@ -50,11 +50,11 @@ function PixelCharPicker({ selected, onSelect, accent }: {
   }, []);
 
   return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, 38px)', gap: 5, justifyContent: 'center', width: '100%' }}>
       {Array.from({ length: PALETTE_COUNT }, (_, i) => (
         <button key={i} onClick={() => onSelect(i)}
           style={{
-            width: 40, height: 56, borderRadius: 8, cursor: 'pointer', padding: 2,
+            width: 38, height: 52, borderRadius: 8, cursor: 'pointer', padding: 2,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             border: selected === i ? `2px solid ${accent}` : '1px solid var(--panel-border)',
             background: selected === i ? `${accent}15` : 'var(--panel)',
@@ -62,7 +62,7 @@ function PixelCharPicker({ selected, onSelect, accent }: {
           }}>
           <canvas ref={(el) => { canvasRefs.current[i] = el; }}
             width={CHAR_FRAME_W * 2} height={CHAR_FRAME_H * 2}
-            style={{ width: 32, height: 64, imageRendering: 'pixelated' }} />
+            style={{ width: 30, height: 60, imageRendering: 'pixelated' }} />
         </button>
       ))}
     </div>
