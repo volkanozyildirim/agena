@@ -510,12 +510,12 @@ export default function TeamPage() {
             </div>
             {/* Title */}
             <div style={{ textAlign: 'center', fontSize: 17, fontWeight: 800, color: 'var(--ink-90)', marginBottom: 8 }}>
-              Üyeyi Çıkar
+              {t('team.removeTitle')}
             </div>
             {/* Description */}
             <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--ink-35)', lineHeight: 1.5, marginBottom: 20 }}>
               <strong style={{ color: 'var(--ink-78)' }}>{confirmRemove.displayName}</strong>
-              {' '}takımdan ve organizasyondan çıkarılacak. Bu işlem geri alınamaz.
+              {' '}{t('team.removeDesc')}
             </div>
             {/* Member preview */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12, background: 'var(--panel)', border: '1px solid var(--panel-border)', marginBottom: 20 }}>
@@ -531,11 +531,11 @@ export default function TeamPage() {
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => setConfirmRemove(null)}
                 style={{ flex: 1, padding: '11px', borderRadius: 12, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: 'var(--panel)', border: '1px solid var(--panel-border)', color: 'var(--ink-50)' }}>
-                Vazgeç
+                {t('team.removeCancel')}
               </button>
               <button onClick={() => doRemoveMember(confirmRemove)}
                 style={{ flex: 1, padding: '11px', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer', background: 'linear-gradient(135deg, #ef4444, #dc2626)', border: 'none', color: '#fff' }}>
-                Çıkar
+                {t('team.removeConfirm')}
               </button>
             </div>
           </div>
@@ -750,7 +750,7 @@ function OrgMembersPanel({ t }: { t: (key: Parameters<ReturnType<typeof useLocal
       {invites.length > 0 && (
         <div style={{ display: 'grid', gap: 8 }}>
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: '#f59e0b', marginBottom: 2 }}>
-            Pending Invites ({invites.length})
+            {t('team.pendingInvites')} ({invites.length})
           </div>
           {invites.map((inv) => (
             <div key={inv.id} style={{
@@ -766,7 +766,7 @@ function OrgMembersPanel({ t }: { t: (key: Parameters<ReturnType<typeof useLocal
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-90)' }}>{inv.email}</div>
                 <div style={{ fontSize: 11, color: 'var(--ink-35)' }}>
-                  {inv.created_at ? new Date(inv.created_at).toLocaleDateString() : ''} · Davet gönderildi
+                  {inv.created_at ? new Date(inv.created_at).toLocaleDateString() : ''} · {t('team.invitePending')}
                 </div>
               </div>
               <span style={{
