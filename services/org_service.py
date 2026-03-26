@@ -206,7 +206,7 @@ class OrgService:
                         Invite.status == 'pending',
                     )
                 )
-                if inv_result.scalar_one_or_none() is not None:
+                if inv_result.scalars().first() is not None:
                     already_exists += 1
                 else:
                     self.db.add(
