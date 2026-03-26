@@ -543,29 +543,29 @@ function AddAgentModal({
           {/* Step 2: Model */}
           {step === 2 && (
             <div style={{ display: 'grid', gap: 10 }}>
-              {availModels.length > 0 ? (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {availModels.length > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, maxHeight: 220, overflowY: 'auto' }}>
                   {availModels.map((m) => (
-                    <button key={m.id} onClick={() => setModel(m.id)}
+                    <button key={m.id} onClick={() => { setModel(m.id); setCustomModel(''); }}
                       style={{
-                        padding: '12px 14px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
-                        border: model === m.id ? `2px solid ${color}` : '1px solid var(--panel-border-2)',
-                        background: model === m.id ? `${color}10` : 'var(--panel)',
+                        padding: '10px 12px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
+                        border: model === m.id && !customModel ? `2px solid ${color}` : '1px solid var(--panel-border-2)',
+                        background: model === m.id && !customModel ? `${color}10` : 'var(--panel)',
                         transition: 'all 0.15s',
                       }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: model === m.id ? color : 'var(--ink-78)' }}>
-                        {model === m.id && '✓ '}{m.label}
+                      <div style={{ fontSize: 12, fontWeight: 600, color: model === m.id && !customModel ? color : 'var(--ink-78)' }}>
+                        {model === m.id && !customModel && '✓ '}{m.label}
                       </div>
                     </button>
                   ))}
                 </div>
-              ) : needsCustomInput ? (
-                <input value={customModel} onChange={(e) => setCustomModel(e.target.value)} placeholder={t('office.modelPlaceholder')} autoFocus style={inputSt} />
-              ) : (
-                <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--ink-35)', fontSize: 13 }}>
-                  {t('office.noModelNeeded')}
-                </div>
               )}
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', marginBottom: 6 }}>{t('office.customModel')}</div>
+                <input value={customModel} onChange={(e) => { setCustomModel(e.target.value); if (e.target.value) setModel(''); }}
+                  placeholder={t('office.modelPlaceholder')}
+                  style={inputSt} />
+              </div>
             </div>
           )}
 
