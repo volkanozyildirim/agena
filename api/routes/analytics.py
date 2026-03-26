@@ -381,6 +381,17 @@ class SprintScopeChangeItem(BaseModel):
 
 
 class SprintDetailResponse(BaseModel):
+    sprint_velocity: int = 0
+    total_items: int = 0
+    planned_items: int = 0
+    delivery_rate_pct: float = 0.0
+    planning_accuracy_pct: float = 0.0
+    total_task_count: int = 0
+    total_bug_count: int = 0
+    completed_task_count: int = 0
+    completed_bug_count: int = 0
+    total_effort: float = 0.0
+    completed_effort: float = 0.0
     assignees: list[SprintAssigneeItem]
     completed_items: list[SprintWorkItem]
     incomplete_items: list[SprintWorkItem]
