@@ -28,13 +28,14 @@ const PRIMARY_NAV_KEYS: NavItem[] = [
   { href: '/dashboard/flows', key: 'nav.flows', icon: '🧠' },
   { href: '/dashboard/templates', key: 'nav.templates', icon: '🧩' },
   { href: '/dashboard/mappings', key: 'nav.mappings', icon: '🔗' },
-  { href: '/dashboard/dora', key: 'nav.dora', icon: '📈', children: [
-    { href: '/dashboard/dora', key: 'nav.doraOverview', icon: '📊' },
-    { href: '/dashboard/dora/project', key: 'nav.doraProject', icon: '📋' },
-    { href: '/dashboard/dora/development', key: 'nav.doraDev', icon: '⚡' },
-    { href: '/dashboard/dora/quality', key: 'nav.doraQuality', icon: '🛡' },
-    { href: '/dashboard/dora/bugs', key: 'nav.doraBugs', icon: '🐛' },
-  ]},
+  // DORA menu — temporarily hidden, will be enabled later
+  // { href: '/dashboard/dora', key: 'nav.dora', icon: '📈', children: [
+  //   { href: '/dashboard/dora', key: 'nav.doraOverview', icon: '📊' },
+  //   { href: '/dashboard/dora/project', key: 'nav.doraProject', icon: '📋' },
+  //   { href: '/dashboard/dora/development', key: 'nav.doraDev', icon: '⚡' },
+  //   { href: '/dashboard/dora/quality', key: 'nav.doraQuality', icon: '🛡' },
+  //   { href: '/dashboard/dora/bugs', key: 'nav.doraBugs', icon: '🐛' },
+  // ]},
   { href: '/dashboard/integrations', key: 'nav.integrations', icon: '🔌', permission: 'integrations:manage' as const },
   { href: '/dashboard/permissions', key: 'nav.permissions', icon: '🛡', permission: 'roles:manage' as const },
 ];

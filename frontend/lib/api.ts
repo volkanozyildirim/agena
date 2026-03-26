@@ -647,6 +647,17 @@ export interface SprintScopeChangeItem {
 }
 
 export interface SprintDetailResponse {
+  sprint_velocity: number;
+  total_items: number;
+  planned_items: number;
+  delivery_rate_pct: number;
+  planning_accuracy_pct: number;
+  total_task_count: number;
+  total_bug_count: number;
+  completed_task_count: number;
+  completed_bug_count: number;
+  total_effort: number;
+  completed_effort: number;
   assignees: SprintAssigneeItem[];
   completed_items: SprintWorkItem[];
   incomplete_items: SprintWorkItem[];

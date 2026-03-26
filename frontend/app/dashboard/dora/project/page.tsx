@@ -398,6 +398,8 @@ export default function DoraProjectPage() {
   const [days, setDays] = useState(30);
   const [repoId, setRepoId] = useState<string | null>(null);
   const [workItemTab, setWorkItemTab] = useState<'completed' | 'incomplete' | 'removed'>('completed');
+  const [velocityTab, setVelocityTab] = useState<'count' | 'effort'>('count');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'task' | 'bug'>('all');
 
   useEffect(() => {
     let active = true;

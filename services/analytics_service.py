@@ -928,7 +928,44 @@ class AnalyticsService:
             for d in all_days
         ]
 
+        # ── 6) Sprint velocity metrics ───────────────────────────────────
+        total_items = len(all_tasks)
+        completed_count = len(completed_items)
+        # "planned" = items created before or at sprint start (first day)
+        planned_count = total_items  # all items in the period are considered planned
+        delivery_rate_pct = round(
+            completed_count / total_items * 100, 1
+        ) if total_items > 0 else 0.0
+        planning_accuracy_pct = round(
+            completed_count / planned_count * 100, 1
+        ) if planned_count > 0 else 0.0
+
+        # Per-type counts
+        total_bug_count = sum(1 for t in all_tasks if 'bug' in (t.title or '').lower())
+        total_task_count = total_items - total_bug_count
+        completed_bug_count = sum(1 for item in completed_items if item.get('work_item_type') == 'Bug')
+        completed_task_count = completed_count - completed_bug_count
+
+        # Per-type effort
+        total_effort_all = sum(
+            round((t.updated_at - t.created_at).total_seconds() / 3600, 1)
+            if t.updated_at and t.created_at else 0
+            for t in all_tasks
+        )
+        completed_effort_all = sum(item.get('effort', 0) for item in completed_items)
+
         return {
+            'sprint_velocity': completed_count,
+            'total_items': total_items,
+            'planned_items': planned_count,
+            'delivery_rate_pct': delivery_rate_pct,
+            'planning_accuracy_pct': planning_accuracy_pct,
+            'total_task_count': total_task_count,
+            'total_bug_count': total_bug_count,
+            'completed_task_count': completed_task_count,
+            'completed_bug_count': completed_bug_count,
+            'total_effort': round(total_effort_all, 1),
+            'completed_effort': round(completed_effort_all, 1),
             'assignees': assignees,
             'completed_items': completed_items,
             'incomplete_items': incomplete_items,
