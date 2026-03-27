@@ -85,6 +85,10 @@ AI_PLAN_SYSTEM_PROMPT = (
     '- ONLY reference files that exist in the repository guide\n'
     '- ALWAYS include the corresponding test files (_test.go, _test.py, .test.ts, etc.) for every file you modify\n'
     '- If you modify struct.go, also include struct_test.go or processor_test.go\n'
+    '- CRITICAL: If the repo has MIRROR/PARALLEL packages (e.g. pkg/esindexer AND pkg/store_esindexer), '
+    'you MUST include BOTH packages. Changes in one almost always need the same change in the other.\n'
+    '- Think about the FULL data chain: struct definition → data loading (SQL/query) → processing/population → serialization → tests. '
+    'Include ALL files in the chain, not just the struct.\n'
     '- Be specific: name structs, functions, fields\n'
     '- Return ONLY valid JSON, no prose\n'
 )

@@ -71,11 +71,15 @@ class LocalRepoService:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(file_change.content, encoding='utf-8')
 
+            if not remote_url:
+                # No PR: files written to disk, no git add/commit
+                await self._run_git(root, ['stash', 'pop'], allow_fail=True)
+                return True, branch_name
+
             await self._run_git(root, ['add', '-A'])
             has_changes = await self._has_staged_changes(root)
             if not has_changes:
-                if remote_url:
-                    await self._run_git(root, ['checkout', original_branch], allow_fail=True)
+                await self._run_git(root, ['checkout', original_branch], allow_fail=True)
                 await self._run_git(root, ['stash', 'pop'], allow_fail=True)
                 return False, branch_name
 
@@ -85,7 +89,7 @@ class LocalRepoService:
                  'commit', '-m', commit_message],
             )
 
-            # Push only in PR flow
+            # Push in PR flow
             if remote_url:
                 try:
                     await self._run_git(root, ['push', '-u', '--force-with-lease', remote_target, branch_name])
