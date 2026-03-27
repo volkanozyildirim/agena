@@ -29,7 +29,7 @@ type FlowRunOptions = {
 };
 
 type AgentRole = 'lead_developer' | 'pm' | 'qa' | 'manager' | 'developer';
-interface AgentConfig { role: AgentRole; label: string; icon: string; provider: string; model: string; custom_model: string; enabled: boolean; }
+interface AgentConfig { role: AgentRole; label: string; icon: string; provider: string; model: string; custom_model: string; enabled: boolean; create_pr?: boolean; }
 type TaskRecord = { id: number };
 type IntegrationConfig = {
   provider: 'jira' | 'azure' | 'openai' | 'gemini' | 'playbook';
@@ -590,7 +590,7 @@ export default function SprintsPage() {
     }
   }
 
-  async function assignAI(item: WorkItem, options?: { project?: string; azureRepo?: string; localRepoMapping?: string; localRepoPath?: string; repoPlaybook?: string; agentRole?: string; agentProvider?: string; agentModel?: string; executionPrompt?: string }) {
+  async function assignAI(item: WorkItem, options?: { project?: string; azureRepo?: string; localRepoMapping?: string; localRepoPath?: string; repoPlaybook?: string; agentRole?: string; agentProvider?: string; agentModel?: string; executionPrompt?: string; createPr?: boolean }) {
     setAiLoading(true); setAiResult('');
     try {
       let taskId = taskMapByExternalId[item.id];
@@ -622,7 +622,7 @@ export default function SprintsPage() {
         method: 'POST',
         body: JSON.stringify({
           mode: 'ai',
-          create_pr: false,
+          create_pr: options?.createPr ?? false,
           agent_role: options?.agentRole || undefined,
           agent_model: options?.agentModel || undefined,
           agent_provider: options?.agentProvider || undefined,
@@ -1165,7 +1165,7 @@ function DetailPanel({ item, onClose, project, integrations, aiLoading, aiResult
             {flowRunning ? <><span style={{ fontSize: 14 }}>⟳</span> {t('sprints.flowRunning')}</> : <><span style={{ fontSize: 14 }}>▶</span> {selFlow ? t('sprints.runFlow') : t('sprints.selectFlow')}</>}
           </button>
         )}
-        <button onClick={() => onAssignAI({ project: selectedLocalMapping?.azure_project, azureRepo: selectedLocalMapping?.azure_repo_url, localRepoMapping: selectedLocalMapping?.name, localRepoPath: selectedLocalMapping?.local_path, repoPlaybook: selectedLocalMapping?.repo_playbook, agentRole: selAgent || undefined, agentProvider: selectedAgent?.provider, agentModel: selectedAgent?.custom_model || selectedAgent?.model, executionPrompt: executionPrompt.trim() || undefined })} disabled={aiLoading || !selAgent || !selectedLocalMapping}
+        <button onClick={() => onAssignAI({ project: selectedLocalMapping?.azure_project, azureRepo: selectedLocalMapping?.azure_repo_url, localRepoMapping: selectedLocalMapping?.name, localRepoPath: selectedLocalMapping?.local_path, repoPlaybook: selectedLocalMapping?.repo_playbook, agentRole: selAgent || undefined, agentProvider: selectedAgent?.provider, agentModel: selectedAgent?.custom_model || selectedAgent?.model, executionPrompt: executionPrompt.trim() || undefined, createPr: selectedAgent?.create_pr ?? false })} disabled={aiLoading || !selAgent || !selectedLocalMapping}
           style={{ width: '100%', padding: '11px', borderRadius: 12, border: 'none', background: aiLoading ? 'rgba(13,148,136,0.3)' : selAgent ? 'linear-gradient(135deg, #0d9488, #7c3aed)' : 'var(--panel-border)', color: selAgent ? '#fff' : 'var(--ink-30)', fontWeight: 700, fontSize: 13, cursor: aiLoading || !selAgent ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           {aiLoading ? <><span style={{ fontSize: 14 }}>⟳</span> {t('sprints.aiRunning')}</> : <><span style={{ fontSize: 14 }}>🤖</span> {selAgent ? (selectedLocalMapping ? t('sprints.assignAi') : t('sprints.selectMappingShort')) : t('sprints.selectAgent')}</>}
         </button>

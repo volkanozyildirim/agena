@@ -378,6 +378,20 @@ export default function AgentsPage() {
       </div>
 
       {/* Agent Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 8, alignItems: 'stretch' }}>
+        {agents.map((agent) => (
+          <div key={agent.role}>
+            <AgentCard
+              agent={agent}
+              isEditing={false}
+              onEdit={() => setEditModalAgent(agent)}
+              onUpdate={(patch) => updateAgent(agent.role, patch)}
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* Analytics — below agent cards */}
       <div style={{ borderRadius: 14, border: '1px solid var(--panel-border)', background: 'linear-gradient(180deg, var(--panel-alt), var(--panel))', padding: 10 }}>
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', marginBottom: 6 }}>
           {t('agents.analyticsTitle')}
@@ -391,7 +405,7 @@ export default function AgentsPage() {
             return (
               <div key={a.role} style={{ borderRadius: 10, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', padding: 8, minHeight: 128 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                  <span>{a.icon}</span>
+                  <AgentCharIcon palette={a.palette ?? 0} color={a.color} size={24} />
                   <span style={{ fontWeight: 700, color: 'var(--ink-90)', fontSize: 12 }}>{a.label}</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 11 }}>
@@ -404,19 +418,6 @@ export default function AgentsPage() {
             );
           })}
         </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 8, alignItems: 'stretch' }}>
-        {agents.map((agent) => (
-          <div key={agent.role}>
-            <AgentCard
-              agent={agent}
-              isEditing={false}
-              onEdit={() => setEditModalAgent(agent)}
-              onUpdate={(patch) => updateAgent(agent.role, patch)}
-            />
-          </div>
-        ))}
       </div>
 
       {/* Save button */}
