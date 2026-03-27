@@ -358,14 +358,44 @@ export default function ProfilePage() {
               placeholder='gpt-5'
             />
           </div>
-          <ProfileInput
-            label='Branch Pattern'
-            value={profileSettings.branch_prefix}
-            onChange={(v) => { setProfileSettings((p) => ({ ...p, branch_prefix: v })); setSaved(false); }}
-            placeholder='feature/{ext_id}-{title_slug}'
-          />
-          <div style={{ fontSize: 10, color: 'var(--ink-25)', marginTop: -8, padding: '0 2px', lineHeight: 1.5 }}>
-            Placeholders: {'{ext_id}'} (AB#61717), {'{title_slug}'} (merchant-status), {'{id}'} (task id), {'{timestamp}'} (20260327)
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-50)', marginBottom: 6 }}>Branch Pattern</div>
+            {/* Preset buttons */}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+              {[
+                { label: 'feature/{ext_id}-{title_slug}', desc: 'feature/AB#61717-merchant-status' },
+                { label: 'bugfix/{ext_id}', desc: 'bugfix/AB#61717' },
+                { label: '{ext_id}/{title_slug}', desc: 'AB#61717/merchant-status' },
+                { label: 'ai-task/{id}-{timestamp}', desc: 'ai-task/47-20260327' },
+                { label: 'feature/{title_slug}', desc: 'feature/merchant-status' },
+              ].map((p) => (
+                <button key={p.label} onClick={() => { setProfileSettings((prev) => ({ ...prev, branch_prefix: p.label })); setSaved(false); }}
+                  style={{
+                    padding: '6px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer',
+                    border: profileSettings.branch_prefix === p.label ? '1px solid rgba(94,234,212,0.5)' : '1px solid var(--panel-border-3)',
+                    background: profileSettings.branch_prefix === p.label ? 'rgba(94,234,212,0.12)' : 'var(--panel)',
+                    color: profileSettings.branch_prefix === p.label ? '#5eead4' : 'var(--ink-50)',
+                    fontFamily: 'monospace', fontWeight: 600,
+                  }}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            {/* Custom input */}
+            <input
+              value={profileSettings.branch_prefix}
+              onChange={(e) => { setProfileSettings((p) => ({ ...p, branch_prefix: e.target.value })); setSaved(false); }}
+              placeholder='feature/{ext_id}-{title_slug}'
+              style={{ width: '100%', padding: '9px 11px', borderRadius: 10, border: '1px solid var(--panel-border-3)', background: 'var(--glass)', color: 'var(--ink-90)', fontSize: 12, fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' }}
+            />
+            {/* Preview */}
+            <div style={{ fontSize: 10, color: 'var(--ink-25)', marginTop: 6, fontFamily: 'monospace' }}>
+              Preview: {(profileSettings.branch_prefix || 'feature/{ext_id}-{title_slug}')
+                .replace('{ext_id}', 'AB#61717')
+                .replace('{title_slug}', 'merchant-status')
+                .replace('{id}', '47')
+                .replace('{timestamp}', '20260327')}
+            </div>
           </div>
           <ProfileInput
             label='Queue warning threshold'
