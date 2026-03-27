@@ -515,9 +515,7 @@ class TaskService:
         if blockers:
             queue_msg_parts.append(f'was_blocked_by={blockers}')
         await self.add_log(task.id, organization_id, 'queued', ' | '.join(queue_msg_parts))
-        if mapping_auto_attached:
-            await self.add_log(task.id, organization_id, 'repo_mapping', 'Default repo mapping auto-attached from preferences')
-        elif task.source != 'internal' and not has_local_mapping:
+        if not has_local_mapping:
             await self.add_log(task.id, organization_id, 'repo_mapping', 'No repo mapping found; PR auto-creation disabled')
 
         notifier = NotificationService(self.db)
