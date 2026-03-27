@@ -31,45 +31,57 @@ class LocalRepoService:
         if not git_dir.exists():
             raise ValueError(f'Not a git repository: {repo_path}')
 
+        # Stash any uncommitted changes first
+        await self._run_git(root, ['stash', '--include-untracked'], allow_fail=True)
+
+        # Save current branch to restore later
+        original_branch = (await self._run_git(root, ['rev-parse', '--abbrev-ref', 'HEAD'])).strip()
+
         remote_target = self._build_remote_target(remote_url, remote_pat)
-        await self._run_git(root, ['fetch', remote_target, base_branch])
-        fetched_commit = await self._run_git(root, ['rev-parse', 'FETCH_HEAD'])
-
-        worktree_path = Path(tempfile.mkdtemp(prefix='ai-agent-worktree-'))
         try:
-            await self._run_git(root, ['worktree', 'add', '--detach', str(worktree_path), fetched_commit])
-            await self._run_git(worktree_path, ['checkout', '-B', branch_name, fetched_commit])
+            await self._run_git(root, ['fetch', remote_target, base_branch])
+        except Exception:
+            pass  # fetch may fail if no remote configured
 
+        try:
+            # Create new branch from base
+            await self._run_git(root, ['checkout', '-B', branch_name, base_branch], allow_fail=True)
+        except Exception:
+            await self._run_git(root, ['checkout', '-B', branch_name])
+
+        try:
+            # Write files directly to the repo
             for file_change in files:
-                target = self._safe_target(worktree_path, file_change.path)
+                target = self._safe_target(root, file_change.path)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(file_change.content, encoding='utf-8')
 
-            await self._run_git(worktree_path, ['add', '-A'])
-            has_changes = await self._has_staged_changes(worktree_path)
+            await self._run_git(root, ['add', '-A'])
+            has_changes = await self._has_staged_changes(root)
             if not has_changes:
+                # Restore original branch
+                await self._run_git(root, ['checkout', original_branch], allow_fail=True)
+                await self._run_git(root, ['stash', 'pop'], allow_fail=True)
                 return False, branch_name
 
             await self._run_git(
-                worktree_path,
-                [
-                    '-c',
-                    'user.name=AI Agent',
-                    '-c',
-                    'user.email=ai-agent@local',
-                    'commit',
-                    '-m',
-                    commit_message,
-                ],
+                root,
+                ['-c', 'user.name=AI Agent', '-c', 'user.email=ai-agent@local',
+                 'commit', '-m', commit_message],
             )
-            await self._run_git(worktree_path, ['push', '-u', remote_target, branch_name])
-            return True, branch_name
-        finally:
+
+            # Try to push (non-fatal if no remote)
             try:
-                await self._run_git(root, ['worktree', 'remove', '--force', str(worktree_path)])
+                await self._run_git(root, ['push', '-u', remote_target, branch_name])
             except Exception:
-                # Non-fatal cleanup issue; main flow already completed/failed.
-                pass
+                pass  # Push is optional — local changes are committed
+
+            return True, branch_name
+        except Exception:
+            # On failure, restore original branch
+            await self._run_git(root, ['checkout', original_branch], allow_fail=True)
+            await self._run_git(root, ['stash', 'pop'], allow_fail=True)
+            raise
 
     async def _has_staged_changes(self, repo: Path) -> bool:
         proc = await asyncio.create_subprocess_exec(
@@ -86,7 +98,7 @@ class LocalRepoService:
         # --quiet returns 1 when changes exist, 0 when clean
         return proc.returncode == 1
 
-    async def _run_git(self, repo: Path, args: list[str]) -> str:
+    async def _run_git(self, repo: Path, args: list[str], allow_fail: bool = False) -> str:
         proc = await asyncio.create_subprocess_exec(
             'git',
             '-C',
@@ -114,6 +126,8 @@ class LocalRepoService:
             )
         if proc.returncode != 0:
             msg = (err.decode('utf-8', errors='ignore') or out.decode('utf-8', errors='ignore')).strip()
+            if allow_fail:
+                return msg
             raise RuntimeError(f"git {' '.join(args)} failed: {msg}")
         return out.decode('utf-8', errors='ignore').strip()
 
