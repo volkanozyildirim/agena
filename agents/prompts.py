@@ -83,7 +83,8 @@ AI_PLAN_SYSTEM_PROMPT = (
     '\n'
     'Rules:\n'
     '- ONLY reference files that exist in the repository guide\n'
-    '- Include test files if tests need updating\n'
+    '- ALWAYS include the corresponding test files (_test.go, _test.py, .test.ts, etc.) for every file you modify\n'
+    '- If you modify struct.go, also include struct_test.go or processor_test.go\n'
     '- Be specific: name structs, functions, fields\n'
     '- Return ONLY valid JSON, no prose\n'
 )
