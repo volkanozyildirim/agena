@@ -228,9 +228,15 @@ class OrchestrationService:
                 await task_service.add_log(task.id, organization_id, 'agent', 'Using claude_cli preferred agent')
             else:
                 orchestrator = await self._build_orchestrator(organization_id, routing)
+                # Build repo context into task description before flow starts
+                enriched_desc = await self._build_effective_description(
+                    task, routing, organization_id,
+                )
+                payload_with_context = dict(payload)
+                payload_with_context['description'] = enriched_desc
                 # Run flow step-by-step with logging
                 flow_state: dict[str, Any] = {
-                    'task': payload,
+                    'task': payload_with_context,
                     'mode': mode,
                     'usage': {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0},
                     'model_usage': [],
@@ -340,8 +346,8 @@ class OrchestrationService:
                                         agents_md_content = Path(md_path).read_text(errors='replace')
                                         agents_md_source = f'db:{Path(md_path).name}'
                                         break
-                        except Exception:
-                            pass
+                        except Exception as _amd_err:
+                            logger.error(f'Failed to read agents.md from DB: {_amd_err}')
 
                     # 2) Fallback: repo root'taki agents.md
                     if not agents_md_content and repo_root:
