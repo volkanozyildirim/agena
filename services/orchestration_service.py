@@ -325,8 +325,8 @@ class OrchestrationService:
                     if routing.local_repo_path:
                         try:
                             from models.user_preference import UserPreference
-                            pref_result = await self.db.execute(
-                                __import__('sqlalchemy', fromlist=['select']).select(UserPreference).where(
+                            pref_result = await self.db_session.execute(
+                                select(UserPreference).where(
                                     UserPreference.user_id == task.created_by_user_id
                                 )
                             )
