@@ -417,14 +417,12 @@ class TaskService:
             if conflict_row is not None:
                 raise ValueError(f'Another active task is already running for this repo: #{conflict_row.id} {conflict_row.title}')
 
-        # Legacy guard: external tasks without mapping should not auto-open PRs.
-        # If mapping metadata exists, orchestration decides provider-specific PR flow.
+        # Auto-attach repo mapping if task has no Local Repo Path
         has_local_mapping = 'Local Repo Path:' in (task.description or '')
-        mapping_auto_attached = False
-        if task.source != 'internal' and not has_local_mapping:
-            mapping_auto_attached = await self._attach_default_repo_mapping(organization_id, task)
+        if not has_local_mapping:
+            await self._attach_default_repo_mapping(organization_id, task)
             has_local_mapping = 'Local Repo Path:' in (task.description or '')
-        if task.source != 'internal' and not has_local_mapping:
+        if not has_local_mapping:
             create_pr = False
 
         # Inject developer agent model/provider into description if not already set.

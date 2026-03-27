@@ -562,17 +562,28 @@ export default function SprintsPage() {
     }
     try {
       const desc = toPlainText(item.description) || '';
+      // Auto-attach repo mapping info from the first available mapping
+      const mapping = repoMappings[0];
+      const ctxParts = [
+        `External Source: ${provider === 'jira' ? `Jira #${item.id}` : `Azure #${item.id}`}`,
+        project ? `Project: ${project}` : '',
+        mapping?.azure_repo_url ? `Azure Repo: ${mapping.azure_repo_url}` : '',
+        mapping?.name ? `Local Repo Mapping: ${mapping.name}` : '',
+        mapping?.local_path ? `Local Repo Path: ${mapping.local_path}` : '',
+        mapping?.repo_playbook ? `Repo Playbook: ${mapping.repo_playbook.replace(/\n+/g, ' ').trim()}` : '',
+        mapping?.github_repo_full_name ? `GitHub Repo: ${mapping.github_repo_full_name}` : '',
+      ].filter(Boolean);
       type TaskRecord = { id: number };
       const created = await apiFetch<TaskRecord>('/tasks', {
         method: 'POST',
         body: JSON.stringify({
           title: `[${provider === 'jira' ? 'Jira' : 'Azure'} #${item.id}] ${item.title}`,
-          description: `${desc}\n\n---\nExternal Source: ${provider === 'jira' ? `Jira #${item.id}` : `Azure #${item.id}`}`,
+          description: `${desc}\n\n---\n${ctxParts.join('\n')}`,
         }),
       });
       setTaskMapByExternalId((prev) => ({ ...prev, [item.id]: created.id }));
       setMsg(t('sprints.importedSingle'));
-      // Ask if user wants to assign to agent
+      // Open detail panel for agent assignment
       setSelected(item);
     } catch {
       setErr(t('sprints.importFailed'));
