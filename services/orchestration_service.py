@@ -1317,11 +1317,26 @@ class OrchestrationService:
         if meta.get('azure repo'):
             effective_source = 'azure'
 
+        # Extract project from Azure Repo URL if available (more reliable than sprint project)
+        azure_repo_url = meta.get('azure repo') or None
+        azure_project = meta.get('project') or None
+        if azure_repo_url and '/_git/' in azure_repo_url:
+            # URL like: https://...dev.azure.com/Org/Project/_git/repo
+            try:
+                from urllib.parse import urlparse
+                path = urlparse(azure_repo_url).path.strip('/')
+                # path = "Org/Project/_git/repo" or "Project/_git/repo"
+                git_idx = path.index('/_git/')
+                before_git = path[:git_idx]
+                azure_project = before_git.split('/')[-1]
+            except Exception:
+                pass
+
         return TaskRouting(
             effective_source=effective_source,
             external_source=external_source,
-            azure_project=meta.get('project') or None,
-            azure_repo_url=meta.get('azure repo') or None,
+            azure_project=azure_project,
+            azure_repo_url=azure_repo_url,
             local_repo_mapping=meta.get('local repo mapping') or None,
             local_repo_path=meta.get('local repo path') or None,
             repo_playbook=meta.get('repo playbook') or None,
