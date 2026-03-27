@@ -51,7 +51,11 @@ class AzureDevOpsClient:
         async with httpx.AsyncClient(timeout=30) as client:
             wiql_response = await client.post(wiql_url, headers=headers, json=wiql_payload)
             wiql_response.raise_for_status()
-            work_item_refs = wiql_response.json().get('workItems', [])
+            try:
+                work_item_refs = wiql_response.json().get('workItems', [])
+            except Exception:
+                logger.error('Azure WIQL response is not valid JSON: %s', wiql_response.text[:200])
+                return []
 
             if not work_item_refs:
                 return []
@@ -67,7 +71,11 @@ class AzureDevOpsClient:
             )
             details_response = await client.get(details_url, headers=headers)
             details_response.raise_for_status()
-            details_payload = details_response.json().get('value', [])
+            try:
+                details_payload = details_response.json().get('value', [])
+            except Exception:
+                logger.error('Azure work items response is not valid JSON: %s', details_response.text[:200])
+                return []
 
         tasks: list[ExternalTask] = []
         for item in details_payload:
