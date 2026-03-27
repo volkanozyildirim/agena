@@ -457,7 +457,11 @@ class OrchestrationService:
                     plan_delta = _usage_delta(u_before, _get_usage(flow_state))
                     await _step_event('ai_plan', plan_delta, plan_model, s_start, time.perf_counter() - s_clock)
 
-                    plan_files = plan.get('files', [])
+                    raw_files = plan.get('files', [])
+                    plan_files = [
+                        f.get('file', f.get('path', '')) if isinstance(f, dict) else str(f)
+                        for f in raw_files
+                    ]
                     plan_changes = plan.get('changes', [])
                     await task_service.add_log(task.id, organization_id, 'agent',
                         f'AI Plan result:\n'

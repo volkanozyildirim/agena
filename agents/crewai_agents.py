@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any
 
 from agents.prompts import (
@@ -99,9 +100,15 @@ class CrewAIAgentRunner:
         """Step 2: Code — plan + actual file contents → code output."""
         changes_text = ''
         for c in plan.get('changes', []):
-            changes_text += f'- {c.get("file","")}: {c.get("description","")}\n'
+            if isinstance(c, dict):
+                changes_text += f'- {c.get("file","")}: {c.get("description","")}\n'
+            else:
+                changes_text += f'- {c}\n'
 
-        file_list = '\n'.join(f'  - {c.get("file","")}' for c in plan.get('changes', []))
+        file_list = '\n'.join(
+            f'  - {c.get("file","") if isinstance(c, dict) else c}'
+            for c in plan.get('changes', [])
+        )
         prompt = (
             f'TASK: {task_title}\n'
             f'DESCRIPTION: {task_description}\n\n'
@@ -221,9 +228,19 @@ class CrewAIAgentRunner:
             return content, usage, model
 
     def _safe_json(self, content: str) -> dict[str, Any]:
+        text = content.strip()
+        if text.startswith('```'):
+            text = re.sub(r'^```[a-zA-Z]*\n?', '', text)
+            text = re.sub(r'\n?```$', '', text.rstrip())
         try:
-            return json.loads(content)
+            return json.loads(text)
         except json.JSONDecodeError:
+            match = re.search(r'\{.*\}', text, re.DOTALL)
+            if match:
+                try:
+                    return json.loads(match.group())
+                except json.JSONDecodeError:
+                    pass
             return {
                 'goal': 'Implement the requested task',
                 'requirements': [content],
