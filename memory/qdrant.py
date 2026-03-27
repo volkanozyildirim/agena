@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import uuid
 from typing import Any
-from uuid import uuid4
 
 import httpx
 from openai import AsyncOpenAI
@@ -94,7 +94,7 @@ class QdrantMemoryStore(MemoryStore):
             payload['organization_id'] = int(organization_id)
 
         point = PointStruct(
-            id=str(uuid4()),
+            id=str(uuid.uuid5(uuid.NAMESPACE_DNS, f'task-{key}')),
             vector=vector,
             payload=payload,
         )
