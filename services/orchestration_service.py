@@ -1447,13 +1447,17 @@ class OrchestrationService:
             # Gather git branch and recent commit info
             git_info = self._get_git_info(root)
 
-            # Check for agents.md — first in Tiqr data dir, then repo root
-            agents_data_dir = Path('/app/data/agents_md') if Path('/app').exists() else Path('data/agents_md')
+            # Check for agents.md — first in Tiqr data dir (org-scoped), then repo root
+            agents_base = Path('/app/data/agents_md') if Path('/app').exists() else Path('data/agents_md')
             agents_md = None
-            # Try data dir first (from scan)
-            for f in agents_data_dir.glob('*.md') if agents_data_dir.exists() else []:
-                if f.is_file() and f.stat().st_size > 500:
-                    agents_md = f
+            # Try all org dirs for a matching file (repo name in filename)
+            repo_name = root.name.lower()
+            for org_dir in sorted(agents_base.glob('org_*')) if agents_base.exists() else []:
+                for f in org_dir.glob('*.md'):
+                    if f.is_file() and f.stat().st_size > 500 and repo_name in f.stem.lower():
+                        agents_md = f
+                        break
+                if agents_md:
                     break
             # Fallback to repo root
             if agents_md is None:

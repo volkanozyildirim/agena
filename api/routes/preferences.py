@@ -501,9 +501,10 @@ async def scan_repo_profile(
     cost_usd = 0.0
     used_model: str | None = None
     # Skip LLM scan if agents.md already exists in our data dir (saves tokens)
-    agents_data_dir = Path('/app/data/agents_md') if Path('/app').exists() else Path('data/agents_md')
-    safe_name = payload.mapping_id.replace('/', '_').replace('\\', '_')
-    existing_agents_md = agents_data_dir / f'{safe_name}.md'
+    _agents_base = Path('/app/data/agents_md') if Path('/app').exists() else Path('data/agents_md')
+    _org_dir = _agents_base / f'org_{tenant.organization_id}'
+    _safe = (payload.mapping_name or payload.mapping_id).replace('/', '_').replace('\\', '_').replace(' ', '_')
+    existing_agents_md = _org_dir / f'{_safe}.md'
     agents_md_exists = existing_agents_md.is_file() and existing_agents_md.stat().st_size > 500
     if agents_md_exists:
         profile['agents_md_path'] = str(existing_agents_md)
@@ -572,11 +573,12 @@ async def scan_repo_profile(
         from services.repo_scanner import scan_repo, generate_agents_md
         scan_data = scan_repo(payload.local_path)
         agents_md_content = generate_agents_md(scan_data, payload.mapping_name)
-        # Save agents.md to Tiqr's data dir (not the customer's repo)
-        agents_data_dir = Path('/app/data/agents_md') if Path('/app').exists() else Path('data/agents_md')
-        agents_data_dir.mkdir(parents=True, exist_ok=True)
-        safe_name = payload.mapping_id.replace('/', '_').replace('\\', '_')
-        agents_md_path = agents_data_dir / f'{safe_name}.md'
+        # Save agents.md to Tiqr's data dir (org-scoped)
+        _ab = Path('/app/data/agents_md') if Path('/app').exists() else Path('data/agents_md')
+        _od = _ab / f'org_{tenant.organization_id}'
+        _od.mkdir(parents=True, exist_ok=True)
+        _sn = (payload.mapping_name or payload.mapping_id).replace('/', '_').replace('\\', '_').replace(' ', '_')
+        agents_md_path = _od / f'{_sn}.md'
         agents_md_path.write_text(agents_md_content, encoding='utf-8')
         profile['agents_md_path'] = str(agents_md_path)
         profile['agents_md_size'] = len(agents_md_content)
@@ -653,10 +655,11 @@ async def generate_agents_md_endpoint(
     from services.repo_scanner import scan_repo, generate_agents_md
     scan_data = scan_repo(payload.local_path)
     content = generate_agents_md(scan_data, payload.mapping_name)
-    agents_data_dir = Path('/app/data/agents_md') if Path('/app').exists() else Path('data/agents_md')
-    agents_data_dir.mkdir(parents=True, exist_ok=True)
-    safe_name = payload.mapping_id.replace('/', '_').replace('\\', '_')
-    agents_path = agents_data_dir / f'{safe_name}.md'
+    _ab2 = Path('/app/data/agents_md') if Path('/app').exists() else Path('data/agents_md')
+    _od2 = _ab2 / f'org_{tenant.organization_id}'
+    _od2.mkdir(parents=True, exist_ok=True)
+    _sn2 = (payload.mapping_name or payload.mapping_id).replace('/', '_').replace('\\', '_').replace(' ', '_')
+    agents_path = _od2 / f'{_sn2}.md'
     agents_path.write_text(content, encoding='utf-8')
 
     # Update profile
