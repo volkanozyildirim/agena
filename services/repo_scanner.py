@@ -320,10 +320,10 @@ def generate_agents_md(scan_data: dict[str, Any], repo_name: str) -> str:
             lines.append(f'| `{sf["path"]}` | {sf["lang"]} | {sf["lines"]} | {sf["size"]:,}B |')
         lines.append('')
 
-    # Signatures — compact format (struct/func names only, no field bodies)
+    # Signatures — struct bodies (compact, no tags) + func signatures
     sigs = scan_data.get('signatures', [])
     if sigs:
-        lines.append('## Code Signatures (compact)')
+        lines.append('## Code Signatures')
         lines.append('')
 
         by_file: dict[str, list[dict]] = {}
@@ -331,19 +331,24 @@ def generate_agents_md(scan_data: dict[str, Any], repo_name: str) -> str:
             by_file.setdefault(s['file'], []).append(s)
 
         for file_path, file_sigs in sorted(by_file.items()):
-            sig_parts: list[str] = []
+            lines.append(f'### `{file_path}`')
             for s in file_sigs:
                 kind = s.get('kind', '')
                 name = s.get('name', '')
                 sig = s.get('signature', '')
-                if kind in ('struct', 'interface', 'class', 'type'):
-                    sig_parts.append(f'{kind} {name}')
+                body = s.get('body', '')
+
+                if body:
+                    # Struct/interface — compact: remove tags and extra whitespace
+                    compact = _compact_struct_body(body)
+                    lines.append(f'```')
+                    lines.append(compact)
+                    lines.append('```')
                 elif sig:
-                    sig_parts.append(sig)
+                    lines.append(f'- `{sig}`')
                 else:
-                    sig_parts.append(f'{kind} {name}')
-            lines.append(f'`{file_path}`: {" | ".join(sig_parts)}')
-        lines.append('')
+                    lines.append(f'- {kind} `{name}`')
+            lines.append('')
 
     return '\n'.join(lines)
 
@@ -392,6 +397,18 @@ def generate_package_mds(scan_data: dict[str, Any]) -> dict[str, str]:
         result[pkg] = '\n'.join(lines)
 
     return result
+
+
+def _compact_struct_body(body: str) -> str:
+    """Compress struct body: remove json/db tags, collapse alignment whitespace."""
+    out: list[str] = []
+    for line in body.splitlines():
+        # Remove backtick-enclosed tags (json, db, gorm, etc.)
+        line = re.sub(r'\s*`[^`]*`', '', line)
+        # Collapse multiple spaces/tabs to single space
+        line = re.sub(r'[ \t]{2,}', ' ', line)
+        out.append(line.rstrip())
+    return '\n'.join(out)
 
 
 def _group_by_package(sigs: list[dict]) -> dict[str, list[dict]]:
