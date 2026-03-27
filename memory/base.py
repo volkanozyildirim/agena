@@ -25,3 +25,7 @@ class MemoryStore(ABC):
         organization_id: int | None = None,
     ) -> list[dict[str, Any]]:
         raise NotImplementedError
+
+    @abstractmethod
+    async def get_status(self) -> dict[str, Any]:
+        raise NotImplementedError
