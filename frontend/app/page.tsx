@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import PricingCard from '@/components/PricingCard';
 import { useLocale } from '@/lib/i18n';
 
@@ -97,9 +97,56 @@ function Counter({ target, suffix = '' }: { target: number; suffix?: string }) {
   return <span ref={ref}>0{suffix}</span>;
 }
 
+function RapidType({ lines }: { lines: string[] }) {
+  const [lineIndex, setLineIndex] = useState(0);
+  const [charIndex, setCharIndex] = useState(0);
+
+  useEffect(() => {
+    if (!lines.length) return;
+    const current = lines[lineIndex] || '';
+    if (charIndex < current.length) {
+      const t = setTimeout(() => setCharIndex((c) => c + 1), 16);
+      return () => clearTimeout(t);
+    }
+    const hold = setTimeout(() => {
+      setLineIndex((i) => (i + 1) % lines.length);
+      setCharIndex(0);
+    }, 650);
+    return () => clearTimeout(hold);
+  }, [charIndex, lineIndex, lines]);
+
+  const visible = (lines[lineIndex] || '').slice(0, charIndex);
+  return (
+    <div style={{
+      marginTop: 10,
+      padding: '10px 12px',
+      borderRadius: 10,
+      border: '1px solid rgba(56,189,248,0.35)',
+      background: 'rgba(2,132,199,0.08)',
+      fontFamily: 'monospace',
+      fontSize: 12,
+      color: 'var(--ink-90)',
+      minHeight: 42,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 6,
+    }}>
+      <span>{visible}</span>
+      <span style={{ opacity: 0.85, animation: 'blink-caret 0.8s steps(1,end) infinite' }}>|</span>
+      <style>{`
+        @keyframes blink-caret {
+          0%, 49% { opacity: 0.95; }
+          50%, 100% { opacity: 0.15; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 export default function HomePage() {
   const { t } = useLocale();
   const flowWords = t('landing.flowShowcaseWords').split(' ');
+  const patronLines = [t('landing.patronLine1'), t('landing.patronLine2'), t('landing.patronLine3')];
   const integrations = [
     { key: 'azure', logo: '/media/azure-logo.svg', name: t('landing.integrationAzure') },
     { key: 'jira', logo: '/media/jira-logo.svg', name: t('landing.integrationJira') },
@@ -216,7 +263,13 @@ export default function HomePage() {
         </section>
 
         {/* ── INTEGRATIONS MARQUEE ── */}
-        <section style={{ padding: '0 0 2px' }}>
+        <section style={{ padding: '0 0 6px' }}>
+          <div style={{ marginBottom: 10 }}>
+            <div className='section-label'>{t('landing.integrationsLabel')}</div>
+            <p style={{ margin: '6px 0 0', color: 'var(--ink-45)', fontSize: 12, lineHeight: 1.6 }}>
+              {t('landing.integrationsSubtitle')}
+            </p>
+          </div>
           <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 9, border: '1px solid var(--panel-border)', background: 'var(--panel)', maxHeight: 64 }}>
             <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(90deg, var(--bg), transparent 10%, transparent 90%, var(--bg))', zIndex: 2 }} />
             <div style={{ display: 'flex', width: 'max-content', animation: 'integrationMarqueeSingle 34s linear infinite', padding: '7px 0' }}>
@@ -232,6 +285,12 @@ export default function HomePage() {
 
         {/* ── FLOW SHOWCASE ── */}
         <section style={{ padding: '16px 0 52px' }}>
+          <div style={{ marginBottom: 14 }}>
+            <div className='section-label'>{t('landing.flowShowcaseLabel')}</div>
+            <h2 style={{ fontSize: 'clamp(24px, 2.5vw, 36px)', fontWeight: 800, color: 'var(--ink-90)', margin: '6px 0 0' }}>
+              {t('landing.flowShowcaseWords')}
+            </h2>
+          </div>
           <div className='flow-showcase'>
             <div className='flow-showcase-image-wrap'>
               <img src='/media/flow.png' alt='Flow Diagram' className='flow-showcase-image' loading='lazy' />
@@ -258,6 +317,49 @@ export default function HomePage() {
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── PATRON MODE ── */}
+        <section style={{ padding: '8px 0 56px' }}>
+          <div style={{ marginBottom: 14 }}>
+            <div className='section-label'>{t('landing.patronLabel')}</div>
+            <h2 style={{ fontSize: 'clamp(24px, 2.5vw, 36px)', fontWeight: 800, color: 'var(--ink-90)', margin: '6px 0 0' }}>
+              {t('landing.patronTitle')}
+            </h2>
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(260px, 1fr) minmax(300px, 1.1fr)',
+            gap: 16,
+            alignItems: 'stretch',
+          }}>
+            <div style={{
+              borderRadius: 16,
+              border: '1px solid var(--panel-border)',
+              background: 'var(--panel)',
+              overflow: 'hidden',
+              minHeight: 220,
+              boxShadow: '0 18px 48px rgba(2,132,199,0.18)',
+            }}>
+              <img
+                src='/media/patron.png'
+                alt='Patron Modu'
+                loading='lazy'
+                style={{ width: '100%', height: '100%', minHeight: 220, objectFit: 'cover' }}
+              />
+            </div>
+            <div style={{
+              borderRadius: 16,
+              border: '1px solid var(--panel-border)',
+              background: 'linear-gradient(160deg, rgba(2,132,199,0.10), rgba(13,148,136,0.08))',
+              padding: '18px 18px 16px',
+            }}>
+              <p style={{ color: 'var(--ink-45)', fontSize: 14, lineHeight: 1.7, margin: 0 }}>
+                {t('landing.patronDesc')}
+              </p>
+              <RapidType lines={patronLines} />
             </div>
           </div>
         </section>
