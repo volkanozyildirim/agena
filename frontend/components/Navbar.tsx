@@ -25,6 +25,15 @@ export default function Navbar() {
           <LangToggle style={{ marginRight: 4 }} />
           <ThemeToggle style={{ marginRight: 4 }} />
           <span className='chip' style={{ marginRight: 8 }}>{t('nav.aiOrchestration')}</span>
+          <a
+            href='https://github.com/sponsors/aozyildirim'
+            target='_blank'
+            rel='noreferrer'
+            className='button button-outline'
+            style={{ padding: '8px 14px', fontSize: 13, marginRight: 4, textDecoration: 'none' }}
+          >
+            {t('nav.donate')} ♡
+          </a>
           {loggedIn ? (
             <Link href='/dashboard' className='button button-primary' style={{ padding: '8px 16px', fontSize: 13 }}>
               {t('nav.dashboard')} →

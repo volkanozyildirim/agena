@@ -1,3 +1,5 @@
+[![Sponsor Tiqr](https://img.shields.io/badge/Sponsor-Tiqr-ff69b4?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/aozyildirim)
+
 # Tiqr AI Agent SaaS
 
 Production-ready, multi-tenant AI agent orchestration platform built with FastAPI + CrewAI + LangGraph + Redis + MySQL, including GitHub PR automation and a Next.js 14 dashboard.
@@ -306,3 +308,9 @@ If Tiqr helps your team, you can support development:
 - GitHub Sponsors: https://github.com/sponsors/aozyildirim
 
 After pushing this repo public, GitHub will also show a **Sponsor** button automatically because `.github/FUNDING.yml` is included.
+
+---
+
+## Support Tiqr
+
+Sponsor: https://github.com/sponsors/aozyildirim
