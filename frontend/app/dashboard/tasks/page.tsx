@@ -6,11 +6,11 @@ import { apiFetch, loadPrefs } from '@/lib/api';
 import { TaskItem } from '@/components/TaskTable';
 import { useLocale, type TranslationKey } from '@/lib/i18n';
 
-const STATUS_FILTERS = ['all', 'queued', 'running', 'completed', 'failed'];
+const STATUS_FILTERS = ['all', 'new', 'queued', 'running', 'completed', 'failed'];
 const SOURCE_FILTERS = ['all', 'internal', 'azure', 'jira'];
 
 function statusColor(s: string) {
-  const m: Record<string, string> = { queued: '#f59e0b', running: '#38bdf8', completed: '#22c55e', failed: '#f87171' };
+  const m: Record<string, string> = { new: '#94a3b8', queued: '#f59e0b', running: '#38bdf8', completed: '#22c55e', failed: '#f87171' };
   return m[s] ?? '#6b7280';
 }
 

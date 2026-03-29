@@ -69,7 +69,7 @@ class TaskService:
             edge_cases=(edge_cases or '').strip() or None,
             max_tokens=max(1, int(max_tokens)) if max_tokens is not None else None,
             max_cost_usd=max(0.0, float(max_cost_usd)) if max_cost_usd is not None else None,
-            status='queued',
+            status='new',
         )
         self.db.add(task)
         await self.db.commit()
@@ -111,7 +111,7 @@ class TaskService:
             external_id=external_id,
             title=title,
             description=description or '',
-            status='queued',
+            status='new',
         )
         self.db.add(task)
         await self.db.commit()

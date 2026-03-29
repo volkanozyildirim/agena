@@ -845,6 +845,7 @@
   "tasks.removeFailed": "Kaldırma başarısız",
   "tasks.status.all": "Tümü",
   "tasks.status.queued": "Kuyrukta",
+  "tasks.status.new": "Yeni",
   "tasks.status.running": "Çalışıyor",
   "tasks.status.completed": "Tamamlandı",
   "tasks.status.failed": "Başarısız",

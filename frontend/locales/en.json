@@ -845,6 +845,7 @@
   "tasks.removeFailed": "Remove failed",
   "tasks.status.all": "All",
   "tasks.status.queued": "Queued",
+  "tasks.status.new": "New",
   "tasks.status.running": "Running",
   "tasks.status.completed": "Completed",
   "tasks.status.failed": "Failed",
