@@ -1913,8 +1913,21 @@ input:focus, textarea:focus {
 
 /* ─── LIGHT MODE OVERRIDES ─── */
 html.light .navbar-shell {
-  background: rgba(248, 250, 252, 0.85);
-  border-bottom-color: rgba(0,0,0,0.08);
+  background: linear-gradient(180deg, rgba(255,255,255,0.94) 0%, rgba(248,250,252,0.92) 100%);
+  border-bottom-color: rgba(15,23,42,0.12);
+  box-shadow: 0 10px 28px rgba(15,23,42,0.08);
+  backdrop-filter: blur(14px) saturate(1.35);
+  -webkit-backdrop-filter: blur(14px) saturate(1.35);
+}
+
+html.light .navbar-wordmark {
+  filter: drop-shadow(0 3px 12px rgba(13, 148, 136, 0.14));
+}
+
+html.light .navbar-shell .chip {
+  border-color: rgba(13,148,136,0.28);
+  background: rgba(13,148,136,0.12);
+  color: #0f766e;
 }
 
 html.light .gradient-text {

@@ -23,8 +23,8 @@ export default function LangToggle({ style }: { style?: React.CSSProperties }) {
       onMouseEnter={(e) => { (e.currentTarget as HTMLSelectElement).style.borderColor = 'rgba(13,148,136,0.4)'; (e.currentTarget as HTMLSelectElement).style.color = '#0d9488'; }}
       onMouseLeave={(e) => { (e.currentTarget as HTMLSelectElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLSelectElement).style.color = 'var(--muted)'; }}
     >
-      <option value='tr' style={{ background: '#0d1117' }}>🇹🇷 TR</option>
-      <option value='en' style={{ background: '#0d1117' }}>🇬🇧 EN</option>
+      <option value='tr'>🇹🇷 TR</option>
+      <option value='en'>🇬🇧 EN</option>
     </select>
   );
 }
