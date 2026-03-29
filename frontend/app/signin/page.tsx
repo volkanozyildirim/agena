@@ -49,22 +49,20 @@ export default function SignInPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, background: '#030712', position: 'relative', overflow: 'hidden' }}>
-      <div style={{ position: 'fixed', top: '20%', left: '15%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(13,148,136,0.12) 0%, transparent 70%)', pointerEvents: 'none' }} />
-      <div style={{ position: 'fixed', bottom: '20%', right: '15%', width: 300, height: 300, borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%)', pointerEvents: 'none' }} />
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, background: 'var(--bg)', position: 'relative', overflow: 'hidden' }}>
+      <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', background: 'radial-gradient(circle at 18% 22%, rgba(13,148,136,0.10), transparent 32%), radial-gradient(circle at 84% 78%, rgba(59,130,246,0.10), transparent 34%)' }} />
       <div style={{ position: 'fixed', top: 16, right: 16 }}><LangToggle /></div>
 
       <div style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 1 }}>
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
           <Link href='/' style={{ display: 'inline-flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-            <span style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #0d9488, #22c55e)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 900, color: '#fff' }}>T</span>
-            <span style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink-90)' }}>Tiqr</span>
+            <img src='/media/tiqr-logo.svg' alt='Tiqr' loading='lazy' style={{ width: 138, height: 'auto', display: 'block' }} />
           </Link>
           <p style={{ marginTop: 16, fontSize: 14, color: 'var(--ink-35)' }}>AI-powered sprint management</p>
         </div>
 
-        <div style={{ borderRadius: 24, border: '1px solid var(--panel-border-2)', background: 'var(--panel-alt)', backdropFilter: 'blur(20px)', padding: '36px 32px', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg, transparent, rgba(13,148,136,0.5), transparent)' }} />
+        <div style={{ borderRadius: 20, border: '1px solid var(--panel-border)', background: 'var(--panel)', boxShadow: '0 18px 40px rgba(2,8,23,0.14)', padding: '34px 30px', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg, transparent, rgba(13,148,136,0.45), transparent)' }} />
 
           <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink-90)', marginBottom: 6 }}>{t('signin.title')}</h1>
           <p style={{ fontSize: 13, color: 'var(--ink-30)', marginBottom: 28 }}>{t('signin.subtitle')}</p>
@@ -74,7 +72,7 @@ export default function SignInPage() {
             <AuthInput label={t('signup.password')} type='password' value={password} onChange={setPassword} placeholder='••••••••' />
 
             {error ? (
-              <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171', fontSize: 13 }}>{error}</div>
+              <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(248,113,113,0.10)', border: '1px solid rgba(248,113,113,0.35)', color: '#dc2626', fontSize: 13 }}>{error}</div>
             ) : null}
 
             <button type='submit' disabled={loading} style={{ marginTop: 4, padding: '13px', borderRadius: 12, border: 'none', background: loading ? 'rgba(13,148,136,0.4)' : 'linear-gradient(135deg, #0d9488, #22c55e)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: loading ? 'not-allowed' : 'pointer', transition: 'opacity 0.2s', letterSpacing: 0.3 }}>
@@ -84,7 +82,7 @@ export default function SignInPage() {
 
           <p style={{ textAlign: 'center', marginTop: 24, fontSize: 13, color: 'var(--ink-30)' }}>
             {t('signin.noAccount')}{' '}
-            <Link href={`/signup${searchParams.get('next') ? `?next=${encodeURIComponent(searchParams.get('next') || '')}` : ''}`} style={{ color: '#5eead4', fontWeight: 600, textDecoration: 'none' }}>{t('signin.startFree')}</Link>
+            <Link href={`/signup${searchParams.get('next') ? `?next=${encodeURIComponent(searchParams.get('next') || '')}` : ''}`} style={{ color: 'var(--ink-78)', fontWeight: 700, textDecoration: 'none' }}>{t('signin.startFree')}</Link>
           </p>
         </div>
       </div>

@@ -188,10 +188,70 @@ function SeatedPixel({ palette, facing = 'front' }: { palette: number; facing?: 
   );
 }
 
+function PatronWalker({ palette, idx }: { palette: number; idx: number }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const img = new Image();
+    img.src = `/pixel-office/assets/characters/char_${palette}.png`;
+
+    let raf = 0;
+    let frame = 0;
+    let lastTick = 0;
+    const FRAMES = [0, 1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1];
+    const SRC_W = 16;
+    const SRC_H = 32;
+    const ROW_FRONT = 0;
+
+    const draw = (ts: number) => {
+      if (!lastTick || ts - lastTick > 110) {
+        frame = (frame + 1) % FRAMES.length;
+        lastTick = ts;
+      }
+      const sx = FRAMES[frame] * SRC_W;
+      const sy = ROW_FRONT * SRC_H;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, sx, sy, SRC_W, SRC_H, 0, 0, 24, 48);
+      raf = window.requestAnimationFrame(draw);
+    };
+
+    img.onload = () => {
+      raf = window.requestAnimationFrame(draw);
+    };
+    return () => window.cancelAnimationFrame(raf);
+  }, [palette]);
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: '-14%',
+        top: `calc(52% + ${((idx % 4) - 1.5) * 14}px)`,
+        width: 24,
+        height: 48,
+        opacity: 0.86,
+        animation: `patron-walk-left ${19 + idx * 3.8}s linear infinite, patron-walk-bob 0.58s steps(2,end) infinite`,
+        animationDelay: `-${idx * 2.8}s, -${idx * 0.22}s`,
+        filter: 'drop-shadow(0 1px 0 rgba(0,0,0,0.55))',
+        zIndex: 3,
+      }}
+    >
+      <canvas ref={canvasRef} width={24} height={48} style={{ width: 24, height: 48, imageRendering: 'pixelated', display: 'block' }} />
+    </div>
+  );
+}
+
 export default function HomePage() {
   const { t } = useLocale();
   const flowWords = t('landing.flowShowcaseWords').split(' ');
   const patronLines = [t('landing.patronLine1'), t('landing.patronLine2'), t('landing.patronLine3')];
+  const patronWalkers = [0, 1, 2, 3, 4, 5, 6];
   const timelineItems = [
     { text: t('landing.timeline1'), palette: 0, facing: 'back' as const },
     { text: t('landing.timeline2'), palette: 3, facing: 'front' as const },
@@ -408,11 +468,19 @@ export default function HomePage() {
               border: '1px solid var(--panel-border)',
               background: 'linear-gradient(160deg, rgba(2,132,199,0.10), rgba(13,148,136,0.08))',
               padding: '18px 18px 16px',
+              position: 'relative',
+              overflow: 'hidden',
             }}>
               <p style={{ color: 'var(--ink-45)', fontSize: 14, lineHeight: 1.7, margin: 0 }}>
                 {t('landing.patronDesc')}
               </p>
               <RapidType lines={patronLines} />
+              <div style={{ position: 'absolute', left: 0, right: 0, bottom: 8, height: 1, background: 'rgba(56,189,248,0.32)' }} />
+              <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+                {patronWalkers.map((p, i) => (
+                  <PatronWalker key={`patron-${p}`} palette={p} idx={i} />
+                ))}
+              </div>
             </div>
           </div>
         </section>
@@ -883,6 +951,14 @@ export default function HomePage() {
         @keyframes integrationMarqueeSingle {
           0% { transform: translateX(100%); }
           100% { transform: translateX(-100%); }
+        }
+        @keyframes patron-walk-left {
+          0% { left: -14%; }
+          100% { left: 108%; }
+        }
+        @keyframes patron-walk-bob {
+          0%, 100% { margin-bottom: 0; }
+          50% { margin-bottom: 2px; }
         }
       `}</style>
     </>

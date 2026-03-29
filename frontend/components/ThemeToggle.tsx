@@ -43,7 +43,7 @@ export default function ThemeToggle({ style }: { style?: React.CSSProperties }) 
       }}
       onMouseEnter={(e) => {
         (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(13,148,136,0.4)';
-        (e.currentTarget as HTMLButtonElement).style.color = '#5eead4';
+        (e.currentTarget as HTMLButtonElement).style.color = 'var(--brand)';
       }}
       onMouseLeave={(e) => {
         (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)';
