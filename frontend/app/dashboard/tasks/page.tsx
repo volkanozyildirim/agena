@@ -597,49 +597,62 @@ export default function DashboardTasksPage() {
           </button>
         </div>
       </div>
-      {/* AI Agent Select Popup */}
+      {/* AI Agent Select Popup — with repo config */}
       {aiPopupTaskId !== null && (
-        <div onClick={() => setAiPopupTaskId(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px', minWidth: 340, maxWidth: 440 }}>
-            <h3 style={{ marginTop: 0, marginBottom: 6, fontSize: 16, color: 'var(--ink)' }}>{t('tasks.selectAgent')}</h3>
-            <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 0, marginBottom: 14 }}>{t('tasks.aiAssignHint')}</p>
-            <div style={{ display: 'grid', gap: 8 }}>
-              {agentConfigs.map((agent) => (
-                <button key={agent.role} onClick={() => void doAssignAI(aiPopupTaskId, agent)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 14px', borderRadius: 12, border: '1px solid var(--panel-border-3)', background: 'var(--panel)', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', textTransform: 'capitalize' }}>{agent.role}</div>
-                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{agent.model || t('tasks.defaultModel')} {agent.provider ? `• ${agent.provider}` : ''}</div>
-                  </div>
-                  <span style={{ fontSize: 18, color: 'var(--muted)' }}>→</span>
-                </button>
-              ))}
-              <button onClick={() => setAiPopupTaskId(null)} className='button button-outline' style={{ marginTop: 4, fontSize: 12 }}>{t('tasks.cancel')}</button>
-            </div>
-          </div>
-        </div>
+        <AssignPopup
+          taskId={aiPopupTaskId}
+          mode='ai'
+          tasks={tasks}
+          agents={agentConfigs}
+          flows={savedFlows}
+          onAssignAI={(id, agent, repoMeta) => {
+            if (repoMeta) {
+              const t = tasks.find((tk) => tk.id === id);
+              if (t && !((t as unknown as { description?: string }).description || '').toLowerCase().includes('remote repo')) {
+                apiFetch('/tasks/' + id, { method: 'PATCH', body: JSON.stringify({ description: ((t as unknown as { description?: string }).description || '') + '\n\n---\nRemote Repo: ' + repoMeta }) }).catch(() => {});
+              }
+            }
+            void doAssignAI(id, agent);
+          }}
+          onAssignFlow={(id, flowId, flowName, repoMeta) => {
+            if (repoMeta) {
+              const t = tasks.find((tk) => tk.id === id);
+              if (t && !((t as unknown as { description?: string }).description || '').toLowerCase().includes('remote repo')) {
+                apiFetch('/tasks/' + id, { method: 'PATCH', body: JSON.stringify({ description: ((t as unknown as { description?: string }).description || '') + '\n\n---\nRemote Repo: ' + repoMeta }) }).catch(() => {});
+              }
+            }
+            void doAssignFlow(id, flowId, flowName);
+          }}
+          onClose={() => setAiPopupTaskId(null)}
+          t={t}
+        />
       )}
-      {/* Flow Select Popup */}
+      {/* Flow Select Popup — with repo config */}
       {flowPopupTaskId !== null && (
-        <div onClick={() => setFlowPopupTaskId(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px', minWidth: 340, maxWidth: 440 }}>
-            <h3 style={{ marginTop: 0, marginBottom: 6, fontSize: 16, color: 'var(--ink)' }}>{t('tasks.assignFlow')}</h3>
-            <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 0, marginBottom: 14 }}>{t('tasks.flowAssignHint')}</p>
-            <div style={{ display: 'grid', gap: 8 }}>
-              {savedFlows.length === 0 ? (
-                <div style={{ fontSize: 12, color: 'var(--muted)', padding: 10 }}>{t('tasks.noSavedFlows')}</div>
-              ) : savedFlows.map((flow) => (
-                <button key={flow.id} onClick={() => void doAssignFlow(flowPopupTaskId, flow.id, flow.name)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(124,58,237,0.3)', background: 'rgba(124,58,237,0.08)', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{flow.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{flow.id}</div>
-                  </div>
-                  <span style={{ fontSize: 18, color: '#a78bfa' }}>▶</span>
-                </button>
-              ))}
-              <button onClick={() => setFlowPopupTaskId(null)} className='button button-outline' style={{ marginTop: 4, fontSize: 12 }}>{t('tasks.cancel')}</button>
-            </div>
-          </div>
-        </div>
+        <AssignPopup
+          taskId={flowPopupTaskId}
+          mode='flow'
+          tasks={tasks}
+          agents={agentConfigs}
+          flows={savedFlows}
+          onAssignAI={(id, agent, repoMeta) => {
+            if (repoMeta) {
+              apiFetch('/tasks/' + id, { method: 'PATCH', body: JSON.stringify({ description: '' }) }).catch(() => {});
+            }
+            void doAssignAI(id, agent);
+          }}
+          onAssignFlow={(id, flowId, flowName, repoMeta) => {
+            if (repoMeta) {
+              const t = tasks.find((tk) => tk.id === id);
+              if (t && !((t as unknown as { description?: string }).description || '').toLowerCase().includes('remote repo')) {
+                apiFetch('/tasks/' + id, { method: 'PATCH', body: JSON.stringify({ description: ((t as unknown as { description?: string }).description || '') + '\n\n---\nRemote Repo: ' + repoMeta }) }).catch(() => {});
+              }
+            }
+            void doAssignFlow(id, flowId, flowName);
+          }}
+          onClose={() => setFlowPopupTaskId(null)}
+          t={t}
+        />
       )}
       {/* Delete confirmation modal */}
       {deleteConfirmTask && (
@@ -669,6 +682,89 @@ export default function DashboardTasksPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function AssignPopup({ taskId, mode, tasks, agents, flows, onAssignAI, onAssignFlow, onClose, t }: {
+  taskId: number;
+  mode: 'ai' | 'flow';
+  tasks: TaskItem[];
+  agents: { role: string; model: string; provider: string; enabled: boolean }[];
+  flows: { id: string; name: string }[];
+  onAssignAI: (id: number, agent: { role: string; model: string; provider: string }, repoMeta?: string) => void;
+  onAssignFlow: (id: number, flowId: string, flowName: string, repoMeta?: string) => void;
+  onClose: () => void;
+  t: (key: TranslationKey) => string;
+}) {
+  const [repoSel, setRepoSel] = useState<{ meta: string } | null>(null);
+  const task = tasks.find((tk) => tk.id === taskId);
+  const taskDesc = ((task as unknown as { description?: string })?.description || '').toLowerCase();
+  const hasRepo = taskDesc.includes('local repo path') || taskDesc.includes('remote repo');
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 18, minWidth: 360, maxWidth: 480, overflow: 'hidden' }}>
+        <div style={{ height: 3, background: mode === 'ai' ? 'linear-gradient(90deg, #0d9488, #22c55e)' : 'linear-gradient(90deg, #7c3aed, #a78bfa)' }} />
+        <div style={{ padding: '18px 22px', display: 'grid', gap: 14 }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--ink)' }}>
+            {mode === 'ai' ? t('tasks.selectAgent') : t('tasks.assignFlow')}
+          </h3>
+
+          {/* Repo selector — only if task has no repo config */}
+          {!hasRepo && (
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 6 }}>Target Repository</div>
+              <RemoteRepoSelector compact onChange={(sel) => setRepoSel(sel ? { meta: sel.meta } : null)} />
+            </div>
+          )}
+          {hasRepo && (
+            <div style={{ fontSize: 11, color: 'var(--ink-35)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
+              Repo configured
+            </div>
+          )}
+
+          {/* Agent / Flow selection */}
+          {mode === 'ai' && (
+            <div style={{ display: 'grid', gap: 6 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)' }}>{t('tasks.selectAgent')}</div>
+              {agents.filter((a) => a.enabled).map((agent) => (
+                <button key={agent.role}
+                  onClick={() => onAssignAI(taskId, agent, !hasRepo ? repoSel?.meta : undefined)}
+                  disabled={!hasRepo && !repoSel}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--panel-border-3)', background: 'var(--panel)', cursor: (!hasRepo && !repoSel) ? 'not-allowed' : 'pointer', textAlign: 'left', width: '100%', opacity: (!hasRepo && !repoSel) ? 0.5 : 1 }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', textTransform: 'capitalize' }}>{agent.role}</div>
+                    <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{agent.model || 'default'} {agent.provider ? `· ${agent.provider}` : ''}</div>
+                  </div>
+                  <span style={{ fontSize: 16, color: 'var(--muted)' }}>→</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {mode === 'flow' && (
+            <div style={{ display: 'grid', gap: 6 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)' }}>{t('tasks.assignFlow')}</div>
+              {flows.length === 0 ? (
+                <div style={{ fontSize: 12, color: 'var(--muted)', padding: 10 }}>{t('tasks.noSavedFlows')}</div>
+              ) : flows.map((flow) => (
+                <button key={flow.id}
+                  onClick={() => onAssignFlow(taskId, flow.id, flow.name, !hasRepo ? repoSel?.meta : undefined)}
+                  disabled={!hasRepo && !repoSel}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(124,58,237,0.3)', background: 'rgba(124,58,237,0.06)', cursor: (!hasRepo && !repoSel) ? 'not-allowed' : 'pointer', textAlign: 'left', width: '100%', opacity: (!hasRepo && !repoSel) ? 0.5 : 1 }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{flow.name}</div>
+                  </div>
+                  <span style={{ fontSize: 16, color: '#a78bfa' }}>▶</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <button onClick={onClose} className='button button-outline' style={{ fontSize: 12, justifyContent: 'center' }}>{t('tasks.cancel')}</button>
+        </div>
+      </div>
     </div>
   );
 }
