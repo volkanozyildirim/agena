@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { apiFetch, loadPrefs, savePrefs } from '@/lib/api';
+import RemoteRepoSelector from '@/components/RemoteRepoSelector';
 import { useLocale, type TranslationKey } from '@/lib/i18n';
 import { useWS } from '@/lib/useWebSocket';
 
@@ -309,9 +310,7 @@ function AssignTaskModal({
   const [repoMappings, setRepoMappings] = useState<RepoMappingItem[]>([]);
   const [selectedMapping, setSelectedMapping] = useState<string>('');
   const [repoMode, setRepoMode] = useState<'mapping' | 'remote'>('mapping');
-  const [remoteRepos, setRemoteRepos] = useState<{ name: string; default_branch: string; provider: string }[]>([]);
-  const [selectedRemoteRepo, setSelectedRemoteRepo] = useState('');
-  const [remoteBranch, setRemoteBranch] = useState('main');
+  const [remoteRepoMeta, setRemoteRepoMeta] = useState('');
   const [sprintProvider, setSprintProvider] = useState<'azure' | 'jira'>('azure');
   const assignable = tasks.filter((tk) => tk.status === 'queued' || tk.status === 'failed');
   const availModels = modelsForProvider(selProvider);
@@ -338,20 +337,7 @@ function AssignTaskModal({
       const mappings: RepoMappingItem[] = mappingsRaw ? JSON.parse(mappingsRaw) : [];
       setRepoMappings(mappings);
       if (mappings.length > 0 && !selectedMapping) setSelectedMapping(mappings[0].id);
-      // Load remote repos (GitHub + Azure)
-      const [ghRepos, azRepos] = await Promise.all([
-        apiFetch<{ name: string; default_branch: string }[]>('/tasks/github/repos').catch(() => []),
-        (async () => {
-          const project = localStorage.getItem('agena_sprint_project') || '';
-          if (!project) return [];
-          return apiFetch<{ name: string }[]>('/tasks/azure/repos?project=' + encodeURIComponent(project)).catch(() => []);
-        })(),
-      ]);
-      setRemoteRepos([
-        ...ghRepos.map((r) => ({ name: r.name, default_branch: r.default_branch || 'main', provider: 'github' })),
-        ...azRepos.map((r) => ({ name: r.name, default_branch: 'main', provider: 'azure' })),
-      ]);
-      if (!mappings.length && (ghRepos.length || azRepos.length)) setRepoMode('remote');
+      if (!mappings.length) setRepoMode('remote');
       const prefs = await loadPrefs();
       const settings = (prefs.profile_settings || {}) as Record<string, unknown>;
       let preferredProvider: 'azure' | 'jira' = localStorage.getItem('agena_sprint_provider') === 'jira' ? 'jira' : 'azure';
@@ -426,22 +412,13 @@ function AssignTaskModal({
     try {
       const project = localStorage.getItem('agena_sprint_project') || '';
       const mapping = repoMappings.find((m) => m.id === selectedMapping) || repoMappings[0];
-      const remoteRepoMeta = repoMode === 'remote' && selectedRemoteRepo
-        ? (() => {
-            const r = remoteRepos.find((x) => x.name === selectedRemoteRepo);
-            if (!r) return '';
-            const prefix = r.provider === 'github' ? 'github' : 'azure';
-            const repoName = r.provider === 'azure' ? `${project}/${r.name}` : r.name;
-            return `${prefix}:${repoName}@${remoteBranch || r.default_branch}`;
-          })()
-        : '';
       const ctxParts = [
         `External Source: ${sprintProvider === 'jira' ? 'Jira' : 'Azure'} #${item.id}`,
         project ? `Project: ${project}` : '',
-        remoteRepoMeta ? `Remote Repo: ${remoteRepoMeta}` : '',
-        !remoteRepoMeta && mapping?.azure_repo_url ? `Azure Repo: ${mapping.azure_repo_url}` : '',
-        !remoteRepoMeta && mapping?.name ? `Local Repo Mapping: ${mapping.name}` : '',
-        !remoteRepoMeta && mapping?.local_path ? `Local Repo Path: ${mapping.local_path}` : '',
+        repoMode === 'remote' && remoteRepoMeta ? `Remote Repo: ${remoteRepoMeta}` : '',
+        repoMode !== 'remote' && mapping?.azure_repo_url ? `Azure Repo: ${mapping.azure_repo_url}` : '',
+        repoMode !== 'remote' && mapping?.name ? `Local Repo Mapping: ${mapping.name}` : '',
+        repoMode !== 'remote' && mapping?.local_path ? `Local Repo Path: ${mapping.local_path}` : '',
       ].filter(Boolean);
       const fullDesc = (sprintDesc || item.title) + '\n\n---\n' + ctxParts.join('\n');
       const created = await apiFetch<{ id: number }>('/tasks', {
@@ -628,12 +605,10 @@ function AssignTaskModal({
                         Mapping
                       </button>
                     )}
-                    {remoteRepos.length > 0 && (
-                      <button onClick={() => setRepoMode('remote')}
-                        style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: repoMode === 'remote' ? '1px solid rgba(94,234,212,0.5)' : '1px solid var(--panel-border-2)', background: repoMode === 'remote' ? 'rgba(94,234,212,0.12)' : 'transparent', color: repoMode === 'remote' ? '#5eead4' : 'var(--ink-45)' }}>
-                        Remote Repo
-                      </button>
-                    )}
+                    <button onClick={() => setRepoMode('remote')}
+                      style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: repoMode === 'remote' ? '1px solid rgba(94,234,212,0.5)' : '1px solid var(--panel-border-2)', background: repoMode === 'remote' ? 'rgba(94,234,212,0.12)' : 'transparent', color: repoMode === 'remote' ? '#5eead4' : 'var(--ink-45)' }}>
+                      Remote Repo
+                    </button>
                   </div>
                   {repoMode === 'mapping' && repoMappings.length > 0 && (
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -645,29 +620,9 @@ function AssignTaskModal({
                       ))}
                     </div>
                   )}
-                  {repoMode === 'remote' && remoteRepos.length > 0 && (
-                    <div style={{ display: 'grid', gap: 6 }}>
-                      <select value={selectedRemoteRepo} onChange={(e) => {
-                        setSelectedRemoteRepo(e.target.value);
-                        const r = remoteRepos.find((x) => x.name === e.target.value);
-                        if (r) setRemoteBranch(r.default_branch);
-                      }}
-                        style={{ padding: '7px 10px', borderRadius: 8, fontSize: 11, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', color: 'var(--ink-78)' }}>
-                        <option value=''>Select repo...</option>
-                        {remoteRepos.map((r) => (
-                          <option key={`${r.provider}:${r.name}`} value={r.name}>
-                            {r.provider === 'github' ? '  ' : '  '} {r.name}
-                          </option>
-                        ))}
-                      </select>
-                      {selectedRemoteRepo && (
-                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                          <span style={{ fontSize: 10, color: 'var(--ink-35)', fontWeight: 600 }}>Branch:</span>
-                          <input value={remoteBranch} onChange={(e) => setRemoteBranch(e.target.value)}
-                            style={{ flex: 1, padding: '5px 8px', borderRadius: 6, fontSize: 11, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', color: 'var(--ink-78)', outline: 'none' }} />
-                        </div>
-                      )}
-                    </div>
+                  {repoMode === 'remote' && (
+                    <RemoteRepoSelector compact accent={agent.color}
+                      onChange={(sel) => setRemoteRepoMeta(sel?.meta || '')} />
                   )}
                 </div>
 
