@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { apiFetch, loadPrefs } from '@/lib/api';
 import { TaskItem } from '@/components/TaskTable';
 import { useLocale, type TranslationKey } from '@/lib/i18n';
+import RemoteRepoSelector from '@/components/RemoteRepoSelector';
 
 const STATUS_FILTERS = ['all', 'new', 'queued', 'running', 'completed', 'failed'];
 const SOURCE_FILTERS = ['all', 'internal', 'azure', 'jira'];
@@ -61,6 +62,7 @@ export default function DashboardTasksPage() {
   const [edgeCases, setEdgeCases] = useState('');
   const [maxTokens, setMaxTokens] = useState('');
   const [maxCostUsd, setMaxCostUsd] = useState('');
+  const [remoteRepoMeta, setRemoteRepoMeta] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
@@ -166,11 +168,14 @@ export default function DashboardTasksPage() {
   async function onCreate(e: FormEvent) {
     e.preventDefault();
     try {
+      const fullDesc = remoteRepoMeta
+        ? description + '\n\n---\nRemote Repo: ' + remoteRepoMeta
+        : description;
       await apiFetch('/tasks', {
         method: 'POST',
         body: JSON.stringify({
           title,
-          description,
+          description: fullDesc,
           story_context: storyContext || undefined,
           acceptance_criteria: acceptanceCriteria || undefined,
           edge_cases: edgeCases || undefined,
@@ -304,6 +309,12 @@ export default function DashboardTasksPage() {
               placeholder={t('tasks.edgeCasesPlaceholder')}
               rows={2}
             />
+            {/* Remote Repo Selector */}
+            <div style={{ borderRadius: 10, border: '1px solid var(--panel-border)', padding: '10px 12px', background: 'var(--panel)' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 6 }}>Target Repo</div>
+              <RemoteRepoSelector compact onChange={(sel) => setRemoteRepoMeta(sel?.meta || '')} />
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <input
                 type='number'
