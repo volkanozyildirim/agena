@@ -1,6 +1,7 @@
 'use client';
+export const dynamic = 'force-dynamic';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { apiFetch, isLoggedIn, setToken } from '@/lib/api';
@@ -17,7 +18,7 @@ type InviteInfo = {
 
 type AuthResponse = { access_token: string };
 
-export default function InvitePage() {
+function InvitePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useLocale();
@@ -231,6 +232,14 @@ export default function InvitePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function InvitePage() {
+  return (
+    <Suspense fallback={null}>
+      <InvitePageContent />
+    </Suspense>
   );
 }
 

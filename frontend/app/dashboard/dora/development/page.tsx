@@ -1005,7 +1005,7 @@ function DeploymentsTab({ data, t }: { data: DeploymentsAnalyticsResponse; t: TF
       </div>
 
       {/* Deployment list */}
-      {data.deployment_list.length > 0 && (
+      {data.deployments.length > 0 && (
         <div style={box}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginBottom: 12 }}>Deployments</div>
           <div style={{ overflowX: 'auto' }}>
@@ -1020,7 +1020,7 @@ function DeploymentsTab({ data, t }: { data: DeploymentsAnalyticsResponse; t: TF
                 </tr>
               </thead>
               <tbody>
-                {data.deployment_list.map((d, i) => (
+                {data.deployments.map((d, i) => (
                   <tr key={i} style={{ borderBottom: '1px solid var(--panel-border-2)' }}>
                     <td style={tdStyle}><span style={{ padding: '2px 8px', borderRadius: 6, background: 'rgba(59,130,246,0.12)', color: '#3b82f6', fontSize: 11, fontWeight: 600 }}>{d.environment}</span></td>
                     <td style={tdStyle}><span style={{ padding: '2px 8px', borderRadius: 6, background: d.status === 'success' ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)', color: d.status === 'success' ? '#22c55e' : '#ef4444', fontSize: 11, fontWeight: 600 }}>{d.status}</span></td>

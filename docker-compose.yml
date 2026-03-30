@@ -1,4 +1,4 @@
-version: '3.9'
+version: '2.2'
 
 services:
   backend:
@@ -80,11 +80,12 @@ services:
     env_file:
       - frontend/.env.example
     ports:
-      - '3010:3010'
+      - '3011:3010'
     volumes:
       - ./frontend:/app
       - /app/node_modules
       - /app/.next
+    command: ["sh", "-lc", "npm run build && npm run start"]
     depends_on:
       - backend
     restart: unless-stopped
@@ -108,7 +109,7 @@ services:
     image: redis:7-alpine
     container_name: ai_agent_redis
     ports:
-      - '6379:6379'
+      - '6380:6379'
     restart: unless-stopped
 
   qdrant:

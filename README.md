@@ -152,6 +152,12 @@ Integration credentials are tenant-scoped from dashboard/API (`/integrations/*`)
 docker compose up --build
 ```
 
+Backup (prod secrets + MySQL volume):
+
+```bash
+./scripts/backup-prod.sh
+```
+
 Services:
 - Backend API: `http://localhost:8010`
 - Frontend: `http://localhost:3010`

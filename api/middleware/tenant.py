@@ -33,9 +33,16 @@ _SKIP_PREFIXES = (
     '/auth/',
 )
 
-# Known non-tenant host prefixes (bare domain, www, localhost, IP addresses).
+# Known non-tenant host prefixes (bare domain, system subdomains, localhost, IP addresses).
+_NON_TENANT_SUBDOMAINS = {
+    'api',
+    'www',
+    'localhost',
+}
+
+# Bare hosts/IPs that should never be treated as tenant slugs.
 _BARE_HOST_RE = re.compile(
-    r'^(localhost|www|127\.\d+\.\d+\.\d+|0\.0\.0\.0|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$'
+    r'^(127\.\d+\.\d+\.\d+|0\.0\.0\.0|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$'
 )
 
 
@@ -50,8 +57,8 @@ def _extract_slug_from_host(host: str) -> str | None:
     if len(parts) < 3:
         # e.g. "agena.app" or "localhost" -- no subdomain
         return None
-    subdomain = parts[0]
-    if _BARE_HOST_RE.match(subdomain):
+    subdomain = parts[0].lower()
+    if subdomain in _NON_TENANT_SUBDOMAINS or _BARE_HOST_RE.match(subdomain):
         return None
     return subdomain
 
