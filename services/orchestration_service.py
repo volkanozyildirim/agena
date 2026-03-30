@@ -349,7 +349,10 @@ class OrchestrationService:
                     )
                 else:
                     # === 2-STEP AI MODE ===
-                    repo_root = Path(routing.local_repo_path).expanduser().resolve() if routing.local_repo_path else None
+                    repo_root = None
+                    if routing.local_repo_path:
+                        _rp = Path(routing.local_repo_path).expanduser().resolve()
+                        repo_root = _rp if _rp.is_dir() else None
                     agents_md_content, agents_md_source, agents_pkg_dir = self._resolve_repo_guide(repo_root)
                     if not self._repo_guide_is_sufficient(agents_md_content, agents_pkg_dir):
                         agents_md_content = self._build_full_scan_context(
