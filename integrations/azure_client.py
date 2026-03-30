@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import logging
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -61,7 +62,7 @@ class AzureDevOpsClient:
                     'System.AssignedTo,System.CreatedDate,Microsoft.VSTS.Common.ActivatedDate'
                 ),
             )
-        return [self._to_external_task(item) for item in details_payload]
+        return [self._to_external_task(item, org_url=org_url, project=project) for item in details_payload]
 
     async def fetch_sprint_work_items(self, cfg: dict[str, str] | None = None) -> list[ExternalTask]:
         cfg = cfg or {}
@@ -104,7 +105,7 @@ class AzureDevOpsClient:
                     'Microsoft.VSTS.Scheduling.Size'
                 ),
             )
-        return [self._to_external_task(item) for item in details_payload]
+        return [self._to_external_task(item, org_url=org_url, project=project) for item in details_payload]
 
     async def writeback_refinement(
         self,
@@ -187,7 +188,7 @@ class AzureDevOpsClient:
                 return []
         return details_payload
 
-    def _to_external_task(self, item: dict[str, Any]) -> ExternalTask:
+    def _to_external_task(self, item: dict[str, Any], *, org_url: str, project: str) -> ExternalTask:
         fields = item.get('fields', {})
         assigned_raw = fields.get('System.AssignedTo')
         if isinstance(assigned_raw, dict):
@@ -200,8 +201,17 @@ class AzureDevOpsClient:
             fields.get('Microsoft.VSTS.Scheduling.Size'),
         )
         effort = self._coerce_float(fields.get('Microsoft.VSTS.Scheduling.Effort'))
+        item_id = str(fields.get('System.Id', item.get('id', '')))
+        link_value = ((item.get('_links') or {}).get('html') or {}).get('href')
+        web_url = str(link_value).strip() if isinstance(link_value, str) else ''
+        if not web_url:
+            web_url = self._build_work_item_web_url(
+                org_url=org_url,
+                project=(fields.get('System.TeamProject') or project or ''),
+                item_id=item_id,
+            )
         return ExternalTask(
-            id=str(fields.get('System.Id', item.get('id', ''))),
+            id=item_id,
             title=fields.get('System.Title', ''),
             description=fields.get('System.Description', '') or '',
             source='azure',
@@ -213,8 +223,16 @@ class AzureDevOpsClient:
             effort=effort,
             work_item_type=fields.get('System.WorkItemType'),
             sprint_path=fields.get('System.IterationPath'),
-            web_url=((item.get('_links') or {}).get('html') or {}).get('href'),
+            web_url=web_url or None,
         )
+
+    def _build_work_item_web_url(self, *, org_url: str, project: str, item_id: str) -> str:
+        base = str(org_url or '').strip().rstrip('/')
+        proj = str(project or '').strip()
+        wid = str(item_id or '').strip()
+        if not base or not proj or not wid:
+            return ''
+        return f'{base}/{quote(proj, safe="")}/_workitems/edit/{quote(wid, safe="")}'
 
     def _coerce_float(self, *values: Any) -> float | None:
         for value in values:
