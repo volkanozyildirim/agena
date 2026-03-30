@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { isLoggedIn } from '@/lib/api';
 import LangToggle from '@/components/LangToggle';
 import ThemeToggle from '@/components/ThemeToggle';
@@ -9,11 +10,12 @@ import { useLocale } from '@/lib/i18n';
 
 export default function Navbar() {
   const { t } = useLocale();
+  const pathname = usePathname();
   const [loggedIn, setLoggedIn] = useState(false);
 
   useEffect(() => {
     setLoggedIn(isLoggedIn());
-  }, []);
+  }, [pathname]);
 
   return (
     <header className='navbar-shell'>

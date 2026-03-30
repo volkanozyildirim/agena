@@ -345,7 +345,7 @@ class CrewAIAgentRunner:
             }
             if multimodal and materialized_images:
                 agent_kwargs['multimodal'] = True
-            if reasoning:
+            if reasoning and 'codex' not in crewai_model.lower():
                 agent_kwargs['reasoning'] = True
                 agent_kwargs['max_reasoning_attempts'] = 2
             agent = Agent(**agent_kwargs)
