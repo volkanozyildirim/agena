@@ -573,26 +573,37 @@ function FlowCanvas({ flow, onChange }: { flow: Flow; onChange: (f: Flow) => voi
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
+  // Helper: extract clientX/clientY from mouse or touch event
+  function getPointer(e: React.MouseEvent | React.TouchEvent | MouseEvent | TouchEvent): { clientX: number; clientY: number } {
+    if ('touches' in e) {
+      const t = (e as TouchEvent).touches[0] || (e as TouchEvent).changedTouches[0];
+      return { clientX: t.clientX, clientY: t.clientY };
+    }
+    return { clientX: (e as MouseEvent).clientX, clientY: (e as MouseEvent).clientY };
+  }
+
   // ── Connector dot'tan drag-to-connect ──
-  const onConnectorMouseDown = useCallback((e: React.MouseEvent, sourceId: string) => {
+  const onConnectorMouseDown = useCallback((e: React.MouseEvent | React.TouchEvent, sourceId: string) => {
     e.stopPropagation();
     e.preventDefault();
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
+    const p = getPointer(e);
     setConnecting({
       sourceId,
-      x: e.clientX - rect.left - canvasOffset.x,
-      y: e.clientY - rect.top - canvasOffset.y,
+      x: p.clientX - rect.left - canvasOffset.x,
+      y: p.clientY - rect.top - canvasOffset.y,
     });
   }, [canvasOffset]);
 
   // ── Drag node ──
-  const onNodeMouseDown = useCallback((e: React.MouseEvent, id: string) => {
+  const onNodeMouseDown = useCallback((e: React.MouseEvent | React.TouchEvent, id: string) => {
     e.stopPropagation();
-    if (connecting) return; // bağlantı modunda node drag yok
+    if (connecting) return;
     setSelected(id);
     const node = flow.nodes.find((n) => n.id === id)!;
-    setDragging({ id, ox: e.clientX - node.x, oy: e.clientY - node.y });
+    const p = getPointer(e);
+    setDragging({ id, ox: p.clientX - node.x, oy: p.clientY - node.y });
   }, [connecting, flow]);
 
   const draggingRef = useRef(dragging);
@@ -607,30 +618,33 @@ function FlowCanvas({ flow, onChange }: { flow: Flow; onChange: (f: Flow) => voi
   canvasOffsetRef.current = canvasOffset;
 
   useEffect(() => {
-    function handleMouseMove(e: MouseEvent) {
+    function handleMove(e: MouseEvent | TouchEvent) {
+      const p = 'touches' in e ? { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY } : { clientX: (e as MouseEvent).clientX, clientY: (e as MouseEvent).clientY };
       const drag = draggingRef.current;
       if (drag) {
-        const nx = e.clientX - drag.ox;
-        const ny = e.clientY - drag.oy;
+        if ('touches' in e) e.preventDefault();
+        const nx = p.clientX - drag.ox;
+        const ny = p.clientY - drag.oy;
         const f = flowRef.current;
         onChange({ ...f, nodes: f.nodes.map((n) => n.id === drag.id ? { ...n, x: Math.max(0, nx), y: Math.max(0, ny) } : n) });
       }
       const pan = panStartRef.current;
       if (pan) {
-        setCanvasOffset({ x: pan.ox + e.clientX - pan.mx, y: pan.oy + e.clientY - pan.my });
+        if ('touches' in e) e.preventDefault();
+        setCanvasOffset({ x: pan.ox + p.clientX - pan.mx, y: pan.oy + p.clientY - pan.my });
       }
       if (connectingRef.current) {
+        if ('touches' in e) e.preventDefault();
         const rect = canvasRef.current?.getBoundingClientRect();
         if (!rect) return;
         const off = canvasOffsetRef.current;
         setConnecting((prev) => prev ? {
           ...prev,
-          x: e.clientX - rect.left - off.x,
-          y: e.clientY - rect.top - off.y,
+          x: p.clientX - rect.left - off.x,
+          y: p.clientY - rect.top - off.y,
         } : null);
-        // hover target güncelle
-        const mx = e.clientX - rect.left - off.x;
-        const my = e.clientY - rect.top - off.y;
+        const mx = p.clientX - rect.left - off.x;
+        const my = p.clientY - rect.top - off.y;
         const f = flowRef.current;
         const conn = connectingRef.current;
         const over = f.nodes.find((n) =>
@@ -641,22 +655,24 @@ function FlowCanvas({ flow, onChange }: { flow: Flow; onChange: (f: Flow) => voi
         setHoverTarget(over?.id ?? null);
       }
     }
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('touchmove', handleMove, { passive: false });
+    return () => { window.removeEventListener('mousemove', handleMove); window.removeEventListener('touchmove', handleMove); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onChange]);
 
-  // Global mouseup — node üzerinde bırakınca da çalışsın
+  // Global mouseup/touchend
   useEffect(() => {
-    function handleMouseUp(e: MouseEvent) {
+    function handleEnd(e: MouseEvent | TouchEvent) {
       setDragging(null);
       setPanStart(null);
       const conn = connectingRef.current;
       if (conn) {
+        const p = 'changedTouches' in e ? { clientX: e.changedTouches[0].clientX, clientY: e.changedTouches[0].clientY } : { clientX: (e as MouseEvent).clientX, clientY: (e as MouseEvent).clientY };
         const rect = canvasRef.current?.getBoundingClientRect();
         if (rect) {
-          const mx = e.clientX - rect.left - canvasOffsetRef.current.x;
-          const my = e.clientY - rect.top - canvasOffsetRef.current.y;
+          const mx = p.clientX - rect.left - canvasOffsetRef.current.x;
+          const my = p.clientY - rect.top - canvasOffsetRef.current.y;
           const f = flowRef.current;
           const target = f.nodes.find((n) =>
             mx >= n.x && mx <= n.x + NODE_W &&
@@ -671,15 +687,17 @@ function FlowCanvas({ flow, onChange }: { flow: Flow; onChange: (f: Flow) => voi
         setHoverTarget(null);
       }
     }
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => window.removeEventListener('mouseup', handleMouseUp);
+    window.addEventListener('mouseup', handleEnd);
+    window.addEventListener('touchend', handleEnd);
+    return () => { window.removeEventListener('mouseup', handleEnd); window.removeEventListener('touchend', handleEnd); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onChange]);
 
-  const onCanvasMouseDown = useCallback((e: React.MouseEvent) => {
+  const onCanvasMouseDown = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     if (connecting) { setConnecting(null); return; }
     setSelected(null);
-    setPanStart({ mx: e.clientX, my: e.clientY, ox: canvasOffset.x, oy: canvasOffset.y });
+    const p = getPointer(e);
+    setPanStart({ mx: p.clientX, my: p.clientY, ox: canvasOffset.x, oy: canvasOffset.y });
   }, [connecting, canvasOffset]);
 
   function getNextNodePosition() {
@@ -792,8 +810,8 @@ function FlowCanvas({ flow, onChange }: { flow: Flow; onChange: (f: Flow) => voi
       </div>
 
       {/* Canvas */}
-      <div ref={canvasRef} style={{ flex: 1, overflow: 'hidden', position: 'relative', cursor: connecting ? 'crosshair' : panStart ? 'grabbing' : 'default', backgroundImage: 'radial-gradient(circle, var(--panel-border) 1px, transparent 1px)', backgroundSize: '20px 20px', backgroundPosition: `${canvasOffset.x % 20}px ${canvasOffset.y % 20}px` }}
-        onMouseDown={onCanvasMouseDown}>
+      <div ref={canvasRef} style={{ flex: 1, overflow: 'hidden', position: 'relative', touchAction: 'none', cursor: connecting ? 'crosshair' : panStart ? 'grabbing' : 'default', backgroundImage: 'radial-gradient(circle, var(--panel-border) 1px, transparent 1px)', backgroundSize: '20px 20px', backgroundPosition: `${canvasOffset.x % 20}px ${canvasOffset.y % 20}px` }}
+        onMouseDown={onCanvasMouseDown} onTouchStart={onCanvasMouseDown}>
 
         {/* SVG edges */}
         <svg ref={svgRef} style={{ position: 'absolute', inset: 0, overflow: 'visible' }}
@@ -953,10 +971,10 @@ function FlowCanvas({ flow, onChange }: { flow: Flow; onChange: (f: Flow) => voi
 // ── FlowNodeCard ──────────────────────────────────────────────────────────────
 function FlowNodeCard({ node, index, selected, connecting, isDropTarget, onMouseDown, onMouseEnterNode, onMouseLeaveNode, onConnectorMouseDown, onEdit, onDelete }: {
   node: FlowNode; index: number; selected: boolean; connecting: boolean; isDropTarget: boolean;
-  onMouseDown: (e: React.MouseEvent) => void;
+  onMouseDown: (e: React.MouseEvent | React.TouchEvent) => void;
   onMouseEnterNode: () => void;
   onMouseLeaveNode: () => void;
-  onConnectorMouseDown: (e: React.MouseEvent) => void;
+  onConnectorMouseDown: (e: React.MouseEvent | React.TouchEvent) => void;
   onEdit: () => void; onDelete: () => void;
 }) {
   const { t } = useLocale();
@@ -986,6 +1004,7 @@ function FlowNodeCard({ node, index, selected, connecting, isDropTarget, onMouse
         pointerEvents: 'all',
       }}
       onMouseDown={onMouseDown}
+      onTouchStart={onMouseDown}
       onMouseEnter={() => { setHovered(true); }}
       onMouseLeave={() => { setHovered(false); }}
     >
@@ -1015,6 +1034,7 @@ function FlowNodeCard({ node, index, selected, connecting, isDropTarget, onMouse
       <div
         title={t('flows.dragConnect')}
         onMouseDown={onConnectorMouseDown}
+        onTouchStart={onConnectorMouseDown}
         style={{
           position: 'absolute', right: -8, top: '50%', transform: 'translateY(-50%)',
           width: 16, height: 16, borderRadius: '50%',
