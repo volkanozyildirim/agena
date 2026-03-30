@@ -1909,6 +1909,27 @@ input:focus, textarea:focus {
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
 
+/* ─── DASHBOARD RESPONSIVE ─── */
+@media (max-width: 768px) {
+  .dashboard-sidebar-toggle { display: flex !important; }
+  .dashboard-sidebar-overlay { display: block !important; }
+  .dashboard-sidebar {
+    transform: translateX(-100%);
+    width: 220px !important;
+    background: var(--bg) !important;
+  }
+  .dashboard-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+  .dashboard-main {
+    margin-left: 0 !important;
+    padding: 16px 12px !important;
+  }
+  .dash-grid-responsive {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 /* ─── RESPONSIVE ─── */
 @media (max-width: 768px) {
   /* ── All grids → single column ── */

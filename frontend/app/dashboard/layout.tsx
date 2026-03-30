@@ -66,6 +66,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
   const [notifLoading, setNotifLoading] = useState(false);
   const [notifFilter, setNotifFilter] = useState<'all' | 'failed'>('all');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [userRole, setUserRole] = useState<Role>('viewer');
   const [orgSlug, setOrgSlugState] = useState('');
   const [orgNameDisplay, setOrgNameDisplay] = useState('');
@@ -93,6 +94,9 @@ function DashboardInner({ children }: { children: ReactNode }) {
     'nav.profile': 'tooltip.nav.profile',
   };
   const navTooltip = (key: string) => t((navTooltipMap[key] || key) as Parameters<typeof t>[0]);
+
+  // Close mobile sidebar on navigation
+  useEffect(() => { setMobileSidebarOpen(false); }, [pathname]);
 
   // Clear task badges when visiting tasks page
   useEffect(() => {
@@ -362,8 +366,30 @@ function DashboardInner({ children }: { children: ReactNode }) {
   return (
     <RoleContext.Provider value={{ role: userRole }}>
     <div style={{ display: 'flex', minHeight: '100vh', paddingTop: 72 }}>
+      {/* Mobile sidebar toggle */}
+      <button
+        className='dashboard-sidebar-toggle'
+        onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+        style={{
+          display: 'none', position: 'fixed', top: 80, left: 8, zIndex: 60,
+          width: 36, height: 36, borderRadius: 10,
+          border: '1px solid var(--panel-border-2)', background: 'var(--surface)',
+          color: 'var(--ink-65)', cursor: 'pointer',
+          alignItems: 'center', justifyContent: 'center', fontSize: 18,
+        }}
+      >
+        {mobileSidebarOpen ? '✕' : '☰'}
+      </button>
+      {/* Mobile overlay */}
+      {mobileSidebarOpen && (
+        <div
+          className='dashboard-sidebar-overlay'
+          onClick={() => setMobileSidebarOpen(false)}
+          style={{ display: 'none', position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 49 }}
+        />
+      )}
       {/* Sidebar */}
-      <aside style={{
+      <aside className={`dashboard-sidebar ${mobileSidebarOpen ? 'mobile-open' : ''}`} style={{
         width: sidebarWidth, flexShrink: 0,
         borderRight: '1px solid var(--panel-border)',
         background: 'var(--glass)', backdropFilter: 'blur(20px)',
@@ -371,7 +397,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
         display: 'flex', flexDirection: 'column',
         padding: '24px 12px', zIndex: 50,
         overflowY: 'auto', overflowX: 'hidden',
-        transition: 'width 0.2s ease',
+        transition: 'width 0.2s ease, transform 0.2s ease',
       }}>
         <button
           onClick={toggleSidebar}
@@ -702,7 +728,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Main */}
-      <main style={{ flex: 1, marginLeft: sidebarWidth, padding: '32px 40px', minWidth: 0, transition: 'margin-left 0.2s ease' }}>
+      <main className='dashboard-main' style={{ flex: 1, marginLeft: sidebarWidth, padding: '32px 40px', minWidth: 0, transition: 'margin-left 0.2s ease' }}>
         {children}
       </main>
 

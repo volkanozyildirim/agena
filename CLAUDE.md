@@ -32,6 +32,19 @@ docker compose exec frontend npm run lint
 
 If stale webpack errors occur: `docker exec ai_agent_frontend rm -rf /app/.next` then restart.
 
+### Frontend Production Deploy (Zero-Downtime)
+
+Frontend runs as **blue/green** production containers (`frontend_blue` :3011, `frontend_green` :3012). Nginx load-balances between them. Code is NOT volume-mounted — changes require a rebuild.
+
+```bash
+# Zero-downtime deploy (rebuilds one at a time):
+./scripts/deploy-frontend.sh
+
+# NEVER use docker-compose up --build for both at once — causes 502
+```
+
+Backend code IS volume-mounted and hot-reloads. For backend changes: `docker-compose restart backend worker`
+
 ## Architecture
 
 **Multi-tenant AI agent SaaS** — orchestrates LLM-powered code generation and creates GitHub/Azure DevOps PRs.

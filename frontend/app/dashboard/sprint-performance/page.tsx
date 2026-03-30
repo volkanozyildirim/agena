@@ -687,7 +687,7 @@ export default function SprintPerformancePage() {
       ) : (
         <>
           {/* ── Sprint Health Overview ── */}
-          <div style={{
+          <div className="dash-grid-responsive" style={{
             display: 'grid', gridTemplateColumns: '200px 1fr', gap: 20,
             padding: 20, borderRadius: 16,
             border: '1px solid var(--panel-border-2)',

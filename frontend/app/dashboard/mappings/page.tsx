@@ -459,14 +459,14 @@ export default function RepoMappingsPage() {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 420px) 1fr', gap: 14, alignItems: 'start' }}>
+      <div className="dash-grid-responsive" style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 420px) 1fr', gap: 14, alignItems: 'start' }}>
         <div style={{ borderRadius: 16, border: '1px solid rgba(56,189,248,0.24)', background: 'var(--surface)', padding: 14, display: 'grid', gap: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: '#7dd3fc' }}>{t('mappings.createMapping')}</div>
             <div style={{ fontSize: 11, color: 'var(--ink-35)' }}>{t('mappings.totalCount', { n: items.length })}</div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <div className="dash-grid-responsive" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <button type='button' onClick={() => setSourceProvider('azure')} className='button'
               style={{ borderColor: sourceProvider === 'azure' ? 'rgba(56,189,248,0.45)' : 'var(--panel-border-3)', background: sourceProvider === 'azure' ? 'rgba(56,189,248,0.12)' : 'var(--panel-alt)', color: sourceProvider === 'azure' ? '#7dd3fc' : 'var(--ink-58)' }}>
               {t('mappings.providerAzure')}
@@ -529,7 +529,7 @@ export default function RepoMappingsPage() {
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div className="dash-grid-responsive" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
               <div style={fieldLabelStyle}>{t('mappings.localPath')}</div>
               <input value={path} onChange={(e) => setPath(e.target.value)} placeholder={t('mappings.pathPlaceholder')} style={fieldStyle} />
@@ -587,7 +587,7 @@ export default function RepoMappingsPage() {
               }}
             />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, minHeight: 38 }}>
+          <div className="dash-grid-responsive" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, minHeight: 38 }}>
             <button
               onClick={() => void upsertMapping()}
               disabled={

@@ -182,7 +182,7 @@ export default function TemplatesPage() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(260px, 1fr))', gap: 12 }}>
+      <div className="dash-grid-responsive" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(260px, 1fr))', gap: 12 }}>
         {templates.map((tp) => (
           <div key={tp.id} style={{ borderRadius: 14, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', padding: 14 }}>
             <div style={{ fontWeight: 700, color: 'var(--ink-90)', marginBottom: 6 }}>{localizeTemplateMeta(tp, t).name}</div>
