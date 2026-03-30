@@ -399,11 +399,18 @@ export default function RefinementPage() {
 
     async function boot() {
       try {
-        const [azureProjectRows, jiraProjectRows, prefs] = await Promise.all([
+        const [azureProjectRows, prefs, integrations] = await Promise.all([
           apiFetch<Opt[]>('/tasks/azure/projects').catch(() => [] as Opt[]),
-          apiFetch<Opt[]>('/tasks/jira/projects').catch(() => [] as Opt[]),
           loadPrefs().catch(() => null),
+          apiFetch<Array<{ provider: string; has_secret?: boolean; base_url?: string | null; username?: string | null }>>('/integrations')
+            .catch(() => [] as Array<{ provider: string; has_secret?: boolean; base_url?: string | null; username?: string | null }>),
         ]);
+        let jiraProjectRows: Opt[] = [];
+        const jiraCfg = integrations.find((cfg) => cfg.provider === 'jira');
+        const jiraConnected = Boolean(jiraCfg && (jiraCfg.has_secret || (jiraCfg.base_url || '').trim() || (jiraCfg.username || '').trim()));
+        if (jiraConnected) {
+          jiraProjectRows = await apiFetch<Opt[]>('/tasks/jira/projects').catch(() => [] as Opt[]);
+        }
         if (!active) return;
         setAzureProjects(azureProjectRows);
         setJiraProjects(jiraProjectRows);

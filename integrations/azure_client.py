@@ -24,7 +24,7 @@ class AzureDevOpsClient:
         pat = cfg.get('pat') or self.settings.azure_pat
         team = cfg.get('team') or ''
         sprint = cfg.get('sprint_path') or ''
-        state = cfg.get('state') or 'New'
+        state = cfg.get('state') if cfg.get('state') is not None else 'New'
 
         if not org_url or not project:
             logger.warning('Azure DevOps settings are incomplete; returning empty task list.')
@@ -58,7 +58,7 @@ class AzureDevOpsClient:
                 wiql_payload=wiql_payload,
                 org_url=org_url,
                 fields_param=(
-                    'System.Id,System.Title,System.Description,'
+                    'System.Id,System.Title,System.Description,System.State,'
                     'System.AssignedTo,System.CreatedDate,Microsoft.VSTS.Common.ActivatedDate,'
                     'Microsoft.VSTS.Common.AcceptanceCriteria,Microsoft.VSTS.TCM.ReproSteps'
                 ),

@@ -3,13 +3,13 @@
 import { useLocale } from '@/lib/i18n';
 
 export default function LangToggle({ style }: { style?: React.CSSProperties }) {
-  const { lang, setLang } = useLocale();
+  const { lang, setLang, t } = useLocale();
 
   return (
     <select
       value={lang}
       onChange={(e) => setLang(e.target.value as 'tr' | 'en' | 'es' | 'zh' | 'it' | 'de' | 'ja')}
-      title='Language'
+      title={t('tooltip.action.language')}
       suppressHydrationWarning
       style={{
         padding: '5px 10px', borderRadius: 8, cursor: 'pointer',

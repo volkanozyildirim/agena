@@ -442,7 +442,7 @@ export default function HomePage() {
               {t('landing.patronTitle')}
             </h2>
           </div>
-          <div style={{
+          <div className='patron-grid-mobile' style={{
             display: 'grid',
             gridTemplateColumns: 'minmax(260px, 1fr) minmax(300px, 1.1fr)',
             gap: 16,
@@ -862,7 +862,7 @@ export default function HomePage() {
             </article>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+          <div className='chatops-points-mobile' style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
             {[t('landing.chatopsPoint1'), t('landing.chatopsPoint2'), t('landing.chatopsPoint3'), t('landing.chatopsPoint4')].map((point, i) => (
               <div key={point} style={{ borderRadius: 12, border: '1px solid var(--panel-border-2)', background: 'rgba(2,8,23,0.72)', padding: '10px 12px', color: 'var(--ink-65)', fontSize: 12, animation: 'fade-up 0.45s ease both', animationDelay: `${i * 0.09}s` }}>
                 {point}

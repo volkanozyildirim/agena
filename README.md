@@ -165,6 +165,25 @@ Services:
 - Redis: `localhost:6379`
 - Qdrant (vector memory): `http://localhost:6333`
 
+## Frontend Restart (Blue/Green)
+
+Quick restart (no rebuild):
+
+```bash
+cd /var/www/tiqr
+docker-compose restart frontend_green
+docker-compose restart frontend_blue
+systemctl reload nginx
+```
+
+Rebuild and deploy updated frontend:
+
+```bash
+cd /var/www/tiqr
+docker-compose up -d --build frontend_green frontend_blue
+systemctl reload nginx
+```
+
 ## Local Development
 
 Backend:

@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useLocale } from '@/lib/i18n';
 
 export default function ThemeToggle({ style }: { style?: React.CSSProperties }) {
   const [light, setLight] = useState(false);
+  const { t } = useLocale();
 
   useEffect(() => {
     const saved = localStorage.getItem('agena_theme');
@@ -28,7 +30,7 @@ export default function ThemeToggle({ style }: { style?: React.CSSProperties }) 
   return (
     <button
       onClick={toggle}
-      title={light ? 'Dark mode' : 'Light mode'}
+      title={light ? t('tooltip.action.darkMode') : t('tooltip.action.lightMode')}
       style={{
         padding: '5px 10px',
         borderRadius: 8,

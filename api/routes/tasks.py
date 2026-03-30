@@ -51,7 +51,7 @@ async def list_azure_projects(
     service = IntegrationConfigService(db)
     config = await service.get_config(tenant.organization_id, 'azure')
     if config is None or not config.secret:
-        raise HTTPException(status_code=400, detail='Azure integration not configured')
+        return []
     url = f"{config.base_url.rstrip('/')}/_apis/projects?api-version=7.1-preview.4"
     async with httpx.AsyncClient(timeout=15) as client:
         try:
@@ -631,7 +631,9 @@ async def list_jira_projects(
     service = IntegrationConfigService(db)
     config = await service.get_config(tenant.organization_id, 'jira')
     if config is None or not config.secret:
-        raise HTTPException(status_code=400, detail='Jira integration not configured')
+        # Return empty list instead of 400 so UI can degrade gracefully
+        # when Jira is not configured yet.
+        return []
 
     task_service = TaskService(db)
     try:

@@ -7,6 +7,7 @@ import {
   fetchAnalyticsDaily,
   fetchAnalyticsSummary,
   fetchAnalyticsModels,
+  loadPrefs,
   type AnalyticsDailyResponse,
   type AnalyticsSummaryResponse,
   type AnalyticsModelResponse,
@@ -58,6 +59,31 @@ type MemorySchema = {
   privacy_scope: string;
 };
 
+type SetupChecklist = {
+  sprintSelected: boolean;
+  agentConfigured: boolean;
+  integrationConfigured: boolean;
+};
+
+type IntegrationConfigLite = {
+  provider: string;
+  has_secret?: boolean;
+  base_url?: string | null;
+};
+
+function hasConfiguredAgent(agents: Record<string, unknown>[] | undefined): boolean {
+  if (!Array.isArray(agents)) return false;
+  return agents.some((raw) => {
+    if (!raw || typeof raw !== 'object') return false;
+    const agent = raw as Record<string, unknown>;
+    const enabled = agent.enabled !== false;
+    const provider = typeof agent.provider === 'string' ? agent.provider.trim() : '';
+    const model = typeof agent.model === 'string' ? agent.model.trim() : '';
+    const customModel = typeof agent.custom_model === 'string' ? agent.custom_model.trim() : '';
+    return enabled && provider.length > 0 && (model.length > 0 || customModel.length > 0);
+  });
+}
+
 export default function DashboardOverview() {
   const { t } = useLocale();
   const { lastEvent } = useWS();
@@ -71,6 +97,7 @@ export default function DashboardOverview() {
   const [analyticsSummary, setAnalyticsSummary] = useState<AnalyticsSummaryResponse | null>(null);
   const [analyticsModels, setAnalyticsModels] = useState<AnalyticsModelResponse | null>(null);
   const [quota, setQuota] = useState<QuotaInfo | null>(null);
+  const [setupChecklist, setSetupChecklist] = useState<SetupChecklist | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -93,6 +120,22 @@ export default function DashboardOverview() {
       setAnalyticsSummary(s);
       setAnalyticsModels(m);
     }).catch(() => {});
+    Promise.all([
+      loadPrefs(),
+      apiFetch<IntegrationConfigLite[]>('/integrations'),
+    ]).then(([prefs, integrations]) => {
+      const profile = (prefs.profile_settings || {}) as Record<string, unknown>;
+      const jiraSprint = typeof profile.jira_sprint_id === 'string' ? profile.jira_sprint_id.trim() : '';
+      const sprintSelected = Boolean((prefs.azure_sprint_path || '').trim() || jiraSprint);
+      const agentConfigured = hasConfiguredAgent(prefs.agents);
+      const integrationConfigured = integrations.some((cfg) => {
+        if (cfg.provider === 'playbook') return false;
+        return cfg.has_secret === true;
+      });
+      setSetupChecklist({ sprintSelected, agentConfigured, integrationConfigured });
+    }).catch(() => {
+      setSetupChecklist(null);
+    });
     const iv = setInterval(() => {
       apiFetch<TaskItem[]>('/tasks').then(setTasks).catch(() => {});
       apiFetch<MemoryStatus>('/memory/status').then(setMemory).catch(() => {});
@@ -144,6 +187,32 @@ export default function DashboardOverview() {
     .filter((t) => t.status === 'queued' && typeof t.estimated_start_sec === 'number')
     .sort((a, b) => (a.estimated_start_sec ?? 0) - (b.estimated_start_sec ?? 0))
     .slice(0, 4);
+  const setupItems = [
+    {
+      key: 'sprint',
+      done: setupChecklist?.sprintSelected ?? true,
+      href: '/dashboard/sprints',
+      title: t('dashboard.setup.sprint.title'),
+      desc: t('dashboard.setup.sprint.desc'),
+    },
+    {
+      key: 'agent',
+      done: setupChecklist?.agentConfigured ?? true,
+      href: '/dashboard/agents',
+      title: t('dashboard.setup.agent.title'),
+      desc: t('dashboard.setup.agent.desc'),
+    },
+    {
+      key: 'integration',
+      done: setupChecklist?.integrationConfigured ?? true,
+      href: '/dashboard/integrations',
+      title: t('dashboard.setup.integration.title'),
+      desc: t('dashboard.setup.integration.desc'),
+    },
+  ];
+  const setupPending = setupItems.filter((item) => !item.done);
+  const setupDoneCount = setupItems.length - setupPending.length;
+  const setupAllDone = setupPending.length === 0;
 
   const kpis = [
     { label: t('dashboard.kpi.totalTasks'), value: tasks.length, color: '#5eead4', icon: '◈' },
@@ -193,6 +262,85 @@ export default function DashboardOverview() {
           )}
         </div>
       </div>
+
+      {/* Quota Usage Bars */}
+      {setupChecklist && (
+        <div style={{
+          borderRadius: 16,
+          border: setupAllDone ? '1px solid rgba(34,197,94,0.35)' : '1px solid rgba(245,158,11,0.35)',
+          background: setupAllDone
+            ? 'linear-gradient(180deg, rgba(34,197,94,0.12), rgba(34,197,94,0.04))'
+            : 'linear-gradient(180deg, rgba(245,158,11,0.12), rgba(245,158,11,0.04))',
+          padding: 16,
+          display: 'grid',
+          gap: 12,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.7, textTransform: 'uppercase', color: setupAllDone ? '#22c55e' : '#fbbf24' }}>
+                {t('dashboard.setup.title')}
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--ink-78)', marginTop: 4 }}>
+                {t('dashboard.setup.subtitle')}
+              </div>
+            </div>
+            <span style={{
+              fontSize: 11,
+              fontWeight: 800,
+              color: setupAllDone ? '#22c55e' : '#f59e0b',
+              background: setupAllDone ? 'rgba(34,197,94,0.18)' : 'rgba(245,158,11,0.18)',
+              border: setupAllDone ? '1px solid rgba(34,197,94,0.4)' : '1px solid rgba(245,158,11,0.4)',
+              borderRadius: 999,
+              padding: '4px 10px',
+              whiteSpace: 'nowrap',
+            }}>
+              {t('dashboard.setup.progress', { done: setupDoneCount, total: setupItems.length })}
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10 }}>
+            {setupItems.map((item) => (
+              <div key={item.key} style={{
+                borderRadius: 12,
+                border: '1px solid var(--panel-border-2)',
+                background: 'var(--panel)',
+                padding: 12,
+                display: 'grid',
+                gap: 8,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <div style={{ fontSize: 13, color: 'var(--ink-90)', fontWeight: 700 }}>
+                    {item.title}
+                  </div>
+                  <span style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: item.done ? '#22c55e' : '#f59e0b',
+                    background: item.done ? 'rgba(34,197,94,0.13)' : 'rgba(245,158,11,0.14)',
+                    border: `1px solid ${item.done ? 'rgba(34,197,94,0.35)' : 'rgba(245,158,11,0.35)'}`,
+                    borderRadius: 999,
+                    padding: '2px 8px',
+                  }}>
+                    {item.done ? t('dashboard.setup.done') : t('dashboard.setup.missing')}
+                  </span>
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--ink-42)', minHeight: 34 }}>
+                  {item.desc}
+                </div>
+                {!item.done && (
+                  <Link href={item.href} style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: '#fbbf24',
+                    textDecoration: 'none',
+                  }}>
+                    {t('dashboard.setup.action')} →
+                  </Link>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Quota Usage Bars */}
       {quota && (
