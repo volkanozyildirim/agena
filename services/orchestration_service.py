@@ -359,6 +359,7 @@ class OrchestrationService:
                         )
                         agents_md_source = 'fallback:full_scan'
                     if not agents_md_content:
+                        # Use remote repo context or flow context as fallback
                         agents_md_content = flow_state.get('context_summary', '')
                         agents_md_source = 'fallback:flow_context'
 
@@ -457,9 +458,12 @@ class OrchestrationService:
                                 task_description_for_ai,
                             )
 
-                    if not plan_files:
+                    if not plan_files and repo_root:
                         raise RuntimeError('AI planner returned no repository files. Aborting before code generation.')
-                    if total_read == 0:
+                    if not plan_files and not repo_root:
+                        # Remote repo mode: context already provided via flow_state, skip file reading
+                        plan_files = []
+                    if total_read == 0 and repo_root:
                         raise RuntimeError(
                             'AI planner selected repository files that could not be read from disk. '
                             f'Aborting before code generation. Missing files: {missing_files[:10]}'
