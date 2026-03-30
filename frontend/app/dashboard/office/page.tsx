@@ -876,7 +876,7 @@ export default function OfficePage() {
     return () => window.removeEventListener('message', handler);
   }, [saveLayoutToDB]);
 
-  // After iframe loads, restore layout from DB
+  // After iframe loads, restore layout from DB and set initial zoom
   useEffect(() => {
     if (!iframeLoaded) return;
     const timer = setTimeout(async () => {
@@ -889,6 +889,20 @@ export default function OfficePage() {
           );
         }
       } catch { /* silent */ }
+      // Click zoom+ buttons to reach target zoom (3x desktop, 4x mobile)
+      try {
+        const iframeDoc = iframeRef.current?.contentDocument;
+        if (!iframeDoc) return;
+        const isMobile = window.innerWidth <= 768;
+        const clicks = isMobile ? 3 : 2; // default is ~1x, each click +1x
+        const zoomIn = iframeDoc.querySelectorAll('button');
+        const btn = Array.from(zoomIn).find(b => b.textContent?.trim() === '+');
+        if (btn) {
+          for (let i = 0; i < clicks; i++) {
+            setTimeout(() => btn.click(), i * 150);
+          }
+        }
+      } catch { /* cross-origin or not ready */ }
     }, 1500);
     return () => clearTimeout(timer);
   }, [iframeLoaded]);
