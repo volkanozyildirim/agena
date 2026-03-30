@@ -796,6 +796,22 @@ export default function SprintsPage() {
             {t('tasks.source.jira')}
           </button>
         )}
+        <Link
+          href='/dashboard/sprint-performance'
+          style={{
+            marginLeft: 'auto',
+            padding: '6px 12px',
+            borderRadius: 999,
+            border: '1px solid rgba(94,234,212,0.45)',
+            background: 'rgba(94,234,212,0.12)',
+            color: '#5eead4',
+            fontSize: 12,
+            fontWeight: 700,
+            textDecoration: 'none',
+          }}
+        >
+          {t('nav.sprintPerformance')}
+        </Link>
       </div>
 
       {/* Selectors */}

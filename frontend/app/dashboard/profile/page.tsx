@@ -73,7 +73,17 @@ export default function ProfilePage() {
   useEffect(() => {
     apiFetch<MeRes>('/auth/me').then(setUser).catch(() => {});
     apiFetch<Opt[]>('/tasks/azure/projects').then(setProjects).catch(() => {});
-    apiFetch<Opt[]>('/tasks/jira/projects').then(setJiraProjects).catch(() => {});
+    apiFetch<Array<{ provider: string; has_secret?: boolean; base_url?: string | null; username?: string | null }>>('/integrations')
+      .then((integrations) => {
+        const jiraCfg = integrations.find((cfg) => cfg.provider === 'jira');
+        const jiraConnected = Boolean(jiraCfg && (jiraCfg.has_secret || (jiraCfg.base_url || '').trim() || (jiraCfg.username || '').trim()));
+        if (!jiraConnected) {
+          setJiraProjects([]);
+          return;
+        }
+        apiFetch<Opt[]>('/tasks/jira/projects').then(setJiraProjects).catch(() => {});
+      })
+      .catch(() => {});
 
     loadPrefs().then(async (prefs) => {
       const p = prefs.azure_project || '';

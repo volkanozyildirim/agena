@@ -183,112 +183,114 @@ function StepIntegration({ onNext, onSkip }: { onNext: () => void; onSkip: () =>
         ))}
       </div>
 
-      {/* Azure form */}
-      {provider === 'azure' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div>
-            <label style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, marginBottom: 4, display: 'block' }}>
-              {t('onboarding.integration.orgUrl')}
-            </label>
-            <input
-              style={inputStyle}
-              placeholder={t('onboarding.integration.orgUrlPlaceholder')}
-              value={azureOrg}
-              onChange={(e) => setAzureOrg(e.target.value)}
-            />
+      <form onSubmit={(e) => { e.preventDefault(); void handleSave(); }}>
+        {/* Azure form */}
+        {provider === 'azure' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, marginBottom: 4, display: 'block' }}>
+                {t('onboarding.integration.orgUrl')}
+              </label>
+              <input
+                style={inputStyle}
+                placeholder={t('onboarding.integration.orgUrlPlaceholder')}
+                value={azureOrg}
+                onChange={(e) => setAzureOrg(e.target.value)}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, marginBottom: 4, display: 'block' }}>
+                {t('onboarding.integration.project')}
+              </label>
+              <input
+                style={inputStyle}
+                placeholder={t('onboarding.integration.projectPlaceholder')}
+                value={azureProject}
+                onChange={(e) => setAzureProject(e.target.value)}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, marginBottom: 4, display: 'block' }}>
+                {t('onboarding.integration.pat')}
+              </label>
+              <input
+                style={inputStyle}
+                type="password"
+                placeholder={t('onboarding.integration.patPlaceholder')}
+                value={azurePat}
+                onChange={(e) => setAzurePat(e.target.value)}
+              />
+            </div>
           </div>
-          <div>
-            <label style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, marginBottom: 4, display: 'block' }}>
-              {t('onboarding.integration.project')}
-            </label>
-            <input
-              style={inputStyle}
-              placeholder={t('onboarding.integration.projectPlaceholder')}
-              value={azureProject}
-              onChange={(e) => setAzureProject(e.target.value)}
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, marginBottom: 4, display: 'block' }}>
-              {t('onboarding.integration.pat')}
-            </label>
-            <input
-              style={inputStyle}
-              type="password"
-              placeholder={t('onboarding.integration.patPlaceholder')}
-              value={azurePat}
-              onChange={(e) => setAzurePat(e.target.value)}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Jira form */}
-      {provider === 'jira' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div>
-            <label style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, marginBottom: 4, display: 'block' }}>
-              {t('onboarding.integration.jiraUrl')}
-            </label>
-            <input
-              style={inputStyle}
-              placeholder={t('onboarding.integration.jiraUrlPlaceholder')}
-              value={jiraUrl}
-              onChange={(e) => setJiraUrl(e.target.value)}
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, marginBottom: 4, display: 'block' }}>
-              {t('onboarding.integration.jiraEmail')}
-            </label>
-            <input
-              style={inputStyle}
-              type="email"
-              placeholder={t('onboarding.integration.jiraEmailPlaceholder')}
-              value={jiraEmail}
-              onChange={(e) => setJiraEmail(e.target.value)}
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, marginBottom: 4, display: 'block' }}>
-              {t('onboarding.integration.jiraToken')}
-            </label>
-            <input
-              style={inputStyle}
-              type="password"
-              placeholder={t('onboarding.integration.jiraTokenPlaceholder')}
-              value={jiraToken}
-              onChange={(e) => setJiraToken(e.target.value)}
-            />
-          </div>
-        </div>
-      )}
-
-      {error && (
-        <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 8, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', fontSize: 13 }}>
-          {error}
-        </div>
-      )}
-      {success && (
-        <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 8, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', color: '#22c55e', fontSize: 13 }}>
-          {success}
-        </div>
-      )}
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 28 }}>
-        <button onClick={onSkip} style={btnSecondary}>
-          {t('onboarding.integration.skip')}
-        </button>
-        {provider && (
-          <button
-            onClick={handleSave}
-            disabled={!canSave || saving}
-            style={{ ...btnPrimary, opacity: !canSave || saving ? 0.5 : 1 }}
-          >
-            {saving ? t('onboarding.integration.saving') : t('onboarding.integration.save')}
-          </button>
         )}
-      </div>
+
+        {/* Jira form */}
+        {provider === 'jira' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, marginBottom: 4, display: 'block' }}>
+                {t('onboarding.integration.jiraUrl')}
+              </label>
+              <input
+                style={inputStyle}
+                placeholder={t('onboarding.integration.jiraUrlPlaceholder')}
+                value={jiraUrl}
+                onChange={(e) => setJiraUrl(e.target.value)}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, marginBottom: 4, display: 'block' }}>
+                {t('onboarding.integration.jiraEmail')}
+              </label>
+              <input
+                style={inputStyle}
+                type="email"
+                placeholder={t('onboarding.integration.jiraEmailPlaceholder')}
+                value={jiraEmail}
+                onChange={(e) => setJiraEmail(e.target.value)}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, marginBottom: 4, display: 'block' }}>
+                {t('onboarding.integration.jiraToken')}
+              </label>
+              <input
+                style={inputStyle}
+                type="password"
+                placeholder={t('onboarding.integration.jiraTokenPlaceholder')}
+                value={jiraToken}
+                onChange={(e) => setJiraToken(e.target.value)}
+              />
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 8, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', fontSize: 13 }}>
+            {error}
+          </div>
+        )}
+        {success && (
+          <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 8, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', color: '#22c55e', fontSize: 13 }}>
+            {success}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 28 }}>
+          <button type='button' onClick={onSkip} style={btnSecondary}>
+            {t('onboarding.integration.skip')}
+          </button>
+          {provider && (
+            <button
+              type='submit'
+              disabled={!canSave || saving}
+              style={{ ...btnPrimary, opacity: !canSave || saving ? 0.5 : 1 }}
+            >
+              {saving ? t('onboarding.integration.saving') : t('onboarding.integration.save')}
+            </button>
+          )}
+        </div>
+      </form>
     </div>
   );
 }

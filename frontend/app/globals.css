@@ -88,7 +88,7 @@ html.light {
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; overflow-x: hidden; }
 
 body {
   background: var(--bg);
@@ -166,6 +166,42 @@ body::before {
   50% { opacity: 0.4; }
 }
 
+/* ─── NAVBAR MOBILE ─── */
+.navbar-mobile-controls {
+  display: none;
+  align-items: center;
+  gap: 6px;
+}
+
+.navbar-hamburger {
+  background: none;
+  border: 1px solid var(--panel-border-2);
+  border-radius: 8px;
+  padding: 6px;
+  color: var(--ink-75);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.navbar-mobile-menu {
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--panel-border-2);
+  background: rgba(3, 7, 18, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+@media (max-width: 768px) {
+  .navbar-desktop { display: none !important; }
+  .navbar-mobile-controls { display: flex; }
+  .navbar-mobile-menu { display: flex; }
+}
+
 /* ─── CHIP ─── */
 .chip {
   display: inline-flex;
@@ -236,8 +272,6 @@ body::before {
 
 /* ─── LANDING GRID ─── */
 .landing-grid {
-  display: grid;
-  gap: 0;
   padding-top: 72px;
 }
 
@@ -255,7 +289,7 @@ body::before {
 /* ─── FLOW SHOWCASE ─── */
 .flow-showcase {
   display: grid;
-  grid-template-columns: minmax(320px, 1.1fr) minmax(320px, 1fr);
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
   gap: 18px;
   align-items: stretch;
 }
@@ -1877,15 +1911,31 @@ input:focus, textarea:focus {
 
 /* ─── RESPONSIVE ─── */
 @media (max-width: 768px) {
+  /* ── All grids → single column ── */
   .hero-layout, .steps-grid, .feature-grid, .grid-2, .grid-3, .split-panel, .pricing-grid {
     grid-template-columns: 1fr;
   }
   .flow-showcase {
     grid-template-columns: 1fr;
   }
-  .widget-grid, .widget-metrics, .capability-grid, .release-grid {
+  .flow-showcase-image-wrap {
+    min-height: 200px;
+  }
+  .flow-showcase-image {
+    min-height: 200px;
+  }
+  .widget-grid, .capability-grid, .release-grid {
     grid-template-columns: 1fr;
   }
+  .widget-metrics {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .metric-pill {
+    padding: 6px 8px;
+  }
+  .metric-pill span { font-size: 9px; }
+  .metric-pill strong { font-size: 11px; }
   .capability-mosaic {
     grid-template-columns: 1fr;
   }
@@ -1903,12 +1953,102 @@ input:focus, textarea:focus {
   .cap-visual-guard {
     width: 100%;
   }
+  .cap-story-content,
+  .cap-guard-content {
+    min-width: 0;
+  }
   .vector-grid {
     grid-template-columns: 1fr;
   }
   .stats-bar { grid-template-columns: repeat(2, 1fr); }
+  .stat-number { font-size: 32px; }
+  .stat-item { padding: 20px 14px; }
   .steps-grid::before { display: none; }
+
+  /* ── Hero ── */
   .hero-layout { min-height: auto; padding: 60px 0 40px; }
+  .hero-shell h1 { word-break: break-word; }
+  .hero-shell p { font-size: 15px !important; max-width: 100% !important; }
+  .spotlight-container .orb { display: none; }
+
+  /* ── Mock panel / terminal ── */
+  .mock-panel { padding: 16px; }
+  .mock-chart { min-height: 100px; }
+
+  /* ── Container / layout ── */
+  .container { width: min(1200px, 94%); }
+  .landing-grid { padding-top: 64px; }
+
+  /* ── Inline grid overrides ── */
+  .patron-grid-mobile { grid-template-columns: 1fr !important; }
+  .chatops-points-mobile { grid-template-columns: 1fr !important; }
+
+  /* ── Sections padding ── */
+  .section-wrapper { padding: 40px 0; }
+  .cta-section { padding: 40px 16px !important; }
+
+  /* ── Cards ── */
+  .widget-card { padding: 16px; }
+  .widget-title { font-size: 17px; }
+  .release-card { padding: 12px; }
+  .release-title { font-size: 14px; }
+  .release-desc { font-size: 12px; min-height: auto; }
+  .feature-box { padding: 18px; }
+
+  /* ── Capabilities ── */
+  .cap-hero, .cap-side, .cap-wide { padding: 14px; }
+  .cap-hero h3 { font-size: 18px; }
+  .cap-side h4, .cap-wide h4 { font-size: 16px; }
+  .cap-visual-dep { flex-wrap: wrap; gap: 6px; }
+  .dep-node { font-size: 10px; min-width: 40px; padding: 4px 8px; }
+  .dep-line { min-width: 16px; }
+  .cap-risk-wrap { grid-template-columns: auto 1fr; gap: 8px; }
+  .cap-risk-gauge { width: 48px; height: 48px; }
+  .cap-risk-gauge::after { width: 34px; height: 34px; }
+  .cap-guardrail-row { grid-template-columns: 70px 1fr; gap: 6px; }
+
+  /* ── Timeline mini ── */
+  .timeline-mini { flex-direction: column; gap: 8px; }
+  .timeline-mini span { white-space: normal; font-size: 11px; }
+
+  /* ── Vector cards ── */
+  .vector-card { padding: 14px; }
+  .vector-card-title { font-size: 16px; }
+  .vector-field-row code { font-size: 10px; }
+
+  /* ── Pricing ── */
+  .pricing-grid { max-width: 100%; gap: 14px; }
+
+  /* ── Integration marquee ── */
+  .flow-showcase-content { padding: 16px; }
+
+  /* ── All images responsive ── */
+  img { max-width: 100%; height: auto; }
+}
+
+@media (max-width: 480px) {
+  .stats-bar { grid-template-columns: 1fr; }
+  .stat-number { font-size: 28px; }
+  .stat-item { padding: 16px 12px; }
+  .hero-layout { padding: 40px 0 24px; }
+  .hero-shell h1 { font-size: 28px !important; }
+  .mock-panel { padding: 12px; border-radius: 16px; }
+  .feature-box { padding: 14px; }
+  .step-card { padding: 14px; }
+  .step-number { width: 48px; height: 48px; font-size: 18px; }
+  .widget-card { padding: 14px; }
+  .widget-title { font-size: 15px; }
+  .widget-metrics { grid-template-columns: 1fr; }
+  .release-grid { gap: 10px; }
+  .cta-section { padding: 32px 12px !important; }
+  .cta-section h2 { font-size: 24px !important; }
+  .cta-section p { font-size: 14px !important; }
+  .cap-hero h3 { font-size: 16px; }
+  .cap-side h4, .cap-wide h4 { font-size: 14px; }
+  .capability-badge { font-size: 9px; padding: 3px 8px; }
+  .section-label { font-size: 11px; letter-spacing: 1.5px; }
+  .flow-word { font-size: 20px !important; }
+  .chip { font-size: 11px; padding: 4px 10px; }
 }
 
 /* ─── LIGHT MODE OVERRIDES ─── */
@@ -1928,6 +2068,16 @@ html.light .navbar-shell .chip {
   border-color: rgba(13,148,136,0.28);
   background: rgba(13,148,136,0.12);
   color: #0f766e;
+}
+
+html.light .navbar-mobile-menu {
+  background: rgba(255, 255, 255, 0.97);
+  border-top-color: rgba(15,23,42,0.1);
+}
+
+html.light .navbar-hamburger {
+  border-color: rgba(15,23,42,0.15);
+  color: rgba(15,23,42,0.7);
 }
 
 html.light .gradient-text {

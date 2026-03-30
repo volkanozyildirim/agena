@@ -24,6 +24,7 @@ const PRIMARY_NAV_KEYS: NavItem[] = [
   { href: '/dashboard/office', key: 'nav.office', icon: '🏢' },
   { href: '/dashboard/tasks', key: 'nav.tasks', icon: '✅', permission: 'tasks:read' as const },
   { href: '/dashboard/sprints', key: 'nav.sprints', icon: '🗂', permission: 'tasks:read' as const },
+  { href: '/dashboard/sprint-performance', key: 'nav.sprintPerformance', icon: '📈', permission: 'tasks:read' as const },
   { href: '/dashboard/refinement', key: 'nav.refinement', icon: '🧪', permission: 'tasks:read' as const },
   { href: '/dashboard/team', key: 'nav.team', icon: '👥', permission: 'team:manage' as const },
   { href: '/dashboard/agents', key: 'nav.agents', icon: '🤖' },
@@ -73,6 +74,25 @@ function DashboardInner({ children }: { children: ReactNode }) {
   const shouldOpenOnboarding = searchParams.get('onboarding') === '1' || searchParams.get('welcome') === '1';
   const lastUnreadRef = useRef<number | null>(null);
   const sidebarWidth = sidebarCollapsed ? 76 : 220;
+  const navTooltipMap: Record<string, Parameters<typeof t>[0]> = {
+    'nav.overview': 'tooltip.nav.overview',
+    'nav.office': 'tooltip.nav.office',
+    'nav.tasks': 'tooltip.nav.tasks',
+    'nav.sprints': 'tooltip.nav.sprints',
+    'nav.sprintPerformance': 'tooltip.nav.sprintPerformance',
+    'nav.refinement': 'tooltip.nav.refinement',
+    'nav.team': 'tooltip.nav.team',
+    'nav.agents': 'tooltip.nav.agents',
+    'nav.flows': 'tooltip.nav.flows',
+    'nav.templates': 'tooltip.nav.templates',
+    'nav.mappings': 'tooltip.nav.mappings',
+    'nav.integrations': 'tooltip.nav.integrations',
+    'nav.permissions': 'tooltip.nav.permissions',
+    'nav.notifications': 'tooltip.nav.notifications',
+    'nav.usage': 'tooltip.nav.usage',
+    'nav.profile': 'tooltip.nav.profile',
+  };
+  const navTooltip = (key: string) => t((navTooltipMap[key] || key) as Parameters<typeof t>[0]);
 
   // Clear task badges when visiting tasks page
   useEffect(() => {
@@ -372,7 +392,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
         </button>
         {/* User info */}
         {userName && (
-          <a href="/dashboard/profile" title={userName}
+          <a href="/dashboard/profile" title={`${t('tooltip.action.openProfile')} · ${userName}`}
             style={{ textDecoration: 'none', padding: sidebarCollapsed ? '8px 6px' : '10px 12px', marginBottom: 16, borderRadius: 12, background: 'var(--glass)', border: '1px solid var(--panel-border)', display: 'block', transition: 'border-color 0.2s' }}
             onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(139,92,246,0.3)'; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.borderColor = 'var(--panel-border)'; }}
@@ -403,7 +423,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
           </div>
         )}
         {sidebarCollapsed && orgSlug && (
-          <div title={`${orgNameDisplay || orgSlug} (${orgSlug}.agena.app)`} style={{ textAlign: 'center', marginBottom: 8, fontSize: 14, fontWeight: 800, color: 'var(--nav-active)' }}>
+          <div title={`${t('tooltip.action.workspaceSlug')}: ${orgNameDisplay || orgSlug} (${orgSlug}.agena.app)`} style={{ textAlign: 'center', marginBottom: 8, fontSize: 14, fontWeight: 800, color: 'var(--nav-active)' }}>
             {(orgNameDisplay || orgSlug)[0]?.toUpperCase()}
           </div>
         )}
@@ -421,7 +441,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
                 <div key={item.href}>
                   <button
                     onClick={() => setExpandedNav(isExpanded && !sectionActive ? null : item.key)}
-                    title={t(item.key as Parameters<typeof t>[0])}
+                    title={navTooltip(item.key)}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10, width: '100%',
                       padding: sidebarCollapsed ? '9px 10px' : '9px 12px', borderRadius: 10, fontSize: 14,
@@ -443,7 +463,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
                           ? pathname === '/dashboard/dora'
                           : pathname.startsWith(child.href);
                         return (
-                          <Link key={child.key} href={child.href} title={t(child.key as Parameters<typeof t>[0])} style={{
+                          <Link key={child.key} href={child.href} title={navTooltip(child.key)} style={{
                             display: 'flex', alignItems: 'center', gap: 8,
                             padding: '7px 10px', borderRadius: 8, fontSize: 13,
                             fontWeight: childActive ? 600 : 400,
@@ -465,7 +485,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
             }
             const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
             return (
-              <Link key={item.href} href={item.href} title={t(item.key as Parameters<typeof t>[0])} style={{
+              <Link key={item.href} href={item.href} title={navTooltip(item.key)} style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: sidebarCollapsed ? '9px 10px' : '9px 12px', borderRadius: 10, fontSize: 14,
                 fontWeight: active ? 600 : 400,
@@ -504,7 +524,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
             const hasUnread = isNotificationItem && unreadCount > 0;
             const itemColor = hasUnread ? '#ef4444' : (active ? 'var(--nav-active)' : 'var(--muted)');
             return (
-              <Link key={item.href} href={item.href} title={t(item.key)} style={{
+              <Link key={item.href} href={item.href} title={navTooltip(item.key)} style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: sidebarCollapsed ? '9px 10px' : '9px 12px', borderRadius: 10, fontSize: 14,
                 fontWeight: active ? 600 : 400,
@@ -547,7 +567,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
           </div>
           <button
             onClick={openNotifications}
-            title={t('notifications.section')}
+            title={t('tooltip.action.openNotifications')}
             style={{
               display: 'flex', alignItems: 'center', gap: 8,
               justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
@@ -586,10 +606,11 @@ function DashboardInner({ children }: { children: ReactNode }) {
             <div style={{ border: '1px solid var(--border)', background: 'var(--surface)', borderRadius: 12, padding: 10, display: 'grid', gap: 8, maxHeight: 250, overflow: 'auto' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 12, color: 'var(--ink)', fontWeight: 700 }}>{t('notifications.recent')}</span>
-                <button onClick={() => void markAllReadAndRefresh()} style={{ border: 'none', background: 'transparent', color: 'var(--nav-active)', fontSize: 11, cursor: 'pointer' }}>{t('notifications.markAllRead')}</button>
+                <button title={t('tooltip.action.markAllRead')} onClick={() => void markAllReadAndRefresh()} style={{ border: 'none', background: 'transparent', color: 'var(--nav-active)', fontSize: 11, cursor: 'pointer' }}>{t('notifications.markAllRead')}</button>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
                 <button
+                  title={t('tooltip.action.filterAllNotifications')}
                   onClick={() => setNotifFilter('all')}
                   style={{
                     border: '1px solid rgba(57,255,136,0.35)',
@@ -604,6 +625,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
                   {t('notifications.all')}
                 </button>
                 <button
+                  title={t('tooltip.action.filterFailedNotifications')}
                   onClick={() => setNotifFilter('failed')}
                   style={{
                     border: '1px solid rgba(239,68,68,0.35)',
@@ -628,6 +650,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
                 <Link
                   key={n.id}
                   href={n.task_id ? `/tasks/${n.task_id}` : '/dashboard/tasks'}
+                  title={t('tooltip.action.openNotification')}
                   onClick={() => {
                     if (n.is_read) return;
                     // Optimistic single-read update for instant badge response.
@@ -646,14 +669,14 @@ function DashboardInner({ children }: { children: ReactNode }) {
                   <div style={{ fontSize: 10, color: 'var(--muted)' }}>{new Date(n.created_at).toLocaleString()}</div>
                 </Link>
               ))}
-              <Link href='/dashboard/notifications' style={{ textDecoration: 'none', textAlign: 'center', padding: '7px 8px', borderRadius: 8, border: '1px solid var(--panel-border-3)', color: '#39ff88', fontSize: 12, fontWeight: 700 }}>
+              <Link href='/dashboard/notifications' title={t('tooltip.nav.notifications')} style={{ textDecoration: 'none', textAlign: 'center', padding: '7px 8px', borderRadius: 8, border: '1px solid var(--panel-border-3)', color: '#39ff88', fontSize: 12, fontWeight: 700 }}>
                 {t('notifications.viewAll')}
               </Link>
             </div>
           )}
           <button
             onClick={() => void toggleBrowserNotifications()}
-            title={t('notifications.browserTitle')}
+            title={t('tooltip.action.toggleBrowserNotifications')}
             style={{
               display: 'flex', alignItems: 'center', gap: 8,
               justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
@@ -666,7 +689,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
           >
             {sidebarCollapsed ? '🔔' : (webPushEnabled ? t('notifications.browserOn') : t('notifications.browserOff'))}
           </button>
-          <button onClick={logout} title={t('nav.logout')} style={{
+          <button onClick={logout} title={t('tooltip.action.logout')} style={{
             display: 'flex', alignItems: 'center', gap: 8,
             justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
             padding: sidebarCollapsed ? '8px 8px' : '8px 12px', borderRadius: 10, fontSize: 13,
