@@ -29,6 +29,9 @@ type ExternalTask = {
   story_points?: number | null;
   effort?: number | null;
   work_item_type?: string | null;
+  refined_before?: boolean;
+  refinement_count?: number;
+  last_refined_at?: string | null;
 };
 
 type RefinementItemsResponse = {
@@ -949,6 +952,11 @@ export default function RefinementPage() {
                       </td>
                       <td style={{ ...tdStyle, minWidth: 360 }}>
                         <div style={{ fontWeight: 600, color: 'var(--ink-90)' }}>{item.title}</div>
+                        {item.refined_before && (
+                          <div style={{ fontSize: 12, color: '#fde68a', marginTop: 4 }}>
+                            Daha once yorumlandi ({item.refinement_count || 1})
+                          </div>
+                        )}
                         {item.assigned_to && <div style={{ fontSize: 12, color: 'var(--ink-35)', marginTop: 4 }}>{item.assigned_to}</div>}
                       </td>
                     </tr>

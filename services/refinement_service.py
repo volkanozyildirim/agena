@@ -18,6 +18,7 @@ from core.settings import get_settings
 from integrations.azure_client import AzureDevOpsClient
 from integrations.jira_client import JiraClient
 from models.user_preference import UserPreference
+from models.refinement_record import RefinementRecord
 from schemas.refinement import (
     RefinementAnalyzeRequest,
     RefinementAnalyzeResponse,
@@ -82,6 +83,18 @@ class RefinementService:
             board_id=board_id,
             sprint_id=sprint_id,
         )
+        history_map = await self._load_item_history_map(
+            organization_id=organization_id,
+            provider=provider_key,
+            item_ids=[item.id for item in items],
+        )
+        for item in items:
+            hist = history_map.get(item.id, {})
+            item.refined_before = bool(hist.get('refinement_count', 0))
+            item.refinement_count = int(hist.get('refinement_count', 0))
+            item.last_refined_at = hist.get('last_refined_at')
+            item.last_refinement_comment = hist.get('last_refinement_comment')
+            item.last_suggested_story_points = hist.get('last_suggested_story_points')
         pointed = sum(1 for item in items if self._has_estimate(item))
         return RefinementItemsResponse(
             provider=provider_key,  # type: ignore[arg-type]
@@ -207,6 +220,14 @@ class RefinementService:
                 'language': request.language,
             },
         )
+        await self._save_analysis_history(
+            organization_id=organization_id,
+            user_id=user_id,
+            provider=request.provider,
+            sprint_ref=items_response.sprint_ref,
+            sprint_name=items_response.sprint_name,
+            results=results,
+        )
 
         return RefinementAnalyzeResponse(
             provider=request.provider,
@@ -257,6 +278,19 @@ class RefinementService:
                     results.append(RefinementWritebackResult(item_id=item.item_id, success=True, message='ok'))
                 except Exception as exc:
                     results.append(RefinementWritebackResult(item_id=item.item_id, success=False, message=str(exc)[:220]))
+                await self._save_writeback_history(
+                    organization_id=organization_id,
+                    user_id=None,
+                    provider='azure',
+                    sprint_ref=request.sprint_path or request.sprint_name or '',
+                    sprint_name=request.sprint_name or '',
+                    item_id=item.item_id,
+                    suggested_story_points=int(item.suggested_story_points or 0),
+                    comment=comment,
+                    signature=signature,
+                    success=results[-1].success,
+                    error_message=results[-1].message if not results[-1].success else '',
+                )
         elif provider == 'jira':
             config = await self.integration_service.get_config(organization_id, 'jira')
             if config is None or not config.secret:
@@ -279,6 +313,19 @@ class RefinementService:
                     results.append(RefinementWritebackResult(item_id=item.item_id, success=True, message='ok'))
                 except Exception as exc:
                     results.append(RefinementWritebackResult(item_id=item.item_id, success=False, message=str(exc)[:220]))
+                await self._save_writeback_history(
+                    organization_id=organization_id,
+                    user_id=None,
+                    provider='jira',
+                    sprint_ref=request.sprint_id or request.sprint_name or '',
+                    sprint_name=request.sprint_name or '',
+                    item_id=item.item_id,
+                    suggested_story_points=int(item.suggested_story_points or 0),
+                    comment=comment,
+                    signature=signature,
+                    success=results[-1].success,
+                    error_message=results[-1].message if not results[-1].success else '',
+                )
         else:
             raise ValueError(f'Unsupported provider: {request.provider}')
 
@@ -630,3 +677,105 @@ class RefinementService:
         if not sig:
             return body
         return f'[{sig}] {body}'
+
+    async def _load_item_history_map(
+        self,
+        *,
+        organization_id: int,
+        provider: str,
+        item_ids: list[str],
+    ) -> dict[str, dict[str, Any]]:
+        ids = [str(item_id).strip() for item_id in item_ids if str(item_id).strip()]
+        if not ids:
+            return {}
+        result = await self.db.execute(
+            select(RefinementRecord)
+            .where(
+                RefinementRecord.organization_id == organization_id,
+                RefinementRecord.provider == provider,
+                RefinementRecord.external_item_id.in_(ids),
+            )
+            .order_by(RefinementRecord.created_at.desc())
+        )
+        rows = result.scalars().all()
+        history: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            current = history.setdefault(
+                row.external_item_id,
+                {
+                    'refinement_count': 0,
+                    'last_refined_at': None,
+                    'last_refinement_comment': None,
+                    'last_suggested_story_points': None,
+                },
+            )
+            current['refinement_count'] += 1
+            if current['last_refined_at'] is None:
+                current['last_refined_at'] = row.created_at.isoformat() if row.created_at else None
+                current['last_refinement_comment'] = row.comment
+                current['last_suggested_story_points'] = float(row.suggested_story_points) if row.suggested_story_points is not None else None
+        return history
+
+    async def _save_analysis_history(
+        self,
+        *,
+        organization_id: int,
+        user_id: int,
+        provider: str,
+        sprint_ref: str,
+        sprint_name: str,
+        results: list[RefinementSuggestion],
+    ) -> None:
+        for row in results:
+            record = RefinementRecord(
+                organization_id=organization_id,
+                user_id=user_id,
+                provider=provider,
+                external_item_id=row.item_id,
+                sprint_ref=sprint_ref or None,
+                sprint_name=sprint_name or None,
+                item_title=row.title,
+                item_url=row.item_url,
+                phase='analysis',
+                status='failed' if row.error else 'completed',
+                suggested_story_points=row.suggested_story_points,
+                confidence=row.confidence,
+                summary=row.summary,
+                estimation_rationale=row.estimation_rationale,
+                comment=row.comment,
+                error_message=row.error,
+            )
+            self.db.add(record)
+        await self.db.commit()
+
+    async def _save_writeback_history(
+        self,
+        *,
+        organization_id: int,
+        user_id: int | None,
+        provider: str,
+        sprint_ref: str,
+        sprint_name: str,
+        item_id: str,
+        suggested_story_points: int,
+        comment: str,
+        signature: str,
+        success: bool,
+        error_message: str,
+    ) -> None:
+        record = RefinementRecord(
+            organization_id=organization_id,
+            user_id=user_id,
+            provider=provider,
+            external_item_id=item_id,
+            sprint_ref=sprint_ref or None,
+            sprint_name=sprint_name or None,
+            phase='writeback',
+            status='completed' if success else 'failed',
+            suggested_story_points=suggested_story_points,
+            comment=comment,
+            signature=signature or None,
+            error_message=error_message or None,
+        )
+        self.db.add(record)
+        await self.db.commit()

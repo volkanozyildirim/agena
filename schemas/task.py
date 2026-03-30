@@ -17,6 +17,11 @@ class ExternalTask(BaseModel):
     sprint_name: str | None = None
     sprint_path: str | None = None
     web_url: str | None = None
+    refined_before: bool = False
+    refinement_count: int = 0
+    last_refined_at: str | None = None
+    last_refinement_comment: str | None = None
+    last_suggested_story_points: float | None = None
 
 
 class TaskListResponse(BaseModel):
