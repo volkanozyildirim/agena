@@ -1936,6 +1936,8 @@ input:focus, textarea:focus {
   .flow-canvas-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .flow-top-bar { flex-direction: column !important; align-items: flex-start !important; }
   .flow-tabs { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
+  /* Show connector dots on touch devices */
+  .flow-canvas-area div[title] { opacity: 1 !important; }
 }
 
 /* ─── RESPONSIVE ─── */
