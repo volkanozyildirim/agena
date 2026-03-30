@@ -377,13 +377,13 @@ export default function FlowsPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 104px)', gap: 0 }}>
       {/* Top bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 0 16px', flexShrink: 0 }}>
+      <div className="flow-top-bar" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 0 16px', flexShrink: 0 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="section-label">{t('nav.flows')}</div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)', margin: '4px 0 0' }}>{t('flows.title')}</h1>
         </div>
         {/* Flow tabs */}
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="flow-tabs" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           {flows.map((f) => (
             <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
               <button onClick={() => setActiveFlow(f.id)}
@@ -532,7 +532,7 @@ export default function FlowsPage() {
 
         {/* Run History Panel — overlay olarak açılır, canvas'ı ezmez */}
         {showRuns && (
-          <div style={{ width: 320, flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="flow-run-panel" style={{ width: 320, flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <RunHistoryPanel
               runs={runs}
               loading={runsLoading}
@@ -785,7 +785,7 @@ function FlowCanvas({ flow, onChange }: { flow: Flow; onChange: (f: Flow) => voi
     <div style={{ flex: 1, display: 'flex', gap: 0, minHeight: 0, borderRadius: 20, border: '1px solid var(--border)', overflow: 'hidden', background: 'var(--surface)', position: 'relative', height: '100%' }}>
 
       {/* Left toolbar */}
-      <div style={{ width: 52, flexShrink: 0, borderRight: '1px solid var(--panel-border)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px 0', gap: 8, background: 'var(--panel-alt)' }}>
+      <div className="flow-toolbar-desktop" style={{ width: 52, flexShrink: 0, borderRight: '1px solid var(--panel-border)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '12px 0', gap: 8, background: 'var(--panel-alt)' }}>
         <ToolBtn title={t('flows.toolbarAddNode')} onClick={() => setShowPicker(true)}>+</ToolBtn>
         <div style={{ flex: 1 }} />
         <ToolBtn title={t('flows.toolbarReset')} onClick={() => setCanvasOffset({ x: 0, y: 0 })}>⊙</ToolBtn>

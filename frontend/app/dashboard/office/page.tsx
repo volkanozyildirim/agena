@@ -841,6 +841,7 @@ export default function OfficePage() {
   const [officeAgents, setOfficeAgents] = useState<OfficeAgent[]>([]);
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [viewMode, setViewMode] = useState<'office' | 'split'>('split');
+  const [panelCollapsed, setPanelCollapsed] = useState(false);
   const [assignAgent, setAssignAgent] = useState<OfficeAgent | null>(null);
   const [showAddAgent, setShowAddAgent] = useState(false);
   const [previewTaskId, setPreviewTaskId] = useState<number | null>(null);
@@ -1021,7 +1022,7 @@ export default function OfficePage() {
       </div>
 
       {/* ── Main area ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: viewMode === 'split' ? '1fr 320px' : '1fr', gap: 0, flex: 1, minHeight: 0 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: viewMode === 'split' ? (panelCollapsed ? '1fr 42px' : '1fr 320px') : '1fr', gap: 0, flex: 1, minHeight: 0, transition: 'grid-template-columns 0.2s ease' }}>
         {/* Pixel Office */}
         <div style={{ borderRadius: 16, border: '1px solid var(--panel-border)', overflow: 'hidden', position: 'relative', background: 'var(--surface)' }}>
           {!iframeLoaded && (
@@ -1035,14 +1036,27 @@ export default function OfficePage() {
 
         {/* ── Side panel ── */}
         {viewMode === 'split' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 0, height: '100%', borderLeft: '1px solid var(--panel-border)', background: 'var(--surface)', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0, height: '100%', borderLeft: '1px solid var(--panel-border)', background: 'var(--surface)', overflowY: panelCollapsed ? 'hidden' : 'auto' }}>
 
+            {/* Toggle button */}
+            <button onClick={() => setPanelCollapsed(!panelCollapsed)} style={{
+              padding: panelCollapsed ? '12px 0' : '10px 14px', border: 'none', borderBottom: '1px solid var(--panel-border)',
+              background: 'transparent', cursor: 'pointer', color: 'var(--ink-35)', fontSize: 14,
+              display: 'flex', alignItems: 'center', justifyContent: panelCollapsed ? 'center' : 'space-between', gap: 6,
+            }}>
+              {panelCollapsed ? '◀' : (
+                <>
+                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--ink-25)' }}>
+                    {t('office.teamTitle')} ({officeAgents.length})
+                  </span>
+                  <span>▶</span>
+                </>
+              )}
+            </button>
+
+            {!panelCollapsed && <>
             {/* Agents */}
-            <div style={{ padding: '14px 14px 10px', borderBottom: '1px solid var(--panel-border)' }}>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--ink-25)', marginBottom: 10, display: 'flex', justifyContent: 'space-between' }}>
-                <span>{t('office.teamTitle')}</span>
-                <span style={{ color: 'var(--ink-35)' }}>{officeAgents.length}</span>
-              </div>
+            <div style={{ padding: '10px 14px 10px', borderBottom: '1px solid var(--panel-border)' }}>
               <div style={{ display: 'grid', gap: 4 }}>
                 {officeAgents.map((agent) => {
                   const isActive = agent.status === 'active';
@@ -1137,6 +1151,7 @@ export default function OfficePage() {
                 {t('office.noActiveTasks')}
               </div>
             )}
+            </>}
           </div>
         )}
       </div>

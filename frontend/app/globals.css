@@ -1928,6 +1928,12 @@ input:focus, textarea:focus {
   .dash-grid-responsive {
     grid-template-columns: 1fr !important;
   }
+  /* Flows page responsive */
+  .flow-toolbar-desktop { display: none !important; }
+  .flow-run-panel { position: fixed !important; right: 0; top: 72px; bottom: 0; z-index: 55; width: min(320px, 90vw) !important; }
+  .flow-canvas-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .flow-top-bar { flex-direction: column !important; align-items: flex-start !important; }
+  .flow-tabs { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
 }
 
 /* ─── RESPONSIVE ─── */
