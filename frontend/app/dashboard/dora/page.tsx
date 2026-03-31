@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState, useCallback } from 'react';
-import { apiFetch, fetchDoraOverview, loadPrefs, syncDoraRepo } from '@/lib/api';
+import { apiFetch, fetchDoraOverview, loadPrefs, savePrefs, syncDoraRepo } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
 
 const box: React.CSSProperties = {
@@ -92,9 +92,11 @@ function formatValue(metric: string, value: number | null): string {
   }
 }
 
-type RepoMapping = { id: string; name: string; provider?: string; github_owner?: string; github_repo?: string; azure_project?: string; azure_repo_name?: string };
+type RepoMapping = { id: string; name: string; provider?: string; local_path?: string; github_owner?: string; github_repo?: string; azure_project?: string; azure_repo_url?: string; azure_repo_name?: string; default_branch?: string };
 type SyncStatusItem = { repo_mapping_id: string; commits: number; prs: number; deployments: number; last_sync: string | null };
 type SyncStatus = Record<string, SyncStatusItem>;
+type AzureProject = { id: string; name: string };
+type AzureRepo = { id: string; name: string; remote_url: string; web_url: string };
 
 export default function DoraOverviewPage() {
   const { t } = useLocale();
@@ -107,20 +109,50 @@ export default function DoraOverviewPage() {
   const [syncingRepo, setSyncingRepo] = useState<string | null>(null);
   const [syncingAll, setSyncingAll] = useState(false);
 
-  // Load repos + sync status
+  // Azure project discovery
+  const [projects, setProjects] = useState<AzureProject[]>([]);
+  const [projectRepos, setProjectRepos] = useState<Record<string, AzureRepo[]>>({});
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const [syncedKeys, setSyncedKeys] = useState<Set<string>>(new Set());
+  const [syncingKeys, setSyncingKeys] = useState<Set<string>>(new Set());
+
+  // Load repos + sync status + Azure projects
   useEffect(() => {
     (async () => {
+      let mappings: RepoMapping[] = [];
       try {
         const prefs = await loadPrefs();
-        const mappings = (prefs.repo_mappings || []) as RepoMapping[];
+        mappings = (prefs.repo_mappings || []) as RepoMapping[];
         setRepos(mappings);
       } catch { /* silent */ }
       try {
         const res = await apiFetch<{ repos: SyncStatusItem[] }>('/analytics/dora/sync-status');
         const map: SyncStatus = {};
-        for (const item of res.repos) map[item.repo_mapping_id] = item;
+        const synced = new Set<string>();
+        for (const item of res.repos) {
+          map[item.repo_mapping_id] = item;
+          // Mark repos that have been synced before
+          const mapping = mappings.find((m) => m.id === item.repo_mapping_id);
+          if (mapping && mapping.azure_project && mapping.azure_repo_name && (item.commits > 0 || item.prs > 0)) {
+            synced.add(`${mapping.azure_project}/${mapping.azure_repo_name}`);
+          }
+        }
         setSyncStatus(map);
+        setSyncedKeys(synced);
       } catch { /* silent */ }
+
+      // Discover Azure projects
+      try {
+        const azProjects = await apiFetch<AzureProject[]>('/tasks/azure/projects');
+        setProjects(azProjects);
+        const repoMap: Record<string, AzureRepo[]> = {};
+        await Promise.all(azProjects.map(async (p) => {
+          try {
+            repoMap[p.name] = await apiFetch<AzureRepo[]>(`/tasks/azure/repos?project=${encodeURIComponent(p.name)}`);
+          } catch { repoMap[p.name] = []; }
+        }));
+        setProjectRepos(repoMap);
+      } catch { /* no azure */ }
     })();
   }, []);
 
@@ -142,77 +174,91 @@ export default function DoraOverviewPage() {
     return () => { active = false; };
   }, [repoId]);
 
-  const handleSync = useCallback(async (id: string) => {
-    setSyncingRepo(id);
+  const refreshSyncStatus = useCallback(async (currentMappings: RepoMapping[]) => {
     try {
-      await syncDoraRepo(id);
       const res2 = await apiFetch<{ repos: SyncStatusItem[] }>('/analytics/dora/sync-status');
       const map2: SyncStatus = {};
-      for (const item of res2.repos) map2[item.repo_mapping_id] = item;
-      setSyncStatus(map2);
-      // Refresh DORA data if this repo is selected
-      if (repoId === id || repoId === null) {
-        const res = await fetchDoraOverview(30, repoId);
-        setData(res);
+      const synced = new Set(syncedKeys);
+      for (const item of res2.repos) {
+        map2[item.repo_mapping_id] = item;
+        const mapping = currentMappings.find((m) => m.id === item.repo_mapping_id);
+        if (mapping && mapping.azure_project && mapping.azure_repo_name && (item.commits > 0 || item.prs > 0)) {
+          synced.add(`${mapping.azure_project}/${mapping.azure_repo_name}`);
+        }
       }
+      setSyncStatus(map2);
+      setSyncedKeys(synced);
     } catch { /* silent */ }
-    setSyncingRepo(null);
-  }, [repoId]);
+  }, [syncedKeys]);
 
+  // Sync a single Azure repo (auto-add mapping if needed)
+  const syncAzureRepo = useCallback(async (projectName: string, repo: AzureRepo) => {
+    const key = `${projectName}/${repo.name}`;
+    setSyncingKeys((prev) => new Set(prev).add(key));
+    setSyncingRepo(key);
+
+    let currentRepos = [...repos];
+    let mapping = currentRepos.find(
+      (m) => m.provider === 'azure' && m.azure_project === projectName && m.azure_repo_name === repo.name,
+    );
+    if (!mapping) {
+      mapping = {
+        id: String(Date.now()) + Math.random().toString(36).slice(2, 6),
+        provider: 'azure',
+        name: repo.name,
+        local_path: '',
+        azure_project: projectName,
+        azure_repo_url: repo.remote_url,
+        azure_repo_name: repo.name,
+        default_branch: 'main',
+      };
+      currentRepos.push(mapping);
+      setRepos(currentRepos);
+      try { await savePrefs({ repo_mappings: currentRepos }); } catch { /* silent */ }
+    }
+
+    try {
+      await syncDoraRepo(mapping.id);
+      setSyncedKeys((prev) => new Set(prev).add(key));
+    } catch { /* silent */ }
+
+    setSyncingKeys((prev) => { const n = new Set(prev); n.delete(key); return n; });
+    setSyncingRepo(null);
+    await refreshSyncStatus(currentRepos);
+  }, [repos, refreshSyncStatus]);
+
+  // Sync entire project
+  const syncProject = useCallback(async (projectName: string) => {
+    const pRepos = projectRepos[projectName] || [];
+    for (const repo of pRepos) {
+      await syncAzureRepo(projectName, repo);
+    }
+    // Refresh DORA data
+    try { const res = await fetchDoraOverview(30, repoId); setData(res); } catch { /* silent */ }
+  }, [projectRepos, syncAzureRepo, repoId]);
+
+  // Sync ALL projects
   const handleSyncAll = useCallback(async () => {
     setSyncingAll(true);
-    for (const repo of repos) {
-      setSyncingRepo(repo.id);
-      try { await syncDoraRepo(repo.id); } catch { /* silent */ }
+    for (const p of projects) {
+      await syncProject(p.name);
     }
-    setSyncingRepo(null);
-    try {
-      const res2 = await apiFetch<{ repos: SyncStatusItem[] }>('/analytics/dora/sync-status');
-      const map2: SyncStatus = {};
-      for (const item of res2.repos) map2[item.repo_mapping_id] = item;
-      setSyncStatus(map2);
-      const res = await fetchDoraOverview(30, repoId);
-      setData(res);
-    } catch { /* silent */ }
     setSyncingAll(false);
-  }, [repos, repoId]);
+  }, [projects, syncProject]);
+
+  const toggleProject = (name: string) => {
+    setExpandedProjects((prev) => {
+      const n = new Set(prev);
+      if (n.has(name)) n.delete(name); else n.add(name);
+      return n;
+    });
+  };
 
   const metrics = [
-    {
-      key: 'leadTime' as const,
-      label: t('dora.leadTime'),
-      desc: t('dora.leadTimeDesc'),
-      value: data?.lead_time_hours ?? null,
-      sparkData: data?.daily.map((d) => d.lead_time_hours ?? 0) ?? [],
-      color: '#3b82f6',
-    },
-    {
-      key: 'deployFreq' as const,
-      label: t('dora.deployFreq'),
-      desc: t('dora.deployFreqDesc'),
-      value: data?.deploy_frequency ?? null,
-      sparkData: data?.daily.map((d) => d.completed) ?? [],
-      color: '#22c55e',
-    },
-    {
-      key: 'changeFailRate' as const,
-      label: t('dora.changeFailRate'),
-      desc: t('dora.changeFailRateDesc'),
-      value: data?.change_failure_rate ?? null,
-      sparkData: data?.daily.map((d) => {
-        const total = d.completed + d.failed;
-        return total > 0 ? (d.failed / total) * 100 : 0;
-      }) ?? [],
-      color: '#ef4444',
-    },
-    {
-      key: 'mttr' as const,
-      label: t('dora.mttr'),
-      desc: t('dora.mttrDesc'),
-      value: data?.mttr_hours ?? null,
-      sparkData: data?.daily.map((d) => d.mttr_hours ?? 0) ?? [],
-      color: '#f59e0b',
-    },
+    { key: 'leadTime' as const, label: t('dora.leadTime'), desc: t('dora.leadTimeDesc'), value: data?.lead_time_hours ?? null, sparkData: data?.daily.map((d) => d.lead_time_hours ?? 0) ?? [], color: '#3b82f6' },
+    { key: 'deployFreq' as const, label: t('dora.deployFreq'), desc: t('dora.deployFreqDesc'), value: data?.deploy_frequency ?? null, sparkData: data?.daily.map((d) => d.completed) ?? [], color: '#22c55e' },
+    { key: 'changeFailRate' as const, label: t('dora.changeFailRate'), desc: t('dora.changeFailRateDesc'), value: data?.change_failure_rate ?? null, sparkData: data?.daily.map((d) => { const tot = d.completed + d.failed; return tot > 0 ? (d.failed / tot) * 100 : 0; }) ?? [], color: '#ef4444' },
+    { key: 'mttr' as const, label: t('dora.mttr'), desc: t('dora.mttrDesc'), value: data?.mttr_hours ?? null, sparkData: data?.daily.map((d) => d.mttr_hours ?? 0) ?? [], color: '#f59e0b' },
   ];
 
   const benchmarkRows = [
@@ -223,11 +269,14 @@ export default function DoraOverviewPage() {
   ];
 
   const quickLinks = [
-    { href: '/dashboard/dora/project', icon: '📋', label: t('dora.projectTitle'), desc: t('dora.projectDesc') },
-    { href: '/dashboard/dora/development', icon: '⚡', label: t('dora.devTitle'), desc: t('dora.devDesc') },
-    { href: '/dashboard/dora/quality', icon: '🛡', label: t('dora.qualityTitle'), desc: t('dora.qualityDesc') },
-    { href: '/dashboard/dora/bugs', icon: '🐛', label: t('dora.bugsTitle'), desc: t('dora.bugsDesc') },
+    { href: '/dashboard/dora/project', icon: '\uD83D\uDCCB', label: t('dora.projectTitle'), desc: t('dora.projectDesc') },
+    { href: '/dashboard/dora/development', icon: '\u26A1', label: t('dora.devTitle'), desc: t('dora.devDesc') },
+    { href: '/dashboard/dora/quality', icon: '\uD83D\uDEE1', label: t('dora.qualityTitle'), desc: t('dora.qualityDesc') },
+    { href: '/dashboard/dora/bugs', icon: '\uD83D\uDC1B', label: t('dora.bugsTitle'), desc: t('dora.bugsDesc') },
+    { href: '/dashboard/dora/team', icon: '\uD83D\uDC65', label: t('nav.doraTeam'), desc: t('tooltip.nav.doraTeam') },
   ];
+
+  const totalReposCount = Object.values(projectRepos).reduce((s, r) => s + r.length, 0);
 
   return (
     <div>
@@ -237,61 +286,120 @@ export default function DoraOverviewPage() {
             <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--ink)', margin: 0 }}>{t('dora.title')}</h1>
             <p style={{ fontSize: 14, color: 'var(--muted)', marginTop: 6 }}>{t('dora.subtitle')}</p>
           </div>
-          <button onClick={handleSyncAll} disabled={syncingAll || repos.length === 0}
+          <button onClick={handleSyncAll} disabled={syncingAll || projects.length === 0}
             style={{ padding: '10px 20px', borderRadius: 12, border: 'none', background: syncingAll ? 'var(--panel-alt)' : 'linear-gradient(135deg, #0d9488, #22c55e)', color: syncingAll ? 'var(--muted)' : '#fff', fontWeight: 700, fontSize: 13, cursor: syncingAll ? 'not-allowed' : 'pointer' }}>
-            {syncingAll ? `Syncing... (${syncingRepo ? repos.findIndex(r => r.id === syncingRepo) + 1 : 0}/${repos.length})` : `Sync All (${repos.length})`}
+            {syncingAll ? `Syncing... ${syncingRepo || ''}` : `Sync All (${totalReposCount} repos)`}
           </button>
-        </div>
-        {/* Repo filter pills */}
-        <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
-          <button onClick={() => setRepoId(null)}
-            style={{ padding: '5px 12px', borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: repoId === null ? '1px solid rgba(94,234,212,0.5)' : '1px solid var(--panel-border)', background: repoId === null ? 'rgba(94,234,212,0.12)' : 'var(--panel-alt)', color: repoId === null ? '#5eead4' : 'var(--muted)' }}>
-            {t('dora.allRepos')}
-          </button>
-          {repos.map((r) => (
-            <button key={r.id} onClick={() => setRepoId(r.id)}
-              style={{ padding: '5px 12px', borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: repoId === r.id ? '1px solid rgba(94,234,212,0.5)' : '1px solid var(--panel-border)', background: repoId === r.id ? 'rgba(94,234,212,0.12)' : 'var(--panel-alt)', color: repoId === r.id ? '#5eead4' : 'var(--muted)' }}>
-              {r.provider === 'github' ? '⬤' : '🔷'} {r.name}
-            </button>
-          ))}
         </div>
       </div>
 
-      {/* Repo Cards */}
-      {repos.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12, marginBottom: 32 }}>
-          {repos.map((repo) => {
-            const st = syncStatus[repo.id];
-            const isSyncing = syncingRepo === repo.id;
-            const providerIcon = repo.provider === 'github' ? '⬤' : repo.provider === 'azure' ? '🔷' : '📁';
-            const repoLabel = repo.github_owner && repo.github_repo
-              ? `${repo.github_owner}/${repo.github_repo}`
-              : repo.azure_project && repo.azure_repo_name
-                ? `${repo.azure_project}/${repo.azure_repo_name}`
-                : repo.name;
-            return (
-              <div key={repo.id} style={{ ...box, padding: 16, display: 'flex', alignItems: 'center', gap: 14 }}>
-                <div style={{ fontSize: 24, flexShrink: 0 }}>{providerIcon}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{repoLabel}</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {st ? (
-                      <>
-                        <span>{st.commits} commits</span>
-                        <span>{st.prs} PRs</span>
-                        <span>{st.deployments} deploys</span>
-                        {st.last_sync && <span>· {new Date(st.last_sync).toLocaleString()}</span>}
-                      </>
-                    ) : <span>Not synced yet</span>}
+      {/* ── Azure Project Cards ─────────────────────────────────────────── */}
+      {projects.length > 0 && (
+        <div style={{ marginBottom: 32 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
+            {projects.map((project) => {
+              const pRepos = projectRepos[project.name] || [];
+              const isExpanded = expandedProjects.has(project.name);
+              const isSyncingProject = pRepos.some((r) => syncingKeys.has(`${project.name}/${r.name}`));
+              const hasSyncedRepos = pRepos.some((r) => syncedKeys.has(`${project.name}/${r.name}`));
+              const allSynced = pRepos.length > 0 && pRepos.every((r) => syncedKeys.has(`${project.name}/${r.name}`));
+
+              // Border color: syncing = yellow animated, synced = green, default
+              const borderColor = isSyncingProject
+                ? 'rgba(234,179,8,0.6)'
+                : allSynced
+                  ? 'rgba(34,197,94,0.4)'
+                  : hasSyncedRepos
+                    ? 'rgba(34,197,94,0.2)'
+                    : 'var(--panel-border-2)';
+
+              return (
+                <div
+                  key={project.id}
+                  className={isSyncingProject ? 'project-card-syncing' : ''}
+                  style={{
+                    borderRadius: 12, padding: '12px 14px',
+                    border: `2px solid ${borderColor}`,
+                    background: allSynced ? 'rgba(34,197,94,0.04)' : 'var(--panel)',
+                    transition: 'border-color 0.3s, background 0.3s',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => toggleProject(project.name)}
+                >
+                  {/* Header */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                      <span style={{ fontSize: 13, transition: 'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>{'\u25B6'}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {project.name}
+                      </span>
+                      <span style={{ fontSize: 10, color: 'var(--muted)', flexShrink: 0 }}>{pRepos.length}</span>
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); syncProject(project.name); }}
+                      disabled={isSyncingProject || pRepos.length === 0}
+                      style={{
+                        padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, flexShrink: 0,
+                        border: 'none', cursor: isSyncingProject ? 'not-allowed' : 'pointer',
+                        background: isSyncingProject ? 'rgba(234,179,8,0.15)' : allSynced ? 'rgba(34,197,94,0.12)' : 'rgba(94,234,212,0.1)',
+                        color: isSyncingProject ? '#eab308' : allSynced ? '#22c55e' : '#5eead4',
+                      }}
+                    >
+                      {isSyncingProject ? '\u23F3' : allSynced ? '\u2714' : '\uD83D\uDD04'}
+                    </button>
                   </div>
+
+                  {/* Expanded: repo list */}
+                  {isExpanded && pRepos.length > 0 && (
+                    <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      {pRepos.map((repo) => {
+                        const key = `${project.name}/${repo.name}`;
+                        const isSyncingThis = syncingKeys.has(key);
+                        const isSynced = syncedKeys.has(key);
+                        const mapping = repos.find((m) => m.provider === 'azure' && m.azure_project === project.name && m.azure_repo_name === repo.name);
+                        const st = mapping ? syncStatus[mapping.id] : null;
+
+                        return (
+                          <div key={repo.id} style={{
+                            display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px',
+                            borderRadius: 8, fontSize: 11,
+                            background: isSyncingThis ? 'rgba(234,179,8,0.06)' : 'transparent',
+                          }}>
+                            <span style={{
+                              width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                              background: isSyncingThis ? '#eab308' : isSynced ? '#22c55e' : 'var(--panel-border)',
+                              boxShadow: isSyncingThis ? '0 0 6px rgba(234,179,8,0.5)' : isSynced ? '0 0 4px rgba(34,197,94,0.4)' : 'none',
+                            }} />
+                            <span style={{ color: 'var(--ink)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {repo.name}
+                            </span>
+                            {isSyncingThis && <span style={{ color: '#eab308', marginLeft: 'auto', flexShrink: 0, fontSize: 10 }}>syncing...</span>}
+                            {!isSyncingThis && st && (st.commits > 0 || st.prs > 0) && (
+                              <span style={{ color: 'var(--muted)', marginLeft: 'auto', flexShrink: 0, fontSize: 10 }}>
+                                {st.commits}c · {st.prs}pr
+                              </span>
+                            )}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); syncAzureRepo(project.name, repo); }}
+                              disabled={isSyncingThis}
+                              style={{
+                                padding: '2px 6px', borderRadius: 6, fontSize: 10, fontWeight: 700,
+                                border: 'none', cursor: isSyncingThis ? 'not-allowed' : 'pointer', flexShrink: 0,
+                                background: isSyncingThis ? 'rgba(234,179,8,0.1)' : isSynced ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.05)',
+                                color: isSyncingThis ? '#eab308' : isSynced ? '#22c55e' : 'var(--muted)',
+                              }}
+                            >
+                              {isSyncingThis ? '\u23F3' : isSynced ? '\u2714' : '\uD83D\uDD04'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-                <button onClick={() => handleSync(repo.id)} disabled={isSyncing}
-                  style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--panel-border)', background: isSyncing ? 'var(--panel-alt)' : 'var(--panel)', color: isSyncing ? 'var(--muted)' : '#5eead4', fontSize: 12, fontWeight: 600, cursor: isSyncing ? 'not-allowed' : 'pointer', flexShrink: 0 }}>
-                  {isSyncing ? '⏳' : '🔄'} Sync
-                </button>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -390,6 +498,18 @@ export default function DoraOverviewPage() {
           ))}
         </div>
       </div>
+
+      {/* Syncing animation CSS */}
+      <style>{`
+        @keyframes border-spin {
+          0% { border-color: rgba(234,179,8,0.3); }
+          50% { border-color: rgba(234,179,8,0.8); }
+          100% { border-color: rgba(234,179,8,0.3); }
+        }
+        .project-card-syncing {
+          animation: border-spin 1.2s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 }

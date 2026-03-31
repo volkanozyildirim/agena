@@ -1042,3 +1042,10 @@ export async function fetchDoraOverview(days = 30, repoMappingId?: string | null
   if (repoMappingId) qs.set('repo_mapping_id', repoMappingId);
   return apiFetch(`/analytics/dora?${qs.toString()}`);
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function fetchTeamSymptoms(days = 90, repoMappingId?: string | null): Promise<any> {
+  const qs = new URLSearchParams({ days: String(days) });
+  if (repoMappingId) qs.set('repo_mapping_id', repoMappingId);
+  return apiFetch(`/analytics/dora/team-symptoms?${qs.toString()}`);
+}

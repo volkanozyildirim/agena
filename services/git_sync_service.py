@@ -378,6 +378,10 @@ class GitSyncService:
                     source_ref = str(item.get('sourceRefName') or '').replace('refs/heads/', '')
                     target_ref = str(item.get('targetRefName') or '').replace('refs/heads/', '')
 
+                    # Reviewer count as proxy for review comments (Azure doesn't include thread count in PR list)
+                    reviewers = item.get('reviewers') or []
+                    review_count = len([r for r in reviewers if r.get('vote', 0) != 0])
+
                     await self._upsert_pr(
                         org_id=org_id,
                         repo_mapping_id=repo_mapping_id,
@@ -394,7 +398,7 @@ class GitSyncService:
                         additions=0,
                         deletions=0,
                         commits_count=0,
-                        review_comments=0,
+                        review_comments=review_count,
                     )
                     count += 1
 

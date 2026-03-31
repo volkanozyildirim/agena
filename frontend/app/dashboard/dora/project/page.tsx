@@ -509,7 +509,7 @@ export default function DoraProjectPage() {
           </div>
 
           {/* Charts row 1: Velocity + WIP */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px', gap: 16, marginBottom: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
             <div style={box}>
               <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', margin: '0 0 16px' }}>{t('dora.project.velocity')}</h2>
               {data.weekly_trend.length > 0 ? (
@@ -646,7 +646,7 @@ export default function DoraProjectPage() {
               </div>
 
               {/* Work Item Distribution + Scope Change */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginBottom: 24 }}>
                 {/* Donut: Task vs Bug */}
                 <div style={box}>
                   <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', margin: '0 0 16px' }}>{t('dora.sprint.typeDistribution')}</h2>

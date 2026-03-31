@@ -983,7 +983,7 @@ function DeploymentsTab({ data, t }: { data: DeploymentsAnalyticsResponse; t: TF
       </div>
 
       {/* Charts */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 24 }}>
         {data.lead_time_trend.length > 0 && (
           <div style={box}>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginBottom: 12 }}>{t('dora.deploy.leadTime')} Trend</div>

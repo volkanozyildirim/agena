@@ -537,6 +537,55 @@ class PrAnalyticsResponse(BaseModel):
     pr_list: list[PrListItem]
 
 
+# ── Team Symptoms (Oobeya-style) response schemas ─────────────────────────────
+
+
+class SymptomItem(BaseModel):
+    id: str
+    name: str
+    category: str
+    active: bool
+    severity: str
+    value: float
+    unit: str
+    detail: str
+    threshold: float | None = None
+    trend: list[float] | None = None
+    trend_labels: list[str] | None = None
+    stale_count: int | None = None
+    total_merged: int | None = None
+    unreviewed_count: int | None = None
+    lightning_count: int | None = None
+    oversize_count: int | None = None
+    total_prs: int | None = None
+    overloaded_members: list[dict] | None = None
+    avg_impact: float | None = None
+    weekend_commits: int | None = None
+    weekend_prs: int | None = None
+    deploy_count: int | None = None
+    failed_deploys: int | None = None
+    all_deploys: int | None = None
+
+
+class SymptomsSummary(BaseModel):
+    total_symptoms: int
+    active_count: int
+    critical_count: int
+    warning_count: int
+    healthy_count: int
+    total_commits: int
+    total_prs: int
+    total_merged: int
+    contributors: int
+    period_days: int
+
+
+class TeamSymptomsResponse(BaseModel):
+    git_analytics: list[SymptomItem]
+    pr_delivery: list[SymptomItem]
+    summary: SymptomsSummary
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 
@@ -725,6 +774,18 @@ def _parse_repo_mappings_json(val: str | None) -> list[dict]:
         return parsed if isinstance(parsed, list) else []
     except Exception:
         return []
+
+
+@router.get('/dora/team-symptoms', response_model=TeamSymptomsResponse)
+async def get_team_symptoms(
+    days: int = Query(default=90, ge=7, le=365),
+    repo_mapping_id: str | None = Query(default=None),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> TeamSymptomsResponse:
+    service = AnalyticsService(db)
+    data = await service.team_symptoms(tenant.organization_id, days, repo_mapping_id)
+    return TeamSymptomsResponse(**data)
 
 
 @router.post('/dora/sync', response_model=DoraSyncResponse)

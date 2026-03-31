@@ -1405,3 +1405,424 @@ class AnalyticsService:
             'reviewer_stats': reviewer_stats,
             'pr_list': pr_list,
         }
+
+    # ── Team Symptoms (Oobeya-style) ─────────────────────────────────────────
+
+    async def team_symptoms(
+        self, organization_id: int, days: int = 90, repo_mapping_id: str | None = None,
+    ) -> dict:
+        """Calculate Oobeya-style team health symptoms from git analytics data."""
+        now = datetime.utcnow()
+        since = now - timedelta(days=days)
+
+        commit_filters = [
+            GitCommit.organization_id == organization_id,
+            GitCommit.committed_at >= since,
+        ]
+        pr_filters = [
+            GitPullRequest.organization_id == organization_id,
+            GitPullRequest.created_at_ext >= since,
+        ]
+        if repo_mapping_id:
+            commit_filters.append(GitCommit.repo_mapping_id == repo_mapping_id)
+            pr_filters.append(GitPullRequest.repo_mapping_id == repo_mapping_id)
+
+        # ── S1: Recurring High Rework Rate ──────────────────────────
+        # churn% = deletions / (additions + deletions) * 100, per month
+        month_churn_q = await self.db.execute(
+            select(
+                func.concat(func.year(GitCommit.committed_at), '-', func.lpad(cast(func.month(GitCommit.committed_at), SAString), 2, '0')).label('month'),
+                func.coalesce(func.sum(GitCommit.additions), 0).label('adds'),
+                func.coalesce(func.sum(GitCommit.deletions), 0).label('dels'),
+            ).where(*commit_filters)
+            .group_by('month')
+            .order_by('month')
+        )
+        monthly_churn = []
+        churn_threshold = 20.0
+        high_churn_months = 0
+        for r in month_churn_q.all():
+            adds = int(r.adds)
+            dels = int(r.dels)
+            total = adds + dels
+            churn = round(dels / total * 100, 1) if total > 0 else 0.0
+            monthly_churn.append({'month': str(r.month), 'churn_pct': churn})
+            if churn > churn_threshold:
+                high_churn_months += 1
+        s1_active = high_churn_months >= 3
+        s1_value = monthly_churn[-1]['churn_pct'] if monthly_churn else 0.0
+
+        # ── S2: Recurring High Cognitive Load ───────────────────────
+        # individual impact > 2x team avg impact
+        contrib_q = await self.db.execute(
+            select(
+                func.coalesce(GitCommit.author_name, GitCommit.author_email).label('author'),
+                GitCommit.author_email,
+                func.coalesce(func.sum(GitCommit.additions), 0).label('adds'),
+                func.coalesce(func.sum(GitCommit.deletions), 0).label('dels'),
+                func.coalesce(func.sum(GitCommit.files_changed), 0).label('files'),
+                func.count(GitCommit.id).label('commits'),
+            ).where(*commit_filters)
+            .group_by(GitCommit.author_email, func.coalesce(GitCommit.author_name, GitCommit.author_email))
+        )
+        contribs = []
+        for r in contrib_q.all():
+            impact = int(r.adds) + int(r.dels) + int(r.files) * 10
+            contribs.append({
+                'author': str(r.author),
+                'email': str(r.author_email or ''),
+                'impact': impact,
+                'commits': int(r.commits),
+                'additions': int(r.adds),
+                'deletions': int(r.dels),
+            })
+        avg_impact = sum(c['impact'] for c in contribs) / len(contribs) if contribs else 0
+        overloaded = [c for c in contribs if c['impact'] > 2 * avg_impact] if avg_impact > 0 else []
+        s2_active = len(overloaded) > 0
+        s2_value = len(overloaded)
+
+        # ── S3: High Weekend Activity ───────────────────────────────
+        # MySQL DAYOFWEEK: 1=Sun, 7=Sat
+        weekend_q = await self.db.execute(
+            select(func.count(GitCommit.id)).where(
+                *commit_filters,
+                func.dayofweek(GitCommit.committed_at).in_([1, 7]),
+            )
+        )
+        weekend_commits = int(weekend_q.scalar() or 0)
+
+        total_commits_q = await self.db.execute(
+            select(func.count(GitCommit.id)).where(*commit_filters)
+        )
+        total_commits = int(total_commits_q.scalar() or 0)
+        weekend_pct = round(weekend_commits / total_commits * 100, 1) if total_commits > 0 else 0.0
+        s3_active = weekend_commits > 5
+        s3_value = weekend_pct
+
+        # Weekend PR activity
+        weekend_pr_q = await self.db.execute(
+            select(func.count(GitPullRequest.id)).where(
+                *pr_filters,
+                func.dayofweek(GitPullRequest.created_at_ext).in_([1, 7]),
+            )
+        )
+        weekend_prs = int(weekend_pr_q.scalar() or 0)
+
+        # ── S4: High Code Review Time ───────────────────────────────
+        # Azure uses 'completed' instead of 'merged'
+        merged_filters = pr_filters + [
+            GitPullRequest.status.in_(['merged', 'completed']),
+            GitPullRequest.merged_at.isnot(None),
+        ]
+        stale_threshold_sec = 3 * 86400  # 3 days
+        stale_pr_q = await self.db.execute(
+            select(func.count(GitPullRequest.id)).where(
+                *merged_filters,
+                (func.unix_timestamp(GitPullRequest.merged_at) - func.unix_timestamp(GitPullRequest.created_at_ext)) > stale_threshold_sec,
+            )
+        )
+        stale_prs = int(stale_pr_q.scalar() or 0)
+        total_merged_q = await self.db.execute(
+            select(func.count(GitPullRequest.id)).where(*merged_filters)
+        )
+        total_merged = int(total_merged_q.scalar() or 0)
+
+        avg_review_q = await self.db.execute(
+            select(
+                func.avg(
+                    func.unix_timestamp(GitPullRequest.merged_at) - func.unix_timestamp(GitPullRequest.created_at_ext)
+                ).label('avg_sec'),
+            ).where(*merged_filters)
+        )
+        avg_review_hours = round(float(avg_review_q.scalar() or 0) / 3600, 1)
+        s4_active = stale_prs > 0
+        s4_value = avg_review_hours
+
+        # ── S9: Unreviewed Pull Requests ────────────────────────────
+        unreviewed_q = await self.db.execute(
+            select(func.count(GitPullRequest.id)).where(
+                *merged_filters,
+                GitPullRequest.review_comments == 0,
+            )
+        )
+        unreviewed_count = int(unreviewed_q.scalar() or 0)
+        unreviewed_pct = round(unreviewed_count / total_merged * 100, 1) if total_merged > 0 else 0.0
+        s9_active = unreviewed_count > 0
+        s9_value = unreviewed_pct
+
+        # ── S10: Lightning Pull Requests ────────────────────────────
+        lightning_threshold_sec = 120  # 2 minutes
+        lightning_q = await self.db.execute(
+            select(func.count(GitPullRequest.id)).where(
+                *merged_filters,
+                (func.unix_timestamp(GitPullRequest.merged_at) - func.unix_timestamp(GitPullRequest.created_at_ext)) < lightning_threshold_sec,
+                (func.unix_timestamp(GitPullRequest.merged_at) - func.unix_timestamp(GitPullRequest.created_at_ext)) > 0,
+            )
+        )
+        lightning_count = int(lightning_q.scalar() or 0)
+        lightning_pct = round(lightning_count / total_merged * 100, 1) if total_merged > 0 else 0.0
+        s10_active = lightning_count > 5
+        s10_value = lightning_pct
+
+        # ── S11: Oversize Pull Requests ─────────────────────────────
+        # Azure PRs often have 0 additions/deletions, so also check commit data
+        oversize_threshold = 500  # lines changed
+        oversize_q = await self.db.execute(
+            select(func.count(GitPullRequest.id)).where(
+                *pr_filters,
+                (GitPullRequest.additions + GitPullRequest.deletions) > oversize_threshold,
+            )
+        )
+        oversize_from_pr = int(oversize_q.scalar() or 0)
+
+        # Fallback: count contributors with >500 lines changed (commit-based)
+        oversize_authors_q = await self.db.execute(
+            select(
+                func.coalesce(GitCommit.author_name, GitCommit.author_email).label('author'),
+                func.coalesce(func.sum(GitCommit.additions + GitCommit.deletions), 0).label('total_lines'),
+            ).where(*commit_filters)
+            .group_by(func.coalesce(GitCommit.author_name, GitCommit.author_email))
+            .having(func.sum(GitCommit.additions + GitCommit.deletions) > oversize_threshold)
+        )
+        oversize_authors = [
+            {'author': str(r.author), 'lines': int(r.total_lines)}
+            for r in oversize_authors_q.all()
+        ]
+
+        total_pr_q = await self.db.execute(
+            select(func.count(GitPullRequest.id)).where(*pr_filters)
+        )
+        total_prs = int(total_pr_q.scalar() or 0)
+        oversize_count = oversize_from_pr if oversize_from_pr > 0 else len(oversize_authors)
+        oversize_pct = round(oversize_count / max(total_prs, len(contribs), 1) * 100, 1)
+        s11_active = oversize_count > 5
+        s11_value = oversize_pct
+
+        # ── S12/S13/S14: DORA Delivery Metrics ──────────────────────
+        # Reuse from DORA service data (lead time from PRs)
+        lead_time_q = await self.db.execute(
+            select(
+                func.avg(
+                    func.unix_timestamp(GitPullRequest.merged_at) - func.unix_timestamp(GitPullRequest.first_commit_at)
+                ).label('avg_sec'),
+            ).where(
+                *merged_filters,
+                GitPullRequest.first_commit_at.isnot(None),
+            )
+        )
+        lead_time_hours = round(float(lead_time_q.scalar() or 0) / 3600, 1)
+        s12_active = lead_time_hours > 168  # > 1 week
+        s12_value = lead_time_hours
+
+        # Deploy frequency (from GitDeployment if available, otherwise estimate from merged PRs)
+        from models.git_deployment import GitDeployment
+        deploy_filters = [
+            GitDeployment.organization_id == organization_id,
+            GitDeployment.deployed_at >= since,
+            GitDeployment.status == 'success',
+        ]
+        if repo_mapping_id:
+            deploy_filters.append(GitDeployment.repo_mapping_id == repo_mapping_id)
+
+        deploy_count_q = await self.db.execute(
+            select(func.count(GitDeployment.id)).where(*deploy_filters)
+        )
+        deploy_count = int(deploy_count_q.scalar() or 0)
+        deploy_freq = round(deploy_count / max(days, 1), 2)
+        s13_active = deploy_freq < (1 / 30)  # less than monthly
+        s13_value = deploy_freq
+
+        # Change failure rate
+        all_deploy_filters = [
+            GitDeployment.organization_id == organization_id,
+            GitDeployment.deployed_at >= since,
+        ]
+        if repo_mapping_id:
+            all_deploy_filters.append(GitDeployment.repo_mapping_id == repo_mapping_id)
+
+        all_deploy_q = await self.db.execute(
+            select(func.count(GitDeployment.id)).where(*all_deploy_filters)
+        )
+        all_deploys = int(all_deploy_q.scalar() or 0)
+
+        failed_deploy_q = await self.db.execute(
+            select(func.count(GitDeployment.id)).where(
+                *all_deploy_filters,
+                GitDeployment.status == 'failure',
+            )
+        )
+        failed_deploys = int(failed_deploy_q.scalar() or 0)
+        cfr = round(failed_deploys / all_deploys * 100, 1) if all_deploys > 0 else 0.0
+        s14_active = cfr > 15
+        s14_value = cfr
+
+        # ── Classify severity ───────────────────────────────────────
+        def severity(active: bool, value: float, thresholds: tuple) -> str:
+            if not active:
+                return 'healthy'
+            low, mid, high = thresholds
+            if value >= high:
+                return 'critical'
+            if value >= mid:
+                return 'warning'
+            if value >= low:
+                return 'info'
+            return 'healthy'
+
+        symptoms = {
+            'git_analytics': [
+                {
+                    'id': 'S1',
+                    'name': 'Recurring High Rework Rate',
+                    'category': 'Git Analytics',
+                    'active': s1_active,
+                    'severity': severity(s1_active, s1_value, (15, 20, 30)),
+                    'value': s1_value,
+                    'unit': '%',
+                    'detail': f'{high_churn_months} months above {churn_threshold}% threshold',
+                    'trend': [m['churn_pct'] for m in monthly_churn],
+                    'trend_labels': [m['month'] for m in monthly_churn],
+                    'threshold': churn_threshold,
+                },
+                {
+                    'id': 'S2',
+                    'name': 'Recurring High Cognitive Load',
+                    'category': 'Git Analytics',
+                    'active': s2_active,
+                    'severity': severity(s2_active, float(s2_value), (1, 2, 3)),
+                    'value': s2_value,
+                    'unit': 'members',
+                    'detail': f'{s2_value} member(s) with >2x avg team impact',
+                    'overloaded_members': overloaded[:5],
+                    'avg_impact': round(avg_impact, 0),
+                    'threshold': 0,
+                },
+                {
+                    'id': 'S3',
+                    'name': 'High Weekend Activity',
+                    'category': 'Git Analytics',
+                    'active': s3_active,
+                    'severity': severity(s3_active, s3_value, (3, 8, 15)),
+                    'value': s3_value,
+                    'unit': '%',
+                    'detail': f'{weekend_commits} commits + {weekend_prs} PRs on weekends',
+                    'weekend_commits': weekend_commits,
+                    'weekend_prs': weekend_prs,
+                    'threshold': 5,
+                },
+            ],
+            'pr_delivery': [
+                {
+                    'id': 'S4',
+                    'name': 'High Code Review Time',
+                    'category': 'PR Analytics',
+                    'active': s4_active,
+                    'severity': severity(s4_active, s4_value, (24, 48, 72)),
+                    'value': s4_value,
+                    'unit': 'hours',
+                    'detail': f'{stale_prs} stale PRs (>{stale_threshold_sec // 86400}d) of {total_merged} merged',
+                    'stale_count': stale_prs,
+                    'total_merged': total_merged,
+                    'threshold': 72,
+                },
+                {
+                    'id': 'S9',
+                    'name': 'Unreviewed Pull Requests',
+                    'category': 'PR Analytics',
+                    'active': s9_active,
+                    'severity': severity(s9_active, s9_value, (5, 15, 30)),
+                    'value': s9_value,
+                    'unit': '%',
+                    'detail': f'{unreviewed_count} of {total_merged} merged PRs had 0 review comments',
+                    'unreviewed_count': unreviewed_count,
+                    'total_merged': total_merged,
+                    'threshold': 0,
+                },
+                {
+                    'id': 'S10',
+                    'name': 'Lightning Pull Requests',
+                    'category': 'PR Analytics',
+                    'active': s10_active,
+                    'severity': severity(s10_active, s10_value, (3, 8, 15)),
+                    'value': s10_value,
+                    'unit': '%',
+                    'detail': f'{lightning_count} PRs merged in <2 min',
+                    'lightning_count': lightning_count,
+                    'threshold': 5,
+                },
+                {
+                    'id': 'S11',
+                    'name': 'Oversize Pull Requests',
+                    'category': 'PR Analytics',
+                    'active': s11_active,
+                    'severity': severity(s11_active, s11_value, (10, 20, 35)),
+                    'value': s11_value,
+                    'unit': '%',
+                    'detail': f'{oversize_count} contributors with >{oversize_threshold} lines changed' if oversize_from_pr == 0 else f'{oversize_count} PRs with >{oversize_threshold} lines changed',
+                    'oversize_count': oversize_count,
+                    'total_prs': total_prs,
+                    'overloaded_members': oversize_authors[:10],
+                    'threshold': 500,
+                },
+                {
+                    'id': 'S12',
+                    'name': 'High Lead Time For Changes',
+                    'category': 'DORA',
+                    'active': s12_active,
+                    'severity': severity(s12_active, s12_value, (24, 168, 720)),
+                    'value': s12_value,
+                    'unit': 'hours',
+                    'detail': f'Avg lead time: {s12_value}h (commit to merge)',
+                    'threshold': 168,
+                },
+                {
+                    'id': 'S13',
+                    'name': 'Low Deployment Frequency',
+                    'category': 'DORA',
+                    'active': s13_active,
+                    'severity': 'critical' if deploy_freq == 0 and all_deploys == 0 else severity(s13_active, 1 / max(deploy_freq, 0.001), (1, 7, 30)),
+                    'value': deploy_freq,
+                    'unit': '/day',
+                    'detail': f'{deploy_count} deployments in {days} days',
+                    'deploy_count': deploy_count,
+                    'threshold': 1 / 30,
+                },
+                {
+                    'id': 'S14',
+                    'name': 'High Change Failure Rate',
+                    'category': 'DORA',
+                    'active': s14_active,
+                    'severity': severity(s14_active, s14_value, (5, 10, 15)),
+                    'value': s14_value,
+                    'unit': '%',
+                    'detail': f'{failed_deploys} failures out of {all_deploys} deployments',
+                    'failed_deploys': failed_deploys,
+                    'all_deploys': all_deploys,
+                    'threshold': 15,
+                },
+            ],
+            'summary': {
+                'total_symptoms': 10,
+                'active_count': sum(1 for s in [s1_active, s2_active, s3_active, s4_active, s9_active, s10_active, s11_active, s12_active, s13_active, s14_active] if s),
+                'critical_count': 0,
+                'warning_count': 0,
+                'healthy_count': 0,
+                'total_commits': total_commits,
+                'total_prs': total_prs,
+                'total_merged': total_merged,
+                'contributors': len(contribs),
+                'period_days': days,
+            },
+        }
+
+        # Count severity levels
+        all_symptoms = symptoms['git_analytics'] + symptoms['pr_delivery']
+        for s in all_symptoms:
+            if s['severity'] == 'critical':
+                symptoms['summary']['critical_count'] += 1
+            elif s['severity'] == 'warning':
+                symptoms['summary']['warning_count'] += 1
+            elif s['severity'] == 'healthy':
+                symptoms['summary']['healthy_count'] += 1
+
+        return symptoms
