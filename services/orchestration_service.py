@@ -645,6 +645,14 @@ class OrchestrationService:
                     'code_diff',
                     self._build_code_diff_message(routing.local_repo_path, pr_payload.files),
                 )
+            elif final_code:
+                # Remote mode: show the raw developer patch output as diff
+                await task_service.add_log(
+                    task.id,
+                    organization_id,
+                    'code_diff',
+                    f'Code Diff ({len(pr_payload.files)} files):\n\n{final_code}',
+                )
 
             if routing.local_repo_path:
                 azure_remote_pat: str | None = None
@@ -1519,15 +1527,13 @@ class OrchestrationService:
             return 'No generated files to preview.'
 
         lines: list[str] = [f'Generated files ({len(files)}):']
-        for file in files[:3]:
+        for file in files:
             snippet = file.content[:500].rstrip()
             lines.append(f'\nFile: {file.path}')
             lines.append('```')
             lines.append(snippet if snippet else '(empty)')
             lines.append('```')
 
-        if len(files) > 3:
-            lines.append(f'\n...and {len(files) - 3} more file(s).')
         return '\n'.join(lines)
 
     def _build_code_diff_message(self, repo_path: str, files: list[GitHubFileChange]) -> str:
@@ -1537,7 +1543,7 @@ class OrchestrationService:
         root = Path(repo_path).expanduser().resolve()
         lines: list[str] = [f'Diff files ({len(files)}):']
 
-        for file in files[:3]:
+        for file in files:
             rel = file.path.strip().replace('\\', '/')
             before = ''
             target = (root / rel).resolve()
@@ -1564,9 +1570,6 @@ class OrchestrationService:
             else:
                 lines.append('(no visible diff)')
             lines.append('```')
-
-        if len(files) > 3:
-            lines.append(f'\n...and {len(files) - 3} more file(s).')
         return '\n'.join(lines)
 
     def _build_memory_impact_message(self, state: dict[str, Any]) -> str:
