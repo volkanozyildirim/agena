@@ -2238,8 +2238,9 @@ class OrchestrationService:
         total_read = 0
         found: list[str] = []
         missing: list[str] = []
-        # Cap remote file reading at 200K chars (~50K tokens) to balance cost vs quality
-        max_total = min(200_000, max(2500, self.settings.max_code_context_chars - 2500))
+        # Cap remote file reading at 80K chars (~20K tokens) to keep cost low
+        # and prevent smaller models from refusing due to context overload
+        max_total = min(80_000, max(2500, self.settings.max_code_context_chars - 2500))
 
         try:
             if remote_repo.startswith('github:'):
