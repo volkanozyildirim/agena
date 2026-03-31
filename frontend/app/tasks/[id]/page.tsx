@@ -517,12 +517,6 @@ export default function TaskDetailPage() {
     try {
       setIsRerunBusy(true);
       setShowRunConfig(false);
-      if (extraDesc) {
-        await apiFetch('/tasks/' + taskId, {
-          method: 'PATCH',
-          body: JSON.stringify({ description: (task?.description || '') + '\n\n---\n' + extraDesc }),
-        }).catch(() => {});
-      }
       await apiFetch('/tasks/' + taskId + '/assign', {
         method: 'POST',
         body: JSON.stringify({
@@ -530,6 +524,7 @@ export default function TaskDetailPage() {
           mode: task?.last_mode || 'ai',
           agent_model: agentOpts?.model || task?.preferred_agent_model || undefined,
           agent_provider: agentOpts?.provider || task?.preferred_agent_provider || undefined,
+          extra_description: extraDesc || undefined,
         }),
       });
       setSelectedRunIndex(-1);

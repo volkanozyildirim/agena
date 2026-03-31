@@ -250,6 +250,20 @@ async def assign_task(
     db: AsyncSession = Depends(get_db_session),
 ) -> AssignTaskResponse:
     service = TaskService(db)
+    # Append extra config (remote repo, agent info) to description before assign
+    if payload.extra_description:
+        from sqlalchemy import select
+        from models.saas_task import TaskRecord
+        result = await db.execute(
+            select(TaskRecord).where(
+                TaskRecord.id == task_id,
+                TaskRecord.organization_id == tenant.organization_id,
+            )
+        )
+        task_record = result.scalar_one_or_none()
+        if task_record:
+            task_record.description = (task_record.description or '') + '\n\n---\n' + payload.extra_description
+            await db.commit()
     try:
         queue_key = await service.assign_task_to_ai(
             tenant.organization_id,

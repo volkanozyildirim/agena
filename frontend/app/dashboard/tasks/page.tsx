@@ -203,7 +203,7 @@ export default function DashboardTasksPage() {
     setFlowPopupTaskId(id);
   }
 
-  async function doAssignAI(id: number, agent: { role: string; model: string; provider: string }) {
+  async function doAssignAI(id: number, agent: { role: string; model: string; provider: string }, extraDesc?: string) {
     setAiPopupTaskId(null);
     try {
       await apiFetch('/tasks/' + id + '/assign', {
@@ -214,16 +214,17 @@ export default function DashboardTasksPage() {
           agent_role: agent.role,
           agent_model: agent.model,
           agent_provider: agent.provider,
+          extra_description: extraDesc || undefined,
         }),
       });
       setMsg(`${t('tasks.assignedAi')} (${agent.role} / ${agent.provider}:${agent.model})`); await load();
     } catch (e) { setError(e instanceof Error ? e.message : t('tasks.assignFailed')); }
   }
 
-  async function doAssignFlow(id: number, flowId: string, flowName: string) {
+  async function doAssignFlow(id: number, flowId: string, flowName: string, extraDesc?: string) {
     setFlowPopupTaskId(null);
     try {
-      await apiFetch('/tasks/' + id + '/assign', { method: 'POST', body: JSON.stringify({ create_pr: defaultCreatePr, mode: 'flow' }) });
+      await apiFetch('/tasks/' + id + '/assign', { method: 'POST', body: JSON.stringify({ create_pr: defaultCreatePr, mode: 'flow', extra_description: extraDesc || undefined }) });
       setMsg(`${t('tasks.assignedFlow')} (${flowName})`); await load();
     } catch (e) { setError(e instanceof Error ? e.message : t('tasks.assignFailed')); }
   }
@@ -606,22 +607,12 @@ export default function DashboardTasksPage() {
           agents={agentConfigs}
           flows={savedFlows}
           onAssignAI={(id, agent, repoMeta) => {
-            if (repoMeta) {
-              const t = tasks.find((tk) => tk.id === id);
-              if (t && !((t as unknown as { description?: string }).description || '').toLowerCase().includes('remote repo')) {
-                apiFetch('/tasks/' + id, { method: 'PATCH', body: JSON.stringify({ description: ((t as unknown as { description?: string }).description || '') + '\n\n---\nRemote Repo: ' + repoMeta }) }).catch(() => {});
-              }
-            }
-            void doAssignAI(id, agent);
+            const extra = repoMeta ? `Remote Repo: ${repoMeta}` : undefined;
+            void doAssignAI(id, agent, extra);
           }}
           onAssignFlow={(id, flowId, flowName, repoMeta) => {
-            if (repoMeta) {
-              const t = tasks.find((tk) => tk.id === id);
-              if (t && !((t as unknown as { description?: string }).description || '').toLowerCase().includes('remote repo')) {
-                apiFetch('/tasks/' + id, { method: 'PATCH', body: JSON.stringify({ description: ((t as unknown as { description?: string }).description || '') + '\n\n---\nRemote Repo: ' + repoMeta }) }).catch(() => {});
-              }
-            }
-            void doAssignFlow(id, flowId, flowName);
+            const extra = repoMeta ? `Remote Repo: ${repoMeta}` : undefined;
+            void doAssignFlow(id, flowId, flowName, extra);
           }}
           onClose={() => setAiPopupTaskId(null)}
           t={t}
@@ -636,19 +627,12 @@ export default function DashboardTasksPage() {
           agents={agentConfigs}
           flows={savedFlows}
           onAssignAI={(id, agent, repoMeta) => {
-            if (repoMeta) {
-              apiFetch('/tasks/' + id, { method: 'PATCH', body: JSON.stringify({ description: '' }) }).catch(() => {});
-            }
-            void doAssignAI(id, agent);
+            const extra = repoMeta ? `Remote Repo: ${repoMeta}` : undefined;
+            void doAssignAI(id, agent, extra);
           }}
           onAssignFlow={(id, flowId, flowName, repoMeta) => {
-            if (repoMeta) {
-              const t = tasks.find((tk) => tk.id === id);
-              if (t && !((t as unknown as { description?: string }).description || '').toLowerCase().includes('remote repo')) {
-                apiFetch('/tasks/' + id, { method: 'PATCH', body: JSON.stringify({ description: ((t as unknown as { description?: string }).description || '') + '\n\n---\nRemote Repo: ' + repoMeta }) }).catch(() => {});
-              }
-            }
-            void doAssignFlow(id, flowId, flowName);
+            const extra = repoMeta ? `Remote Repo: ${repoMeta}` : undefined;
+            void doAssignFlow(id, flowId, flowName, extra);
           }}
           onClose={() => setFlowPopupTaskId(null)}
           t={t}

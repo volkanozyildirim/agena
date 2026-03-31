@@ -59,6 +59,7 @@ class AssignTaskRequest(BaseModel):
     agent_role: str | None = None
     agent_model: str | None = None
     agent_provider: str | None = None
+    extra_description: str | None = None  # appended to task description before assign
 
 
 class TaskLogItem(BaseModel):
