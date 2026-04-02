@@ -11,7 +11,7 @@ from agena_api.api.routes import agents, analytics, auth, billing, flows, github
 from agena_core.database import engine
 from agena_core.logging import configure_logging
 from agena_core.settings import get_settings
-from db import models  # noqa: F401
+import agena_models.models  # noqa: F401 -- register all ORM models
 from agena_core.db.base import Base
 
 settings = get_settings()
