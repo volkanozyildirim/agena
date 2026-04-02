@@ -1070,7 +1070,7 @@ export default function OfficePage() {
   const failed = tasks.filter((tk) => tk.status === 'failed').slice(0, 3);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 140px)', gap: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 104px)', gap: 0 }}>
       {/* ── Header bar ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 0 14px', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -1107,7 +1107,7 @@ export default function OfficePage() {
       {/* ── Main area ── */}
       <div style={{ display: 'grid', gridTemplateColumns: viewMode === 'split' ? (panelCollapsed ? '1fr 42px' : '1fr 320px') : '1fr', gap: 0, flex: 1, minHeight: 0, transition: 'grid-template-columns 0.2s ease' }}>
         {/* Pixel Office */}
-        <div style={{ borderRadius: 16, border: '1px solid var(--panel-border)', overflow: 'hidden', position: 'relative', background: '#0a0a14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ borderRadius: 16, border: '1px solid var(--panel-border)', overflow: 'hidden', position: 'relative', background: '#0a0a14' }}>
           {!iframeLoaded && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-25)', fontSize: 13, zIndex: 2 }}>
               {t('office.loading')}
@@ -1115,7 +1115,7 @@ export default function OfficePage() {
           )}
           <iframe ref={iframeRef} src="/pixel-office/index.html" onLoad={() => setIframeLoaded(true)}
             className="pixel-office-iframe"
-            style={{ width: '100%', height: '100%', border: 'none', display: iframeLoaded ? 'block' : 'none', maxHeight: '100%' }} title={t('office.title')} />
+            style={{ width: '100%', height: '100%', border: 'none', display: iframeLoaded ? 'block' : 'none' }} title={t('office.title')} />
         </div>
 
         {/* ── Side panel ── */}
