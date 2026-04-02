@@ -12,7 +12,6 @@ type TourStep = {
 };
 
 const STEPS: TourStep[] = [
-  { target: 'nav-overview',      titleKey: 'tour.step.overview.title',      descKey: 'tour.step.overview.desc' },
   { target: 'nav-office',        titleKey: 'tour.step.office.title',        descKey: 'tour.step.office.desc' },
   { target: 'nav-tasks',         titleKey: 'tour.step.tasks.title',         descKey: 'tour.step.tasks.desc' },
   { target: 'nav-sprints',       titleKey: 'tour.step.sprints.title',       descKey: 'tour.step.sprints.desc' },

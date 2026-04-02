@@ -27,7 +27,6 @@ const NAV_GROUPS: NavGroup[] = [
     labelKey: 'nav.group.workspace',
     defaultOpen: true,
     items: [
-      { href: '/dashboard', key: 'nav.overview', icon: '🧭' },
       { href: '/dashboard/office', key: 'nav.office', icon: '🏢' },
       { href: '/dashboard/tasks', key: 'nav.tasks', icon: '✅', permission: 'tasks:read' as const },
       { href: '/dashboard/sprints', key: 'nav.sprints', icon: '🗂', permission: 'tasks:read' as const },
@@ -132,7 +131,6 @@ function DashboardInner({ children }: { children: ReactNode }) {
   };
   const navTooltip = (key: string) => t((navTooltipMap[key] || key) as Parameters<typeof t>[0]);
   const tourTargetMap: Record<string, string> = {
-    'nav.overview': 'nav-overview',
     'nav.office': 'nav-office',
     'nav.tasks': 'nav-tasks',
     'nav.sprints': 'nav-sprints',
@@ -632,9 +630,6 @@ function DashboardInner({ children }: { children: ReactNode }) {
         }}>
           📊
         </Link>
-
-        {/* LangToggle */}
-        <LangToggle style={{ width: 'auto' }} />
 
         {/* Notification bell */}
         <button
