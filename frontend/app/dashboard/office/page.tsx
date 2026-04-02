@@ -1070,11 +1070,11 @@ export default function OfficePage() {
   const failed = tasks.filter((tk) => tk.status === 'failed').slice(0, 3);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 104px)', gap: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 100px)', gap: 0 }}>
       {/* ── Header bar ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 0 6px', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <h1 style={{ fontSize: 16, fontWeight: 800, color: 'var(--ink-90)', margin: 0 }}>{t('office.title')}</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 0 14px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink-90)', margin: 0 }}>{t('office.title')}</h1>
           {/* Live status pills */}
           <div style={{ display: 'flex', gap: 6 }}>
             {running.length > 0 && (
@@ -1107,7 +1107,7 @@ export default function OfficePage() {
       {/* ── Main area ── */}
       <div style={{ display: 'grid', gridTemplateColumns: viewMode === 'split' ? (panelCollapsed ? '1fr 42px' : '1fr 320px') : '1fr', gap: 0, flex: 1, minHeight: 0, transition: 'grid-template-columns 0.2s ease' }}>
         {/* Pixel Office */}
-        <div style={{ borderRadius: 16, border: '1px solid var(--panel-border)', overflow: 'hidden', position: 'relative', background: '#0a0a14' }}>
+        <div style={{ borderRadius: 16, border: '1px solid var(--panel-border)', overflow: 'hidden', position: 'relative', background: 'var(--surface)' }}>
           {!iframeLoaded && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-25)', fontSize: 13, zIndex: 2 }}>
               {t('office.loading')}
