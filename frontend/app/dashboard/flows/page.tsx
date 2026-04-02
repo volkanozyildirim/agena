@@ -7,7 +7,7 @@ import { useLocale } from '@/lib/i18n';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type AgentRole = 'lead_developer' | 'pm' | 'qa' | 'manager' | 'developer' | string;
-type NodeType = 'agent' | 'trigger' | 'http' | 'azure_update' | 'github' | 'notify' | 'condition';
+type NodeType = 'agent' | 'trigger' | 'http' | 'azure_update' | 'azure_devops' | 'github' | 'notify' | 'condition';
 
 interface FlowNode {
   id: string;
@@ -66,6 +66,14 @@ interface FlowNode {
   labels?: string;
   // notify advanced
   notify_channel?: string;
+  // azure_devops node (PR operations)
+  azure_action?: string;
+  azure_project?: string;
+  azure_repo?: string;
+  azure_branch?: string;
+  azure_pr_title?: string;
+  azure_pr_description?: string;
+  azure_reviewers?: string;
 }
 
 interface FlowEdge {
@@ -107,6 +115,7 @@ const NODE_TYPE_PRESETS: { type: NodeType; icon: string; color: string }[] = [
   { type: 'trigger', icon: '⚡', color: '#f59e0b' },
   { type: 'http', icon: '🌐', color: '#38bdf8' },
   { type: 'azure_update', icon: '☁️', color: '#0078d4' },
+  { type: 'azure_devops', icon: '🔷', color: '#0078d4' },
   { type: 'github', icon: '🐙', color: '#6e40c9' },
   { type: 'notify', icon: '🔔', color: '#fb923c' },
   { type: 'condition', icon: '🔀', color: '#22c55e' },
@@ -125,6 +134,7 @@ function nodeTypeLabel(type: NodeType, t: ReturnType<typeof useLocale>['t']) {
   if (type === 'trigger') return t('flows.nodeTypeTrigger');
   if (type === 'http') return t('flows.nodeTypeHttp');
   if (type === 'azure_update') return t('flows.nodeTypeAzureUpdate');
+  if (type === 'azure_devops') return 'Azure DevOps';
   if (type === 'github') return t('flows.nodeTypeGithub');
   if (type === 'notify') return t('flows.nodeTypeNotify');
   if (type === 'condition') return t('flows.nodeTypeCondition');
@@ -1343,7 +1353,8 @@ function NodeEditPanel({ node, onChange, onClose, flow }: {
             </div>
             <span style={{ fontSize: 13, color: 'var(--ink-58)' }}>{t('flows.nodeWaitApproval')}</span>
           </label>
-          {String(node.role || '').trim().toLowerCase() === 'lead_developer' && (
+          {/* PR Review options — available for any agent role */}
+          {(
             <>
               <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
                 <div onClick={() => onChange({ review_only: !node.review_only })}
@@ -1601,6 +1612,53 @@ function NodeEditPanel({ node, onChange, onClose, flow }: {
                   ))}
                 </div>
               )}
+            </div>
+          </>)}
+        </>)}
+
+        {/* AZURE DEVOPS (PR operations) */}
+        {node.type === 'azure_devops' && (<>
+          <div>
+            <label style={pLbl}>Action</label>
+            <select value={node.azure_action ?? 'create_pr'} onChange={(e) => onChange({ azure_action: e.target.value })}
+              style={{ ...pInp, cursor: 'pointer' }}>
+              <option value="create_branch">Create Branch</option>
+              <option value="create_pr">Create Pull Request</option>
+              <option value="complete_pr">Complete (Merge) PR</option>
+              <option value="abandon_pr">Abandon PR</option>
+            </select>
+          </div>
+          <div>
+            <label style={pLbl}>Project</label>
+            <input value={node.azure_project ?? ''} onChange={(e) => onChange({ azure_project: e.target.value })}
+              placeholder="e.g. EcomBackend" style={pInp} />
+          </div>
+          <div>
+            <label style={pLbl}>Repository</label>
+            <input value={node.azure_repo ?? ''} onChange={(e) => onChange({ azure_repo: e.target.value })}
+              placeholder="e.g. my-service" style={pInp} />
+          </div>
+          <div>
+            <label style={pLbl}>Branch</label>
+            <input value={node.azure_branch ?? ''} onChange={(e) => onChange({ azure_branch: e.target.value })}
+              placeholder="e.g. feature/ai-task-123" style={pInp} />
+          </div>
+          {(node.azure_action === 'create_pr' || !node.azure_action) && (<>
+            <div>
+              <label style={pLbl}>PR Title</label>
+              <input value={node.azure_pr_title ?? ''} onChange={(e) => onChange({ azure_pr_title: e.target.value })}
+                placeholder="AI: {{task.title}}" style={pInp} />
+            </div>
+            <div>
+              <label style={pLbl}>PR Description</label>
+              <textarea value={node.azure_pr_description ?? ''} onChange={(e) => onChange({ azure_pr_description: e.target.value })}
+                placeholder="Markdown template..." rows={3}
+                style={{ ...pInp, resize: 'vertical', lineHeight: 1.5, fontFamily: 'monospace', fontSize: 11 }} />
+            </div>
+            <div>
+              <label style={pLbl}>Reviewers</label>
+              <input value={node.azure_reviewers ?? ''} onChange={(e) => onChange({ azure_reviewers: e.target.value })}
+                placeholder="user@company.com (comma-separated)" style={pInp} />
             </div>
           </>)}
         </>)}

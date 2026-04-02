@@ -88,6 +88,9 @@ async def execute_node(
     elif node_type == 'azure_update':
         return await _run_azure_update_node(node, context, db, organization_id)
 
+    elif node_type == 'azure_devops':
+        return await _run_azure_devops_node(node, context, db, organization_id)
+
     elif node_type == 'notify':
         return await _run_notify_node(node, context)
 
@@ -1053,6 +1056,86 @@ async def _run_azure_update_node(
         async with httpx.AsyncClient(timeout=15) as client:
             r = await client.patch(url, headers=headers, json=patch)
             return {'status': 'ok' if r.is_success else 'error', 'http_status': r.status_code, 'new_state': new_state}
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}
+
+
+async def _run_azure_devops_node(
+    node: dict[str, Any], context: dict[str, Any], db: AsyncSession, organization_id: int,
+) -> dict[str, Any]:
+    """Azure DevOps PR operations: create_branch, create_pr, complete_pr, abandon_pr."""
+    action = node.get('azure_action', 'create_pr')
+    project = node.get('azure_project', '')
+    repo_name = node.get('azure_repo', '')
+    branch = node.get('azure_branch', '')
+    task = context.get('task', {})
+
+    # Variable substitution
+    for k, v in task.items():
+        project = project.replace(f'{{{{{k}}}}}', str(v))
+        repo_name = repo_name.replace(f'{{{{{k}}}}}', str(v))
+        branch = branch.replace(f'{{{{{k}}}}}', str(v))
+
+    if not project or not repo_name:
+        return {'status': 'error', 'message': 'Azure project and repo are required'}
+
+    try:
+        cfg = await IntegrationConfigService(db).get_config(organization_id, 'azure')
+        if not cfg or not cfg.secret:
+            return {'status': 'error', 'message': 'Azure DevOps integration not configured'}
+
+        pat = cfg.secret
+        org_url = cfg.base_url or ''
+
+        pr_service = AzurePRService(org_url=org_url, pat=pat, project=project)
+
+        if action == 'create_branch':
+            result = await pr_service.create_branch(repo_name, branch, source_branch='main')
+            return {'status': 'ok', 'action': 'create_branch', 'branch': branch, **result}
+
+        elif action == 'create_pr':
+            pr_title = node.get('azure_pr_title', f'AI: {task.get("title", "")}')
+            pr_desc = node.get('azure_pr_description', '')
+            reviewers_str = node.get('azure_reviewers', '')
+            for k, v in task.items():
+                pr_title = pr_title.replace(f'{{{{{k}}}}}', str(v))
+                pr_desc = pr_desc.replace(f'{{{{{k}}}}}', str(v))
+            reviewers = [r.strip() for r in reviewers_str.split(',') if r.strip()] if reviewers_str else []
+            result = await pr_service.create_pull_request(
+                repo_name=repo_name,
+                source_branch=branch or f'ai/task-{task.get("id", "")}',
+                target_branch='main',
+                title=pr_title,
+                description=pr_desc,
+                reviewers=reviewers,
+            )
+            return {'status': 'ok', 'action': 'create_pr', 'pr_id': result.get('pullRequestId'), **result}
+
+        elif action == 'complete_pr':
+            pr_id = context.get('outputs', {}).get(node.get('id', ''), {}).get('pr_id', '')
+            if not pr_id:
+                # Try to find from previous node outputs
+                for out in context.get('outputs', {}).values():
+                    if isinstance(out, dict) and out.get('pr_id'):
+                        pr_id = out['pr_id']
+                        break
+            if not pr_id:
+                return {'status': 'error', 'message': 'No PR ID found to complete'}
+            result = await pr_service.complete_pull_request(repo_name=repo_name, pr_id=int(pr_id))
+            return {'status': 'ok', 'action': 'complete_pr', **result}
+
+        elif action == 'abandon_pr':
+            pr_id = context.get('outputs', {}).get(node.get('id', ''), {}).get('pr_id', '')
+            for out in context.get('outputs', {}).values():
+                if isinstance(out, dict) and out.get('pr_id'):
+                    pr_id = out['pr_id']
+                    break
+            if not pr_id:
+                return {'status': 'error', 'message': 'No PR ID found to abandon'}
+            result = await pr_service.abandon_pull_request(repo_name=repo_name, pr_id=int(pr_id))
+            return {'status': 'ok', 'action': 'abandon_pr', **result}
+
+        return {'status': 'error', 'message': f'Unknown azure action: {action}'}
     except Exception as e:
         return {'status': 'error', 'message': str(e)}
 
