@@ -1,7 +1,7 @@
 """create prompt_overrides table
 
-Revision ID: 0023_prompt_overrides
-Revises: f0cb9f7a0e30
+Revision ID: 0024_prompt_overrides
+Revises: 0023_prompts_table
 Create Date: 2026-04-02 12:40:00.000000
 
 """
@@ -11,8 +11,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '0023_prompt_overrides'
-down_revision = 'f0cb9f7a0e30'
+revision = '0024_prompt_overrides'
+down_revision = '0023_prompts_table'
 branch_labels = None
 depends_on = None
 
