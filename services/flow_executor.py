@@ -20,6 +20,7 @@ from services.integration_config_service import IntegrationConfigService
 from services.llm.provider import LLMProvider
 from agents.crewai_agents import AGENT_TOKEN_LIMITS
 from services.orchestration_service import OrchestrationService
+from services.prompt_service import PromptService
 
 logger = logging.getLogger(__name__)
 
@@ -305,21 +306,7 @@ async def _run_product_review_node(
         large_model=model,
     )
 
-    system_prompt = (
-        'You are a senior product manager and technical lead.\n'
-        'Analyze the incoming task and produce a structured implementation brief for a developer agent.\n'
-        'Return a JSON object with these keys:\n'
-        '- goal: string (one-sentence implementation goal)\n'
-        '- requirements: string[] (concrete functional requirements, 3-7 items)\n'
-        '- acceptance_criteria: string[] (testable acceptance criteria, 3-5 items)\n'
-        '- edge_cases: string[] (important edge cases to handle, 2-4 items)\n'
-        '- technical_notes: string[] (architectural hints, affected files/services, 2-5 items)\n'
-        '- story_context: string (full narrative context for the developer, 2-4 sentences)\n\n'
-        'Rules:\n'
-        '- Be concrete and specific — no vague statements\n'
-        '- Reference real file paths or service names if inferable from the task\n'
-        '- Return only valid JSON, no prose before or after'
-    )
+    system_prompt = await PromptService.get(db, 'flow_product_review_system_prompt')
     user_prompt = (
         f"Task title: {task.get('title', '')}\n"
         f"Task description: {task.get('description', '')}\n"
@@ -505,7 +492,7 @@ async def _run_agent_node(
         small_model=model,
         large_model=model,
     )
-    system_prompt = f'You are a {role}. Complete the following task clearly and concisely.'
+    system_prompt = (await PromptService.get(db, 'flow_agent_node_system_prompt')).replace('{role}', role)
     user_prompt = (
         f"Task: {task.get('title', '')}\n"
         f"Description: {task.get('description', '')}\n"
@@ -783,11 +770,7 @@ async def _run_lead_pr_review_node(
         repo_playbook = meta.get('repo playbook', '')
         tenant_playbook = meta.get('tenant playbook', '')
 
-        system_prompt = (
-            'You are a strict Lead Developer reviewing a pull request. '
-            'Use task intent, execution prompt, and code diff to produce actionable review notes. '
-            'Keep it concise and technical.'
-        )
+        system_prompt = await PromptService.get(db, 'flow_pr_review_system_prompt')
         user_prompt = (
             f"Task title:\n{task_row.title}\n\n"
             f"Task description:\n{(task_row.description or '')[:5000]}\n\n"

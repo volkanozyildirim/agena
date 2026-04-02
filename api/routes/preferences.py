@@ -22,6 +22,7 @@ from services.llm.provider import LLMProvider
 from services.notification_service import NotificationService
 from services.org_service import OrgService
 from services.usage_service import UsageService
+from services.prompt_service import PromptService
 
 router = APIRouter(prefix='/preferences', tags=['preferences'])
 
@@ -513,25 +514,7 @@ async def scan_repo_profile(
         llm = None  # skip LLM call
 
     if llm is not None:
-        system_prompt = (
-            'You are a principal software architect and technical writer.\n'
-            'Analyze repository snapshot and return STRICT JSON object only.\n'
-            'Do not write high-level architecture prose. Prefer concrete repo facts.\n'
-            'Return keys:\n'
-            '- stack: string[]\n'
-            '- package_manager: string|null\n'
-            '- suggested_test_commands: string[]\n'
-            '- suggested_lint_commands: string[]\n'
-            '- top_directories: string[]\n'
-            '- top_files: string[]\n'
-            '- repo_rules: string[]\n'
-            'Rules:\n'
-            '- No placeholders, no "etc", no "..."\n'
-            '- top_directories MUST be real directories from the snapshot, verbatim\n'
-            '- top_files MUST be real file paths from the snapshot, verbatim\n'
-            '- Every repo_rules item MUST mention at least one concrete file or directory path\n'
-            '- Prefer package/module names and concrete file paths over generic system-overview language\n'
-        )
+        system_prompt = await PromptService.get(db, 'repo_analysis_system_prompt')
         user_prompt = (
             f"Mapping Name: {payload.mapping_name}\n"
             f"Azure Repo: {payload.azure_repo_name or ''}\n"
