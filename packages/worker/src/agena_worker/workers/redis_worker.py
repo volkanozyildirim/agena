@@ -12,7 +12,7 @@ from agena_core.database import SessionLocal
 from agena_core.logging import configure_logging
 from agena_core.settings import get_settings
 from agena_models.models.task_record import TaskRecord
-from db import models  # noqa: F401
+import agena_models.models  # noqa: F401 -- register all ORM models
 from agena_services.services.event_bus import publish_fire_and_forget
 from agena_services.services.orchestration_service import OrchestrationService
 from agena_services.services.queue_service import QueueService
