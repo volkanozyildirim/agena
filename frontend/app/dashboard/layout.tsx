@@ -7,6 +7,7 @@ import { isLoggedIn, removeToken, apiFetch, listNotifications, markAllNotificati
 import OnboardingModal from '@/components/OnboardingModal';
 import WebPushBridge from '@/components/WebPushBridge';
 import LangToggle from '@/components/LangToggle';
+import GuidedTour from '@/components/GuidedTour';
 import { useLocale } from '@/lib/i18n';
 import { RoleContext, canAccess, type Role } from '@/lib/rbac';
 import { WebSocketProvider } from '@/lib/useWebSocket';
@@ -104,6 +105,18 @@ function DashboardInner({ children }: { children: ReactNode }) {
     'nav.profile': 'tooltip.nav.profile',
   };
   const navTooltip = (key: string) => t((navTooltipMap[key] || key) as Parameters<typeof t>[0]);
+  const tourTargetMap: Record<string, string> = {
+    'nav.overview': 'nav-overview',
+    'nav.office': 'nav-office',
+    'nav.tasks': 'nav-tasks',
+    'nav.sprints': 'nav-sprints',
+    'nav.agents': 'nav-agents',
+    'nav.flows': 'nav-flows',
+    'nav.integrations': 'nav-integrations',
+    'nav.dora': 'nav-dora',
+    'nav.notifications': 'nav-notifications',
+  };
+  const tourAttr = (key: string) => tourTargetMap[key] || undefined;
 
   // Close mobile sidebar on navigation
   useEffect(() => { setMobileSidebarOpen(false); }, [pathname]);
@@ -480,6 +493,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
                   <button
                     onClick={() => setExpandedNav(isExpanded && !sectionActive ? null : item.key)}
                     title={navTooltip(item.key)}
+                    data-tour={tourAttr(item.key)}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10, width: '100%',
                       padding: sidebarCollapsed ? '9px 10px' : '9px 12px', borderRadius: 10, fontSize: 14,
@@ -523,7 +537,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
             }
             const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
             return (
-              <Link key={item.href} href={item.href} title={navTooltip(item.key)} style={{
+              <Link key={item.href} href={item.href} title={navTooltip(item.key)} data-tour={tourAttr(item.key)} style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: sidebarCollapsed ? '9px 10px' : '9px 12px', borderRadius: 10, fontSize: 14,
                 fontWeight: active ? 600 : 400,
@@ -563,7 +577,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
             const hasUnread = isNotificationItem && unreadCount > 0;
             const itemColor = hasUnread ? '#ef4444' : (active ? 'var(--nav-active)' : 'var(--muted)');
             return (
-              <Link key={item.href} href={item.href} title={navTooltip(item.key)} style={{
+              <Link key={item.href} href={item.href} title={navTooltip(item.key)} data-tour={tourAttr(item.key)} style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: sidebarCollapsed ? '9px 10px' : '9px 12px', borderRadius: 10, fontSize: 14,
                 fontWeight: active ? 600 : 400,
@@ -753,6 +767,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
         />
       )}
       <WebPushBridge />
+      <GuidedTour />
     </div>
     </RoleContext.Provider>
   );
