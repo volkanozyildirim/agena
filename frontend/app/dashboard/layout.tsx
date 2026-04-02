@@ -498,27 +498,36 @@ function DashboardInner({ children }: { children: ReactNode }) {
           </div>
         )}
 
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {NAV_GROUPS.map((group) => {
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          {NAV_GROUPS.map((group, gi) => {
             const visibleItems = group.items.filter((item) => !item.permission || canAccess(userRole, item.permission as Parameters<typeof canAccess>[1]));
             if (!visibleItems.length) return null;
             const groupHasActive = visibleItems.some((item) => pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href)));
             const isGroupOpen = groupHasActive || (collapsedGroups[group.labelKey] !== undefined ? !collapsedGroups[group.labelKey] : (group.defaultOpen ?? true));
+            const groupColors = ['var(--nav-active)', 'var(--purple)', 'var(--blue)', 'var(--muted)'];
+            const gc = groupColors[gi] || 'var(--muted)';
             return (
-              <div key={group.labelKey} style={{ marginBottom: 4 }}>
+              <div key={group.labelKey} style={{ marginBottom: 2 }}>
                 {!sidebarCollapsed && (
+                  <>
+                  {gi > 0 && <div style={{ height: 1, background: 'var(--panel-border)', margin: '6px 12px 4px' }} />}
                   <button
                     onClick={() => setCollapsedGroups((prev) => ({ ...prev, [group.labelKey]: isGroupOpen }))}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: 6, width: '100%',
-                      fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: 'var(--muted)',
-                      textTransform: 'uppercase', padding: '6px 12px', marginBottom: 2,
+                      display: 'flex', alignItems: 'center', gap: 7, width: '100%',
+                      fontSize: 10, fontWeight: 800, letterSpacing: 1.2, color: groupHasActive ? gc : 'var(--ink-42)',
+                      textTransform: 'uppercase', padding: '5px 12px', marginBottom: 2,
                       background: 'transparent', border: 'none', cursor: 'pointer',
+                      transition: 'color 0.15s',
                     }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = gc; }}
+                    onMouseLeave={(e) => { if (!groupHasActive) (e.currentTarget as HTMLButtonElement).style.color = 'var(--ink-42)'; }}
                   >
-                    <span style={{ fontSize: 8, transition: 'transform 0.2s', transform: isGroupOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}>&#9654;</span>
+                    <span style={{ fontSize: 7, transition: 'transform 0.2s', transform: isGroupOpen ? 'rotate(90deg)' : 'rotate(0deg)', opacity: 0.6 }}>&#9654;</span>
                     {t(group.labelKey as Parameters<typeof t>[0])}
+                    {!isGroupOpen && <span style={{ marginLeft: 'auto', fontSize: 9, color: 'var(--ink-25)' }}>{visibleItems.length}</span>}
                   </button>
+                  </>
                 )}
                 {(sidebarCollapsed || isGroupOpen) && visibleItems.map((item) => {
             if (item.children) {
