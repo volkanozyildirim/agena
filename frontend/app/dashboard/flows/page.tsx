@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { loadPrefs, savePrefs, runFlow, getFlowRuns, FlowRunResult, createFlowVersion, getFlowVersion, listFlowVersions, createNotificationEvent } from '@/lib/api';
+import { loadPrefs, savePrefs, runFlow, getFlowRuns, FlowRunResult, createFlowVersion, getFlowVersion, listFlowVersions, createNotificationEvent, loadPromptCatalog } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -45,6 +45,27 @@ interface FlowNode {
   condition_field?: string;
   condition_op?: string;
   condition_value?: string;
+  true_target?: string;
+  false_target?: string;
+  // agent advanced
+  model?: string;
+  provider?: string;
+  prompt_slug?: string;
+  max_tokens?: number;
+  temperature?: number;
+  // http advanced
+  auth_type?: string;
+  auth_token?: string;
+  auth_key_name?: string;
+  auth_key_value?: string;
+  timeout?: number;
+  response_var?: string;
+  // github advanced
+  pr_description?: string;
+  reviewers?: string;
+  labels?: string;
+  // notify advanced
+  notify_channel?: string;
 }
 
 interface FlowEdge {
@@ -975,6 +996,7 @@ function FlowCanvas({ flow, onChange }: { flow: Flow; onChange: (f: Flow) => voi
           node={editNode}
           onChange={updateNode}
           onClose={() => setEditNode(null)}
+          flow={flow}
         />
       )}
     </div>
@@ -1043,23 +1065,62 @@ function FlowNodeCard({ node, index, selected, connecting, isDropTarget, onMouse
         )}
       </div>
 
-      {/* Right connector dot — sürükle → bağla */}
-      <div
-        title={t('flows.dragConnect')}
-        onMouseDown={onConnectorMouseDown}
-        onTouchStart={onConnectorMouseDown}
-        style={{
-          position: 'absolute', right: -8, top: '50%', transform: 'translateY(-50%)',
-          width: 16, height: 16, borderRadius: '50%',
-          background: node.color, border: '2px solid var(--surface)',
-          cursor: 'crosshair', zIndex: 10,
-          opacity: hovered || selected ? 1 : 0,
-          transition: 'opacity 0.15s',
-          boxShadow: '0 0 8px ' + node.color,
-        }}
-        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-50%) scale(1.4)'; }}
-        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-50%) scale(1)'; }}
-      />
+      {/* Right connector dot(s) */}
+      {node.type === 'condition' ? (<>
+        {/* True connector — green, top-right */}
+        <div
+          title="True path"
+          onMouseDown={onConnectorMouseDown}
+          onTouchStart={onConnectorMouseDown}
+          style={{
+            position: 'absolute', right: -8, top: '30%', transform: 'translateY(-50%)',
+            width: 16, height: 16, borderRadius: '50%',
+            background: '#22c55e', border: '2px solid var(--surface)',
+            cursor: 'crosshair', zIndex: 10,
+            opacity: hovered || selected ? 1 : 0,
+            transition: 'opacity 0.15s',
+            boxShadow: '0 0 8px #22c55e',
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-50%) scale(1.4)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-50%) scale(1)'; }}
+        />
+        {(hovered || selected) && <div style={{ position: 'absolute', right: 12, top: 'calc(30% - 14px)', fontSize: 8, fontWeight: 700, color: '#22c55e', pointerEvents: 'none' }}>T</div>}
+        {/* False connector — red, bottom-right */}
+        <div
+          title="False path"
+          onMouseDown={onConnectorMouseDown}
+          onTouchStart={onConnectorMouseDown}
+          style={{
+            position: 'absolute', right: -8, top: '70%', transform: 'translateY(-50%)',
+            width: 16, height: 16, borderRadius: '50%',
+            background: '#f87171', border: '2px solid var(--surface)',
+            cursor: 'crosshair', zIndex: 10,
+            opacity: hovered || selected ? 1 : 0,
+            transition: 'opacity 0.15s',
+            boxShadow: '0 0 8px #f87171',
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-50%) scale(1.4)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-50%) scale(1)'; }}
+        />
+        {(hovered || selected) && <div style={{ position: 'absolute', right: 12, top: 'calc(70% - 14px)', fontSize: 8, fontWeight: 700, color: '#f87171', pointerEvents: 'none' }}>F</div>}
+      </>) : (
+        <div
+          title={t('flows.dragConnect')}
+          onMouseDown={onConnectorMouseDown}
+          onTouchStart={onConnectorMouseDown}
+          style={{
+            position: 'absolute', right: -8, top: '50%', transform: 'translateY(-50%)',
+            width: 16, height: 16, borderRadius: '50%',
+            background: node.color, border: '2px solid var(--surface)',
+            cursor: 'crosshair', zIndex: 10,
+            opacity: hovered || selected ? 1 : 0,
+            transition: 'opacity 0.15s',
+            boxShadow: '0 0 8px ' + node.color,
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-50%) scale(1.4)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-50%) scale(1)'; }}
+        />
+      )}
 
       {/* Left connector dot (input indicator) */}
       <div style={{
@@ -1086,14 +1147,109 @@ function FlowNodeCard({ node, index, selected, connecting, isDropTarget, onMouse
   );
 }
 
+// ── CollapsibleSection ───────────────────────────────────────────────────────
+function CollapsibleSection({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ borderRadius: 10, border: '1px solid var(--panel-border-2)', overflow: 'hidden' }}>
+      <button onClick={() => setOpen(!open)} style={{ width: '100%', padding: '8px 12px', border: 'none', background: 'var(--panel-alt)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)' }}>{title}</span>
+        <span style={{ fontSize: 11, color: 'var(--ink-30)', transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
+      </button>
+      {open && <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: 12 }}>{children}</div>}
+    </div>
+  );
+}
+
+// ── VariablePicker ───────────────────────────────────────────────────────────
+const VARIABLE_OPTIONS = [
+  { label: 'Task Title', value: '{{task.title}}' },
+  { label: 'Task Description', value: '{{task.description}}' },
+  { label: 'Task ID', value: '{{task.id}}' },
+  { label: 'Task Status', value: '{{task.status}}' },
+  { label: 'Task Priority', value: '{{task.priority}}' },
+  { label: 'Previous Output', value: '{{outputs.PREV.result}}' },
+];
+
+function VariablePicker({ targetRef, onInsert }: { targetRef: React.RefObject<HTMLTextAreaElement | HTMLInputElement | null>; onInsert: (val: string) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <button onClick={() => setOpen(!open)} title="Insert variable"
+        style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid var(--panel-border-3)', background: open ? 'var(--panel)' : 'var(--glass)', color: 'var(--ink-45)', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}>
+        {'\u{1F4CB}'}
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', right: 0, top: 28, zIndex: 80, minWidth: 200, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface)', boxShadow: '0 8px 24px rgba(0,0,0,0.18)', padding: 6 }}>
+          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-25)', padding: '4px 8px' }}>Variables</div>
+          {VARIABLE_OPTIONS.map((v) => (
+            <button key={v.value} onClick={() => { onInsert(v.value); setOpen(false); }}
+              style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 1, padding: '6px 8px', borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--panel-alt)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-78)' }}>{v.label}</span>
+              <span style={{ fontSize: 10, color: 'var(--ink-35)', fontFamily: 'monospace' }}>{v.value}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Model / Provider options ─────────────────────────────────────────────────
+const MODEL_OPTIONS = [
+  { value: 'gpt-4o', label: 'GPT-4o' },
+  { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+  { value: 'gpt-5', label: 'GPT-5' },
+  { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+  { value: 'claude-sonnet', label: 'Claude Sonnet' },
+  { value: 'custom', label: 'Custom' },
+];
+
+const PROVIDER_OPTIONS = [
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'gemini', label: 'Gemini' },
+  { value: 'custom', label: 'Custom' },
+];
+
 // ── NodeEditPanel ─────────────────────────────────────────────────────────────
 const ICON_OPTIONS = ['🤖','👔','📋','🧑‍💻','⚡','🔍','🚀','🛠','🧪','🔧','📊','💡','🎯','⚙️','🔐','🌐','☁️','🐙','🔔','🔀'];
 const COLOR_OPTIONS = ['#38bdf8','#22c55e','#a78bfa','#f59e0b','#f472b6','#fb923c','#5eead4','#0d9488','#7c3aed','#e11d48','#0078d4','#6e40c9'];
 
-function NodeEditPanel({ node, onChange, onClose }: {
-  node: FlowNode; onChange: (p: Partial<FlowNode>) => void; onClose: () => void;
+function NodeEditPanel({ node, onChange, onClose, flow }: {
+  node: FlowNode; onChange: (p: Partial<FlowNode>) => void; onClose: () => void; flow: Flow;
 }) {
   const { t } = useLocale();
+  const [promptSlugs, setPromptSlugs] = useState<string[]>([]);
+  const actionRef = useRef<HTMLTextAreaElement>(null);
+  const urlRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const headersRef = useRef<HTMLTextAreaElement>(null);
+  const messageRef = useRef<HTMLTextAreaElement>(null);
+  const condValueRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    loadPromptCatalog().then((catalog) => {
+      const slugs = Object.keys(catalog.effective ?? {});
+      setPromptSlugs(slugs);
+    }).catch(() => {});
+  }, []);
+
+  function insertVar(ref: React.RefObject<HTMLTextAreaElement | HTMLInputElement | null>, val: string, currentVal: string, field: string) {
+    const el = ref.current;
+    if (el) {
+      const start = el.selectionStart ?? currentVal.length;
+      const end = el.selectionEnd ?? currentVal.length;
+      const next = currentVal.slice(0, start) + val + currentVal.slice(end);
+      onChange({ [field]: next } as Partial<FlowNode>);
+      setTimeout(() => { el.focus(); el.setSelectionRange(start + val.length, start + val.length); }, 0);
+    } else {
+      onChange({ [field]: currentVal + val } as Partial<FlowNode>);
+    }
+  }
+
   return (
     <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 300, borderLeft: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', flexDirection: 'column', zIndex: 50 }}>
       <div style={{ height: 2, background: 'linear-gradient(90deg, ' + node.color + ', #7c3aed)' }} />
@@ -1158,8 +1314,11 @@ function NodeEditPanel({ node, onChange, onClose }: {
               placeholder={t('flows.nodeRolePlaceholder')} style={pInp} />
           </div>
           <div>
-            <label style={pLbl}>{t('flows.nodeTask')}</label>
-            <textarea value={node.action} onChange={(e) => onChange({ action: e.target.value })}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <label style={{ ...pLbl, marginBottom: 0 }}>{t('flows.nodeTask')}</label>
+              <VariablePicker targetRef={actionRef} onInsert={(val) => insertVar(actionRef, val, node.action ?? '', 'action')} />
+            </div>
+            <textarea ref={actionRef} value={node.action} onChange={(e) => onChange({ action: e.target.value })}
               placeholder={t('flows.nodeTaskPlaceholder')} rows={3}
               style={{ ...pInp, resize: 'vertical', lineHeight: 1.5 }} />
           </div>
@@ -1188,6 +1347,71 @@ function NodeEditPanel({ node, onChange, onClose }: {
               </label>
             </>
           )}
+
+          {/* Model & Provider */}
+          <CollapsibleSection title="Model & Provider" defaultOpen={false}>
+            <div>
+              <label style={pLbl}>Model</label>
+              <select value={node.model ?? ''} onChange={(e) => onChange({ model: e.target.value })}
+                style={{ ...pInp, cursor: 'pointer' }}>
+                <option value="">Default</option>
+                {MODEL_OPTIONS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+            </div>
+            {node.model === 'custom' && (
+              <div>
+                <label style={pLbl}>Custom Model Name</label>
+                <input value={node.model === 'custom' ? (node as FlowNode & { custom_model?: string }).custom_model ?? '' : ''} onChange={(e) => onChange({ model: 'custom', ...({ custom_model: e.target.value } as unknown as Partial<FlowNode>) })}
+                  placeholder="e.g. my-fine-tuned-model" style={pInp} />
+              </div>
+            )}
+            <div>
+              <label style={pLbl}>Provider</label>
+              <select value={node.provider ?? ''} onChange={(e) => onChange({ provider: e.target.value })}
+                style={{ ...pInp, cursor: 'pointer' }}>
+                <option value="">Auto-detect</option>
+                {PROVIDER_OPTIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+              </select>
+            </div>
+          </CollapsibleSection>
+
+          {/* Prompt Studio */}
+          <CollapsibleSection title="Prompt Studio" defaultOpen={false}>
+            <div>
+              <label style={pLbl}>System Prompt</label>
+              <select value={node.prompt_slug ?? ''} onChange={(e) => onChange({ prompt_slug: e.target.value })}
+                style={{ ...pInp, cursor: 'pointer' }}>
+                <option value="">Default (role-based)</option>
+                {promptSlugs.map((slug) => <option key={slug} value={slug}>{slug}</option>)}
+              </select>
+              {node.prompt_slug && (
+                <div style={{ marginTop: 6, display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 10px', borderRadius: 999, background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.3)', fontSize: 11, fontWeight: 600, color: '#a78bfa' }}>
+                  {node.prompt_slug}
+                  <button onClick={() => onChange({ prompt_slug: '' })} style={{ border: 'none', background: 'none', color: '#a78bfa', cursor: 'pointer', fontSize: 13, padding: 0, lineHeight: 1 }}>x</button>
+                </div>
+              )}
+            </div>
+          </CollapsibleSection>
+
+          {/* Generation Settings */}
+          <CollapsibleSection title="Generation Settings" defaultOpen={false}>
+            <div>
+              <label style={pLbl}>Max Tokens</label>
+              <input type="number" value={node.max_tokens ?? 8000} onChange={(e) => onChange({ max_tokens: Math.min(128000, Math.max(1, Number(e.target.value) || 8000)) })}
+                min={1} max={128000} style={pInp} />
+              <div style={{ fontSize: 9, color: 'var(--ink-25)', marginTop: 3 }}>Range: 1 - 128,000</div>
+            </div>
+            <div>
+              <label style={pLbl}>Temperature: {(node.temperature ?? 0.2).toFixed(1)}</label>
+              <input type="range" min={0} max={1} step={0.1} value={node.temperature ?? 0.2}
+                onChange={(e) => onChange({ temperature: parseFloat(e.target.value) })}
+                style={{ width: '100%', accentColor: node.color }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--ink-25)' }}>
+                <span>Precise (0.0)</span>
+                <span>Creative (1.0)</span>
+              </div>
+            </div>
+          </CollapsibleSection>
         </>)}
 
         {/* TRIGGER */}
@@ -1209,22 +1433,91 @@ function NodeEditPanel({ node, onChange, onClose }: {
             </select>
           </div>
           <div>
-            <label style={pLbl}>{t('flows.nodeUrl')}</label>
-            <input value={node.url ?? ''} onChange={(e) => onChange({ url: e.target.value })}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <label style={{ ...pLbl, marginBottom: 0 }}>{t('flows.nodeUrl')}</label>
+              <VariablePicker targetRef={urlRef} onInsert={(val) => insertVar(urlRef, val, node.url ?? '', 'url')} />
+            </div>
+            <input ref={urlRef} value={node.url ?? ''} onChange={(e) => onChange({ url: e.target.value })}
               placeholder={t('flows.nodeUrlPlaceholder')} style={pInp} />
           </div>
           <div>
-            <label style={pLbl}>{t('flows.nodeHeaders')}</label>
-            <textarea value={node.headers ?? ''} onChange={(e) => onChange({ headers: e.target.value })}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <label style={{ ...pLbl, marginBottom: 0 }}>{t('flows.nodeHeaders')}</label>
+              <VariablePicker targetRef={headersRef} onInsert={(val) => insertVar(headersRef, val, node.headers ?? '', 'headers')} />
+            </div>
+            <textarea ref={headersRef} value={node.headers ?? ''} onChange={(e) => onChange({ headers: e.target.value })}
               placeholder={t('flows.nodeHeadersPlaceholder')} rows={2}
               style={{ ...pInp, resize: 'vertical', lineHeight: 1.5, fontFamily: 'monospace', fontSize: 11 }} />
           </div>
           <div>
-            <label style={pLbl}>{t('flows.nodeBody')}</label>
-            <textarea value={node.body ?? ''} onChange={(e) => onChange({ body: e.target.value })}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <label style={{ ...pLbl, marginBottom: 0 }}>{t('flows.nodeBody')}</label>
+              <VariablePicker targetRef={bodyRef} onInsert={(val) => insertVar(bodyRef, val, node.body ?? '', 'body')} />
+            </div>
+            <textarea ref={bodyRef} value={node.body ?? ''} onChange={(e) => onChange({ body: e.target.value })}
               placeholder={t('flows.nodeBodyPlaceholder')} rows={3}
               style={{ ...pInp, resize: 'vertical', lineHeight: 1.5, fontFamily: 'monospace', fontSize: 11 }} />
           </div>
+
+          {/* Authentication */}
+          <CollapsibleSection title="Authentication" defaultOpen={false}>
+            <div>
+              <label style={pLbl}>Auth Type</label>
+              <select value={node.auth_type ?? 'none'} onChange={(e) => onChange({ auth_type: e.target.value })}
+                style={{ ...pInp, cursor: 'pointer' }}>
+                <option value="none">None</option>
+                <option value="bearer">Bearer Token</option>
+                <option value="api_key">API Key</option>
+                <option value="basic">Basic Auth</option>
+              </select>
+            </div>
+            {node.auth_type === 'bearer' && (
+              <div>
+                <label style={pLbl}>Token</label>
+                <input type="password" value={node.auth_token ?? ''} onChange={(e) => onChange({ auth_token: e.target.value })}
+                  placeholder="Bearer token" style={pInp} />
+              </div>
+            )}
+            {node.auth_type === 'api_key' && (<>
+              <div>
+                <label style={pLbl}>Key Name</label>
+                <input value={node.auth_key_name ?? ''} onChange={(e) => onChange({ auth_key_name: e.target.value })}
+                  placeholder="e.g. X-API-Key" style={pInp} />
+              </div>
+              <div>
+                <label style={pLbl}>Key Value</label>
+                <input type="password" value={node.auth_key_value ?? ''} onChange={(e) => onChange({ auth_key_value: e.target.value })}
+                  placeholder="API key value" style={pInp} />
+              </div>
+            </>)}
+            {node.auth_type === 'basic' && (<>
+              <div>
+                <label style={pLbl}>Username</label>
+                <input value={node.auth_key_name ?? ''} onChange={(e) => onChange({ auth_key_name: e.target.value })}
+                  placeholder="Username" style={pInp} />
+              </div>
+              <div>
+                <label style={pLbl}>Password</label>
+                <input type="password" value={node.auth_key_value ?? ''} onChange={(e) => onChange({ auth_key_value: e.target.value })}
+                  placeholder="Password" style={pInp} />
+              </div>
+            </>)}
+          </CollapsibleSection>
+
+          {/* Request Options */}
+          <CollapsibleSection title="Request Options" defaultOpen={false}>
+            <div>
+              <label style={pLbl}>Timeout (seconds)</label>
+              <input type="number" value={node.timeout ?? 30} onChange={(e) => onChange({ timeout: Math.max(1, Number(e.target.value) || 30) })}
+                min={1} max={300} style={pInp} />
+            </div>
+            <div>
+              <label style={pLbl}>Response Variable</label>
+              <input value={node.response_var ?? ''} onChange={(e) => onChange({ response_var: e.target.value })}
+                placeholder="e.g. api_result" style={pInp} />
+              <div style={{ fontSize: 9, color: 'var(--ink-25)', marginTop: 3 }}>Access via {'{{outputs.NODE_ID.result}}'}</div>
+            </div>
+          </CollapsibleSection>
         </>)}
 
         {/* AZURE UPDATE */}
@@ -1266,25 +1559,60 @@ function NodeEditPanel({ node, onChange, onClose }: {
             <input value={node.branch ?? ''} onChange={(e) => onChange({ branch: e.target.value })}
               placeholder={t('flows.nodeBranchPlaceholder')} style={pInp} />
           </div>
-          {(node.github_action === 'create_pr' || !node.github_action) && (
+          {(node.github_action === 'create_pr' || !node.github_action) && (<>
             <div>
               <label style={pLbl}>{t('flows.nodePrTitle')}</label>
               <input value={node.pr_title ?? ''} onChange={(e) => onChange({ pr_title: e.target.value })}
                 placeholder={t('flows.nodePrTitlePlaceholder')} style={pInp} />
             </div>
-          )}
+            <div>
+              <label style={pLbl}>PR Description</label>
+              <textarea value={node.pr_description ?? ''} onChange={(e) => onChange({ pr_description: e.target.value })}
+                placeholder="Markdown template for PR body..." rows={4}
+                style={{ ...pInp, resize: 'vertical', lineHeight: 1.5, fontFamily: 'monospace', fontSize: 11 }} />
+            </div>
+            <div>
+              <label style={pLbl}>Reviewers</label>
+              <input value={node.reviewers ?? ''} onChange={(e) => onChange({ reviewers: e.target.value })}
+                placeholder="user1, user2 (comma-separated)" style={pInp} />
+            </div>
+            <div>
+              <label style={pLbl}>Labels</label>
+              <input value={node.labels ?? ''} onChange={(e) => onChange({ labels: e.target.value })}
+                placeholder="bug, enhancement (comma-separated)" style={pInp} />
+              {node.labels && (
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
+                  {node.labels.split(',').map((l) => l.trim()).filter(Boolean).map((l) => (
+                    <span key={l} style={{ padding: '2px 8px', borderRadius: 999, background: 'rgba(110,64,201,0.12)', border: '1px solid rgba(110,64,201,0.3)', fontSize: 10, fontWeight: 600, color: '#6e40c9' }}>{l}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>)}
         </>)}
 
         {/* NOTIFY */}
         {node.type === 'notify' && (<>
+          <div>
+            <label style={pLbl}>Channel Type</label>
+            <select value={node.notify_channel ?? 'webhook'} onChange={(e) => onChange({ notify_channel: e.target.value })}
+              style={{ ...pInp, cursor: 'pointer' }}>
+              <option value="webhook">Webhook</option>
+              <option value="slack" disabled>Slack (coming soon)</option>
+              <option value="email" disabled>Email (coming soon)</option>
+            </select>
+          </div>
           <div>
             <label style={pLbl}>{t('flows.nodeWebhookUrl')}</label>
             <input value={node.webhook_url ?? ''} onChange={(e) => onChange({ webhook_url: e.target.value })}
               placeholder={t('flows.nodeWebhookUrlPlaceholder')} style={pInp} />
           </div>
           <div>
-            <label style={pLbl}>{t('flows.nodeMessage')}</label>
-            <textarea value={node.notify_message ?? ''} onChange={(e) => onChange({ notify_message: e.target.value })}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <label style={{ ...pLbl, marginBottom: 0 }}>{t('flows.nodeMessage')}</label>
+              <VariablePicker targetRef={messageRef} onInsert={(val) => insertVar(messageRef, val, node.notify_message ?? '', 'notify_message')} />
+            </div>
+            <textarea ref={messageRef} value={node.notify_message ?? ''} onChange={(e) => onChange({ notify_message: e.target.value })}
               placeholder={t('flows.nodeMessagePlaceholder')} rows={2}
               style={{ ...pInp, resize: 'vertical', lineHeight: 1.5 }} />
           </div>
@@ -1304,13 +1632,51 @@ function NodeEditPanel({ node, onChange, onClose }: {
               <option value="eq">{t('flows.nodeOperatorEq')}</option>
               <option value="neq">{t('flows.nodeOperatorNeq')}</option>
               <option value="contains">{t('flows.nodeOperatorContains')}</option>
+              <option value="gt">Greater than</option>
+              <option value="lt">Less than</option>
+              <option value="gte">Greater or equal</option>
+              <option value="lte">Less or equal</option>
+              <option value="regex">Regex match</option>
+              <option value="empty">Is empty</option>
+              <option value="not_empty">Is not empty</option>
             </select>
           </div>
-          <div>
-            <label style={pLbl}>{t('flows.nodeValue')}</label>
-            <input value={node.condition_value ?? ''} onChange={(e) => onChange({ condition_value: e.target.value })}
-              placeholder={t('flows.nodeValuePlaceholder')} style={pInp} />
-          </div>
+          {node.condition_op !== 'empty' && node.condition_op !== 'not_empty' && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <label style={{ ...pLbl, marginBottom: 0 }}>{t('flows.nodeValue')}</label>
+                <VariablePicker targetRef={condValueRef} onInsert={(val) => insertVar(condValueRef, val, node.condition_value ?? '', 'condition_value')} />
+              </div>
+              <input ref={condValueRef} value={node.condition_value ?? ''} onChange={(e) => onChange({ condition_value: e.target.value })}
+                placeholder={t('flows.nodeValuePlaceholder')} style={pInp} />
+            </div>
+          )}
+
+          {/* Branching paths */}
+          <CollapsibleSection title="Branch Targets" defaultOpen={true}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+              <div style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.06)' }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: '#22c55e', marginBottom: 6, letterSpacing: 1, textTransform: 'uppercase' }}>True path</div>
+                <select value={node.true_target ?? ''} onChange={(e) => onChange({ true_target: e.target.value })}
+                  style={{ ...pInp, fontSize: 11, padding: '6px 8px', cursor: 'pointer' }}>
+                  <option value="">-- none --</option>
+                  {flow.nodes.filter((n) => n.id !== node.id).map((n) => (
+                    <option key={n.id} value={n.id}>{n.label} ({n.id})</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.06)' }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: '#f87171', marginBottom: 6, letterSpacing: 1, textTransform: 'uppercase' }}>False path</div>
+                <select value={node.false_target ?? ''} onChange={(e) => onChange({ false_target: e.target.value })}
+                  style={{ ...pInp, fontSize: 11, padding: '6px 8px', cursor: 'pointer' }}>
+                  <option value="">-- none --</option>
+                  {flow.nodes.filter((n) => n.id !== node.id).map((n) => (
+                    <option key={n.id} value={n.id}>{n.label} ({n.id})</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </CollapsibleSection>
         </>)}
 
       </div>

@@ -492,7 +492,17 @@ async def _run_agent_node(
         small_model=model,
         large_model=model,
     )
-    system_prompt = (await PromptService.get(db, 'flow_agent_node_system_prompt')).replace('{role}', role)
+    # Use node-level prompt_slug if set, otherwise default
+    prompt_slug = node.get('prompt_slug', '').strip()
+    if prompt_slug:
+        try:
+            system_prompt = await PromptService.get(db, prompt_slug)
+        except Exception:
+            system_prompt = (await PromptService.get(db, 'flow_agent_node_system_prompt')).replace('{role}', role)
+    else:
+        system_prompt = (await PromptService.get(db, 'flow_agent_node_system_prompt')).replace('{role}', role)
+
+    max_tokens = int(node.get('max_tokens', 0) or 0) or AGENT_TOKEN_LIMITS['agent_node']
     user_prompt = (
         f"Task: {task.get('title', '')}\n"
         f"Description: {task.get('description', '')}\n"
@@ -503,7 +513,7 @@ async def _run_agent_node(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             complexity_hint='normal',
-            max_output_tokens=AGENT_TOKEN_LIMITS['agent_node'],
+            max_output_tokens=max_tokens,
         )
         return {'status': 'ok', 'output': output, 'role': role, 'model': used_model, 'usage': usage_meta}
     except Exception as exc:
@@ -512,39 +522,72 @@ async def _run_agent_node(
 
 
 async def _run_http_node(node: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
-    """HTTP isteği atar."""
+    """HTTP request with auth, timeout, and response variable support."""
     url: str = node.get('url', '')
     method: str = node.get('method', 'GET').upper()
-    headers: dict[str, str] = node.get('headers', {})
+    headers: dict[str, str] = dict(node.get('headers', {}))
     body_template: str = node.get('body', '')
+    timeout_sec: int = int(node.get('timeout', 30) or 30)
+    auth_type: str = node.get('auth_type', 'none')
+    response_var: str = node.get('response_var', '')
 
     if not url:
-        return {'status': 'error', 'message': 'URL belirtilmedi'}
+        return {'status': 'error', 'message': 'URL not specified'}
 
-    # Context değişkenlerini body'ye inject et
+    # Apply auth headers
+    if auth_type == 'bearer':
+        token = node.get('auth_token', '')
+        if token:
+            headers['Authorization'] = f'Bearer {token}'
+    elif auth_type == 'api_key':
+        key_name = node.get('auth_key_name', 'X-API-Key')
+        key_value = node.get('auth_key_value', '')
+        if key_name and key_value:
+            headers[key_name] = key_value
+    elif auth_type == 'basic':
+        import base64
+        username = node.get('auth_username', '')
+        password = node.get('auth_password', '')
+        if username:
+            cred = base64.b64encode(f'{username}:{password}'.encode()).decode()
+            headers['Authorization'] = f'Basic {cred}'
+
+    # Inject context variables into url and body
     task = context.get('task', {})
-    body_str = body_template
     for k, v in task.items():
-        body_str = body_str.replace(f'{{{{{k}}}}}', str(v))
+        url = url.replace(f'{{{{{k}}}}}', str(v))
+        body_template = body_template.replace(f'{{{{{k}}}}}', str(v))
+    # Also inject outputs
+    for nid, out in context.get('outputs', {}).items():
+        if isinstance(out, dict):
+            for ok, ov in out.items():
+                placeholder = f'{{{{outputs.{nid}.{ok}}}}}'
+                url = url.replace(placeholder, str(ov))
+                body_template = body_template.replace(placeholder, str(ov))
 
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=timeout_sec) as client:
             req_kwargs: dict[str, Any] = {'headers': headers}
-            if method in ('POST', 'PUT', 'PATCH') and body_str:
+            if method in ('POST', 'PUT', 'PATCH') and body_template:
                 try:
-                    req_kwargs['json'] = json.loads(body_str)
+                    req_kwargs['json'] = json.loads(body_template)
                 except Exception:
-                    req_kwargs['content'] = body_str.encode()
+                    req_kwargs['content'] = body_template.encode()
             r = await client.request(method, url, **req_kwargs)
             try:
                 resp_body = r.json()
             except Exception:
                 resp_body = r.text
-            return {
+
+            result = {
                 'status': 'ok' if r.is_success else 'error',
                 'http_status': r.status_code,
                 'response': resp_body,
             }
+            # Store response in named variable for downstream nodes
+            if response_var:
+                result['result'] = resp_body
+            return result
     except Exception as e:
         return {'status': 'error', 'message': str(e)}
 
@@ -1038,24 +1081,59 @@ async def _run_notify_node(node: dict[str, Any], context: dict[str, Any]) -> dic
 
 
 def _run_condition_node(node: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
-    """Basit condition — field == value kontrolü."""
+    """Condition node with branching support and extended operators."""
     field = node.get('condition_field', '')
     operator = node.get('condition_op', 'eq')
     value = node.get('condition_value', '')
 
     task = context.get('task', {})
-    actual = str(task.get(field, context.get(field, '')))
+    # Resolve field from task, outputs, or context
+    actual_raw = task.get(field, context.get(field, ''))
+    # Also check outputs (e.g., "outputs.node_id.result")
+    if field.startswith('outputs.'):
+        parts = field.split('.', 2)
+        if len(parts) >= 3:
+            actual_raw = context.get('outputs', {}).get(parts[1], {}).get(parts[2], '')
+        elif len(parts) == 2:
+            actual_raw = context.get('outputs', {}).get(parts[1], '')
+    actual = str(actual_raw)
 
     if operator == 'eq':
         result = actual == str(value)
-    elif operator == 'contains':
-        result = str(value).lower() in actual.lower()
     elif operator == 'neq':
         result = actual != str(value)
+    elif operator == 'contains':
+        result = str(value).lower() in actual.lower()
+    elif operator == 'gt':
+        try: result = float(actual) > float(value)
+        except ValueError: result = actual > str(value)
+    elif operator == 'lt':
+        try: result = float(actual) < float(value)
+        except ValueError: result = actual < str(value)
+    elif operator == 'gte':
+        try: result = float(actual) >= float(value)
+        except ValueError: result = actual >= str(value)
+    elif operator == 'lte':
+        try: result = float(actual) <= float(value)
+        except ValueError: result = actual <= str(value)
+    elif operator == 'regex':
+        import re as _re
+        try: result = bool(_re.search(str(value), actual))
+        except _re.error: result = False
+    elif operator == 'empty':
+        result = not actual.strip()
+    elif operator == 'not_empty':
+        result = bool(actual.strip())
     else:
         result = bool(actual)
 
-    return {'status': 'ok', 'result': result, 'branch': 'true' if result else 'false'}
+    return {
+        'status': 'ok',
+        'result': result,
+        'branch': 'true' if result else 'false',
+        'true_target': node.get('true_target', ''),
+        'false_target': node.get('false_target', ''),
+    }
 
 
 # ── Main runner ───────────────────────────────────────────────────────────────
@@ -1092,10 +1170,27 @@ async def run_flow(
     context: dict[str, Any] = {'task': task, 'outputs': {}, 'user_id': user_id}
     overall_status = 'completed'
 
+    skip_nodes: set[str] = set()  # Nodes to skip due to condition branching
+    node_map = {n['id']: n for n in ordered}
+
     for node in ordered:
+        node_id = node['id']
+
+        # Skip nodes excluded by condition branching
+        if node_id in skip_nodes:
+            step = FlowRunStep(
+                run_id=flow_run.id, node_id=node_id,
+                node_type=node.get('type', 'agent'), node_label=node.get('label', ''),
+                status='skipped', input_json='{}',
+                started_at=datetime.now(timezone.utc), finished_at=datetime.now(timezone.utc),
+            )
+            db.add(step)
+            await db.flush()
+            continue
+
         step = FlowRunStep(
             run_id=flow_run.id,
-            node_id=node['id'],
+            node_id=node_id,
             node_type=node.get('type', 'agent'),
             node_label=node.get('label', ''),
             status='running',
@@ -1109,15 +1204,22 @@ async def run_flow(
             output = await execute_node(node, context, db, organization_id)
             step.status = 'completed' if output.get('status') != 'error' else 'failed'
             step.output_json = json.dumps(output, ensure_ascii=False, default=str)
-            context['outputs'][node['id']] = output
+            context['outputs'][node_id] = output
 
-            # Condition node → branch context'e ekle
+            # Condition node → apply branching
             if node.get('type') == 'condition':
                 context['last_condition'] = output.get('result', False)
+                branch = output.get('branch', 'true')
+                true_target = output.get('true_target', '')
+                false_target = output.get('false_target', '')
+                # Skip the path that wasn't taken
+                if branch == 'true' and false_target:
+                    skip_nodes.add(false_target)
+                elif branch == 'false' and true_target:
+                    skip_nodes.add(true_target)
 
             if step.status == 'failed':
                 overall_status = 'failed'
-                # Hata durumunda dur
                 step.finished_at = datetime.now(timezone.utc)
                 await db.flush()
                 break
@@ -1126,7 +1228,7 @@ async def run_flow(
             step.status = 'failed'
             step.error_msg = str(e)
             overall_status = 'failed'
-            logger.exception('Flow step failed: %s', node.get('id'))
+            logger.exception('Flow step failed: %s', node_id)
 
         step.finished_at = datetime.now(timezone.utc)
         await db.flush()
