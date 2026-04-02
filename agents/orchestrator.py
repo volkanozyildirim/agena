@@ -6,6 +6,7 @@ from agents.crewai_agents import CrewAIAgentRunner
 from agents.langgraph_flow import OrchestrationState, build_graph
 from memory.qdrant import QdrantMemoryStore
 from services.llm.provider import LLMProvider
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class AgentOrchestrator:
@@ -13,12 +14,13 @@ class AgentOrchestrator:
         self,
         llm_provider: LLMProvider | None = None,
         *,
+        db: AsyncSession | None = None,
         memory_provider: str | None = None,
         memory_api_key: str | None = None,
         memory_base_url: str | None = None,
         memory_model: str | None = None,
     ) -> None:
-        self.agents = CrewAIAgentRunner(llm_provider=llm_provider)
+        self.agents = CrewAIAgentRunner(llm_provider=llm_provider, db=db)
         self.memory_store = QdrantMemoryStore(
             embedding_provider=memory_provider,
             embedding_api_key=memory_api_key,
