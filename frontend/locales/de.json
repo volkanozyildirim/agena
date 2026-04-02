@@ -1875,5 +1875,9 @@
   "nav.group.analytics": "Analytik",
   "nav.group.settings": "Einstellungen",
   "agents.promptCustom": "Benutzerdefinierter Prompt (Freitext)",
-  "agents.promptCustomPlaceholder": "Eigenen System-Prompt schreiben oder oben aus Prompt Studio wahlen..."
+  "agents.promptCustomPlaceholder": "Eigenen System-Prompt schreiben oder oben aus Prompt Studio wahlen...",
+  "mappings.confirmDeleteTitle": "Mapping loschen",
+  "mappings.confirmDeleteDesc": "Dieses Mapping wird dauerhaft geloscht. Diese Aktion kann nicht ruckgangig gemacht werden.",
+  "mappings.confirmDelete": "Ja, loschen",
+  "mappings.cancel": "Abbrechen"
 }

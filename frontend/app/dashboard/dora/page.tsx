@@ -214,7 +214,8 @@ export default function DoraOverviewPage() {
       };
       currentRepos.push(mapping);
       setRepos(currentRepos);
-      try { await savePrefs({ repo_mappings: currentRepos }); } catch { /* silent */ }
+      // NOTE: intentionally NOT saving to preferences — DORA sync mappings
+      // are ephemeral and should not pollute the repo_mappings page
     }
 
     try {

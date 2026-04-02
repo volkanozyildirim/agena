@@ -1875,5 +1875,9 @@
   "nav.group.analytics": "Analitica",
   "nav.group.settings": "Configuracion",
   "agents.promptCustom": "Prompt personalizado (texto libre)",
-  "agents.promptCustomPlaceholder": "Escriba un prompt personalizado o seleccione de Prompt Studio..."
+  "agents.promptCustomPlaceholder": "Escriba un prompt personalizado o seleccione de Prompt Studio...",
+  "mappings.confirmDeleteTitle": "Eliminar Mapping",
+  "mappings.confirmDeleteDesc": "Este mapping se eliminara permanentemente. Esta accion no se puede deshacer.",
+  "mappings.confirmDelete": "Si, Eliminar",
+  "mappings.cancel": "Cancelar"
 }

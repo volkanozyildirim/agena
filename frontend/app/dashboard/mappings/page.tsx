@@ -66,6 +66,7 @@ export default function RepoMappingsPage() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [loadingRepos, setLoadingRepos] = useState(false);
   const [loadingGithubRepos, setLoadingGithubRepos] = useState(false);
@@ -646,7 +647,7 @@ export default function RepoMappingsPage() {
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                     <button onClick={() => startEdit(m)} className='button button-outline' style={{ padding: '5px 10px', fontSize: 11 }}>{t('mappings.edit')}</button>
-                    <button onClick={() => void removeMapping(m.id)} className='button button-outline' style={{ padding: '5px 10px', fontSize: 11, borderColor: 'rgba(239,68,68,0.3)', color: '#ef4444' }}>{t('mappings.delete')}</button>
+                    <button onClick={() => setConfirmDeleteId(m.id)} className='button button-outline' style={{ padding: '5px 10px', fontSize: 11, borderColor: 'rgba(239,68,68,0.3)', color: '#ef4444' }}>{t('mappings.delete')}</button>
                   </div>
                 </div>
 
@@ -787,6 +788,23 @@ export default function RepoMappingsPage() {
                 {t('mappings.regenerate')}
               </button>
               <button className='button button-outline' onClick={() => { setAgentsMdViewId(null); setAgentsMdContent(null); }} style={{ fontSize: 12 }}>{t('mappings.close')}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {confirmDeleteId && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }} onClick={() => setConfirmDeleteId(null)}>
+          <div style={{ width: 'min(400px, 90vw)', borderRadius: 16, background: 'var(--surface)', border: '1px solid rgba(239,68,68,0.2)', padding: '24px', boxShadow: '0 16px 48px rgba(0,0,0,0.4)' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--ink-90)', marginBottom: 8 }}>{t('mappings.confirmDeleteTitle')}</div>
+            <div style={{ fontSize: 13, color: 'var(--ink-58)', marginBottom: 6 }}>
+              {items.find((m) => m.id === confirmDeleteId)?.name || ''}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--ink-42)', marginBottom: 20 }}>{t('mappings.confirmDeleteDesc')}</div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setConfirmDeleteId(null)} style={{ padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 600, background: 'var(--panel)', border: '1px solid var(--panel-border)', color: 'var(--ink-58)', cursor: 'pointer' }}>{t('mappings.cancel')}</button>
+              <button onClick={() => { void removeMapping(confirmDeleteId); setConfirmDeleteId(null); }} style={{ padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 700, background: '#ef4444', border: 'none', color: '#fff', cursor: 'pointer' }}>{t('mappings.confirmDelete')}</button>
             </div>
           </div>
         </div>

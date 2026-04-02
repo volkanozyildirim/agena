@@ -1875,5 +1875,9 @@
   "nav.group.analytics": "Analitik",
   "nav.group.settings": "Ayarlar",
   "agents.promptCustom": "Ozel Prompt (serbest metin)",
-  "agents.promptCustomPlaceholder": "Ozel system prompt yazin veya yukaridan Prompt Studio'dan secin..."
+  "agents.promptCustomPlaceholder": "Ozel system prompt yazin veya yukaridan Prompt Studio'dan secin...",
+  "mappings.confirmDeleteTitle": "Mapping Silinecek",
+  "mappings.confirmDeleteDesc": "Bu mapping silinecek. Bu islem geri alinamaz.",
+  "mappings.confirmDelete": "Evet, Sil",
+  "mappings.cancel": "Vazgec"
 }
