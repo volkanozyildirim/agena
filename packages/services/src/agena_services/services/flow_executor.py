@@ -44,9 +44,11 @@ async def _resolve_agent_model(
         try:
             agents = json.loads(pref.agents_json)
             role_map = {
-                'pm': ['pm', 'product_review', 'product_manager'],
+                'pm': ['pm', 'product_review', 'product_manager', 'analyzer'],
+                'planner': ['planner'],
                 'developer': ['developer', 'dev'],
                 'lead_developer': ['lead_developer', 'lead'],
+                'reviewer': ['reviewer', 'code_reviewer'],
                 'qa': ['qa', 'tester'],
             }
             match_roles = role_map.get(node_role.lower(), [node_role.lower()])
@@ -388,6 +390,87 @@ async def _run_product_review_node(
         return {'status': 'error', 'role': role, 'message': str(exc)}
 
 
+async def _run_planner_node(
+    node: dict[str, Any],
+    context: dict[str, Any],
+    db: AsyncSession,
+    organization_id: int,
+) -> dict[str, Any]:
+    """Planner agent: creates implementation plan with file-level changes."""
+    task = context.get('task', {})
+    user_id = context.get('user_id', 0)
+    role = node.get('role', 'planner')
+
+    resolved_model, resolved_provider = await _resolve_agent_model(
+        db, user_id, role, node.get('model', ''), default='gpt-4o',
+    )
+    provider = (str(node.get('provider') or resolved_provider or '') or 'openai').strip().lower()
+    if provider not in {'openai', 'gemini'}:
+        provider = 'openai'
+    cfg = await IntegrationConfigService(db).get_config(organization_id, provider)
+    api_key = (cfg.secret if cfg else '') or ''
+    base_url = (cfg.base_url if cfg else '') or ''
+    if not api_key or api_key.startswith('your_'):
+        fallback = await IntegrationConfigService(db).get_config(organization_id, 'openai')
+        api_key = (fallback.secret if fallback else '') or ''
+        base_url = (fallback.base_url if fallback else '') or ''
+        provider = 'openai'
+
+    llm = LLMProvider(
+        provider=provider, api_key=api_key or None, base_url=base_url or None,
+        small_model=resolved_model, large_model=resolved_model,
+    )
+
+    # Use node-level prompt_slug or default planner prompt
+    prompt_slug = node.get('prompt_slug', '').strip()
+    if prompt_slug:
+        try:
+            system_prompt = await PromptService.get(db, prompt_slug)
+        except Exception:
+            system_prompt = await PromptService.get(db, 'ai_plan_system_prompt')
+    else:
+        system_prompt = await PromptService.get(db, 'ai_plan_system_prompt')
+
+    # Build user prompt including analyzer output if available
+    user_prompt = (
+        f"Task title: {task.get('title', '')}\n"
+        f"Task description: {task.get('description', '')}\n"
+    )
+    if context.get('product_review_output'):
+        user_prompt += f"\nAnalyzer output:\n{json.dumps(context['product_review_output'], indent=2)}\n"
+    if context.get('product_review_raw'):
+        user_prompt += f"\nRaw analysis:\n{context['product_review_raw'][:3000]}\n"
+
+    user_prompt += "\nReturn JSON with: plan (string), files (string[]), changes (object[]).\n"
+
+    max_tokens = int(node.get('max_tokens', 0) or 0) or AGENT_TOKEN_LIMITS['planner']
+
+    try:
+        output, usage_meta, used_model, _ = await llm.generate(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            complexity_hint='high',
+            max_output_tokens=max_tokens,
+        )
+        parsed: dict[str, Any] = {}
+        try:
+            raw = output.strip()
+            if raw.startswith('```'):
+                raw = raw.split('\n', 1)[1].rsplit('```', 1)[0]
+            parsed = json.loads(raw)
+        except Exception:
+            parsed = {'plan': output, 'files': [], 'changes': []}
+
+        context['plan_output'] = parsed
+        return {
+            'status': 'ok', 'role': role, 'model': used_model,
+            'output': parsed, 'usage': usage_meta,
+        }
+    except Exception as exc:
+        logger.warning('Planner LLM call failed: %s', exc)
+        return {'status': 'error', 'role': role, 'message': str(exc)}
+
+
 async def _run_agent_node(
     node: dict[str, Any],
     context: dict[str, Any],
@@ -406,9 +489,13 @@ async def _run_agent_node(
     action_text = str(action or '').lower()
     role_lower = str(role).strip().lower()
 
-    # Product Review node → gerçek LLM spec üretimi
-    if role_lower in ('product_review', 'pm', 'product_manager'):
+    # Product Review / Analyzer node → gerçek LLM spec üretimi
+    if role_lower in ('product_review', 'pm', 'product_manager', 'analyzer'):
         return await _run_product_review_node(node, context, db, organization_id)
+
+    # Planner node → plan + file list
+    if role_lower == 'planner':
+        return await _run_planner_node(node, context, db, organization_id)
 
     execute_task_pipeline = _bool_val(node.get('execute_task_pipeline'), False) or (
         role_lower == 'developer' and ('pr' in action_text or not action_text)

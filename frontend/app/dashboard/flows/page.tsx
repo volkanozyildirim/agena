@@ -106,8 +106,11 @@ interface DryRunStep {
 const AGENT_PRESETS: { role: AgentRole; icon: string; color: string }[] = [
   { role: 'manager', icon: '👔', color: '#f59e0b' },
   { role: 'pm', icon: '📋', color: '#a78bfa' },
+  { role: 'analyzer', icon: '🔬', color: '#8b5cf6' },
+  { role: 'planner', icon: '🗺️', color: '#06b6d4' },
   { role: 'lead_developer', icon: '🧑‍💻', color: '#38bdf8' },
   { role: 'developer', icon: '⚡', color: '#22c55e' },
+  { role: 'reviewer', icon: '🔎', color: '#f97316' },
   { role: 'qa', icon: '🔍', color: '#f472b6' },
 ];
 
@@ -124,8 +127,11 @@ const NODE_TYPE_PRESETS: { type: NodeType; icon: string; color: string }[] = [
 function agentRoleLabel(role: AgentRole, t: ReturnType<typeof useLocale>['t']) {
   if (role === 'manager') return t('agents.role.manager.label');
   if (role === 'pm') return t('agents.role.pm.label');
+  if (role === 'analyzer') return 'Analyzer';
+  if (role === 'planner') return 'Planner';
   if (role === 'lead_developer') return t('agents.role.leadDeveloper.label');
   if (role === 'developer') return t('agents.role.developer.label');
+  if (role === 'reviewer') return 'Code Reviewer';
   if (role === 'qa') return t('agents.role.qa.label');
   return role;
 }
@@ -172,14 +178,16 @@ function presetFlows(t: ReturnType<typeof useLocale>['t']): Flow[] {
     name: 'Azure DevOps PR Flow',
     createdAt: new Date().toISOString(),
     nodes: [
-      { id: 'a1', type: 'trigger', role: 'trigger', label: 'Task Trigger', icon: '⚡', color: '#f59e0b', action: 'Triggered from sprint backlog', waitForApproval: false, x: 60, y: 160 },
-      { id: 'a2', type: 'agent', role: 'pm', label: 'PM Analysis', icon: '📋', color: '#a78bfa', action: 'Analyze task and create implementation plan', waitForApproval: false, x: 260, y: 160 },
-      { id: 'a3', type: 'agent', role: 'developer', label: 'Developer', icon: '⚡', color: '#22c55e', action: 'Implement the task according to the plan', execute_task_pipeline: true, waitForApproval: false, x: 460, y: 160 },
-      { id: 'a4', type: 'azure_devops', role: 'azure_devops', label: 'Create PR', icon: '🔷', color: '#0078d4', action: 'Create pull request on Azure DevOps', azure_action: 'create_pr', azure_pr_title: 'AI: {{task.title}}', azure_pr_description: '## Summary\nAI-generated implementation for: {{task.title}}\n\n{{task.description}}', waitForApproval: false, x: 660, y: 160 },
-      { id: 'a5', type: 'azure_update', role: 'azure_update', label: 'Update Work Item', icon: '☁️', color: '#0078d4', action: 'Set work item to Code Review', new_state: 'Code Review', comment: 'AI PR created — ready for review', waitForApproval: false, x: 860, y: 160 },
-      { id: 'a6', type: 'notify', role: 'notify', label: 'Notify Team', icon: '🔔', color: '#fb923c', action: 'Notify team about PR', notify_message: 'PR created for: {{task.title}}', waitForApproval: false, x: 1060, y: 160 },
+      { id: 'a1', type: 'trigger', role: 'trigger', label: 'Task Trigger', icon: '⚡', color: '#f59e0b', action: 'Triggered from sprint backlog', waitForApproval: false, x: 60, y: 180 },
+      { id: 'a2', type: 'agent', role: 'analyzer', label: 'Analyzer', icon: '🔬', color: '#8b5cf6', action: 'Analyze task scope, identify affected files, estimate complexity and risks', prompt_slug: 'pm_system_prompt', waitForApproval: false, x: 240, y: 180 },
+      { id: 'a3', type: 'agent', role: 'planner', label: 'Planner', icon: '🗺️', color: '#06b6d4', action: 'Create detailed implementation plan with file-level changes', prompt_slug: 'ai_plan_system_prompt', waitForApproval: true, x: 420, y: 180 },
+      { id: 'a4', type: 'agent', role: 'developer', label: 'Developer', icon: '⚡', color: '#22c55e', action: 'Implement code changes following the plan', prompt_slug: 'ai_code_system_prompt', execute_task_pipeline: true, waitForApproval: false, x: 600, y: 180 },
+      { id: 'a5', type: 'agent', role: 'reviewer', label: 'Code Reviewer', icon: '🔎', color: '#f97316', action: 'Review generated patches for correctness and security', prompt_slug: 'reviewer_system_prompt', waitForApproval: false, x: 780, y: 180 },
+      { id: 'a6', type: 'azure_devops', role: 'azure_devops', label: 'Create PR', icon: '🔷', color: '#0078d4', action: 'Create pull request on Azure DevOps', azure_action: 'create_pr', azure_pr_title: 'AI: {{task.title}}', azure_pr_description: '## Summary\nAI-generated implementation for: {{task.title}}\n\n{{task.description}}', waitForApproval: false, x: 960, y: 180 },
+      { id: 'a7', type: 'azure_update', role: 'azure_update', label: 'Update Work Item', icon: '☁️', color: '#0078d4', action: 'Set work item to Code Review', new_state: 'Code Review', comment: 'AI PR created — ready for review', waitForApproval: false, x: 1140, y: 180 },
+      { id: 'a8', type: 'notify', role: 'notify', label: 'Notify', icon: '🔔', color: '#fb923c', action: 'Notify team', notify_message: 'PR created for: {{task.title}}', waitForApproval: false, x: 1320, y: 180 },
     ],
-    edges: [{ from: 'a1', to: 'a2' }, { from: 'a2', to: 'a3' }, { from: 'a3', to: 'a4' }, { from: 'a4', to: 'a5' }, { from: 'a5', to: 'a6' }],
+    edges: [{ from: 'a1', to: 'a2' }, { from: 'a2', to: 'a3' }, { from: 'a3', to: 'a4' }, { from: 'a4', to: 'a5' }, { from: 'a5', to: 'a6' }, { from: 'a6', to: 'a7' }, { from: 'a7', to: 'a8' }],
   },
   {
     id: 'quick-fix',
@@ -1282,6 +1290,8 @@ function NodeEditPanel({ node, onChange, onClose, flow }: {
       .catch(() => {});
   }, []);
 
+  const [azureTeamMembers, setAzureTeamMembers] = useState<{ displayName: string; uniqueName: string }[]>([]);
+
   // Load repos when azure project changes
   useEffect(() => {
     if (node.type !== 'azure_devops' || !node.azure_project) return;
@@ -1290,6 +1300,10 @@ function NodeEditPanel({ node, onChange, onClose, flow }: {
       .then((repos) => setAzureRepos(repos.map((r) => r.name)))
       .catch(() => setAzureRepos([]))
       .finally(() => setAzureReposLoading(false));
+    // Load team members for reviewer selection
+    apiFetch<{ displayName: string; uniqueName: string }[]>(`/tasks/azure/teams?project=${encodeURIComponent(node.azure_project)}`)
+      .then((members) => setAzureTeamMembers(members))
+      .catch(() => setAzureTeamMembers([]));
   }, [node.type, node.azure_project]);
 
   function insertVar(ref: React.RefObject<HTMLTextAreaElement | HTMLInputElement | null>, val: string, currentVal: string, field: string) {
@@ -1704,8 +1718,37 @@ function NodeEditPanel({ node, onChange, onClose, flow }: {
             </div>
             <div>
               <label style={pLbl}>Reviewers</label>
-              <input value={node.azure_reviewers ?? ''} onChange={(e) => onChange({ azure_reviewers: e.target.value })}
-                placeholder="user@company.com (comma-separated)" style={pInp} />
+              {azureTeamMembers.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxHeight: 120, overflowY: 'auto' }}>
+                    {azureTeamMembers.map((m) => {
+                      const selected = (node.azure_reviewers || '').includes(m.uniqueName);
+                      return (
+                        <button key={m.uniqueName} onClick={() => {
+                          const current = (node.azure_reviewers || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+                          const next = selected ? current.filter((c: string) => c !== m.uniqueName) : [...current, m.uniqueName];
+                          onChange({ azure_reviewers: next.join(', ') });
+                        }} style={{
+                          padding: '3px 8px', borderRadius: 999, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+                          background: selected ? 'rgba(0,120,212,0.15)' : 'var(--panel)',
+                          border: selected ? '1px solid rgba(0,120,212,0.4)' : '1px solid var(--panel-border)',
+                          color: selected ? '#0078d4' : 'var(--ink-50)',
+                        }}>
+                          {selected ? '✓ ' : ''}{m.displayName}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {node.azure_reviewers && (
+                    <div style={{ fontSize: 10, color: 'var(--ink-35)' }}>
+                      {(node.azure_reviewers || '').split(',').filter((s: string) => s.trim()).length} reviewer selected
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <input value={node.azure_reviewers ?? ''} onChange={(e) => onChange({ azure_reviewers: e.target.value })}
+                  placeholder="user@company.com (comma-separated)" style={pInp} />
+              )}
             </div>
           </>)}
         </>)}
