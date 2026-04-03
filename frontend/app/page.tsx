@@ -38,16 +38,24 @@ function SpotlightCursor() {
   );
 }
 
-/* ── Floating particles ── */
+/* ── Floating particles (client-only to avoid hydration mismatch) ── */
 function Particles() {
-  const particles = Array.from({ length: 30 }, (_, i) => ({
-    id: i,
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    size: Math.random() * 3 + 1,
-    delay: Math.random() * 8,
-    duration: Math.random() * 10 + 8,
-  }));
+  const [particles, setParticles] = useState<
+    { id: number; x: number; y: number; size: number; delay: number; duration: number }[]
+  >([]);
+
+  useEffect(() => {
+    setParticles(
+      Array.from({ length: 30 }, (_, i) => ({
+        id: i,
+        x: Math.random() * 100,
+        y: Math.random() * 100,
+        size: Math.random() * 3 + 1,
+        delay: Math.random() * 8,
+        duration: Math.random() * 10 + 8,
+      }))
+    );
+  }, []);
 
   return (
     <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
