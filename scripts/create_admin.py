@@ -2,13 +2,13 @@
 """Create a platform admin user.
 
 Usage (inside backend container):
-    python -m scripts.create_admin --email admin@agena.dev --password 'YourStr0ng!Pass' --name 'Platform Admin'
+    python /app/scripts/create_admin.py
 
 Usage (via docker):
-    docker exec ai_agent_api python /app/scripts/create_admin.py --email admin@agena.dev --password 'YourStr0ng!Pass'
+    docker exec -it ai_agent_api python /app/scripts/create_admin.py
 """
-import argparse
 import asyncio
+import getpass
 import re
 import sys
 
@@ -16,7 +16,7 @@ from sqlalchemy import select
 
 from agena_core.database import SessionLocal
 from agena_core.security.passwords import hash_password
-from agena_models.models.organization import Organization, slugify
+from agena_models.models.organization import Organization
 from agena_models.models.organization_member import OrganizationMember
 from agena_models.models.subscription import Subscription
 from agena_models.models.user import User
@@ -25,26 +25,67 @@ from agena_models.models.user import User
 PASSWORD_PATTERN = re.compile(
     r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};:,.<>?]).{12,}$'
 )
+EMAIL_PATTERN = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 
 ADMIN_ORG_NAME = 'AGENA Platform'
 ADMIN_ORG_SLUG = 'agena-platform'
 
 
-async def create_admin(email: str, password: str, name: str) -> None:
-    if not PASSWORD_PATTERN.match(password):
-        print('ERROR: Password must be at least 12 characters with uppercase, lowercase, digit, and special character.')
-        sys.exit(1)
+def collect_input() -> tuple[str, str, str]:
+    print()
+    print('╔══════════════════════════════════════════╗')
+    print('║     AGENA — Create Platform Admin        ║')
+    print('╚══════════════════════════════════════════╝')
+    print()
 
+    # Email
+    while True:
+        email = input('  Email: ').strip()
+        if EMAIL_PATTERN.match(email):
+            break
+        print('  ✗ Invalid email format. Try again.\n')
+
+    # Full name
+    name = input('  Full Name: ').strip()
+    if not name:
+        name = 'Platform Admin'
+
+    # Password
+    print()
+    print('  Password rules:')
+    print('    • Minimum 12 characters')
+    print('    • At least 1 uppercase letter')
+    print('    • At least 1 lowercase letter')
+    print('    • At least 1 digit')
+    print('    • At least 1 special character (!@#$%^&*...)')
+    print()
+
+    while True:
+        password = getpass.getpass('  Password: ')
+        if not PASSWORD_PATTERN.match(password):
+            print('  ✗ Password does not meet requirements. Try again.\n')
+            continue
+
+        confirm = getpass.getpass('  Confirm Password: ')
+        if password != confirm:
+            print('  ✗ Passwords do not match. Try again.\n')
+            continue
+
+        break
+
+    return email, password, name
+
+
+async def create_admin(email: str, password: str, name: str) -> None:
     async with SessionLocal() as db:
         # Check if user already exists
         existing = await db.execute(select(User).where(User.email == email))
         user = existing.scalar_one_or_none()
 
         if user:
-            # Promote existing user to platform admin
             user.is_platform_admin = True
             await db.commit()
-            print(f'Existing user {email} promoted to platform admin.')
+            print(f'\n  ✓ Existing user "{email}" promoted to platform admin.\n')
             return
 
         # Get or create platform admin org
@@ -66,22 +107,28 @@ async def create_admin(email: str, password: str, name: str) -> None:
         db.add(user)
         await db.flush()
 
-        # Add to admin org as owner
         db.add(OrganizationMember(organization_id=org.id, user_id=user.id, role='owner'))
         await db.commit()
 
-        print(f'Platform admin created: {email} (org: {ADMIN_ORG_NAME})')
-        print(f'Login at: https://agena.dev/signin')
+        print()
+        print('  ╔══════════════════════════════════════╗')
+        print('  ║  ✓ Platform admin created!            ║')
+        print('  ╚══════════════════════════════════════╝')
+        print(f'  Email: {email}')
+        print(f'  Name:  {name}')
+        print(f'  Org:   {ADMIN_ORG_NAME}')
+        print(f'  Login: https://agena.dev/signin')
+        print()
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description='Create a platform admin user')
-    parser.add_argument('--email', required=True, help='Admin email')
-    parser.add_argument('--password', required=True, help='Strong password (12+ chars, upper/lower/digit/special)')
-    parser.add_argument('--name', default='Platform Admin', help='Full name')
-    args = parser.parse_args()
+    try:
+        email, password, name = collect_input()
+    except (KeyboardInterrupt, EOFError):
+        print('\n\n  Cancelled.\n')
+        sys.exit(0)
 
-    asyncio.run(create_admin(args.email, args.password, args.name))
+    asyncio.run(create_admin(email, password, name))
 
 
 if __name__ == '__main__':
