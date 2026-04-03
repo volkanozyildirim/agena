@@ -79,6 +79,51 @@ export function getOrgName(): string {
   return localStorage.getItem(ORG_NAME_KEY) ?? '';
 }
 
+// ── Cached API fetch (sessionStorage, per-user, 5min TTL) ────────────────────
+
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const CACHE_PREFIX = 'agena_api_cache:';
+
+export async function cachedApiFetch<T>(path: string, ttlMs: number = CACHE_TTL_MS): Promise<T> {
+  if (typeof window !== 'undefined') {
+    const cacheKey = CACHE_PREFIX + path;
+    try {
+      const raw = sessionStorage.getItem(cacheKey);
+      if (raw) {
+        const entry = JSON.parse(raw) as { ts: number; data: T };
+        if (Date.now() - entry.ts < ttlMs) {
+          return entry.data;
+        }
+        sessionStorage.removeItem(cacheKey);
+      }
+    } catch { /* ignore corrupt cache */ }
+  }
+
+  const data = await apiFetch<T>(path);
+
+  if (typeof window !== 'undefined') {
+    try {
+      sessionStorage.setItem(CACHE_PREFIX + path, JSON.stringify({ ts: Date.now(), data }));
+    } catch { /* sessionStorage full — ignore */ }
+  }
+
+  return data;
+}
+
+export function invalidateApiCache(pathPrefix?: string): void {
+  if (typeof window === 'undefined') return;
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < sessionStorage.length; i++) {
+    const key = sessionStorage.key(i);
+    if (key?.startsWith(CACHE_PREFIX)) {
+      if (!pathPrefix || key.startsWith(CACHE_PREFIX + pathPrefix)) {
+        keysToRemove.push(key);
+      }
+    }
+  }
+  keysToRemove.forEach((k) => sessionStorage.removeItem(k));
+}
+
 export async function apiFetch<T>(path: string, init?: RequestInit, auth = true): Promise<T> {
   const API_BASE = resolveApiBase();
   const headers: Record<string, string> = {

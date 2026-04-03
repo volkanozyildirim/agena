@@ -85,9 +85,8 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = Field(default=True, alias='SMTP_USE_TLS')
     smtp_use_ssl: bool = Field(default=False, alias='SMTP_USE_SSL')
     pr_webhook_secret: str = Field(default='', alias='PR_WEBHOOK_SECRET')
-    teams_chatops_secret: str = Field(default='', alias='TEAMS_CHATOPS_SECRET')
-    telegram_bot_token: str = Field(default='', alias='TELEGRAM_BOT_TOKEN')
-    telegram_webhook_secret: str = Field(default='', alias='TELEGRAM_WEBHOOK_SECRET')
+    # Telegram & Teams bot credentials are stored per-org in IntegrationConfig (DB).
+    # No env vars needed — each org manages their own bot via Dashboard → Integrations.
 
     @property
     def sqlalchemy_database_uri(self) -> str:
