@@ -12,6 +12,20 @@ export const metadata: Metadata = {
   },
 };
 
+const breadcrumbLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://agena.dev' },
+    { '@type': 'ListItem', position: 2, name: 'Documentation', item: 'https://agena.dev/docs' },
+  ],
+};
+
 export default function DocsLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+  return (
+    <>
+      <script type='application/ld+json' dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
+      {children}
+    </>
+  );
 }

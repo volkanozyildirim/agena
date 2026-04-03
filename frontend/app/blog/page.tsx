@@ -138,9 +138,19 @@ export default function BlogPage() {
     })),
   };
 
+  const breadcrumbLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://agena.dev' },
+      { '@type': 'ListItem', position: 2, name: 'Blog', item: 'https://agena.dev/blog' },
+    ],
+  };
+
   return (
     <>
       <script type='application/ld+json' dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type='application/ld+json' dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
 
       <div className='container' style={{ maxWidth: 860, padding: '80px 24px' }}>
         <div style={{ marginBottom: 48 }}>

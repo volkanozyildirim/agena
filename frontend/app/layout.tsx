@@ -113,6 +113,14 @@ const jsonLd = {
       name: 'AGENA',
       description: 'Agentic AI Platform for Autonomous Code Generation',
       inLanguage: ['tr-TR', 'en-US'],
+      potentialAction: {
+        '@type': 'SearchAction',
+        target: {
+          '@type': 'EntryPoint',
+          urlTemplate: `${SITE_URL}/blog?q={search_term_string}`,
+        },
+        'query-input': 'required name=search_term_string',
+      },
     },
     {
       '@type': 'Organization',
@@ -123,7 +131,40 @@ const jsonLd = {
         '@type': 'ImageObject',
         url: `${SITE_URL}/media/agena-logo.svg`,
       },
-      sameAs: ['https://github.com/aozyildirim/Agena'],
+      sameAs: [
+        'https://github.com/aozyildirim/Agena',
+        'https://www.producthunt.com/products/agena',
+      ],
+    },
+    {
+      '@type': 'SiteNavigationElement',
+      name: 'Documentation',
+      url: `${SITE_URL}/docs`,
+    },
+    {
+      '@type': 'SiteNavigationElement',
+      name: 'Blog',
+      url: `${SITE_URL}/blog`,
+    },
+    {
+      '@type': 'SiteNavigationElement',
+      name: 'Use Cases',
+      url: `${SITE_URL}/use-cases`,
+    },
+    {
+      '@type': 'SiteNavigationElement',
+      name: 'Pricing',
+      url: `${SITE_URL}/pricing`,
+    },
+    {
+      '@type': 'SiteNavigationElement',
+      name: 'Changelog',
+      url: `${SITE_URL}/changelog`,
+    },
+    {
+      '@type': 'SiteNavigationElement',
+      name: 'Contact',
+      url: `${SITE_URL}/contact`,
     },
     {
       '@type': 'SoftwareApplication',
