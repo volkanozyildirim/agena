@@ -64,8 +64,9 @@ export default function Navbar() {
               title='Product Hunt'
               style={{ color: 'var(--muted)', padding: '6px 8px', borderRadius: 8, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
             >
-              <svg width='16' height='16' viewBox='0 0 24 24' fill='currentColor' aria-hidden='true'>
-                <path d='M13.6 12.4h-2.8V8.8h2.8a1.8 1.8 0 1 1 0 3.6ZM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm1.6 14H10.8v-3.6h2.8a3.6 3.6 0 0 0 0-7.2H8.4v14.4h2.4V16Z' />
+              <svg width='16' height='16' viewBox='0 0 40 40' fill='none' aria-hidden='true'>
+                <circle cx='20' cy='20' r='20' fill='currentColor' fillOpacity='0.15'/>
+                <path d='M22.667 18.667h-4v-5.334h4a2.667 2.667 0 0 1 0 5.334ZM15.333 10v20h3.334v-8h4a6 6 0 0 0 0-12h-7.334Z' fill='currentColor'/>
               </svg>
             </a>
           </div>
