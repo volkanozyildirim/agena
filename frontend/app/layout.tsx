@@ -259,6 +259,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang={lang}>
       <head>
         <link
+          rel='alternate'
+          type='application/rss+xml'
+          title='AGENA Blog'
+          href='/feed.xml'
+        />
+        <link
           rel='preconnect'
           href='https://fonts.googleapis.com'
         />

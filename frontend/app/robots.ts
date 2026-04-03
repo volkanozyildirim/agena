@@ -10,5 +10,6 @@ export default function robots(): MetadataRoute.Robots {
       },
     ],
     sitemap: 'https://agena.dev/sitemap.xml',
+    host: 'https://agena.dev',
   };
 }
