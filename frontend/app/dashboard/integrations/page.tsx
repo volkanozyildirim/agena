@@ -5,7 +5,7 @@ import { apiFetch } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
 
 type IntegrationConfig = {
-  provider: 'jira' | 'azure' | 'openai' | 'gemini' | 'github' | 'playbook' | 'slack' | 'teams';
+  provider: 'jira' | 'azure' | 'openai' | 'gemini' | 'github' | 'playbook' | 'slack' | 'teams' | 'telegram';
   base_url: string;
   project?: string | null;
   username?: string | null;
@@ -68,6 +68,10 @@ export default function IntegrationsPage() {
   const [teamsWebhook, setTeamsWebhook] = useState('');
   const [slackPreview, setSlackPreview] = useState('');
   const [teamsPreview, setTeamsPreview] = useState('');
+  const [telegramToken, setTelegramToken] = useState('');
+  const [telegramChatId, setTelegramChatId] = useState('');
+  const [telegramPreview, setTelegramPreview] = useState('');
+  const [telegramSetupMsg, setTelegramSetupMsg] = useState('');
   const [notifyTesting, setNotifyTesting] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
@@ -156,6 +160,19 @@ export default function IntegrationsPage() {
         t('integrations.helpPlaybookStep3'),
       ],
     },
+    telegram: {
+      title: 'Telegram Bot Setup',
+      steps: [
+        '1. Open Telegram and search for @BotFather',
+        '2. Send /newbot and follow the prompts to create your bot',
+        '3. Copy the Bot Token (e.g. 7123456789:AAH...)',
+        '4. Paste it below and save',
+        '5. Add the bot to your group chat or DM it directly',
+        '6. Use /help to see available commands',
+      ],
+      link: 'https://core.telegram.org/bots#botfather',
+      note: 'ChatOps commands: /fix, /status, /queue, /recent, /stats',
+    },
   };
 
   async function loadIntegrationState() {
@@ -180,8 +197,10 @@ export default function IntegrationsPage() {
     }
     if (openai) { setOpenaiBaseUrl(openai.base_url); }
     if (gemini) { setGeminiBaseUrl(gemini.base_url); }
+    const telegram = data.find((c) => c.provider === 'telegram');
     if (slack) { setSlackWebhook(''); }
     if (teams) { setTeamsWebhook(''); }
+    if (telegram) { setTelegramToken(''); setTelegramChatId(telegram.username ?? ''); }
   }
 
   useEffect(() => {
@@ -192,6 +211,7 @@ export default function IntegrationsPage() {
     setJiraTokenPreview(loadSecretPreview('jira'));
     setSlackPreview(loadSecretPreview('slack'));
     setTeamsPreview(loadSecretPreview('teams'));
+    setTelegramPreview(loadSecretPreview('telegram'));
     void loadIntegrationState().catch(() => {});
   }, []);
 
@@ -361,6 +381,33 @@ export default function IntegrationsPage() {
     }).catch((e) => { setError(e instanceof Error ? e.message : t('integrations.saveFailed')); });
   }
 
+  async function saveTelegram() {
+    setTelegramSetupMsg('');
+    try {
+      await apiFetch('/integrations/telegram', {
+        method: 'PUT',
+        body: JSON.stringify({
+          base_url: 'https://api.telegram.org',
+          secret: telegramToken || undefined,
+          username: telegramChatId || undefined,
+        }),
+      });
+      if (telegramToken.trim()) {
+        const preview = maskSecretPreview(telegramToken);
+        setTelegramPreview(preview);
+        saveSecretPreview('telegram', preview);
+      }
+      setTelegramToken('');
+      await loadIntegrationState();
+      // Auto-register webhook
+      try {
+        const res = await apiFetch<{ status: string; bot_username?: string }>('/webhooks/telegram/setup?base_url=' + encodeURIComponent(window.location.origin.replace('agena.dev', 'api.agena.dev').replace(/:\d+$/, ':8010')), { method: 'POST' });
+        setTelegramSetupMsg(`Bot @${res.bot_username || '?'} webhook registered.`);
+      } catch { setTelegramSetupMsg('Saved. Webhook registration may need manual setup.'); }
+      setMsg('Telegram saved');
+    } catch (e) { setError(e instanceof Error ? e.message : 'Save failed'); }
+  }
+
   async function sendTestNotification() {
     setNotifyTesting(true);
     setError('');
@@ -390,6 +437,7 @@ export default function IntegrationsPage() {
   const playbookConfig = configs.find((c) => c.provider === 'playbook');
   const slackConfig = configs.find((c) => c.provider === 'slack');
   const teamsConfig = configs.find((c) => c.provider === 'teams');
+  const telegramConfig = configs.find((c) => c.provider === 'telegram');
 
   return (
     <div style={{ display: 'grid', gap: 28 }}>
@@ -720,6 +768,38 @@ export default function IntegrationsPage() {
           <button className='button button-primary' onClick={() => void saveTeams()} style={{ width: '100%', justifyContent: 'center', marginTop: 4 }}>
             {t('integrations.saveTeams')}
           </button>
+        </IntegrationCard>}
+
+        {activeTab === 'notifications' && <IntegrationCard
+          title='Telegram ChatOps'
+          icon='✈️'
+          color='#38bdf8'
+          connected={telegramConfig?.has_secret ?? false}
+          updatedAt={telegramConfig?.updated_at}
+          onHelp={() => setHelp(helpByProvider.telegram)}
+        >
+          <FieldGroup label='Bot Token (from @BotFather)'>
+            <input
+              type='password'
+              value={telegramToken}
+              onChange={(e) => setTelegramToken(e.target.value)}
+              placeholder={telegramConfig?.has_secret ? `${telegramConfig?.secret_preview || telegramPreview || '****'} (keep existing)` : '7123456789:AAH...'}
+            />
+          </FieldGroup>
+          <FieldGroup label='Chat / Group ID (optional, for org mapping)'>
+            <input
+              value={telegramChatId}
+              onChange={(e) => setTelegramChatId(e.target.value)}
+              placeholder='e.g. -100123456789'
+            />
+          </FieldGroup>
+          <button className='button button-primary' onClick={() => void saveTelegram()} style={{ width: '100%', justifyContent: 'center', marginTop: 4 }}>
+            Save Telegram
+          </button>
+          {telegramSetupMsg && <div style={{ fontSize: 11, color: '#5eead4', marginTop: 6 }}>{telegramSetupMsg}</div>}
+          <div style={{ fontSize: 11, color: 'var(--ink-35)', marginTop: 8, lineHeight: 1.5 }}>
+            Commands: <code>/help</code> <code>/fix</code> <code>/status</code> <code>/queue</code> <code>/recent</code> <code>/stats</code> <code>/cancel</code>
+          </div>
         </IntegrationCard>}
 
         {activeTab === 'notifications' && <IntegrationCard

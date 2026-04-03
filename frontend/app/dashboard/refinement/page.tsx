@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { apiFetch, loadPrefs } from '@/lib/api';
+import { apiFetch, cachedApiFetch, loadPrefs } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
 
 type Provider = 'azure' | 'jira';
@@ -400,16 +400,16 @@ export default function RefinementPage() {
     async function boot() {
       try {
         const [azureProjectRows, prefs, integrations] = await Promise.all([
-          apiFetch<Opt[]>('/tasks/azure/projects').catch(() => [] as Opt[]),
+          cachedApiFetch<Opt[]>('/tasks/azure/projects').catch(() => [] as Opt[]),
           loadPrefs().catch(() => null),
-          apiFetch<Array<{ provider: string; has_secret?: boolean; base_url?: string | null; username?: string | null }>>('/integrations')
+          cachedApiFetch<Array<{ provider: string; has_secret?: boolean; base_url?: string | null; username?: string | null }>>('/integrations')
             .catch(() => [] as Array<{ provider: string; has_secret?: boolean; base_url?: string | null; username?: string | null }>),
         ]);
         let jiraProjectRows: Opt[] = [];
         const jiraCfg = integrations.find((cfg) => cfg.provider === 'jira');
         const jiraConnected = Boolean(jiraCfg && (jiraCfg.has_secret || (jiraCfg.base_url || '').trim() || (jiraCfg.username || '').trim()));
         if (jiraConnected) {
-          jiraProjectRows = await apiFetch<Opt[]>('/tasks/jira/projects').catch(() => [] as Opt[]);
+          jiraProjectRows = await cachedApiFetch<Opt[]>('/tasks/jira/projects').catch(() => [] as Opt[]);
         }
         if (!active) return;
         setAzureProjects(azureProjectRows);
@@ -426,12 +426,12 @@ export default function RefinementPage() {
         const prefAzureSprint = prefs?.azure_sprint_path || '';
         if (prefAzureProject) {
           setAzureProject(prefAzureProject);
-          const teams = await apiFetch<Opt[]>('/tasks/azure/teams?project=' + encodeURIComponent(prefAzureProject)).catch(() => [] as Opt[]);
+          const teams = await cachedApiFetch<Opt[]>('/tasks/azure/teams?project=' + encodeURIComponent(prefAzureProject)).catch(() => [] as Opt[]);
           if (!active) return;
           setAzureTeams(teams);
           if (prefAzureTeam) {
             setAzureTeam(prefAzureTeam);
-            const sprints = await apiFetch<Opt[]>(
+            const sprints = await cachedApiFetch<Opt[]>(
               '/tasks/azure/sprints?project=' + encodeURIComponent(prefAzureProject) + '&team=' + encodeURIComponent(prefAzureTeam),
             ).catch(() => [] as Opt[]);
             if (!active) return;
@@ -446,12 +446,12 @@ export default function RefinementPage() {
         const prefJiraSprint = typeof settings.jira_sprint_id === 'string' ? settings.jira_sprint_id : '';
         if (prefJiraProject) {
           setJiraProject(prefJiraProject);
-          const boards = await apiFetch<Opt[]>('/tasks/jira/boards?project_key=' + encodeURIComponent(prefJiraProject)).catch(() => [] as Opt[]);
+          const boards = await cachedApiFetch<Opt[]>('/tasks/jira/boards?project_key=' + encodeURIComponent(prefJiraProject)).catch(() => [] as Opt[]);
           if (!active) return;
           setJiraBoards(boards);
           if (prefJiraBoard) {
             setJiraBoard(prefJiraBoard);
-            const sprints = await apiFetch<Opt[]>('/tasks/jira/sprints?board_id=' + encodeURIComponent(prefJiraBoard)).catch(() => [] as Opt[]);
+            const sprints = await cachedApiFetch<Opt[]>('/tasks/jira/sprints?board_id=' + encodeURIComponent(prefJiraBoard)).catch(() => [] as Opt[]);
             if (!active) return;
             setJiraSprints(sprints);
             const selected = defaultSprint(sprints, 'jira') || prefJiraSprint;
@@ -479,7 +479,7 @@ export default function RefinementPage() {
     setItemsData(null);
     setResults(null);
     if (!nextProject) return;
-    const rows = await apiFetch<Opt[]>('/tasks/azure/teams?project=' + encodeURIComponent(nextProject));
+    const rows = await cachedApiFetch<Opt[]>('/tasks/azure/teams?project=' + encodeURIComponent(nextProject));
     setAzureTeams(rows);
   }, []);
 
@@ -490,7 +490,7 @@ export default function RefinementPage() {
     setItemsData(null);
     setResults(null);
     if (!azureProject || !nextTeam) return;
-    const rows = await apiFetch<Opt[]>(
+    const rows = await cachedApiFetch<Opt[]>(
       '/tasks/azure/sprints?project=' + encodeURIComponent(azureProject) + '&team=' + encodeURIComponent(nextTeam),
     );
     setAzureSprints(rows);
@@ -506,7 +506,7 @@ export default function RefinementPage() {
     setItemsData(null);
     setResults(null);
     if (!nextProject) return;
-    const rows = await apiFetch<Opt[]>('/tasks/jira/boards?project_key=' + encodeURIComponent(nextProject));
+    const rows = await cachedApiFetch<Opt[]>('/tasks/jira/boards?project_key=' + encodeURIComponent(nextProject));
     setJiraBoards(rows);
   }, []);
 
@@ -517,7 +517,7 @@ export default function RefinementPage() {
     setItemsData(null);
     setResults(null);
     if (!nextBoard) return;
-    const rows = await apiFetch<Opt[]>('/tasks/jira/sprints?board_id=' + encodeURIComponent(nextBoard));
+    const rows = await cachedApiFetch<Opt[]>('/tasks/jira/sprints?board_id=' + encodeURIComponent(nextBoard));
     setJiraSprints(rows);
     setJiraSprint(defaultSprint(rows, 'jira'));
   }, []);
