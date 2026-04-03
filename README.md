@@ -295,10 +295,15 @@ curl -X POST http://localhost:8010/auth/signup \
 ### 6. Create platform admin (optional)
 
 ```bash
-docker exec -it ai_agent_api python /app/scripts/create_admin.py
-```
+# Create admin (interactive — prompts for email, name, password)
+docker exec -it ai_agent_api agena admin:user:create
 
-Interactive prompts will ask for email, name, and password (with confirmation).
+# List all platform admins
+docker exec ai_agent_api agena admin:user:list
+
+# Promote existing user to admin
+docker exec -it ai_agent_api agena admin:user:promote
+```
 
 Password requirements: 12+ characters, uppercase, lowercase, digit, and special character.
 

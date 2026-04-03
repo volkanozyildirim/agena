@@ -17,6 +17,7 @@ dependencies = [
 ]
 
 [project.scripts]
+agena = "agena_api.cli:main"
 agena-api = "agena_api.api.main:run"
 
 [tool.setuptools.packages.find]
