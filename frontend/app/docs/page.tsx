@@ -6,76 +6,65 @@ import { useLocale } from '@/lib/i18n';
 
 const SITE = 'https://agena.dev';
 
-const sections = [
+// Section/child keys map to i18n - titles resolved at render time
+const sectionsDef = [
   {
-    id: 'getting-started',
-    icon: '🚀',
-    title: 'Getting Started',
+    id: 'getting-started', icon: '🚀', titleKey: 'docs.sec.gettingStarted',
     children: [
-      { id: 'overview', title: 'Platform Overview' },
-      { id: 'signup', title: 'Sign Up & First Login' },
-      { id: 'quickstart-saas', title: 'Quick Start (SaaS)' },
-      { id: 'quickstart-selfhost', title: 'Quick Start (Self-Hosted)' },
+      { id: 'overview', titleKey: 'docs.overview' },
+      { id: 'signup', titleKey: 'docs.signup' },
+      { id: 'quickstart-saas', titleKey: 'docs.quickstartSaas' },
+      { id: 'quickstart-selfhost', titleKey: 'docs.quickstartSelfhost' },
     ],
   },
   {
-    id: 'dashboard',
-    icon: '🖥️',
-    title: 'Dashboard Guide',
+    id: 'dashboard', icon: '🖥️', titleKey: 'docs.sec.dashboard',
     children: [
-      { id: 'office', title: 'Office (Pixel Agent Workspace)' },
-      { id: 'tasks', title: 'Tasks' },
-      { id: 'sprints', title: 'Sprint Board' },
-      { id: 'sprint-performance', title: 'Sprint Performance' },
-      { id: 'refinement', title: 'Refinement' },
-      { id: 'agents', title: 'AI Agents' },
-      { id: 'prompt-studio', title: 'Prompt Studio' },
-      { id: 'flows', title: 'Flow Builder' },
-      { id: 'templates', title: 'Templates' },
-      { id: 'dora', title: 'DORA Metrics' },
+      { id: 'office', titleKey: 'docs.office' },
+      { id: 'tasks', titleKey: 'docs.tasks' },
+      { id: 'sprints', titleKey: 'docs.sprints' },
+      { id: 'sprint-performance', titleKey: 'docs.sprintPerf' },
+      { id: 'refinement', titleKey: 'docs.refinement' },
+      { id: 'agents', titleKey: 'docs.agents' },
+      { id: 'prompt-studio', titleKey: 'docs.promptStudio' },
+      { id: 'flows', titleKey: 'docs.flows' },
+      { id: 'templates', titleKey: 'docs.templates' },
+      { id: 'dora', titleKey: 'docs.dora' },
     ],
   },
   {
-    id: 'setup',
-    icon: '⚙️',
-    title: 'Configuration',
+    id: 'setup', icon: '⚙️', titleKey: 'docs.sec.configuration',
     children: [
-      { id: 'integrations', title: 'Integrations Setup' },
-      { id: 'repo-mapping', title: 'Repository Mapping' },
-      { id: 'team-management', title: 'Team & Permissions' },
-      { id: 'profile-settings', title: 'Profile & Preferences' },
-      { id: 'chatops', title: 'ChatOps (Teams / Slack / Telegram)' },
+      { id: 'integrations', titleKey: 'docs.integrations' },
+      { id: 'repo-mapping', titleKey: 'docs.repoMapping' },
+      { id: 'team-management', titleKey: 'docs.teamManagement' },
+      { id: 'profile-settings', titleKey: 'docs.profileSettings' },
+      { id: 'chatops', titleKey: 'docs.chatops' },
     ],
   },
   {
-    id: 'architecture',
-    icon: '🏗️',
-    title: 'Architecture',
+    id: 'architecture', icon: '🏗️', titleKey: 'docs.sec.architecture',
     children: [
-      { id: 'pipeline', title: 'AI Agent Pipeline' },
-      { id: 'services', title: 'Service Architecture' },
-      { id: 'selfhost-deploy', title: 'Self-Hosted Deployment' },
+      { id: 'pipeline', titleKey: 'docs.pipeline' },
+      { id: 'services', titleKey: 'docs.services' },
+      { id: 'selfhost-deploy', titleKey: 'docs.selfhostDeploy' },
     ],
   },
   {
-    id: 'admin',
-    icon: '👑',
-    title: 'Platform Admin',
+    id: 'admin', icon: '👑', titleKey: 'docs.sec.admin',
     children: [
-      { id: 'admin-panel', title: 'Admin Panel' },
-      { id: 'admin-orgs', title: 'Managing Organizations' },
-      { id: 'admin-users', title: 'Managing Users' },
+      { id: 'admin-panel', titleKey: 'docs.adminPanel' },
+      { id: 'admin-orgs', titleKey: 'docs.adminOrgs' },
+      { id: 'admin-users', titleKey: 'docs.adminUsers' },
     ],
   },
   {
-    id: 'api-ref',
-    icon: '📡',
-    title: 'API Reference',
+    id: 'api-ref', icon: '📡', titleKey: 'docs.sec.apiRef',
     children: [
-      { id: 'auth-api', title: 'Authentication' },
-      { id: 'tasks-api', title: 'Tasks API' },
-      { id: 'flows-api', title: 'Flows API' },
-      { id: 'integrations-api', title: 'Integrations API' },
+      { id: 'auth-api', titleKey: 'docs.authApi' },
+      { id: 'tasks-api', titleKey: 'docs.tasksApi' },
+      { id: 'flows-api', titleKey: 'docs.flowsApi' },
+      { id: 'integrations-api', titleKey: 'docs.integrationsApi' },
     ],
   },
 ];
@@ -947,6 +936,14 @@ function renderMarkdown(md: string): string {
 
 export default function DocsPage() {
   const { t } = useLocale();
+
+  // Resolve i18n titles from sectionsDef
+  const sections = useMemo(() => sectionsDef.map(s => ({
+    ...s,
+    title: t(s.titleKey as any),
+    children: s.children.map(c => ({ ...c, title: t(c.titleKey as any) })),
+  })), [t]);
+
   const [activeId, setActiveId] = useState('overview');
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -965,7 +962,7 @@ export default function DocsPage() {
       }
     }
     return results;
-  }, [searchQuery]);
+  }, [searchQuery, sections]);
 
   const activeContent = content[activeId] || '';
   const activeSection = sections.flatMap(s => s.children).find(c => c.id === activeId);
@@ -1095,7 +1092,7 @@ export default function DocsPage() {
           {parentSection && <>{parentSection.icon} {parentSection.title} → </>}
         </div>
         <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--ink-90)', margin: '0 0 24px' }}>
-          {activeSection?.title || 'Documentation'}
+          {activeSection?.title || t('docs.title')}
         </h1>
         <div
           style={{ maxWidth: 720 }}
