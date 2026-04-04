@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useLocale } from '@/lib/i18n';
 
 interface ServiceStatus {
   name: string;
@@ -13,6 +14,7 @@ interface ServiceStatus {
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://api.agena.dev';
 
 export default function StatusPage() {
+  const { t } = useLocale();
   const [services, setServices] = useState<ServiceStatus[]>([
     { name: 'API Server', status: 'checking' },
     { name: 'Database', status: 'checking' },
@@ -92,18 +94,18 @@ export default function StatusPage() {
   };
 
   const statusLabel = (s: string) => {
-    if (s === 'ok') return 'Operational';
-    if (s === 'degraded') return 'Degraded';
-    if (s === 'down') return 'Down';
-    return 'Checking...';
+    if (s === 'ok') return t('status.operational');
+    if (s === 'degraded') return t('status.degradedLabel');
+    if (s === 'down') return t('status.down');
+    return t('status.checking');
   };
 
   return (
     <div className='container page-container-narrow' style={{ maxWidth: 700, padding: '80px 24px' }}>
       <div style={{ marginBottom: 48 }}>
-        <div className='section-label'>System Status</div>
+        <div className='section-label'>{t('status.label')}</div>
         <h1 style={{ fontSize: 'clamp(32px, 4vw, 48px)', fontWeight: 800, color: 'var(--ink-90)', margin: '8px 0 16px' }}>
-          Service Status
+          {t('status.title')}
         </h1>
 
         {/* Overall banner */}
@@ -132,7 +134,7 @@ export default function StatusPage() {
             }}
           />
           <span style={{ color: 'var(--ink-90)', fontWeight: 600, fontSize: 16 }}>
-            {allOk ? 'All systems operational' : anyDown ? 'Service disruption detected' : 'Some services degraded'}
+            {allOk ? t('status.allOk') : anyDown ? t('status.disruption') : t('status.degraded')}
           </span>
         </div>
       </div>
@@ -184,13 +186,13 @@ export default function StatusPage() {
 
       {lastChecked && (
         <p style={{ color: 'var(--ink-25)', fontSize: 12, marginTop: 24, textAlign: 'center' }}>
-          Last checked: {lastChecked} &middot; Auto-refreshes every 30s
+          {t('status.lastChecked')} {lastChecked} &middot; {t('status.autoRefresh')}
         </p>
       )}
 
       <div style={{ marginTop: 48, textAlign: 'center' }}>
         <Link href='/contact' style={{ color: 'var(--accent)', fontSize: 14, textDecoration: 'none', fontWeight: 600 }}>
-          Report an issue →
+          {t('status.reportIssue')} →
         </Link>
       </div>
     </div>

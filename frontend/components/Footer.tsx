@@ -47,8 +47,8 @@ export default function Footer() {
         </div>
         {/* Newsletter */}
         <div style={{ paddingTop: 24, borderTop: '1px solid var(--panel-border)', textAlign: 'center', marginBottom: 24 }}>
-          <h4 style={{ color: 'var(--ink-65)', fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Stay in the loop</h4>
-          <p style={{ color: 'var(--ink-35)', fontSize: 13, marginBottom: 16 }}>Get agentic AI updates. No spam.</p>
+          <h4 style={{ color: 'var(--ink-65)', fontSize: 14, fontWeight: 700, marginBottom: 8 }}>{t('footer.stayInLoop')}</h4>
+          <p style={{ color: 'var(--ink-35)', fontSize: 13, marginBottom: 16 }}>{t('footer.noSpam')}</p>
           <NewsletterForm />
         </div>
 

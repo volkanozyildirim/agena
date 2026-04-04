@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useLocale } from '@/lib/i18n';
 
 interface Post {
   slug: string;
@@ -13,6 +14,7 @@ interface Post {
 }
 
 export default function BlogList({ posts }: { posts: Post[] }) {
+  const { t } = useLocale();
   const [query, setQuery] = useState('');
 
   const filtered = query.trim()
@@ -33,7 +35,7 @@ export default function BlogList({ posts }: { posts: Post[] }) {
           type='search'
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder='Search articles...'
+          placeholder={t('blog.searchPlaceholder')}
           style={{
             width: '100%',
             padding: '12px 18px 12px 44px',
@@ -54,7 +56,7 @@ export default function BlogList({ posts }: { posts: Post[] }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         {filtered.length === 0 && (
           <p style={{ color: 'var(--ink-35)', fontSize: 15, textAlign: 'center', padding: '40px 0' }}>
-            No articles found for &ldquo;{query}&rdquo;
+            {t('blog.noResults')} &ldquo;{query}&rdquo;
           </p>
         )}
         {filtered.map((post) => (

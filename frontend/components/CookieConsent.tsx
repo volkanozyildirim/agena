@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useLocale } from '@/lib/i18n';
 
 export default function CookieConsent() {
+  const { t } = useLocale();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -45,8 +47,7 @@ export default function CookieConsent() {
       }}
     >
       <p style={{ color: 'var(--ink-78)', fontSize: 13, lineHeight: 1.6, marginBottom: 16 }}>
-        We use cookies and analytics (Google Analytics, Microsoft Clarity) to improve your experience.
-        By continuing, you agree to our use of cookies.
+        {t('cookie.text')}
       </p>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
         <button
@@ -54,7 +55,7 @@ export default function CookieConsent() {
           className='button button-primary'
           style={{ padding: '8px 20px', fontSize: 13 }}
         >
-          Accept
+          {t('cookie.accept')}
         </button>
         <button
           onClick={decline}
@@ -69,7 +70,7 @@ export default function CookieConsent() {
             fontFamily: 'inherit',
           }}
         >
-          Decline
+          {t('cookie.decline')}
         </button>
       </div>
       <style>{`

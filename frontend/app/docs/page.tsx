@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useMemo } from 'react';
+import { useLocale } from '@/lib/i18n';
 
 const SITE = 'https://agena.dev';
 
@@ -945,6 +946,7 @@ function renderMarkdown(md: string): string {
 }
 
 export default function DocsPage() {
+  const { t } = useLocale();
   const [activeId, setActiveId] = useState('overview');
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -998,7 +1000,7 @@ export default function DocsPage() {
             type='search'
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder='Search docs...'
+            placeholder={t('docs.searchPlaceholder')}
             style={{
               width: '100%',
               padding: '8px 12px 8px 32px',
@@ -1065,7 +1067,7 @@ export default function DocsPage() {
               textAlign: 'center',
               boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
             }}>
-              <p style={{ color: 'var(--ink-35)', fontSize: 13 }}>No results found</p>
+              <p style={{ color: 'var(--ink-35)', fontSize: 13 }}>{t('docs.noResults')}</p>
             </div>
           )}
         </div>

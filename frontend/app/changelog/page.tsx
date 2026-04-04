@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useLocale } from '@/lib/i18n';
 
 interface Commit {
   hash: string;
@@ -12,14 +13,15 @@ interface Commit {
   type: 'feat' | 'fix' | 'docs' | 'other';
 }
 
-const typeBadge: Record<string, { bg: string; color: string; label: string }> = {
-  feat: { bg: 'rgba(34,197,94,0.1)', color: '#22c55e', label: 'Feature' },
-  fix: { bg: 'rgba(239,68,68,0.1)', color: '#ef4444', label: 'Fix' },
-  docs: { bg: 'rgba(59,130,246,0.1)', color: '#3b82f6', label: 'Docs' },
-  other: { bg: 'rgba(139,92,246,0.1)', color: '#8b5cf6', label: 'Update' },
+const typeBadgeStyle: Record<string, { bg: string; color: string }> = {
+  feat: { bg: 'rgba(34,197,94,0.1)', color: '#22c55e' },
+  fix: { bg: 'rgba(239,68,68,0.1)', color: '#ef4444' },
+  docs: { bg: 'rgba(59,130,246,0.1)', color: '#3b82f6' },
+  other: { bg: 'rgba(139,92,246,0.1)', color: '#8b5cf6' },
 };
 
 export default function ChangelogPage() {
+  const { t } = useLocale();
   const [commits, setCommits] = useState<Commit[]>([]);
   const [filter, setFilter] = useState<string>('all');
   const [loading, setLoading] = useState(true);
@@ -44,22 +46,22 @@ export default function ChangelogPage() {
   return (
     <div className='container changelog-container' style={{ maxWidth: 760, padding: '80px 24px' }}>
       <div style={{ marginBottom: 48 }}>
-        <div className='section-label'>Changelog</div>
+        <div className='section-label'>{t('changelog.label')}</div>
         <h1 style={{ fontSize: 'clamp(32px, 4vw, 48px)', fontWeight: 800, color: 'var(--ink-90)', margin: '8px 0 16px' }}>
-          What&apos;s New in AGENA
+          {t('changelog.title')}
         </h1>
         <p style={{ color: 'var(--ink-45)', fontSize: 16, lineHeight: 1.7 }}>
-          Real-time changelog pulled from our git history.
+          {t('changelog.subtitle')}
         </p>
       </div>
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 32, flexWrap: 'wrap' }}>
         {[
-          { key: 'all', label: 'All' },
-          { key: 'feat', label: 'Features' },
-          { key: 'fix', label: 'Fixes' },
-          { key: 'docs', label: 'Docs' },
+          { key: 'all', label: t('changelog.filterAll') },
+          { key: 'feat', label: t('changelog.filterFeat') },
+          { key: 'fix', label: t('changelog.filterFix') },
+          { key: 'docs', label: t('changelog.filterDocs') },
         ].map((f) => (
           <button
             key={f.key}
@@ -83,7 +85,7 @@ export default function ChangelogPage() {
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--ink-35)' }}>
-          Loading changelog...
+          {t('changelog.loading')}
         </div>
       ) : (
         <div style={{ position: 'relative', paddingLeft: 32 }}>
@@ -101,7 +103,8 @@ export default function ChangelogPage() {
               {/* Commits for this date */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {grouped[date].map((commit) => {
-                  const badge = typeBadge[commit.type] || typeBadge.other;
+                  const badge = typeBadgeStyle[commit.type] || typeBadgeStyle.other;
+                  const badgeLabel = t(`changelog.badge.${commit.type}`) || t('changelog.badge.other');
                   return (
                     <div
                       key={commit.hash}
@@ -117,7 +120,7 @@ export default function ChangelogPage() {
                       }}
                     >
                       <span style={{ padding: '2px 8px', borderRadius: 4, background: badge.bg, color: badge.color, fontSize: 11, fontWeight: 600, flexShrink: 0 }}>
-                        {badge.label}
+                        {badgeLabel}
                       </span>
                       <span style={{ color: 'var(--ink-78)', fontSize: 14, flex: 1, minWidth: 0 }}>
                         {commit.message}
@@ -136,7 +139,7 @@ export default function ChangelogPage() {
 
       <div style={{ textAlign: 'center', marginTop: 40, padding: '32px', borderRadius: 16, border: '1px solid var(--panel-border-2)', background: 'var(--panel)' }}>
         <p style={{ color: 'var(--ink-50)', marginBottom: 16 }}>
-          Want to see AGENA in action?
+          {t('changelog.cta')}
         </p>
         <Link href='/signup' className='button button-primary' style={{ padding: '12px 28px', fontSize: 15 }}>
           Start Free →
