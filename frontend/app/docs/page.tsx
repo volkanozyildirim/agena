@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 const SITE = 'https://agena.dev';
 
@@ -947,6 +947,24 @@ function renderMarkdown(md: string): string {
 export default function DocsPage() {
   const [activeId, setActiveId] = useState('overview');
 
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return null;
+    const q = searchQuery.toLowerCase();
+    const results: { id: string; title: string; snippet: string }[] = [];
+    for (const [id, text] of Object.entries(content)) {
+      const child = sections.flatMap(s => s.children).find(c => c.id === id);
+      if (!child) continue;
+      if (child.title.toLowerCase().includes(q) || text.toLowerCase().includes(q)) {
+        const idx = text.toLowerCase().indexOf(q);
+        const snippet = idx >= 0 ? text.slice(Math.max(0, idx - 40), idx + 80).replace(/[#*`|]/g, '').trim() : '';
+        results.push({ id, title: child.title, snippet });
+      }
+    }
+    return results;
+  }, [searchQuery]);
+
   const activeContent = content[activeId] || '';
   const activeSection = sections.flatMap(s => s.children).find(c => c.id === activeId);
   const parentSection = sections.find(s => s.children.some(c => c.id === activeId));
@@ -959,7 +977,7 @@ export default function DocsPage() {
           section.children.map((child) => (
             <button
               key={child.id}
-              onClick={() => { setActiveId(child.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              onClick={() => { setActiveId(child.id); setSearchQuery(''); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
               style={{
                 padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
                 border: activeId === child.id ? '1px solid rgba(13,148,136,0.5)' : '1px solid var(--panel-border)',
@@ -974,6 +992,83 @@ export default function DocsPage() {
       </div>
       {/* Sidebar */}
       <nav className='docs-sidebar' style={{ width: 240, flexShrink: 0, padding: '24px 0', borderRight: '1px solid var(--panel-border)', position: 'sticky', top: 72, height: 'calc(100vh - 72px)', overflowY: 'auto' }}>
+        {/* Search */}
+        <div style={{ padding: '0 12px 16px', position: 'relative' }}>
+          <input
+            type='search'
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder='Search docs...'
+            style={{
+              width: '100%',
+              padding: '8px 12px 8px 32px',
+              borderRadius: 8,
+              border: '1px solid var(--panel-border-2)',
+              background: 'var(--panel)',
+              color: 'var(--ink-90)',
+              fontSize: 13,
+              outline: 'none',
+              fontFamily: 'inherit',
+              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.3)' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E")`,
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: '10px center',
+            }}
+          />
+          {searchResults && searchResults.length > 0 && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: 12,
+              right: 12,
+              background: 'var(--surface)',
+              border: '1px solid var(--panel-border-2)',
+              borderRadius: 10,
+              padding: 8,
+              zIndex: 10,
+              maxHeight: 300,
+              overflowY: 'auto',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+            }}>
+              {searchResults.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => { setActiveId(r.id); setSearchQuery(''); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '8px 10px',
+                    borderRadius: 6,
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-90)' }}>{r.title}</div>
+                  {r.snippet && <div style={{ fontSize: 11, color: 'var(--ink-35)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>...{r.snippet}...</div>}
+                </button>
+              ))}
+            </div>
+          )}
+          {searchResults && searchResults.length === 0 && searchQuery.trim() && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: 12,
+              right: 12,
+              background: 'var(--surface)',
+              border: '1px solid var(--panel-border-2)',
+              borderRadius: 10,
+              padding: '16px',
+              zIndex: 10,
+              textAlign: 'center',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+            }}>
+              <p style={{ color: 'var(--ink-35)', fontSize: 13 }}>No results found</p>
+            </div>
+          )}
+        </div>
         {sections.map((section) => (
           <div key={section.id} style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-35)', textTransform: 'uppercase', letterSpacing: 1, padding: '4px 12px', marginBottom: 4 }}>
