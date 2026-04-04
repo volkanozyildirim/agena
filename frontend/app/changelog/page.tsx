@@ -25,7 +25,7 @@ export default function ChangelogPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/changelog')
+    fetch('/changelog-data.json')
       .then((r) => r.json())
       .then((data) => { setCommits(data); setLoading(false); })
       .catch(() => setLoading(false));

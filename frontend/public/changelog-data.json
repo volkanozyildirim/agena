@@ -1,0 +1,802 @@
+[
+  {
+    "hash": "4a7b040",
+    "short": "4a7b040",
+    "message": "changelog now shows real git commits with type filters and timeline",
+    "date": "2026-04-04",
+    "author": "root",
+    "type": "other"
+  },
+  {
+    "hash": "443bcb7",
+    "short": "443bcb7",
+    "message": "add search to docs sidebar with instant results dropdown",
+    "date": "2026-04-04",
+    "author": "root",
+    "type": "other"
+  },
+  {
+    "hash": "06f95a8",
+    "short": "06f95a8",
+    "message": "fix cookie consent styling for light mode",
+    "date": "2026-04-04",
+    "author": "root",
+    "type": "fix"
+  },
+  {
+    "hash": "7006b92",
+    "short": "7006b92",
+    "message": "add reading progress bar, TOC sidebar, and share buttons to blog posts",
+    "date": "2026-04-04",
+    "author": "root",
+    "type": "other"
+  },
+  {
+    "hash": "ac652ea",
+    "short": "ac652ea",
+    "message": "add fade-up page transition animation between routes",
+    "date": "2026-04-04",
+    "author": "root",
+    "type": "other"
+  },
+  {
+    "hash": "2d3f25c",
+    "short": "2d3f25c",
+    "message": "add per-page OG images for docs, blog, contact, changelog, use-cases, status",
+    "date": "2026-04-04",
+    "author": "root",
+    "type": "other"
+  },
+  {
+    "hash": "e0e6a49",
+    "short": "e0e6a49",
+    "message": "add /status to sitemap, remove /pricing",
+    "date": "2026-04-04",
+    "author": "root",
+    "type": "other"
+  },
+  {
+    "hash": "c2c7ea3",
+    "short": "c2c7ea3",
+    "message": "9 new frontend features - testimonials, status page, blog search, cookie consent, back-to-top, FAQ, newsletter footer, theme animation, improved 404",
+    "date": "2026-04-04",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "34366af",
+    "short": "34366af",
+    "message": "contact form responsive - stack inputs and reduce padding on mobile",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "fix"
+  },
+  {
+    "hash": "5da2b5e",
+    "short": "5da2b5e",
+    "message": "mobile responsive improvements + mobile menu with full navigation",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "ef3925d",
+    "short": "ef3925d",
+    "message": "5 new flow templates, fix duplicate install bug",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "4874597",
+    "short": "4874597",
+    "message": "error boundaries, deep health check, CORS hardening, request tracing, auth rate limit",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "edbb06a",
+    "short": "edbb06a",
+    "message": "remove duplicate X-Frame-Options header from Next.js config",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "fix"
+  },
+  {
+    "hash": "07a07f1",
+    "short": "07a07f1",
+    "message": "rerun modal uses correct repo mappings format, filter active agents only",
+    "date": "2026-04-03",
+    "author": "Ali Ozyildirim",
+    "type": "fix"
+  },
+  {
+    "hash": "5fae25c",
+    "short": "5fae25c",
+    "message": "device code login, bridge improvements, agent config fixes",
+    "date": "2026-04-03",
+    "author": "Ali Ozyildirim",
+    "type": "feat"
+  },
+  {
+    "hash": "2942ea7",
+    "short": "2942ea7",
+    "message": "enhanced onboarding (6 steps), command center dashboard, sprint UX fixes",
+    "date": "2026-04-03",
+    "author": "Ali Ozyildirim",
+    "type": "feat"
+  },
+  {
+    "hash": "64cf751",
+    "short": "64cf751",
+    "message": "RSS feed, pricing FAQ schema, security.txt",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "70e3225",
+    "short": "70e3225",
+    "message": "SEO sitelinks \u2014 SearchAction, SiteNavigationElement, breadcrumbs",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "127bf38",
+    "short": "127bf38",
+    "message": "correct Product Hunt logo SVG in navbar",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "fix"
+  },
+  {
+    "hash": "c38a590",
+    "short": "c38a590",
+    "message": "resolve local dev issues \u2014 icon.svg 500, hydration mismatch, X-Frame-Options",
+    "date": "2026-04-03",
+    "author": "Ali Ozyildirim",
+    "type": "fix"
+  },
+  {
+    "hash": "3db1dda",
+    "short": "3db1dda",
+    "message": "fix header overlap + expand content detail",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "docs"
+  },
+  {
+    "hash": "59b57a8",
+    "short": "59b57a8",
+    "message": "Product Hunt navbar link + professional docs page",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "1bcdd09",
+    "short": "1bcdd09",
+    "message": "full ChatOps \u2014 Slack Events API + Teams Bot Framework + UI fields",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "4ac03fc",
+    "short": "4ac03fc",
+    "message": "DB-only bot config, refinement cache, Telegram UI",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "f8e5c08",
+    "short": "f8e5c08",
+    "message": "Telegram ChatOps bot support",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "9b6f83b",
+    "short": "9b6f83b",
+    "message": "Teams ChatOps \u2014 command tasks from Teams channel",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "9ea8356",
+    "short": "9ea8356",
+    "message": "auto-select active sprint + SEO improvements",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "138516f",
+    "short": "138516f",
+    "message": "dual Google Analytics + Microsoft Clarity tracking",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "01995e6",
+    "short": "01995e6",
+    "message": "redirect platform admin to /dashboard/admin on login",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "fix"
+  },
+  {
+    "hash": "bf2598d",
+    "short": "bf2598d",
+    "message": "remove Pricing from navbar",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "fix"
+  },
+  {
+    "hash": "5dc826e",
+    "short": "5dc826e",
+    "message": "hide org-level nav for platform admins \u2014 admin-only sidebar",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "fix"
+  },
+  {
+    "hash": "b19ad83",
+    "short": "b19ad83",
+    "message": "clean navbar grouping, skip onboarding for platform admins",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "fix"
+  },
+  {
+    "hash": "980659d",
+    "short": "980659d",
+    "message": "admin-first sidebar \u2014 platform admins see admin nav on top",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "dca9a93",
+    "short": "dca9a93",
+    "message": "agena CLI tool \u2014 admin:user:create, admin:user:list, admin:user:promote",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "9a0f32d",
+    "short": "9a0f32d",
+    "message": "interactive admin creation CLI with password confirmation",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "1a0a593",
+    "short": "1a0a593",
+    "message": "create_admin.py CLI script + README docs",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "2670a17",
+    "short": "2670a17",
+    "message": "platform admin panel \u2014 orgs, users, contact, newsletter management",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "063e130",
+    "short": "063e130",
+    "message": "contact page with form, newsletter opt-in, and navbar link",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "522d3b9",
+    "short": "522d3b9",
+    "message": "Clarity analytics, Web Vitals, dynamic OG images, newsletter, redirects",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "34e82ed",
+    "short": "34e82ed",
+    "message": "seo: 3 Turkish blog posts + README backlinks for keyword targeting",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "other"
+  },
+  {
+    "hash": "c1a6238",
+    "short": "c1a6238",
+    "message": "seo: security headers, canonical URLs, OG images, Product schema",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "other"
+  },
+  {
+    "hash": "be57dac",
+    "short": "be57dac",
+    "message": "Redis cache for Azure/Jira sprint endpoints + parallel Azure requests",
+    "date": "2026-04-03",
+    "author": "root",
+    "type": "other"
+  },
+  {
+    "hash": "56dd9ff",
+    "short": "56dd9ff",
+    "message": "repo mapping agent.md path changed",
+    "date": "2026-04-03",
+    "author": "Orhan G\u00f6k\u00e7e",
+    "type": "other"
+  },
+  {
+    "hash": "5b7dc45",
+    "short": "5b7dc45",
+    "message": "Azure Sprint-to-Merge full pipeline flow template",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "d28000b",
+    "short": "d28000b",
+    "message": "update CLAUDE.md for monorepo package structure",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "docs"
+  },
+  {
+    "hash": "1b51794",
+    "short": "1b51794",
+    "message": "analyzer/planner/reviewer agent presets, Azure reviewer picker",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "6758729",
+    "short": "6758729",
+    "message": "Azure DevOps node \u2014 project/repo dropdowns + preset template",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "8311f4f",
+    "short": "8311f4f",
+    "message": "Azure DevOps node for flows + remove lead_developer role lock",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "e0c1e52",
+    "short": "e0c1e52",
+    "message": "add mobile floating + button for flow node picker",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "fix"
+  },
+  {
+    "hash": "85e3198",
+    "short": "85e3198",
+    "message": "n8n-style flow node configuration overhaul",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "eed78f5",
+    "short": "eed78f5",
+    "message": "DORA sync no longer creates repo mappings, add delete confirmation",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "fix"
+  },
+  {
+    "hash": "843450a",
+    "short": "843450a",
+    "message": "nav group toggle respects manual collapse even when active",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "fix"
+  },
+  {
+    "hash": "592001b",
+    "short": "592001b",
+    "message": "improved sidebar menu \u2014 colored group headers, separators, hover effects",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "4014197",
+    "short": "4014197",
+    "message": "revert: restore office page to pre-height-fix state",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "other"
+  },
+  {
+    "hash": "eaa675e",
+    "short": "eaa675e",
+    "message": "compact office header to give more height to pixel map",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "fix"
+  },
+  {
+    "hash": "8c9c42b",
+    "short": "8c9c42b",
+    "message": "revert pixel office CSS, increase container height to 100vh-104px",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "fix"
+  },
+  {
+    "hash": "32cc3a1",
+    "short": "32cc3a1",
+    "message": "align pixel office map to top of container",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "fix"
+  },
+  {
+    "hash": "71f31a3",
+    "short": "71f31a3",
+    "message": "increase office pixel map height to prevent bottom toolbar overlap",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "fix"
+  },
+  {
+    "hash": "fc80e3b",
+    "short": "fc80e3b",
+    "message": "center pixel office canvas in iframe container",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "fix"
+  },
+  {
+    "hash": "9d3c3e7",
+    "short": "9d3c3e7",
+    "message": "office page height calc for top bar, prevent content cutoff",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "fix"
+  },
+  {
+    "hash": "1b47cc2",
+    "short": "1b47cc2",
+    "message": "office agent wizard step 4 (prompt/settings), fix promptSlugs prop, compact sidebar",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "860c672",
+    "short": "860c672",
+    "message": "agent prompt selector \u2014 choose from Prompt Studio or write custom",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "d029816",
+    "short": "d029816",
+    "message": "add local dev frontend service on port 3010",
+    "date": "2026-04-03",
+    "author": "Ali Ozyildirim",
+    "type": "feat"
+  },
+  {
+    "hash": "92f186b",
+    "short": "92f186b",
+    "message": "comprehensive README rewrite for monorepo package structure",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "docs"
+  },
+  {
+    "hash": "7b4af9c",
+    "short": "7b4af9c",
+    "message": "remove old source directories after package migration",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "other"
+  },
+  {
+    "hash": "ce67170",
+    "short": "ce67170",
+    "message": "replace 'from db import models' with agena_models in main.py and worker",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "fix"
+  },
+  {
+    "hash": "42e35cf",
+    "short": "42e35cf",
+    "message": "complete import rewrite for all package files",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "fix"
+  },
+  {
+    "hash": "ff5f8c4",
+    "short": "ff5f8c4",
+    "message": "monorepo package split \u2014 6 pip-installable packages",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "32e0f0c",
+    "short": "32e0f0c",
+    "message": "remove overview from sidebar, remove duplicate lang toggle from topbar",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "fix"
+  },
+  {
+    "hash": "283e9f9",
+    "short": "283e9f9",
+    "message": "move notifications/profile/usage to top bar, clean up sidebar",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "0763143",
+    "short": "0763143",
+    "message": "group sidebar navigation into collapsible sections",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "7379abe",
+    "short": "7379abe",
+    "message": "Merge obfox/feat/prompts-as-db-records (PR #5): DB-backed LLM prompts",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "other"
+  },
+  {
+    "hash": "5e11267",
+    "short": "5e11267",
+    "message": "prompt studio shows default prompts in editor for direct editing",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "d0e9856",
+    "short": "d0e9856",
+    "message": "Merge pull request #6 from aozyildirim/feat/team-health-pr-details",
+    "date": "2026-04-02",
+    "author": "aozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "d3e3de5",
+    "short": "d3e3de5",
+    "message": "sync all locale files \u2014 add missing translations for ES, ZH, IT, DE, JA",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "1854560",
+    "short": "1854560",
+    "message": "add guided tour for dashboard onboarding",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "d263bca",
+    "short": "d263bca",
+    "message": "load LLM prompts from database instead of static constants",
+    "date": "2026-04-02",
+    "author": "omer.bolatan",
+    "type": "feat"
+  },
+  {
+    "hash": "1fdafbc",
+    "short": "1fdafbc",
+    "message": "prompt studio dark mode - replace hardcoded colors with CSS variables",
+    "date": "2026-04-02",
+    "author": "root",
+    "type": "fix"
+  },
+  {
+    "hash": "34003ad",
+    "short": "34003ad",
+    "message": "Merge pull request #3 from obfox/fix/alembic-env-path",
+    "date": "2026-04-02",
+    "author": "aozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "8e128fb",
+    "short": "8e128fb",
+    "message": "Merge pull request #4 from obfox/feat/flows-page-update",
+    "date": "2026-04-02",
+    "author": "aozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "0ef9fa9",
+    "short": "0ef9fa9",
+    "message": "optimize node dragging with deferred state update",
+    "date": "2026-04-02",
+    "author": "omer.bolatan",
+    "type": "feat"
+  },
+  {
+    "hash": "e55508c",
+    "short": "e55508c",
+    "message": "add project root to sys.path in alembic env.py",
+    "date": "2026-04-02",
+    "author": "omer.bolatan",
+    "type": "fix"
+  },
+  {
+    "hash": "79872d7",
+    "short": "79872d7",
+    "message": "Merge pull request #2 from aozyildirim/feat/team-health-pr-details",
+    "date": "2026-04-02",
+    "author": "aozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "41812b7",
+    "short": "41812b7",
+    "message": "Merge pull request #1 from aozyildirim/feat/prompt-studio",
+    "date": "2026-04-02",
+    "author": "aozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "24dc9b8",
+    "short": "24dc9b8",
+    "message": "migrations",
+    "date": "2026-04-02",
+    "author": "Orhan G\u00f6k\u00e7e",
+    "type": "other"
+  },
+  {
+    "hash": "8d0a95b",
+    "short": "8d0a95b",
+    "message": "add prompt_overrides table and simplify editor UI",
+    "date": "2026-04-02",
+    "author": "Orhan G\u00f6k\u00e7e",
+    "type": "feat"
+  },
+  {
+    "hash": "45a849e",
+    "short": "45a849e",
+    "message": "add PR detail tables to team health symptoms + green border for synced repos",
+    "date": "2026-04-01",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "8d46fc8",
+    "short": "8d46fc8",
+    "message": "add author-level detail queries for team health symptoms",
+    "date": "2026-04-01",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "9c892dc",
+    "short": "9c892dc",
+    "message": "add DORA team health symptoms + Azure project discovery",
+    "date": "2026-03-31",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "a1a03da",
+    "short": "a1a03da",
+    "message": "add Boss Mode hero image to README header",
+    "date": "2026-03-31",
+    "author": "root",
+    "type": "docs"
+  },
+  {
+    "hash": "d53bd37",
+    "short": "d53bd37",
+    "message": "comprehensive SEO implementation",
+    "date": "2026-03-31",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "631c6c3",
+    "short": "631c6c3",
+    "message": "Add video",
+    "date": "2026-03-31",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "0e9672c",
+    "short": "0e9672c",
+    "message": "revert: remove file excerpt trimming, send full file contents to developer",
+    "date": "2026-03-31",
+    "author": "root",
+    "type": "other"
+  },
+  {
+    "hash": "1eef0a7",
+    "short": "1eef0a7",
+    "message": "shrink large files to 20K char excerpts before developer batching",
+    "date": "2026-03-31",
+    "author": "root",
+    "type": "other"
+  },
+  {
+    "hash": "327b23c",
+    "short": "327b23c",
+    "message": "batch developer step for large file sets (80K char batches)",
+    "date": "2026-03-31",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "8422e34",
+    "short": "8422e34",
+    "message": "cap remote file reading at 80K to prevent mini model refusal",
+    "date": "2026-03-31",
+    "author": "root",
+    "type": "other"
+  },
+  {
+    "hash": "5daf7bc",
+    "short": "5daf7bc",
+    "message": "lightweight file tree for agents.md repos + always show real paths",
+    "date": "2026-03-31",
+    "author": "root",
+    "type": "other"
+  },
+  {
+    "hash": "61b463e",
+    "short": "61b463e",
+    "message": "skip full repo context scan when agents.md exists",
+    "date": "2026-03-31",
+    "author": "root",
+    "type": "other"
+  },
+  {
+    "hash": "7f0f0ef",
+    "short": "7f0f0ef",
+    "message": "cost optimization + running task glow + local/remote repo toggle",
+    "date": "2026-03-31",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "ce2e0ef",
+    "short": "ce2e0ef",
+    "message": "add gpt-5.1-codex-mini to rerun model selector",
+    "date": "2026-03-31",
+    "author": "root",
+    "type": "feat"
+  }
+]
