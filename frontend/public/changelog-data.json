@@ -1,5 +1,13 @@
 [
   {
+    "hash": "1336296",
+    "short": "1336296",
+    "message": "changelog reads from static JSON instead of runtime git",
+    "date": "2026-04-04",
+    "author": "root",
+    "type": "fix"
+  },
+  {
     "hash": "4a7b040",
     "short": "4a7b040",
     "message": "changelog now shows real git commits with type filters and timeline",
@@ -787,14 +795,6 @@
     "hash": "7f0f0ef",
     "short": "7f0f0ef",
     "message": "cost optimization + running task glow + local/remote repo toggle",
-    "date": "2026-03-31",
-    "author": "root",
-    "type": "feat"
-  },
-  {
-    "hash": "ce2e0ef",
-    "short": "ce2e0ef",
-    "message": "add gpt-5.1-codex-mini to rerun model selector",
     "date": "2026-03-31",
     "author": "root",
     "type": "feat"
