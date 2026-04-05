@@ -2377,5 +2377,15 @@
   "useCases.uc8.b1": "Imposta le dipendenze alla creazione o aggiornale successivamente",
   "useCases.uc8.b2": "Auto-coda: le attività dipendenti partono quando tutti i bloccanti sono completati",
   "useCases.uc8.b3": "Il rilevamento dei cicli previene catene di dipendenze circolari",
-  "useCases.uc8.b4": "Il flusso visivo delle dipendenze mostra l'intera pipeline di esecuzione"
+  "useCases.uc8.b4": "Il flusso visivo delle dipendenze mostra l'intera pipeline di esecuzione",
+  "promptStudio.refinementSystem": "Prompt di sistema per il refinement",
+  "promptStudio.refinementSystemSummary": "Istruzioni di sistema per l'analista di refinement dello sprint",
+  "promptStudio.refinementDescription": "Prompt di descrizione del refinement",
+  "promptStudio.refinementDescriptionSummary": "Modello di elemento di lavoro con variabili ({title}, {description}, ecc.)",
+  "promptStudio.refinementExpected": "Output atteso del refinement",
+  "promptStudio.refinementExpectedSummary": "Specifica del formato di output JSON per i risultati del refinement",
+  "refinement.promptConfig": "Configurazione prompt",
+  "refinement.useCustomPrompt": "Usa prompt personalizzato",
+  "refinement.promptPreview": "Anteprima del prompt di sistema",
+  "refinement.editInStudio": "Modifica in Prompt Studio →"
 }

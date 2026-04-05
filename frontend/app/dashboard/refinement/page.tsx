@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { apiFetch, cachedApiFetch, loadPrefs } from '@/lib/api';
+import { apiFetch, cachedApiFetch, loadPrefs, loadPromptCatalog } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
 
 type Provider = 'azure' | 'jira';
@@ -151,6 +151,10 @@ type Copy = {
   writeShort: string;
   confirmAzure: string;
   confirmJira: string;
+  promptConfig: string;
+  useCustomPrompt: string;
+  promptPreview: string;
+  editInStudio: string;
 };
 
 const COPY: Record<'tr' | 'en', Copy> = {
@@ -215,6 +219,10 @@ const COPY: Record<'tr' | 'en', Copy> = {
     writeShort: 'Yaz',
     confirmAzure: 'Azure itemina yorum/puan yazilsin mi?',
     confirmJira: 'Jira issueya yorum/puan yazilsin mi?',
+    promptConfig: 'Prompt Yapilandirmasi',
+    useCustomPrompt: 'Ozel prompt kullan',
+    promptPreview: 'Sistem prompt onizlemesi',
+    editInStudio: 'Prompt Studio\'da Duzenle →',
   },
   en: {
     section: 'Refinement',
@@ -277,6 +285,10 @@ const COPY: Record<'tr' | 'en', Copy> = {
     writeShort: 'Write',
     confirmAzure: 'Write comment/points to Azure item?',
     confirmJira: 'Write comment/points to Jira issue?',
+    promptConfig: 'Prompt Configuration',
+    useCustomPrompt: 'Use custom prompt',
+    promptPreview: 'System prompt preview',
+    editInStudio: 'Edit in Prompt Studio →',
   },
 };
 
@@ -383,6 +395,10 @@ export default function RefinementPage() {
   const [confirmWritebackItemId, setConfirmWritebackItemId] = useState('');
   const [commentSignature, setCommentSignature] = useState('AGENA AI');
   const [focusedResultId, setFocusedResultId] = useState('');
+  const [promptExpanded, setPromptExpanded] = useState(false);
+  const [useCustomPrompt, setUseCustomPrompt] = useState(false);
+  const [customPromptText, setCustomPromptText] = useState('');
+  const [defaultPromptText, setDefaultPromptText] = useState('');
   const availableModels = useMemo(() => modelsForProvider(agentProvider), [agentProvider]);
 
   const selectedAzureSprint = useMemo(
@@ -399,12 +415,23 @@ export default function RefinementPage() {
 
     async function boot() {
       try {
-        const [azureProjectRows, prefs, integrations] = await Promise.all([
+        const [azureProjectRows, prefs, integrations, promptCatalog] = await Promise.all([
           cachedApiFetch<Opt[]>('/tasks/azure/projects').catch(() => [] as Opt[]),
           loadPrefs().catch(() => null),
           cachedApiFetch<Array<{ provider: string; has_secret?: boolean; base_url?: string | null; username?: string | null }>>('/integrations')
             .catch(() => [] as Array<{ provider: string; has_secret?: boolean; base_url?: string | null; username?: string | null }>),
+          loadPromptCatalog().catch(() => null),
         ]);
+        if (promptCatalog) {
+          const key = 'REFINEMENT_SYSTEM_PROMPT';
+          const defaultVal = (promptCatalog.defaults?.[key] || '').trim();
+          const overrideVal = (promptCatalog.overrides?.[key] || '').trim();
+          setDefaultPromptText(defaultVal);
+          if (overrideVal && overrideVal !== defaultVal) {
+            setUseCustomPrompt(true);
+            setCustomPromptText(overrideVal);
+          }
+        }
         let jiraProjectRows: Opt[] = [];
         const jiraCfg = integrations.find((cfg) => cfg.provider === 'jira');
         const jiraConnected = Boolean(jiraCfg && (jiraCfg.has_secret || (jiraCfg.base_url || '').trim() || (jiraCfg.username || '').trim()));
@@ -589,6 +616,7 @@ export default function RefinementPage() {
     setError('');
     setRunMessage(null);
     try {
+      const customSystemPrompt = useCustomPrompt && customPromptText.trim() ? customPromptText.trim() : undefined;
       const payload = provider === 'azure'
         ? {
           provider,
@@ -601,6 +629,7 @@ export default function RefinementPage() {
           agent_model: agentModel,
           item_ids: selectedIds,
           max_items: maxItems,
+          ...(customSystemPrompt ? { custom_system_prompt: customSystemPrompt } : {}),
         }
         : {
           provider,
@@ -612,6 +641,7 @@ export default function RefinementPage() {
           agent_model: agentModel,
           item_ids: selectedIds,
           max_items: maxItems,
+          ...(customSystemPrompt ? { custom_system_prompt: customSystemPrompt } : {}),
         };
       const response = await apiFetch<RefinementAnalyzeResponse>('/refinement/analyze', {
         method: 'POST',
@@ -638,7 +668,7 @@ export default function RefinementPage() {
     } finally {
       setRunning(false);
     }
-  }, [provider, azureProject, azureTeam, azureSprint, selectedAzureSprint, jiraBoard, jiraSprint, selectedJiraSprint, language, agentProvider, agentModel, selectedIds, maxItems, normalizeAnalyzeResponse, copy.failedRun, copy.successRun, copy.partialRun]);
+  }, [provider, azureProject, azureTeam, azureSprint, selectedAzureSprint, jiraBoard, jiraSprint, selectedJiraSprint, language, agentProvider, agentModel, selectedIds, maxItems, useCustomPrompt, customPromptText, normalizeAnalyzeResponse, copy.failedRun, copy.successRun, copy.partialRun]);
 
   useEffect(() => {
     if (!autoFocusResults || !results?.results.length) return;
@@ -862,6 +892,74 @@ export default function RefinementPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', padding: 0, overflow: 'hidden' }}>
+            <button
+              type='button'
+              onClick={() => setPromptExpanded((p) => !p)}
+              style={{
+                width: '100%',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '12px 14px',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--ink-75)',
+              }}
+            >
+              <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                {copy.promptConfig}
+              </span>
+              <span style={{ fontSize: 11, color: 'var(--ink-42)', transform: promptExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                ▼
+              </span>
+            </button>
+            {promptExpanded && (
+              <div style={{ padding: '0 14px 14px', display: 'grid', gap: 10 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input
+                    type='checkbox'
+                    checked={useCustomPrompt}
+                    onChange={(e) => {
+                      setUseCustomPrompt(e.target.checked);
+                      if (e.target.checked && !customPromptText) {
+                        setCustomPromptText(defaultPromptText);
+                      }
+                    }}
+                    style={{ accentColor: 'var(--accent)' }}
+                  />
+                  <span style={{ fontSize: 12, color: 'var(--ink-75)', fontWeight: 600 }}>{copy.useCustomPrompt}</span>
+                </label>
+                {useCustomPrompt ? (
+                  <textarea
+                    value={customPromptText}
+                    onChange={(e) => setCustomPromptText(e.target.value)}
+                    rows={8}
+                    style={{
+                      ...inputStyle,
+                      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                      lineHeight: 1.45,
+                      resize: 'vertical',
+                      minHeight: 120,
+                      borderColor: 'var(--accent)',
+                    }}
+                  />
+                ) : (
+                  <div style={{ fontSize: 11, color: 'var(--ink-42)', fontStyle: 'italic' }}>
+                    {copy.promptPreview}: {defaultPromptText ? defaultPromptText.slice(0, 120) + (defaultPromptText.length > 120 ? '...' : '') : '-'}
+                  </div>
+                )}
+                <a
+                  href='/dashboard/prompt-studio'
+                  style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}
+                >
+                  {copy.editInStudio}
+                </a>
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>

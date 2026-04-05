@@ -2377,5 +2377,15 @@
   "useCases.uc8.b1": "在创建时设置依赖关系或稍后更新",
   "useCases.uc8.b2": "自动排队：所有阻塞项完成后依赖任务启动",
   "useCases.uc8.b3": "循环检测防止循环依赖链",
-  "useCases.uc8.b4": "可视化依赖流程展示完整执行管线"
+  "useCases.uc8.b4": "可视化依赖流程展示完整执行管线",
+  "promptStudio.refinementSystem": "精炼系统提示词",
+  "promptStudio.refinementSystemSummary": "Sprint精炼分析师的系统指令",
+  "promptStudio.refinementDescription": "精炼描述提示词",
+  "promptStudio.refinementDescriptionSummary": "带变量的工作项模板（{title}、{description}等）",
+  "promptStudio.refinementExpected": "精炼预期输出",
+  "promptStudio.refinementExpectedSummary": "精炼结果的JSON输出格式规范",
+  "refinement.promptConfig": "提示词配置",
+  "refinement.useCustomPrompt": "使用自定义提示词",
+  "refinement.promptPreview": "系统提示词预览",
+  "refinement.editInStudio": "在Prompt Studio中编辑 →"
 }

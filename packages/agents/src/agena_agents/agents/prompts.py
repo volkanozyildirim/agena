@@ -193,6 +193,45 @@ FLOW_LEAD_PR_REVIEW_SYSTEM_PROMPT = (
     'Keep it concise and technical.'
 )
 
+REFINEMENT_SYSTEM_PROMPT = (
+    'You are performing sprint refinement for an engineering team.\n'
+    'Follow the requested output language exactly for all natural-language fields.\n'
+    'Use only the provided work item content.\n'
+    'Do not assume implementation details that are not present.\n'
+    'If information is missing, lower confidence and list explicit ambiguities and follow-up questions.\n'
+    'The "comment" field must be a direct actionable statement, not a question sentence.\n'
+    'Put all questions only in the "questions" array.\n'
+    'Suggested story points must be chosen only from this Fibonacci scale: {point_scale}.\n'
+    'Return valid JSON only.'
+)
+
+REFINEMENT_DESCRIPTION_PROMPT = (
+    'Provider: {provider}\n'
+    'Sprint: {sprint_name}\n'
+    'Requested output language: {language}\n'
+    'Point scale: {point_scale}\n\n'
+    'Work item ID: {item_id}\n'
+    'Work item type: {work_item_type}\n'
+    'Title: {title}\n'
+    'Current state: {state}\n'
+    'Current story points: {current_story_points}\n'
+    'Current effort: {current_effort}\n'
+    'Assigned to: {assigned_to}\n\n'
+    'Description:\n{description}'
+)
+
+REFINEMENT_EXPECTED_OUTPUT = (
+    'Return a JSON object with these keys:\n'
+    '- summary: short delivery-oriented summary in {language}\n'
+    '- suggested_story_points: integer from {point_scale}, or 0 if the item is too ambiguous to estimate\n'
+    '- estimation_rationale: concise explanation in {language} describing why this score fits the item\n'
+    '- confidence: integer from 0 to 100\n'
+    '- comment: a refinement comment in {language} ready to paste into the work item\n'
+    '- ambiguities: array of missing details that block precise estimation\n'
+    '- questions: array of concrete follow-up questions for product or engineering\n'
+    '- ready_for_planning: boolean'
+)
+
 PROMPT_DEFAULTS: dict[str, str] = {
     'FETCH_CONTEXT_SYSTEM_PROMPT': FETCH_CONTEXT_SYSTEM_PROMPT,
     'PM_SYSTEM_PROMPT': PM_SYSTEM_PROMPT,
@@ -205,6 +244,9 @@ PROMPT_DEFAULTS: dict[str, str] = {
     'FLOW_PRODUCT_REVIEW_SYSTEM_PROMPT': FLOW_PRODUCT_REVIEW_SYSTEM_PROMPT,
     'FLOW_AGENT_NODE_SYSTEM_PROMPT_TEMPLATE': FLOW_AGENT_NODE_SYSTEM_PROMPT_TEMPLATE,
     'FLOW_LEAD_PR_REVIEW_SYSTEM_PROMPT': FLOW_LEAD_PR_REVIEW_SYSTEM_PROMPT,
+    'REFINEMENT_SYSTEM_PROMPT': REFINEMENT_SYSTEM_PROMPT,
+    'REFINEMENT_DESCRIPTION_PROMPT': REFINEMENT_DESCRIPTION_PROMPT,
+    'REFINEMENT_EXPECTED_OUTPUT': REFINEMENT_EXPECTED_OUTPUT,
 }
 
 

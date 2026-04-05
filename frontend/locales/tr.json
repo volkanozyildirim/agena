@@ -2377,5 +2377,15 @@
   "useCases.uc8.b1": "Oluşturma sırasında veya sonradan bağımlılıkları ayarlayın",
   "useCases.uc8.b2": "Otomatik kuyruk: tüm engelleyiciler tamamlandığında bağımlı görevler başlar",
   "useCases.uc8.b3": "Döngü algılama, dairesel bağımlılık zincirlerini önler",
-  "useCases.uc8.b4": "Görsel bağımlılık akışı tüm yürütme hattını gösterir"
+  "useCases.uc8.b4": "Görsel bağımlılık akışı tüm yürütme hattını gösterir",
+  "promptStudio.refinementSystem": "Refinement Sistem Promptu",
+  "promptStudio.refinementSystemSummary": "Sprint refinement analizcisi icin sistem talimatlari",
+  "promptStudio.refinementDescription": "Refinement Aciklama Promptu",
+  "promptStudio.refinementDescriptionSummary": "Degiskenli is maddesi sablonu ({title}, {description}, vb.)",
+  "promptStudio.refinementExpected": "Refinement Beklenen Cikti",
+  "promptStudio.refinementExpectedSummary": "Refinement sonuclari icin JSON cikti format sartnamesi",
+  "refinement.promptConfig": "Prompt Yapilandirmasi",
+  "refinement.useCustomPrompt": "Ozel prompt kullan",
+  "refinement.promptPreview": "Sistem prompt onizlemesi",
+  "refinement.editInStudio": "Prompt Studio'da Duzenle →"
 }

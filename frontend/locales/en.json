@@ -2377,5 +2377,15 @@
   "useCases.uc8.b1": "Set dependencies at creation time or update them later",
   "useCases.uc8.b2": "Auto-queue: dependent tasks start when all blockers complete",
   "useCases.uc8.b3": "Cycle detection prevents circular dependency chains",
-  "useCases.uc8.b4": "Visual dependency flow shows the full execution pipeline"
+  "useCases.uc8.b4": "Visual dependency flow shows the full execution pipeline",
+  "promptStudio.refinementSystem": "Refinement System Prompt",
+  "promptStudio.refinementSystemSummary": "System instructions for the sprint refinement analyst",
+  "promptStudio.refinementDescription": "Refinement Description Prompt",
+  "promptStudio.refinementDescriptionSummary": "Work item template with variables ({title}, {description}, etc.)",
+  "promptStudio.refinementExpected": "Refinement Expected Output",
+  "promptStudio.refinementExpectedSummary": "JSON output format specification for refinement results",
+  "refinement.promptConfig": "Prompt Configuration",
+  "refinement.useCustomPrompt": "Use custom prompt",
+  "refinement.promptPreview": "System prompt preview",
+  "refinement.editInStudio": "Edit in Prompt Studio →"
 }

@@ -1,5 +1,13 @@
 [
   {
+    "hash": "501bbd3",
+    "short": "501bbd3",
+    "message": "disable CrewAI cache at Agent, Task, and Crew level for refinement",
+    "date": "2026-04-05",
+    "author": "root",
+    "type": "fix"
+  },
+  {
     "hash": "b31af74",
     "short": "b31af74",
     "message": "add multi-repo orchestration and task dependencies to README and CLAUDE.md",
@@ -790,13 +798,5 @@
     "date": "2026-04-02",
     "author": "root",
     "type": "fix"
-  },
-  {
-    "hash": "283e9f9",
-    "short": "283e9f9",
-    "message": "move notifications/profile/usage to top bar, clean up sidebar",
-    "date": "2026-04-02",
-    "author": "root",
-    "type": "feat"
   }
 ]

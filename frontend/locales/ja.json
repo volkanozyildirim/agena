@@ -2377,5 +2377,15 @@
   "useCases.uc8.b1": "作成時に依存関係を設定するか、後で更新",
   "useCases.uc8.b2": "自動キュー：すべてのブロッカーが完了すると依存タスクが開始",
   "useCases.uc8.b3": "循環検出により循環依存チェーンを防止",
-  "useCases.uc8.b4": "ビジュアル依存フローで実行パイプライン全体を表示"
+  "useCases.uc8.b4": "ビジュアル依存フローで実行パイプライン全体を表示",
+  "promptStudio.refinementSystem": "リファインメントシステムプロンプト",
+  "promptStudio.refinementSystemSummary": "スプリントリファインメントアナリストのシステム指示",
+  "promptStudio.refinementDescription": "リファインメント説明プロンプト",
+  "promptStudio.refinementDescriptionSummary": "変数付き作業項目テンプレート（{title}、{description}など）",
+  "promptStudio.refinementExpected": "リファインメント期待出力",
+  "promptStudio.refinementExpectedSummary": "リファインメント結果のJSON出力フォーマット仕様",
+  "refinement.promptConfig": "プロンプト設定",
+  "refinement.useCustomPrompt": "カスタムプロンプトを使用",
+  "refinement.promptPreview": "システムプロンプトプレビュー",
+  "refinement.editInStudio": "Prompt Studioで編集 →"
 }

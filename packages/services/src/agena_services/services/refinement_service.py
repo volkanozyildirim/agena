@@ -139,7 +139,8 @@ class RefinementService:
 
         if selected:
             runner = CrewAIAgentRunner(llm)
-            agent_cfg, task_cfg = self._load_prompt_config()
+            # Load prompts from DB (Prompt Studio editable) with YAML fallback
+            system_tpl, desc_tpl, expected_tpl, agent_cfg = await self._load_prompt_config_from_db()
             point_scale = self._normalize_point_scale(request.point_scale)
 
             for item in selected:
@@ -155,9 +156,9 @@ class RefinementService:
                         role=str(agent_cfg.get('role') or 'Sprint Refinement Analyst'),
                         goal=str(agent_cfg.get('goal') or 'Refine and estimate backlog items.'),
                         backstory=str(agent_cfg.get('backstory') or ''),
-                        system_prompt=self._format_template(str(task_cfg.get('system_prompt') or ''), prompt_vars),
-                        user_prompt=self._format_template(str(task_cfg.get('description') or ''), prompt_vars),
-                        expected_output=self._format_template(str(task_cfg.get('expected_output') or ''), prompt_vars),
+                        system_prompt=self._format_template(system_tpl, prompt_vars),
+                        user_prompt=self._format_template(desc_tpl, prompt_vars),
+                        expected_output=self._format_template(expected_tpl, prompt_vars),
                         complexity_hint='normal',
                         max_output_tokens=4000,
                         structured_output=_RefinementStructuredOutput,
@@ -461,7 +462,39 @@ class RefinementService:
         limit = max(1, min(int(max_items or 1), 20))
         return pool[:limit]
 
-    def _load_prompt_config(self) -> tuple[dict[str, Any], dict[str, Any]]:
+    async def _load_prompt_config_from_db(self) -> tuple[str, str, str, dict[str, Any]]:
+        """Load refinement prompts from PromptService (DB) with YAML fallback."""
+        from agena_services.services.prompt_service import PromptService
+
+        # Try DB first (Prompt Studio editable)
+        try:
+            system_tpl = await PromptService.get(self.db, 'refinement_system_prompt')
+        except ValueError:
+            system_tpl = ''
+        try:
+            desc_tpl = await PromptService.get(self.db, 'refinement_description_prompt')
+        except ValueError:
+            desc_tpl = ''
+        try:
+            expected_tpl = await PromptService.get(self.db, 'refinement_expected_output')
+        except ValueError:
+            expected_tpl = ''
+
+        # Fallback to YAML if DB prompts are empty
+        if not system_tpl or not desc_tpl or not expected_tpl:
+            _, task_cfg = self._load_prompt_config_yaml()
+            if not system_tpl:
+                system_tpl = str(task_cfg.get('system_prompt') or '')
+            if not desc_tpl:
+                desc_tpl = str(task_cfg.get('description') or '')
+            if not expected_tpl:
+                expected_tpl = str(task_cfg.get('expected_output') or '')
+
+        agent_cfg, _ = self._load_prompt_config_yaml()
+        return system_tpl, desc_tpl, expected_tpl, agent_cfg
+
+    def _load_prompt_config_yaml(self) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Legacy: load refinement prompts from YAML config files."""
         base = Path(__file__).resolve().parents[1] / 'agents' / 'config'
         with (base / 'refinement_agents.yaml').open('r', encoding='utf-8') as fh:
             agents = yaml.safe_load(fh) or {}

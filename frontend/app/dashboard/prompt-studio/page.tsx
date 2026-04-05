@@ -21,6 +21,9 @@ const PROMPT_ORDER = [
   'FLOW_PRODUCT_REVIEW_SYSTEM_PROMPT',
   'FLOW_AGENT_NODE_SYSTEM_PROMPT_TEMPLATE',
   'FLOW_LEAD_PR_REVIEW_SYSTEM_PROMPT',
+  'REFINEMENT_SYSTEM_PROMPT',
+  'REFINEMENT_DESCRIPTION_PROMPT',
+  'REFINEMENT_EXPECTED_OUTPUT',
 ] as const;
 
 // Language-aware prompt labels for non-technical users.
@@ -37,6 +40,9 @@ const PROMPT_LABELS: Record<'tr' | 'en', Record<string, PromptMeta>> = {
     FLOW_PRODUCT_REVIEW_SYSTEM_PROMPT: { title: 'Flow Product Review', summary: 'Flow review node davranışı.' },
     FLOW_AGENT_NODE_SYSTEM_PROMPT_TEMPLATE: { title: 'Flow Agent Template', summary: 'Flow generic agent sistem şablonu.' },
     FLOW_LEAD_PR_REVIEW_SYSTEM_PROMPT: { title: 'Flow Lead PR Review', summary: 'PR review üslubu ve kalite standardı.' },
+    REFINEMENT_SYSTEM_PROMPT: { title: 'Refinement Sistem Promptu', summary: 'Sprint refinement analizcisi icin sistem talimatlari.' },
+    REFINEMENT_DESCRIPTION_PROMPT: { title: 'Refinement Aciklama Promptu', summary: 'Degiskenli is maddesi sablonu ({title}, {description}, vb.).' },
+    REFINEMENT_EXPECTED_OUTPUT: { title: 'Refinement Beklenen Cikti', summary: 'Refinement sonuclari icin JSON cikti format sartnamesi.' },
   },
   en: {
     PM_SYSTEM_PROMPT: { title: 'PM Analysis Prompt', summary: 'Technical analysis and scope extraction.' },
@@ -50,6 +56,9 @@ const PROMPT_LABELS: Record<'tr' | 'en', Record<string, PromptMeta>> = {
     FLOW_PRODUCT_REVIEW_SYSTEM_PROMPT: { title: 'Flow Product Review', summary: 'Behavior for flow review node.' },
     FLOW_AGENT_NODE_SYSTEM_PROMPT_TEMPLATE: { title: 'Flow Agent Template', summary: 'System template for generic flow nodes.' },
     FLOW_LEAD_PR_REVIEW_SYSTEM_PROMPT: { title: 'Flow Lead PR Review', summary: 'Quality/tone for PR review comments.' },
+    REFINEMENT_SYSTEM_PROMPT: { title: 'Refinement System Prompt', summary: 'System instructions for the sprint refinement analyst.' },
+    REFINEMENT_DESCRIPTION_PROMPT: { title: 'Refinement Description Prompt', summary: 'Work item template with variables ({title}, {description}, etc.).' },
+    REFINEMENT_EXPECTED_OUTPUT: { title: 'Refinement Expected Output', summary: 'JSON output format specification for refinement results.' },
   },
 };
 

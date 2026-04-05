@@ -2377,5 +2377,15 @@
   "useCases.uc8.b1": "Establece dependencias al crear o actualízalas después",
   "useCases.uc8.b2": "Auto-cola: las tareas dependientes comienzan cuando todos los bloqueadores se completan",
   "useCases.uc8.b3": "Detección de ciclos previene cadenas de dependencias circulares",
-  "useCases.uc8.b4": "Flujo visual de dependencias muestra el pipeline de ejecución completo"
+  "useCases.uc8.b4": "Flujo visual de dependencias muestra el pipeline de ejecución completo",
+  "promptStudio.refinementSystem": "Prompt del sistema de refinamiento",
+  "promptStudio.refinementSystemSummary": "Instrucciones del sistema para el analista de refinamiento de sprint",
+  "promptStudio.refinementDescription": "Prompt de descripcion de refinamiento",
+  "promptStudio.refinementDescriptionSummary": "Plantilla de elemento de trabajo con variables ({title}, {description}, etc.)",
+  "promptStudio.refinementExpected": "Salida esperada de refinamiento",
+  "promptStudio.refinementExpectedSummary": "Especificacion de formato de salida JSON para resultados de refinamiento",
+  "refinement.promptConfig": "Configuracion de prompts",
+  "refinement.useCustomPrompt": "Usar prompt personalizado",
+  "refinement.promptPreview": "Vista previa del prompt del sistema",
+  "refinement.editInStudio": "Editar en Prompt Studio →"
 }
