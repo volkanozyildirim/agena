@@ -21,6 +21,7 @@ export default function Footer() {
             <h4 style={{ color: 'var(--ink-65)', fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{t('footer.product')}</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <Link href='/use-cases' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>{t('footer.useCases')}</Link>
+              <Link href='/integrations' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>{t('footer.integrations')}</Link>
               <Link href='/docs' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>{t('footer.docs')}</Link>
               <Link href='/roadmap' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>{t('footer.roadmap')}</Link>
               <Link href='/api-docs' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>{t('footer.apiDocs')}</Link>
@@ -31,6 +32,7 @@ export default function Footer() {
             <h4 style={{ color: 'var(--ink-65)', fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{t('footer.resources')}</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <Link href='/blog' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>{t('footer.blog')}</Link>
+              <Link href='/glossary' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>{t('footer.glossary')}</Link>
               <Link href='/blog/what-is-agentic-ai' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>{t('footer.agenticAI')}</Link>
               <Link href='/blog/pixel-agent-technology' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>{t('footer.pixelAgent')}</Link>
               <Link href='/blog/github-copilot-alternative' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>{t('footer.vsCopilot')}</Link>

@@ -4,6 +4,7 @@ import json
 import logging
 import smtplib
 from datetime import datetime, timezone
+from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any
 
@@ -16,6 +17,12 @@ from agena_models.models.integration_config import IntegrationConfig
 from agena_models.models.notification_record import NotificationRecord
 from agena_models.models.user import User
 from agena_models.models.user_preference import UserPreference
+from agena_services.services.email_templates import (
+    generic_notification_email,
+    pr_created_email,
+    task_completed_email,
+    task_failed_email,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,27 +58,25 @@ class NotificationService:
         task_title: str,
         status: str,
         pr_url: str | None = None,
+        branch_name: str | None = None,
         failure_reason: str | None = None,
     ) -> bool:
         is_completed = status == 'completed'
         event_type = 'task_completed' if is_completed else 'task_failed'
         title = f"Task #{task_id} {'completed' if is_completed else 'failed'}"
         message = task_title if is_completed else (failure_reason or task_title)
-        subject = f"[AGENA] Task #{task_id} {status.upper()}: {task_title}"
+
         if is_completed:
-            email_body = (
-                f"Task completed successfully.\n\n"
-                f"Task: #{task_id} - {task_title}\n"
-                f"Status: {status}\n"
-                f"PR: {pr_url or '-'}\n"
+            subject, html_body = task_completed_email(
+                task_id=task_id, task_title=task_title,
+                pr_url=pr_url, branch_name=branch_name,
             )
         else:
-            email_body = (
-                f"Task finished with status: {status}\n\n"
-                f"Task: #{task_id} - {task_title}\n"
-                f"Reason: {failure_reason or '-'}\n"
-                f"PR: {pr_url or '-'}\n"
+            subject, html_body = task_failed_email(
+                task_id=task_id, task_title=task_title,
+                failure_reason=failure_reason,
             )
+
         return await self.notify_event(
             organization_id=organization_id,
             user_id=user_id,
@@ -82,7 +87,7 @@ class NotificationService:
             task_id=task_id,
             payload={'status': status, 'pr_url': pr_url, 'failure_reason': failure_reason},
             email_subject=subject,
-            email_body=email_body,
+            email_html=html_body,
         )
 
     async def notify_event(
@@ -98,6 +103,7 @@ class NotificationService:
         payload: dict[str, Any] | None = None,
         email_subject: str | None = None,
         email_body: str | None = None,
+        email_html: str | None = None,
     ) -> bool:
         settings = await self._resolve_profile_settings(user_id)
         should_store_in_app = self._is_enabled(settings, event_type, 'in_app')
@@ -126,8 +132,14 @@ class NotificationService:
             recipient = await self._resolve_recipient(user_id)
             if recipient:
                 subject = email_subject or f"[AGENA] {title}"
-                body = email_body or f"{title}\n\n{message}"
-                sent_any = self._send_email(recipient, subject, body) or sent_any
+                plain_body = email_body or f"{title}\n\n{message}"
+                html = email_html
+                if not html:
+                    _, html = generic_notification_email(
+                        title=title, message=message, severity=severity,
+                        action_url='https://agena.dev/dashboard/tasks',
+                    )
+                sent_any = self._send_email(recipient, subject, plain_body, html_body=html) or sent_any
 
         if should_slack or should_teams:
             hooks = await self._resolve_channel_webhooks(organization_id)
@@ -373,12 +385,17 @@ class NotificationService:
             return '#22c55e'
         return '#38bdf8'
 
-    def _send_email(self, to_email: str, subject: str, body: str) -> bool:
+    def _send_email(self, to_email: str, subject: str, body: str, *, html_body: str | None = None) -> bool:
         if not self.settings.smtp_host:
             logger.info('SMTP_HOST not configured, skipping email notification')
             return False
 
-        msg = MIMEText(body, 'plain', 'utf-8')
+        if html_body:
+            msg = MIMEMultipart('alternative')
+            msg.attach(MIMEText(body, 'plain', 'utf-8'))
+            msg.attach(MIMEText(html_body, 'html', 'utf-8'))
+        else:
+            msg = MIMEText(body, 'plain', 'utf-8')
         msg['Subject'] = subject
         msg['From'] = f"{self.settings.smtp_from_name} <{self.settings.smtp_from_email}>"
         msg['To'] = to_email

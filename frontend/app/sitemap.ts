@@ -22,6 +22,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: '/roadmap', modified: '2026-04-04', freq: 'weekly' as const, priority: 0.7 },
     { path: '/api-docs', modified: '2026-04-04', freq: 'monthly' as const, priority: 0.6 },
     { path: '/status', modified: '2026-04-04', freq: 'daily' as const, priority: 0.5 },
+    { path: '/glossary', modified: '2026-04-05', freq: 'monthly' as const, priority: 0.7 },
+    { path: '/integrations', modified: '2026-04-05', freq: 'monthly' as const, priority: 0.8 },
   ];
 
   // All blog slugs

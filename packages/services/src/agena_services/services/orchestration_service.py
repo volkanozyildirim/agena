@@ -95,7 +95,8 @@ class OrchestrationService:
             'task_id': task_id, 'status': 'running', 'title': task.title,
         })
 
-        routing = self._extract_task_routing(task)
+        repo_mapping = await self._resolve_repo_mapping(task)
+        routing = self._extract_task_routing(task, repo_mapping)
 
         # Override model/provider if explicitly passed from assignment
         if agent_model:
@@ -1528,7 +1529,18 @@ class OrchestrationService:
         logger.info(f'Trimmed agents.md: kept {kept_sections} / {kept_sections + skipped_sections} signature sections, keywords={keywords}')
         return '\n'.join(result)
 
-    def _extract_task_routing(self, task: TaskRecord) -> TaskRouting:
+    async def _resolve_repo_mapping(self, task: TaskRecord) -> 'RepoMapping | None':
+        """Load the RepoMapping linked to this task, if any."""
+        mapping_id = getattr(task, 'repo_mapping_id', None)
+        if not mapping_id:
+            return None
+        from agena_models.models.repo_mapping import RepoMapping
+        mapping = await self.db_session.get(RepoMapping, mapping_id)
+        if mapping and mapping.organization_id == task.organization_id and mapping.is_active:
+            return mapping
+        return None
+
+    def _extract_task_routing(self, task: TaskRecord, repo_mapping: 'RepoMapping | None' = None) -> TaskRouting:
         meta: dict[str, str] = {}
         for raw in (task.description or '').splitlines():
             if ':' not in raw:
@@ -1567,6 +1579,21 @@ class OrchestrationService:
         if remote_repo:
             local_repo_path = None
 
+        # Override routing from RepoMapping if linked
+        repo_playbook = meta.get('repo playbook') or None
+        if repo_mapping:
+            if repo_mapping.provider == 'github':
+                remote_repo = f"github:{repo_mapping.owner}/{repo_mapping.repo_name}"
+                effective_source = 'github'
+            elif repo_mapping.provider == 'azure':
+                effective_source = 'azure'
+                azure_project = repo_mapping.owner
+            if repo_mapping.local_repo_path:
+                local_repo_path = repo_mapping.local_repo_path
+                remote_repo = None
+            if repo_mapping.playbook:
+                repo_playbook = repo_mapping.playbook
+
         return TaskRouting(
             effective_source=effective_source,
             external_source=external_source,
@@ -1574,7 +1601,7 @@ class OrchestrationService:
             azure_repo_url=azure_repo_url,
             local_repo_mapping=meta.get('local repo mapping') or None,
             local_repo_path=local_repo_path,
-            repo_playbook=meta.get('repo playbook') or None,
+            repo_playbook=repo_playbook,
             preferred_agent=meta.get('preferred agent') or None,
             preferred_agent_provider=meta.get('preferred agent provider') or None,
             preferred_agent_model=meta.get('preferred agent model') or None,

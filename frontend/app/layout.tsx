@@ -186,6 +186,16 @@ const jsonLd = {
       url: `${SITE_URL}/status`,
     },
     {
+      '@type': 'SiteNavigationElement',
+      name: 'Glossary',
+      url: `${SITE_URL}/glossary`,
+    },
+    {
+      '@type': 'SiteNavigationElement',
+      name: 'Integrations',
+      url: `${SITE_URL}/integrations`,
+    },
+    {
       '@type': 'SoftwareApplication',
       name: 'AGENA',
       applicationCategory: 'DeveloperApplication',

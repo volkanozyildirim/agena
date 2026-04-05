@@ -34,6 +34,7 @@ export default function Navbar() {
           {/* Page links */}
           <div style={{ display: 'flex', gap: 2, alignItems: 'center', marginRight: 12 }}>
             <Link href='/use-cases' style={{ color: 'var(--muted)', fontSize: 13, padding: '6px 10px', borderRadius: 8, textDecoration: 'none', fontWeight: 500 }}>{t('nav.useCases')}</Link>
+            <Link href='/integrations' style={{ color: 'var(--muted)', fontSize: 13, padding: '6px 10px', borderRadius: 8, textDecoration: 'none', fontWeight: 500 }}>{t('nav.integrations')}</Link>
             <Link href='/docs' style={{ color: 'var(--muted)', fontSize: 13, padding: '6px 10px', borderRadius: 8, textDecoration: 'none', fontWeight: 500 }}>{t('nav.docs')}</Link>
             <Link href='/blog' style={{ color: 'var(--muted)', fontSize: 13, padding: '6px 10px', borderRadius: 8, textDecoration: 'none', fontWeight: 500 }}>{t('nav.blog')}</Link>
             <Link href='/contact' style={{ color: 'var(--muted)', fontSize: 13, padding: '6px 10px', borderRadius: 8, textDecoration: 'none', fontWeight: 500 }}>{t('nav.contact')}</Link>
@@ -115,6 +116,7 @@ export default function Navbar() {
       {menuOpen && (
         <div className='navbar-mobile-menu'>
           <Link href='/use-cases' style={{ color: 'var(--muted)', fontSize: 14, padding: '10px 16px', borderRadius: 8, textDecoration: 'none', textAlign: 'center' }}>{t('nav.useCases')}</Link>
+          <Link href='/integrations' style={{ color: 'var(--muted)', fontSize: 14, padding: '10px 16px', borderRadius: 8, textDecoration: 'none', textAlign: 'center' }}>{t('nav.integrations')}</Link>
           <Link href='/docs' style={{ color: 'var(--muted)', fontSize: 14, padding: '10px 16px', borderRadius: 8, textDecoration: 'none', textAlign: 'center' }}>{t('nav.docs')}</Link>
           <Link href='/blog' style={{ color: 'var(--muted)', fontSize: 14, padding: '10px 16px', borderRadius: 8, textDecoration: 'none', textAlign: 'center' }}>{t('nav.blog')}</Link>
           <Link href='/changelog' style={{ color: 'var(--muted)', fontSize: 14, padding: '10px 16px', borderRadius: 8, textDecoration: 'none', textAlign: 'center' }}>{t('nav.changelog')}</Link>

@@ -18,6 +18,7 @@ from agena_models.models.payment_record import PaymentRecord
 from agena_models.models.prompt import Prompt
 from agena_models.models.prompt_override import PromptOverride
 from agena_models.models.refinement_record import RefinementRecord
+from agena_models.models.repo_mapping import RepoMapping
 from agena_models.models.run_record import RunRecord
 from agena_models.models.subscription import Subscription
 from agena_models.models.task_dependency import TaskDependency
@@ -29,7 +30,7 @@ from agena_models.models.user_preference import UserPreference
 __all__ = [
     'User', 'Organization', 'OrganizationMember', 'Subscription',
     'TaskDependency', 'PaymentRecord', 'Prompt', 'PromptOverride',
-    'RefinementRecord', 'UsageRecord', 'TaskRecord', 'RunRecord',
+    'RefinementRecord', 'RepoMapping', 'UsageRecord', 'TaskRecord', 'RunRecord',
     'AgentLog', 'AIUsageEvent', 'FlowTemplate', 'FlowVersion',
     'AgentAnalyticsSnapshot', 'FlowRun', 'FlowRunStep', 'Invite',
     'IntegrationConfig', 'NotificationRecord', 'UserPreference',

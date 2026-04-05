@@ -1,28 +1,10 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { apiFetch, loadPrefs } from '@/lib/api';
+import { loadPrefs } from '@/lib/api';
+import { useWS } from '@/lib/useWebSocket';
 
-type TaskLite = {
-  id: number;
-  title: string;
-  status: string;
-};
-
-const LS_STATUS_KEY = 'agena_last_task_status_map';
 const NOTIF_EVENT = 'agena:notification';
-
-function loadLastMap(): Record<string, string> {
-  try {
-    return JSON.parse(localStorage.getItem(LS_STATUS_KEY) || '{}') as Record<string, string>;
-  } catch {
-    return {};
-  }
-}
-
-function saveLastMap(map: Record<string, string>): void {
-  localStorage.setItem(LS_STATUS_KEY, JSON.stringify(map));
-}
 
 function playNotificationTone(): void {
   if (typeof window === 'undefined') return;
@@ -49,8 +31,8 @@ function playNotificationTone(): void {
 }
 
 export default function WebPushBridge() {
-  const initialized = useRef(false);
   const enabledRef = useRef(true);
+  const { lastEvent } = useWS();
 
   useEffect(() => {
     loadPrefs().then((prefs) => {
@@ -63,45 +45,33 @@ export default function WebPushBridge() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
+    if (!lastEvent || !enabledRef.current) return;
+    if (lastEvent.event !== 'task_status') return;
 
-    const poll = async () => {
-      if (cancelled || !enabledRef.current) return;
-      try {
-        const res = await apiFetch<{ items: TaskLite[]; total: number; page: number; page_size: number }>('/tasks/search?page=1&page_size=25');
-        const items = res.items || [];
-        const prev = loadLastMap();
-        const next: Record<string, string> = {};
-        for (const t of items) {
-          const id = String(t.id);
-          const old = prev[id];
-          next[id] = t.status;
-          if (!initialized.current) continue;
-          if (old === t.status) continue;
-          if (t.status !== 'completed' && t.status !== 'failed') continue;
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent(NOTIF_EVENT, { detail: { taskId: t.id, status: t.status, title: t.title } }));
-          }
-          playNotificationTone();
-          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-            const prefix = t.status === 'completed' ? 'Completed' : 'Failed';
-            new Notification(`Task ${prefix}`, { body: `#${t.id} ${t.title}` });
-          }
-        }
-        saveLastMap({ ...prev, ...next });
-        initialized.current = true;
-      } catch {
-        // no-op
-      }
-    };
+    const data = lastEvent.data as { task_id?: number; status?: string; title?: string } | undefined;
+    if (!data) return;
 
-    void poll();
-    const iv = setInterval(() => void poll(), 12000);
-    return () => {
-      cancelled = true;
-      clearInterval(iv);
-    };
-  }, []);
+    const { task_id, status, title } = data;
+    if (status !== 'completed' && status !== 'failed') return;
+
+    // Dispatch custom event for other components
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(NOTIF_EVENT, { detail: { taskId: task_id, status, title } }));
+    }
+
+    playNotificationTone();
+
+    // Show native browser notification
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      const prefix = status === 'completed' ? 'Completed' : 'Failed';
+      const icon = status === 'completed' ? '/media/agena-logo.svg' : undefined;
+      new Notification(`Task ${prefix}`, {
+        body: `#${task_id} ${title || ''}`,
+        icon,
+        tag: `agena-task-${task_id}`,
+      });
+    }
+  }, [lastEvent]);
 
   return null;
 }
