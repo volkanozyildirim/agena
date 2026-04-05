@@ -41,6 +41,19 @@ AGENA is a production-ready, multi-tenant **agentic AI** orchestration platform.
 - Prompt Studio — edit system prompts at runtime without code deploy
 - Vector memory (Qdrant) — learns from previous tasks for better context
 
+**Multi-Repo Orchestration**
+- Assign a single task to multiple repositories simultaneously
+- Each repo runs its own AI pipeline in parallel — independent branches and PRs
+- Per-repo locking prevents concurrent conflicts
+- Unified dashboard shows all PRs and their status in one view
+
+**Task Dependencies & Auto-Queue**
+- Define execution order: Task B depends on Task A
+- Worker checks dependencies before running — blocked tasks wait automatically
+- When a dependency completes, dependent tasks auto-queue and start
+- Cycle detection prevents circular dependency chains
+- Visual dependency flow in the dashboard: A ✓ → B ✓ → C (waiting)
+
 **DevOps Automation**
 - Auto-generates branches, commits, and pull requests (GitHub + Azure DevOps)
 - Sprint import from Jira and Azure DevOps

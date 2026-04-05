@@ -9,7 +9,7 @@ Backend is split into **6 pip-installable packages** + **1 npm package** under `
 ```
 packages/
   core/        → agena-core      (settings, database, auth, rbac, security)
-  models/      → agena-models    (25 SQLAlchemy ORM models + 9 Pydantic schemas)
+  models/      → agena-models    (27 SQLAlchemy ORM models + 9 Pydantic schemas)
   services/    → agena-services  (31 business logic services + integrations)
   agents/      → agena-agents    (CrewAI/LangGraph pipeline + vector memory)
   api/         → agena-api       (FastAPI routes, middleware, dependencies)
@@ -123,19 +123,19 @@ agena-worker     ← depends on agena-core, agena-models, agena-services
 
 - `packages/api/` — FastAPI endpoints (18 route modules: auth, tasks, agents, flows, analytics, integrations, billing, etc.)
 - `packages/services/` — Business logic (orchestration, LLM, queue, GitHub, Azure, Jira, DORA, billing, notifications) + integrations (azure_client, github_client, jira_client)
-- `packages/models/` — SQLAlchemy async ORM models (25 models, all scoped by `organization_id`) + Pydantic schemas
+- `packages/models/` — SQLAlchemy async ORM models (27 models, all scoped by `organization_id`) + Pydantic schemas
 - `packages/agents/` — CrewAI agent definitions + LangGraph orchestration + system prompts + Qdrant vector memory
 - `packages/core/` — Settings (`pydantic-settings`), database engine, JWT auth, RBAC, logging
 - `packages/worker/` — Redis queue consumer with concurrent task execution
 
 ### Other Root Directories
 
-- `alembic/` — Database migrations (24 versions)
+- `alembic/` — Database migrations (26 versions)
 - `db/init.sql` — MySQL bootstrap script
 - `docker/` — Dockerfiles + SSL certificate
 - `docs/` — Architecture Decision Records
 - `frontend/` — Next.js 14 app (React 18, TypeScript, 7 languages)
-- `scripts/` — Utility scripts (import rewriter, locale translator, deploy)
+- `scripts/` — Utility scripts (import rewriter, locale translator, deploy, changelog generator, blog post generator)
 - `tests/` — Test suite
 
 ### Tech Stack
@@ -147,6 +147,45 @@ agena-worker     ← depends on agena-core, agena-models, agena-services
 - **Frontend**: Next.js 14, React 18, TypeScript
 - **Auth**: JWT (python-jose), bcrypt, RBAC (owner/admin/member/viewer)
 - **Deploy**: Docker Compose, Nginx (blue/green frontend)
+
+## Multi-Repo Orchestration
+
+A single task can target multiple repositories simultaneously. Each repo runs its own AI pipeline and gets its own PR.
+
+### Key Components
+- **`RepoMapping`** model (`packages/models/.../repo_mapping.py`) — org-level repo registry (provider, owner, repo_name, base_branch, playbook)
+- **`TaskRepoAssignment`** model (`packages/models/.../task_repo_assignment.py`) — join table linking tasks to multiple repo mappings with per-repo status/PR
+- **API**: `POST /tasks/{id}/assign` with `repo_mapping_ids: [1, 3, 5]` → fan-out to N Redis jobs
+- **Worker**: each assignment processed independently with per-repo locking
+- **Status aggregation**: all assignments complete → task completed; any fails → partial
+
+### Multi-Repo Flow
+```
+Task Assignment (repo_mapping_ids: [1, 2, 3])
+  → TaskRepoAssignment row per repo (status: queued)
+  → Redis payload per assignment (includes assignment_id)
+  → Worker picks up each independently (parallel)
+  → OrchestrationService resolves repo from assignment
+  → PR created per repo
+  → Status aggregated when all terminal
+```
+
+## Task Dependencies
+
+Tasks can depend on other tasks. The system enforces execution order automatically.
+
+### How It Works
+- **Set dependencies**: at task creation (`depends_on_task_ids`), via `PUT /tasks/{id}/dependencies`, or in the UI
+- **Assignment check**: `assign_task_to_ai()` raises ValueError if dependencies aren't completed
+- **Worker check**: worker re-queues tasks whose dependencies aren't done yet
+- **Auto-unblock**: when a task completes, `_auto_queue_dependents()` checks and queues any dependent tasks whose blockers are now all complete
+- **Cycle detection**: DFS algorithm prevents circular dependencies
+
+### Key Files
+- `packages/models/src/agena_models/models/task_dependency.py` — TaskDependency model
+- `packages/services/src/agena_services/services/task_service.py` — `get_dependency_blockers()`, `set_dependencies()`, `get_dependents()`
+- `packages/services/src/agena_services/services/orchestration_service.py` — `_auto_queue_dependents()`
+- `packages/worker/src/agena_worker/workers/redis_worker.py` — runtime dependency check before execution
 
 ## Flow System
 
