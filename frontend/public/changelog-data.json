@@ -1,5 +1,13 @@
 [
   {
+    "hash": "c0f39f5",
+    "short": "c0f39f5",
+    "message": "complete mobile-first redesign of refinement page",
+    "date": "2026-04-05",
+    "author": "root",
+    "type": "feat"
+  },
+  {
     "hash": "1f308a5",
     "short": "1f308a5",
     "message": "redesign refinement results UI",
@@ -789,14 +797,6 @@
     "message": "agent prompt selector — choose from Prompt Studio or write custom",
     "date": "2026-04-02",
     "author": "root",
-    "type": "feat"
-  },
-  {
-    "hash": "d029816",
-    "short": "d029816",
-    "message": "add local dev frontend service on port 3010",
-    "date": "2026-04-03",
-    "author": "Ali Ozyildirim",
     "type": "feat"
   }
 ]

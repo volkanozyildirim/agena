@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { apiFetch, cachedApiFetch, loadPrefs, loadPromptCatalog } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
@@ -853,13 +854,13 @@ export default function RefinementPage() {
 
   return (
     <div className="refinement-page" style={{ display: 'grid', gap: 18, maxWidth: 1200, paddingBottom: 40 }}>
-      {/* ── LOADING OVERLAY ── */}
-      {running && (
+      {/* ── LOADING OVERLAY (portal to body) ── */}
+      {running && typeof document !== 'undefined' && createPortal(
         <div className="refinement-overlay" style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          zIndex: 9999, display: 'flex', flexDirection: 'column',
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          zIndex: 99999, display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center', gap: 20,
-          background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)',
+          background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(8px)',
         }}>
           <div style={{
             width: 56, height: 56, borderRadius: '50%',
@@ -888,7 +889,8 @@ export default function RefinementPage() {
               transition: 'width 0.4s ease',
             }} />
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
       <div>
         <div className='section-label'>{copy.section}</div>
@@ -1434,9 +1436,10 @@ export default function RefinementPage() {
                         {item.state && <span style={{ fontSize: 10, color: 'var(--ink-42)', padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.04)' }}>{item.state}</span>}
                       </div>
                       <div style={{
-                        fontSize: 13, fontWeight: 600, lineHeight: 1.3,
+                        fontSize: 13, fontWeight: 600, lineHeight: 1.4,
                         color: itemSourceUrl ? '#93c5fd' : 'var(--ink-90)',
-                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const,
+                        overflow: 'hidden',
                       }}>
                         {itemSourceUrl ? (
                           <a href={itemSourceUrl} target='_blank' rel='noreferrer' style={{ color: '#93c5fd', textDecoration: 'none' }}>
