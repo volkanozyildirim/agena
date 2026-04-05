@@ -2387,5 +2387,6 @@
   "refinement.promptConfig": "プロンプト設定",
   "refinement.useCustomPrompt": "カスタムプロンプトを使用",
   "refinement.promptPreview": "システムプロンプトプレビュー",
-  "refinement.editInStudio": "Prompt Studioで編集 →"
+  "refinement.editInStudio": "Prompt Studioで編集 →",
+  "refinement.writebackSelected": "選択を書き込む"
 }

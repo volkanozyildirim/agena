@@ -2387,5 +2387,6 @@
   "refinement.promptConfig": "Prompt Yapilandirmasi",
   "refinement.useCustomPrompt": "Ozel prompt kullan",
   "refinement.promptPreview": "Sistem prompt onizlemesi",
-  "refinement.editInStudio": "Prompt Studio'da Duzenle →"
+  "refinement.editInStudio": "Prompt Studio'da Duzenle →",
+  "refinement.writebackSelected": "Secilenleri Yaz"
 }

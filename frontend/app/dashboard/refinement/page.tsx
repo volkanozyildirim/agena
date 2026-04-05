@@ -144,6 +144,7 @@ type Copy = {
   resultsTitle: string;
   writeback: string;
   writebackRunning: string;
+  writebackSelected: string;
   signature: string;
   openSource: string;
   result: string;
@@ -212,6 +213,7 @@ const COPY: Record<'tr' | 'en', Copy> = {
     resultsTitle: 'Refinement Sonuclari',
     writeback: 'Yaz (Azure/Jira)',
     writebackRunning: 'Yaziliyor...',
+    writebackSelected: 'Secilenleri Yaz',
     signature: 'Yorum imzasi',
     openSource: 'Kaynagi Ac',
     result: 'Sonuc',
@@ -278,6 +280,7 @@ const COPY: Record<'tr' | 'en', Copy> = {
     resultsTitle: 'Refinement Results',
     writeback: 'Write Back',
     writebackRunning: 'Writing...',
+    writebackSelected: 'Write Selected',
     signature: 'Comment signature',
     openSource: 'Open Source',
     result: 'Result',
@@ -393,6 +396,8 @@ export default function RefinementPage() {
   const [resultsModalOpen, setResultsModalOpen] = useState(false);
   const [writebackItemId, setWritebackItemId] = useState('');
   const [confirmWritebackItemId, setConfirmWritebackItemId] = useState('');
+  const [confirmBulkWriteback, setConfirmBulkWriteback] = useState(false);
+  const [bulkWritebackRunning, setBulkWritebackRunning] = useState(false);
   const [commentSignature, setCommentSignature] = useState('AGENA AI');
   const [focusedResultId, setFocusedResultId] = useState('');
   const [promptExpanded, setPromptExpanded] = useState(false);
@@ -979,6 +984,19 @@ export default function RefinementPage() {
             <button onClick={() => void runRefinement()} style={secondaryButton} disabled={running || !selectedIds.length}>
               {running ? copy.analyzing : copy.analyze}
             </button>
+            {results && results.results.filter(r => !r.error).length > 0 && (
+              <button
+                onClick={() => {
+                  const validResults = results.results.filter(r => !r.error && selectedIds.includes(r.item_id));
+                  if (validResults.length === 0) return;
+                  setConfirmBulkWriteback(true);
+                }}
+                style={{ ...secondaryButton, background: 'rgba(34,197,94,0.1)', borderColor: 'rgba(34,197,94,0.3)', color: '#4ade80' }}
+                disabled={writebackItemId !== '' || !selectedIds.some(id => results.results.some(r => r.item_id === id && !r.error))}
+              >
+                {copy.writebackSelected || 'Write Selected'} ({selectedIds.filter(id => results.results.some(r => r.item_id === id && !r.error)).length})
+              </button>
+            )}
             <span style={{ fontSize: 12, color: 'var(--ink-35)' }}>{copy.selectionHint}</span>
           </div>
 
@@ -1245,6 +1263,56 @@ export default function RefinementPage() {
                   )}
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmBulkWriteback && results && (
+        <div style={modalOverlay} onClick={() => setConfirmBulkWriteback(false)}>
+          <div style={{ ...modalCard, width: 'min(560px, 94vw)' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--ink-90)' }}>
+              {copy.writebackSelected || 'Write Selected Items'}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--ink-50)', margin: '8px 0 16px' }}>
+              {(() => {
+                const valid = results.results.filter(r => !r.error && selectedIds.includes(r.item_id));
+                return `${valid.length} item → ${provider === 'azure' ? 'Azure DevOps' : 'Jira'} (story point + comment)`;
+              })()}
+            </div>
+            <div style={{ maxHeight: 200, overflowY: 'auto', display: 'grid', gap: 6, marginBottom: 16 }}>
+              {results.results.filter(r => !r.error && selectedIds.includes(r.item_id)).map(r => (
+                <div key={r.item_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderRadius: 8, background: 'rgba(0,0,0,0.2)', fontSize: 12 }}>
+                  <span style={{ color: 'var(--ink-65)' }}>{r.item_id} — {r.title?.slice(0, 40)}</span>
+                  <span style={{ color: '#5eead4', fontWeight: 700 }}>{r.suggested_story_points} pts</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button type='button' style={ghostButton} onClick={() => setConfirmBulkWriteback(false)}>
+                {copy.close}
+              </button>
+              <button
+                type='button'
+                disabled={bulkWritebackRunning}
+                style={{ ...secondaryButton, background: 'rgba(34,197,94,0.15)', borderColor: 'rgba(34,197,94,0.3)', color: '#4ade80' }}
+                onClick={async () => {
+                  setBulkWritebackRunning(true);
+                  const valid = results.results.filter(r => !r.error && selectedIds.includes(r.item_id));
+                  let ok = 0, fail = 0;
+                  for (const row of valid) {
+                    try {
+                      await runWritebackForItem(row.item_id);
+                      ok++;
+                    } catch { fail++; }
+                  }
+                  setBulkWritebackRunning(false);
+                  setConfirmBulkWriteback(false);
+                  setRunMessage({ kind: fail === 0 ? 'success' : 'warning', text: `Writeback: ${ok} ok, ${fail} fail` });
+                }}
+              >
+                {bulkWritebackRunning ? copy.writebackRunning : (copy.writeShort || 'Write')}
+              </button>
             </div>
           </div>
         </div>

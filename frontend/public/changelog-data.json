@@ -1,5 +1,13 @@
 [
   {
+    "hash": "296efbe",
+    "short": "296efbe",
+    "message": "improve refinement prompts — no more 0 points, unique per-item analysis",
+    "date": "2026-04-05",
+    "author": "root",
+    "type": "fix"
+  },
+  {
     "hash": "051e8ca",
     "short": "051e8ca",
     "message": "refinement int parse error + mobile responsive for refinement & usage pages",
@@ -790,13 +798,5 @@
     "date": "2026-04-02",
     "author": "root",
     "type": "refactor"
-  },
-  {
-    "hash": "ce67170",
-    "short": "ce67170",
-    "message": "replace 'from db import models' with agena_models in main.py and worker",
-    "date": "2026-04-02",
-    "author": "root",
-    "type": "fix"
   }
 ]

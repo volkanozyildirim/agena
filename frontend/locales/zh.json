@@ -2387,5 +2387,6 @@
   "refinement.promptConfig": "提示词配置",
   "refinement.useCustomPrompt": "使用自定义提示词",
   "refinement.promptPreview": "系统提示词预览",
-  "refinement.editInStudio": "在Prompt Studio中编辑 →"
+  "refinement.editInStudio": "在Prompt Studio中编辑 →",
+  "refinement.writebackSelected": "写入所选"
 }

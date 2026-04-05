@@ -2387,5 +2387,6 @@
   "refinement.promptConfig": "Prompt Configuration",
   "refinement.useCustomPrompt": "Use custom prompt",
   "refinement.promptPreview": "System prompt preview",
-  "refinement.editInStudio": "Edit in Prompt Studio →"
+  "refinement.editInStudio": "Edit in Prompt Studio →",
+  "refinement.writebackSelected": "Write Selected"
 }

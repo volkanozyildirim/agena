@@ -2387,5 +2387,6 @@
   "refinement.promptConfig": "Prompt-Konfiguration",
   "refinement.useCustomPrompt": "Benutzerdefinierten Prompt verwenden",
   "refinement.promptPreview": "Systemprompt-Vorschau",
-  "refinement.editInStudio": "In Prompt Studio bearbeiten →"
+  "refinement.editInStudio": "In Prompt Studio bearbeiten →",
+  "refinement.writebackSelected": "Ausgewählte schreiben"
 }
