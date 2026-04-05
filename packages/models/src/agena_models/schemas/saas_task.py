@@ -11,6 +11,7 @@ class TaskCreateRequest(BaseModel):
     edge_cases: str | None = None
     max_tokens: int | None = None
     max_cost_usd: float | None = None
+    depends_on_task_ids: list[int] | None = None  # set dependencies at creation time
 
 
 class TaskResponse(BaseModel):

@@ -971,6 +971,9 @@ class OrchestrationService:
             task.branch_name = branch_name
             await self.db_session.commit()
 
+            # Auto-unblock: queue dependent tasks whose dependencies are now all completed
+            await self._auto_queue_dependents(organization_id, task.id, task_service, create_pr, mode)
+
             await orchestrator.memory_store.upsert_memory(
                 key=str(task.id),
                 input_text=f"{task.title}\n{task.description or ''}",
@@ -1619,6 +1622,59 @@ class OrchestrationService:
             execution_prompt=meta.get('execution prompt') or None,
             remote_repo=remote_repo,
         )
+
+    async def _auto_queue_dependents(
+        self,
+        organization_id: int,
+        completed_task_id: int,
+        task_service: 'TaskService',
+        create_pr: bool,
+        mode: str,
+    ) -> None:
+        """When a task completes, auto-queue any dependent tasks whose blockers are now all done."""
+        try:
+            dependents = await task_service.get_dependents(organization_id, completed_task_id)
+            if not dependents:
+                return
+
+            from agena_services.services.queue_service import QueueService
+            queue = QueueService()
+
+            for dep_task_id in dependents:
+                dep_task = await task_service.get_task(organization_id, dep_task_id)
+                if not dep_task or dep_task.status not in ('new', 'queued', 'failed'):
+                    continue
+
+                blockers = await task_service.get_dependency_blockers(organization_id, dep_task_id)
+                if blockers:
+                    continue  # still has unfinished dependencies
+
+                # All dependencies completed — auto-queue this task
+                dep_task.status = 'queued'
+                dep_task.failure_reason = None
+                await self.db_session.commit()
+
+                await queue.enqueue({
+                    'organization_id': organization_id,
+                    'task_id': dep_task_id,
+                    'create_pr': create_pr,
+                    'mode': mode,
+                })
+
+                await task_service.add_log(
+                    dep_task_id,
+                    organization_id,
+                    'queued',
+                    f'Auto-queued: dependency #{completed_task_id} completed',
+                )
+
+                publish_fire_and_forget(organization_id, 'task_status', {
+                    'task_id': dep_task_id, 'status': 'queued', 'title': dep_task.title,
+                })
+
+                logger.info('Auto-queued dependent task #%s (dependency #%s completed)', dep_task_id, completed_task_id)
+        except Exception:
+            logger.exception('Failed to auto-queue dependents for task #%s', completed_task_id)
 
     def _can_create_github_pr(self) -> bool:
         token = (self.settings.github_token or '').strip()

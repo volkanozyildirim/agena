@@ -171,6 +171,21 @@ async def _run_single_task(payload: dict) -> None:
             assignment.status = 'running'
             await session.commit()
 
+        # Check dependencies before running (skip for multi-repo assignments)
+        if not assignment_id:
+            blockers = await task_service.get_dependency_blockers(organization_id, task_id)
+            if blockers:
+                blocker_str = ', '.join(f'#{b}' for b in blockers)
+                logger.info('Task %s blocked by dependencies: %s — re-queuing', task_id, blocker_str)
+                await task_service.add_log(task.id, organization_id, 'queued', f'Blocked by dependencies: {blocker_str}')
+                task.status = 'queued'
+                await session.commit()
+                # Re-queue with delay via lock_retries (will be retried)
+                payload['lock_retries'] = lock_retries + 1
+                queue_service = QueueService()
+                await queue_service.enqueue(payload)
+                return
+
         publish_fire_and_forget(organization_id, 'task_status', {
             'task_id': task_id, 'status': 'picked_up', 'title': task.title,
             **(({'assignment_id': assignment_id}) if assignment_id else {}),
