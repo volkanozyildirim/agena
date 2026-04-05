@@ -115,6 +115,14 @@ async def create_task(
         )
     except PermissionError as exc:
         raise HTTPException(status_code=402, detail=str(exc)) from exc
+
+    # Set dependencies if provided at creation time
+    if request.depends_on_task_ids:
+        try:
+            await service.set_dependencies(tenant.organization_id, task.id, request.depends_on_task_ids)
+        except ValueError:
+            pass  # non-critical: task created, dependency setting failed silently
+
     return await _to_task_response(service, tenant.organization_id, task)
 
 

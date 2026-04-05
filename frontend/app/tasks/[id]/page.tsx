@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { apiFetch, getToken, loadPrefs, resolveApiBase } from '@/lib/api';
 import StatusBadge from '@/components/StatusBadge';
 import RemoteRepoSelector, { type RemoteRepoSelection, type RepoDefault } from '@/components/RemoteRepoSelector';
-import { useLocale } from '@/lib/i18n';
+import { useLocale, type TranslationKey } from '@/lib/i18n';
 
 type TaskDetail = {
   id: number;
@@ -857,9 +857,86 @@ export default function TaskDetailPage() {
               ) : null}
               <div style={{ border: '1px solid var(--panel-border-2)', borderRadius: 10, padding: '9px 10px', marginBottom: 12, background: 'var(--panel)' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-72)', textTransform: 'uppercase', marginBottom: 6 }}>{t('taskDetail.dependencies')}</div>
-                <div style={{ fontSize: 12, color: 'var(--ink-65)', marginBottom: 8 }}>
-                  {t('taskDetail.blockers')}: {(depsData?.blocker_task_ids || []).length > 0 ? depsData?.blocker_task_ids?.join(', ') : t('taskDetail.none')}
-                </div>
+
+                {/* Blocker status banner */}
+                {(depsData?.blocker_task_ids || []).length > 0 ? (
+                  <div style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(245,158,11,0.35)', background: 'rgba(245,158,11,0.08)', marginBottom: 10 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b', marginBottom: 3 }}>
+                      &#9888; {t('tasks.deps.blockedBy' as TranslationKey)}
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 4 }}>
+                      {(depsData?.blocker_task_ids || []).map((blockerId) => {
+                        const blockerTask = dependencyCandidates.find((c) => c.id === blockerId);
+                        return (
+                          <span key={blockerId} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 600, background: 'rgba(248,113,113,0.12)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171' }}>
+                            #{blockerId} {blockerTask ? blockerTask.title : ''}
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-45)' }}>
+                      {t('tasks.deps.blockerWarning' as TranslationKey)}
+                    </div>
+                  </div>
+                ) : (depsData?.depends_on_task_ids || []).length > 0 ? (
+                  <div style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(34,197,94,0.25)', background: 'rgba(34,197,94,0.06)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ color: '#22c55e', fontSize: 13 }}>&#10003;</span>
+                    <span style={{ fontSize: 11, color: '#22c55e', fontWeight: 600 }}>{t('tasks.deps.noBlockers' as TranslationKey)}</span>
+                  </div>
+                ) : null}
+
+                {/* Auto-queue indicator */}
+                {(depsData?.blocker_task_ids || []).length > 0 && (
+                  <div style={{ fontSize: 11, color: 'var(--ink-45)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b', animation: 'pulse-brand 2s infinite' }} />
+                    {t('tasks.deps.autoQueue' as TranslationKey)}
+                  </div>
+                )}
+
+                {/* Visual dependency flow */}
+                {(depsData?.depends_on_task_ids || []).length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginBottom: 10, padding: '6px 8px', borderRadius: 8, background: 'var(--panel-alt)' }}>
+                    {(depsData?.depends_on_task_ids || []).map((depId, idx) => {
+                      const depTask = dependencyCandidates.find((c) => c.id === depId);
+                      const isBlocked = (depsData?.blocker_task_ids || []).includes(depId);
+                      const depStatus = depTask?.status || 'unknown';
+                      const depColor = depStatus === 'completed' ? '#22c55e' : depStatus === 'running' ? '#f59e0b' : depStatus === 'failed' ? '#f87171' : 'var(--ink-45)';
+                      return (
+                        <span key={depId} style={{ display: 'contents' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 7px', borderRadius: 6, fontSize: 11, fontWeight: 600, border: `1px solid ${depColor}40`, background: `${depColor}12`, color: depColor }}>
+                            {depStatus === 'completed' ? '\u2713' : depStatus === 'running' ? '\u25CB' : depStatus === 'failed' ? '\u2717' : '\u25CB'}{' '}
+                            #{depId} {depTask ? depTask.title.slice(0, 20) + (depTask.title.length > 20 ? '...' : '') : ''}
+                          </span>
+                          {idx < (depsData?.depends_on_task_ids || []).length - 1 && (
+                            <span style={{ color: 'var(--ink-35)', fontSize: 11 }}>&rarr;</span>
+                          )}
+                        </span>
+                      );
+                    })}
+                    <span style={{ color: 'var(--ink-35)', fontSize: 11 }}>&rarr;</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 7px', borderRadius: 6, fontSize: 11, fontWeight: 700, border: '1px solid rgba(56,189,248,0.35)', background: 'rgba(56,189,248,0.08)', color: '#38bdf8' }}>
+                      {t('tasks.deps.waiting' as TranslationKey)}
+                    </span>
+                  </div>
+                )}
+
+                {/* Dependent tasks (downstream) */}
+                {(depsData?.dependent_task_ids || []).length > 0 && (
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#5eead4', marginBottom: 4 }}>{t('tasks.deps.dependents' as TranslationKey)}</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                      {(depsData?.dependent_task_ids || []).map((depId) => {
+                        const depTask = dependencyCandidates.find((c) => c.id === depId);
+                        return (
+                          <span key={depId} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 7px', borderRadius: 6, fontSize: 11, fontWeight: 600, border: '1px solid rgba(94,234,212,0.25)', background: 'rgba(94,234,212,0.06)', color: '#5eead4' }}>
+                            #{depId} {depTask ? depTask.title.slice(0, 25) + (depTask.title.length > 25 ? '...' : '') : ''}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ fontSize: 11, color: 'var(--ink-45)', marginBottom: 6 }}>
                   {t('taskDetail.selectedDependencies')}: {selectedDependencyIds.length}
                 </div>
@@ -872,7 +949,7 @@ export default function TaskDetailPage() {
                     overflowY: 'auto',
                     padding: '6px 8px',
                     display: 'grid',
-                    gap: 6,
+                    gap: 4,
                   }}
                 >
                   {dependencyCandidates.length === 0 ? (
@@ -880,8 +957,10 @@ export default function TaskDetailPage() {
                   ) : (
                     dependencyCandidates.map((candidate) => {
                       const checked = selectedDependencyIds.includes(candidate.id);
+                      const isBlocker = (depsData?.blocker_task_ids || []).includes(candidate.id);
+                      const sColor = candidate.status === 'completed' ? '#22c55e' : candidate.status === 'running' ? '#f59e0b' : candidate.status === 'failed' ? '#f87171' : 'var(--ink-45)';
                       return (
-                        <label key={candidate.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', padding: '4px 2px' }}>
+                        <label key={candidate.id} style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer', padding: '4px 6px', borderRadius: 6, background: checked ? 'rgba(94,234,212,0.06)' : 'transparent', transition: 'background 0.15s' }}>
                           <input
                             type='checkbox'
                             checked={checked}
@@ -891,27 +970,35 @@ export default function TaskDetailPage() {
                                 return prev.filter((id) => id !== candidate.id);
                               });
                             }}
-                            style={{ marginTop: 2 }}
+                            style={{ accentColor: '#0d9488', width: 14, height: 14, flexShrink: 0 }}
                           />
-                          <span style={{ fontSize: 12, color: checked ? 'var(--ink-90)' : 'var(--ink-72)', lineHeight: 1.35 }}>
-                            #{candidate.id} • {candidate.title} <span style={{ color: 'var(--ink-45)' }}>({candidate.status})</span>
+                          <span style={{ fontSize: 12, color: checked ? 'var(--ink-90)' : 'var(--ink-72)', lineHeight: 1.35, display: 'flex', alignItems: 'center', gap: 5 }}>
+                            #{candidate.id} {candidate.title}
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 6px', borderRadius: 999, fontSize: 10, fontWeight: 600, background: `${sColor}15`, color: sColor }}>
+                              {candidate.status}
+                            </span>
+                            {isBlocker && (
+                              <span style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700 }}>&#9888;</span>
+                            )}
                           </span>
                         </label>
                       );
                     })
                   )}
                 </div>
-                <button
-                  className='button button-outline'
-                  onClick={() => setSelectedDependencyIds([])}
-                  type='button'
-                  style={{ marginTop: 8 }}
-                >
-                  {t('taskDetail.clearSelection')}
-                </button>
-                <button className='button button-outline' onClick={() => void saveDependencies()} disabled={isDepsBusy} style={{ marginTop: 8 }}>
-                  {isDepsBusy ? t('taskDetail.saving') : t('taskDetail.saveDependencies')}
-                </button>
+                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                  <button
+                    className='button button-outline'
+                    onClick={() => setSelectedDependencyIds([])}
+                    type='button'
+                    style={{ fontSize: 11, padding: '5px 10px' }}
+                  >
+                    {t('taskDetail.clearSelection')}
+                  </button>
+                  <button className='button button-outline' onClick={() => void saveDependencies()} disabled={isDepsBusy} style={{ fontSize: 11, padding: '5px 10px' }}>
+                    {isDepsBusy ? t('taskDetail.saving') : t('taskDetail.saveDependencies')}
+                  </button>
+                </div>
               </div>
               {(task.pr_risk_score !== null && task.pr_risk_score !== undefined) ? (
                 <div style={{ border: '1px solid rgba(245,158,11,0.28)', borderRadius: 10, padding: '9px 10px', marginBottom: 12, background: 'rgba(245,158,11,0.08)' }}>

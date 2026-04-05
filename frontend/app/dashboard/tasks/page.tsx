@@ -63,6 +63,10 @@ export default function DashboardTasksPage() {
   const [maxTokens, setMaxTokens] = useState('');
   const [maxCostUsd, setMaxCostUsd] = useState('');
   const [remoteRepoMeta, setRemoteRepoMeta] = useState('');
+  const [showDepsSection, setShowDepsSection] = useState(false);
+  const [depSearchQuery, setDepSearchQuery] = useState('');
+  const [selectedDepIds, setSelectedDepIds] = useState<number[]>([]);
+  const [depCandidates, setDepCandidates] = useState<{ id: number; title: string; status: string }[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [error, setError] = useState('');
   const [msg, setMsg] = useState('');
@@ -172,6 +176,18 @@ export default function DashboardTasksPage() {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
+  async function loadDepCandidates() {
+    try {
+      const data = await apiFetch<{ items: { id: number; title: string; status: string }[] }>('/tasks/search?page=1&page_size=50');
+      setDepCandidates(data.items || []);
+    } catch {
+      try {
+        const data = await apiFetch<{ id: number; title: string; status: string }[]>('/tasks');
+        setDepCandidates(data || []);
+      } catch { /* ignore */ }
+    }
+  }
+
   async function onCreate(e: FormEvent) {
     e.preventDefault();
     try {
@@ -188,6 +204,7 @@ export default function DashboardTasksPage() {
           edge_cases: edgeCases || undefined,
           max_tokens: maxTokens ? Number(maxTokens) : undefined,
           max_cost_usd: maxCostUsd ? Number(maxCostUsd) : undefined,
+          depends_on_task_ids: selectedDepIds.length > 0 ? selectedDepIds : undefined,
         }),
       });
       setTitle('');
@@ -197,6 +214,9 @@ export default function DashboardTasksPage() {
       setEdgeCases('');
       setMaxTokens('');
       setMaxCostUsd('');
+      setSelectedDepIds([]);
+      setShowDepsSection(false);
+      setDepSearchQuery('');
       setShowCreate(false);
       setMsg(t('tasks.created')); await load();
     } catch (e) { setError(e instanceof Error ? e.message : t('tasks.createFailed')); }
@@ -322,6 +342,56 @@ export default function DashboardTasksPage() {
             <div style={{ borderRadius: 10, border: '1px solid var(--panel-border)', padding: '10px 12px', background: 'var(--panel)' }}>
               <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 6 }}>Target Repo</div>
               <RemoteRepoSelector compact onChange={(sel) => setRemoteRepoMeta(sel?.meta || '')} />
+            </div>
+
+            {/* Dependencies section */}
+            <div style={{ borderRadius: 10, border: '1px solid var(--panel-border)', background: 'var(--panel)', overflow: 'hidden' }}>
+              <button
+                type='button'
+                onClick={() => { setShowDepsSection(!showDepsSection); if (!showDepsSection) void loadDepCandidates(); }}
+                style={{
+                  width: '100%', padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-72)',
+                }}
+              >
+                <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)' }}>
+                  {t('tasks.deps.title' as TranslationKey)} {selectedDepIds.length > 0 ? `(${selectedDepIds.length})` : ''}
+                </span>
+                <span style={{ fontSize: 12, color: 'var(--ink-35)', transform: showDepsSection ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
+              </button>
+              {showDepsSection && (
+                <div style={{ padding: '0 12px 12px' }}>
+                  <input
+                    value={depSearchQuery}
+                    onChange={(e) => setDepSearchQuery(e.target.value)}
+                    placeholder={t('tasks.deps.searchPlaceholder' as TranslationKey)}
+                    style={{ width: '100%', padding: '6px 10px', fontSize: 12, marginBottom: 8, borderRadius: 8 }}
+                  />
+                  <div style={{ maxHeight: 160, overflowY: 'auto', borderRadius: 8, border: '1px solid var(--panel-border-2)', background: 'var(--panel-alt)', padding: '4px 6px', display: 'grid', gap: 2 }}>
+                    {depCandidates
+                      .filter((c) => !depSearchQuery || c.title.toLowerCase().includes(depSearchQuery.toLowerCase()) || String(c.id).includes(depSearchQuery))
+                      .map((c) => (
+                        <label key={c.id} style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer', padding: '4px 4px', borderRadius: 6, background: selectedDepIds.includes(c.id) ? 'rgba(94,234,212,0.08)' : 'transparent' }}>
+                          <input
+                            type='checkbox'
+                            checked={selectedDepIds.includes(c.id)}
+                            onChange={(e) => {
+                              setSelectedDepIds((prev) => e.target.checked ? [...prev, c.id] : prev.filter((x) => x !== c.id));
+                            }}
+                            style={{ accentColor: '#0d9488', width: 14, height: 14, flexShrink: 0 }}
+                          />
+                          <span style={{ fontSize: 12, color: selectedDepIds.includes(c.id) ? 'var(--ink-90)' : 'var(--ink-65)' }}>
+                            #{c.id} {c.title}{' '}
+                            <span style={{ color: statusColor(c.status), fontSize: 11 }}>({c.status})</span>
+                          </span>
+                        </label>
+                      ))}
+                    {depCandidates.filter((c) => !depSearchQuery || c.title.toLowerCase().includes(depSearchQuery.toLowerCase()) || String(c.id).includes(depSearchQuery)).length === 0 && (
+                      <div style={{ fontSize: 11, color: 'var(--ink-35)', padding: '6px 4px' }}>{t('tasks.deps.selectTasks' as TranslationKey)}</div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -502,7 +572,22 @@ export default function DashboardTasksPage() {
               animation: task.status === 'running' ? 'running-glow 2s ease-in-out infinite' : undefined,
             }}>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 600, color: 'var(--ink-78)', fontSize: 14, marginBottom: 2 }}>{task.title}</div>
+                <div style={{ fontWeight: 600, color: 'var(--ink-78)', fontSize: 14, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</span>
+                  {(task.dependency_blockers && task.dependency_blockers.length > 0) && (
+                    <span title={`${t('tasks.deps.blockedBy' as TranslationKey)}: ${task.dependency_blockers.map((id: number) => '#' + id).join(', ')}`}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 6px', borderRadius: 999, fontSize: 10, fontWeight: 700, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                      <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M8 1L3 4v4c0 3.3 2.1 6.4 5 7.5 2.9-1.1 5-4.2 5-7.5V4L8 1z" stroke="#f59e0b" strokeWidth="1.5" fill="none"/><path d="M6 8h4M8 6v4" stroke="#f59e0b" strokeWidth="1.2"/></svg>
+                      {t('tasks.deps.depCount' as TranslationKey, { n: task.dependency_blockers.length })}
+                    </span>
+                  )}
+                  {(task.dependent_task_ids && task.dependent_task_ids.length > 0) && (
+                    <span title={`${t('tasks.deps.dependents' as TranslationKey)}: ${task.dependent_task_ids.map((id: number) => '#' + id).join(', ')}`}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 2, padding: '1px 6px', borderRadius: 999, fontSize: 10, fontWeight: 700, background: 'rgba(94,234,212,0.1)', border: '1px solid rgba(94,234,212,0.25)', color: '#5eead4', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                      &rarr;{task.dependent_task_ids.length}
+                    </span>
+                  )}
+                </div>
                 <div style={{
                   fontSize: 12,
                   color: 'var(--ink-30)',
@@ -743,6 +828,26 @@ function AssignPopup({ taskId, mode, tasks, agents, flows, onAssignAI, onAssignF
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--ink)' }}>
             {mode === 'ai' ? t('tasks.selectAgent') : t('tasks.assignFlow')}
           </h3>
+
+          {/* Dependency blocker warning */}
+          {task && task.dependency_blockers && task.dependency_blockers.length > 0 ? (
+            <div style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(245,158,11,0.35)', background: 'rgba(245,158,11,0.08)' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>
+                &#9888; {t('tasks.deps.blockedBy' as TranslationKey)}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--ink-65)', lineHeight: 1.4 }}>
+                {task.dependency_blockers.map((id: number) => `#${id}`).join(', ')}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--ink-45)', marginTop: 4 }}>
+                {t('tasks.deps.blockerWarning' as TranslationKey)}
+              </div>
+            </div>
+          ) : task ? (
+            <div style={{ padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(34,197,94,0.25)', background: 'rgba(34,197,94,0.06)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: '#22c55e', fontSize: 13 }}>&#10003;</span>
+              <span style={{ fontSize: 11, color: '#22c55e', fontWeight: 600 }}>{t('tasks.deps.noBlockers' as TranslationKey)}</span>
+            </div>
+          ) : null}
 
           {/* Multi-repo selector from backend mappings */}
           {mappingsLoaded && backendMappings.length > 0 && (
