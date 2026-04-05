@@ -1,5 +1,13 @@
 [
   {
+    "hash": "2a7a97c",
+    "short": "2a7a97c",
+    "message": "extract story points from rationale when structured output returns 0",
+    "date": "2026-04-05",
+    "author": "root",
+    "type": "fix"
+  },
+  {
     "hash": "3aa8935",
     "short": "3aa8935",
     "message": "writeback includes questions alongside comment",
@@ -787,14 +795,6 @@
     "hash": "8c9c42b",
     "short": "8c9c42b",
     "message": "revert pixel office CSS, increase container height to 100vh-104px",
-    "date": "2026-04-02",
-    "author": "root",
-    "type": "fix"
-  },
-  {
-    "hash": "32cc3a1",
-    "short": "32cc3a1",
-    "message": "align pixel office map to top of container",
     "date": "2026-04-02",
     "author": "root",
     "type": "fix"

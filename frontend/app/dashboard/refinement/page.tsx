@@ -752,10 +752,19 @@ export default function RefinementPage() {
     setError('');
     setRunMessage(null);
 
-    // Build rich comment: comment + questions
+    // Build rich comment: comment + rationale + questions
     let richComment = (row.comment || '').trim();
+    if (row.estimation_rationale) {
+      richComment += `\n\n📊 Puan Gerekçesi: ${row.estimation_rationale}`;
+    }
+    if (row.suggested_story_points) {
+      richComment += `\n🎯 Önerilen Puan: ${row.suggested_story_points}`;
+    }
     if (row.questions && row.questions.length > 0) {
-      richComment += '\n\n--- Sorular / Questions ---\n' + row.questions.map((q: string, i: number) => `${i + 1}. ${q}`).join('\n');
+      richComment += '\n\n❓ Sorular:\n' + row.questions.map((q: string, i: number) => `${i + 1}. ${q}`).join('\n');
+    }
+    if (row.ambiguities && row.ambiguities.length > 0) {
+      richComment += '\n\n⚠️ Belirsizlikler:\n' + row.ambiguities.map((a: string) => `• ${a}`).join('\n');
     }
 
     try {
@@ -1772,42 +1781,53 @@ export default function RefinementPage() {
         (() => {
         const confirmRow = resultByItemId.get(confirmWritebackItemId);
         return (
-          <div className="refinement-modal-overlay" style={modalOverlay} onClick={() => setConfirmWritebackItemId('')}>
-            <div className="refinement-modal refinement-modal-sm" style={{ ...modalCard, width: 'min(520px, 94vw)' }} onClick={(e) => e.stopPropagation()}>
-              <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--ink-90)' }}>
-                {copy.writeConfirm}
-              </div>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '10px 14px', borderRadius: 12, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{
+            position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+            zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+          }} onClick={() => setConfirmWritebackItemId('')}>
+            <div style={{
+              width: 'min(400px, 92vw)', borderRadius: 16, padding: '20px 22px',
+              background: '#111827', border: '1px solid rgba(255,255,255,0.1)',
+              display: 'grid', gap: 14,
+            }} onClick={(e) => e.stopPropagation()}>
+              {/* Header with title + points */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, color: 'var(--ink-35)', fontFamily: 'monospace' }}>{confirmWritebackItemId}</div>
-                  {confirmRow && <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-80)', marginTop: 4 }}>{confirmRow.title}</div>}
+                  <div style={{ fontSize: 11, color: '#64748b', fontFamily: 'monospace' }}>#{confirmWritebackItemId}</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#e2e8f0', marginTop: 2, lineHeight: 1.3 }}>
+                    {confirmRow?.title || ''}
+                  </div>
                 </div>
                 {confirmRow && (
-                  <div style={{ textAlign: 'center', flexShrink: 0 }}>
-                    <div style={{ fontSize: 24, fontWeight: 800, color: '#5eead4' }}>
+                  <div style={{ background: 'rgba(13,148,136,0.15)', border: '1px solid rgba(13,148,136,0.3)', borderRadius: 10, padding: '8px 14px', textAlign: 'center', flexShrink: 0 }}>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: '#5eead4', lineHeight: 1 }}>
                       {displaySuggestionEstimate(confirmRow.suggested_story_points, { allowZero: true })}
                     </div>
-                    <div style={{ fontSize: 10, color: 'var(--ink-42)', textTransform: 'uppercase' }}>{copy.pts}</div>
+                    <div style={{ fontSize: 9, color: '#64748b', textTransform: 'uppercase', marginTop: 2 }}>puan</div>
                   </div>
                 )}
               </div>
-              <div style={{ fontSize: 13, color: 'var(--ink-50)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: provider === 'azure' ? '#38bdf8' : '#a78bfa' }} />
+              {/* Comment preview */}
+              {confirmRow?.comment && (
+                <div style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.5, padding: '10px 12px', borderRadius: 10, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.06)', maxHeight: 120, overflowY: 'auto', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+                  {confirmRow.comment}
+                </div>
+              )}
+              {/* Provider indicator */}
+              <div style={{ fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 6, height: 6, borderRadius: 3, background: provider === 'azure' ? '#38bdf8' : '#a78bfa' }} />
                 {providerLabel}
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                <button type='button' style={ghostButton} onClick={() => setConfirmWritebackItemId('')}>
+              {/* Buttons */}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type='button' onClick={() => setConfirmWritebackItemId('')}
+                  style={{ flex: 1, padding: '10px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#94a3b8', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
                   {copy.close}
                 </button>
-                <button
-                  type='button'
-                  style={writeProviderButton}
-                  onClick={() => {
-                    const itemId = confirmWritebackItemId;
-                    setConfirmWritebackItemId('');
-                    void runWritebackForItem(itemId);
-                  }}
-                >
+                <button type='button'
+                  style={{ flex: 2, padding: '10px 16px', borderRadius: 10, border: '1px solid rgba(13,148,136,0.4)', background: 'rgba(13,148,136,0.15)', color: '#5eead4', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+                  onClick={() => { const id = confirmWritebackItemId; setConfirmWritebackItemId(''); void runWritebackForItem(id); }}>
                   {copy.writeToProvider} → {providerLabel}
                 </button>
               </div>
