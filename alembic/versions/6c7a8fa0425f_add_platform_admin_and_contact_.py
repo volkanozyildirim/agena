@@ -24,25 +24,31 @@ def upgrade() -> None:
         pass
 
     # Contact submissions table — may already exist from create_all
-    op.create_table(
-        'contact_submissions',
-        sa.Column('id', sa.Integer(), primary_key=True, autoincrement=True),
-        sa.Column('name', sa.String(255), nullable=False),
-        sa.Column('email', sa.String(255), nullable=False, index=True),
-        sa.Column('message', sa.Text(), nullable=False),
-        sa.Column('newsletter', sa.Boolean(), default=False, nullable=False),
-        sa.Column('is_read', sa.Boolean(), default=False, nullable=False),
-        sa.Column('created_at', sa.DateTime(), server_default=sa.func.now()),
-    )
+    try:
+        op.create_table(
+            'contact_submissions',
+            sa.Column('id', sa.Integer(), primary_key=True, autoincrement=True),
+            sa.Column('name', sa.String(255), nullable=False),
+            sa.Column('email', sa.String(255), nullable=False, index=True),
+            sa.Column('message', sa.Text(), nullable=False),
+            sa.Column('newsletter', sa.Boolean(), default=False, nullable=False),
+            sa.Column('is_read', sa.Boolean(), default=False, nullable=False),
+            sa.Column('created_at', sa.DateTime(), server_default=sa.func.now()),
+        )
+    except Exception:
+        pass
 
     # Newsletter subscribers table
-    op.create_table(
-        'newsletter_subscribers',
-        sa.Column('id', sa.Integer(), primary_key=True, autoincrement=True),
-        sa.Column('email', sa.String(255), unique=True, nullable=False, index=True),
-        sa.Column('is_active', sa.Boolean(), default=True, nullable=False),
-        sa.Column('created_at', sa.DateTime(), server_default=sa.func.now()),
-    )
+    try:
+        op.create_table(
+            'newsletter_subscribers',
+            sa.Column('id', sa.Integer(), primary_key=True, autoincrement=True),
+            sa.Column('email', sa.String(255), unique=True, nullable=False, index=True),
+            sa.Column('is_active', sa.Boolean(), default=True, nullable=False),
+            sa.Column('created_at', sa.DateTime(), server_default=sa.func.now()),
+        )
+    except Exception:
+        pass
 
 
 def downgrade() -> None:

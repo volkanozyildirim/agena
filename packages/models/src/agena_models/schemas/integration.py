@@ -8,6 +8,7 @@ class IntegrationConfigUpsertRequest(BaseModel):
     project: str | None = None
     username: str | None = None
     secret: str | None = None
+    extra_config: dict | None = None
 
 
 class IntegrationConfigResponse(BaseModel):
@@ -17,4 +18,5 @@ class IntegrationConfigResponse(BaseModel):
     username: str | None = None
     has_secret: bool
     secret_preview: str | None = None
+    extra_config: dict | None = None
     updated_at: datetime

@@ -7,7 +7,7 @@ from agena_models.models.integration_config import IntegrationConfig
 
 
 class IntegrationConfigService:
-    SUPPORTED_PROVIDERS = {'jira', 'azure', 'openai', 'gemini', 'github', 'playbook', 'slack', 'teams', 'telegram'}
+    SUPPORTED_PROVIDERS = {'jira', 'azure', 'openai', 'gemini', 'github', 'playbook', 'slack', 'teams', 'telegram', 'hal'}
     DEFAULT_BASE_URLS = {
         'openai': 'https://api.openai.com/v1',
         'gemini': 'https://generativelanguage.googleapis.com',
@@ -47,6 +47,7 @@ class IntegrationConfigService:
         project: str | None,
         username: str | None,
         secret: str | None,
+        extra_config: dict | None = None,
     ) -> IntegrationConfig:
         provider = provider.lower()
         self._validate_provider(provider)
@@ -64,6 +65,7 @@ class IntegrationConfigService:
                 project=project.strip() if project else None,
                 username=username.strip() if username else None,
                 secret=secret.strip(),
+                extra_config=extra_config,
             )
             self.db.add(existing)
         else:
@@ -72,6 +74,8 @@ class IntegrationConfigService:
             existing.username = username.strip() if username else None
             if secret is not None and secret.strip():
                 existing.secret = secret.strip()
+            if extra_config is not None:
+                existing.extra_config = extra_config
 
         await self.db.commit()
         await self.db.refresh(existing)
@@ -87,7 +91,7 @@ class IntegrationConfigService:
         await self.db.commit()
         return True
 
-    def to_public_dict(self, config: IntegrationConfig) -> dict[str, str | None | bool]:
+    def to_public_dict(self, config: IntegrationConfig) -> dict[str, str | None | bool | dict]:
         return {
             'provider': config.provider,
             'base_url': config.base_url,
@@ -95,12 +99,15 @@ class IntegrationConfigService:
             'username': config.username,
             'has_secret': bool(config.secret),
             'secret_preview': self._mask_secret(config.secret),
+            'extra_config': config.extra_config,
             'updated_at': config.updated_at,
         }
 
     def _validate_provider(self, provider: str) -> None:
         if provider not in self.SUPPORTED_PROVIDERS:
             raise ValueError(f'Unsupported provider: {provider}')
+
+    OPTIONAL_BASE_URL_PROVIDERS = {'hal'}
 
     def _resolve_base_url(self, provider: str, base_url: str | None) -> str:
         value = (base_url or '').strip()
@@ -109,6 +116,8 @@ class IntegrationConfigService:
         default = self.DEFAULT_BASE_URLS.get(provider)
         if default:
             return default
+        if provider in self.OPTIONAL_BASE_URL_PROVIDERS:
+            return ''
         raise ValueError(f'Base URL is required for provider: {provider}')
 
     def _mask_secret(self, secret: str | None) -> str | None:

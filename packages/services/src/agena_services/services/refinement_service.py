@@ -32,6 +32,7 @@ from agena_models.schemas.task import ExternalTask
 from agena_services.services.ai_usage_event_service import AIUsageEventService
 from agena_services.services.integration_config_service import IntegrationConfigService
 from agena_services.services.llm.cost_tracker import CostTracker
+from agena_services.services.llm.hal_provider import HalProvider
 from agena_services.services.llm.provider import LLMProvider
 
 
@@ -420,11 +421,27 @@ class RefinementService:
         user_id: int,
         explicit_provider: str | None,
         explicit_model: str | None,
-    ) -> tuple[str, str, LLMProvider]:
+    ) -> tuple[str, str, LLMProvider | HalProvider]:
         pref_provider, pref_model = await self._get_user_preferred_agent_selection(user_id)
         provider = (explicit_provider or pref_provider or 'openai').strip().lower()
-        if provider not in {'openai', 'gemini'}:
+        if provider not in {'openai', 'gemini', 'hal'}:
             provider = 'openai'
+
+        if provider == 'hal':
+            integration = await self.integration_service.get_config(organization_id, 'hal')
+            if not integration:
+                raise ValueError('HAL integration is not configured')
+            extra = integration.extra_config or {}
+            hal = HalProvider(
+                organization_id=organization_id,
+                base_url=integration.base_url or '',
+                login_endpoint=extra.get('login_url', '/auth/login'),
+                chat_endpoint=extra.get('chat_url', '/api/chat'),
+                username=integration.username or '',
+                password=integration.secret,
+            )
+            return 'hal', 'hal', hal
+
         model = (explicit_model or pref_model or self.settings.llm_large_model or 'gpt-4.1').strip()
 
         integration = await self.integration_service.get_config(organization_id, provider)
