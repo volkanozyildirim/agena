@@ -319,9 +319,9 @@ class CrewAIAgentRunner:
         crewai_model = self._normalize_crewai_model(selected_model)
         materialized_images = self._materialize_image_inputs(image_inputs)
 
-        # Codex models are incompatible with CrewAI's internal tool-call mechanism
-        # (structured output, reasoning, etc.) — go straight to direct LLM.
-        use_direct_llm = 'codex' in crewai_model.lower()
+        # Codex models and HAL provider are incompatible with CrewAI's internal
+        # tool-call mechanism — go straight to direct LLM.generate().
+        use_direct_llm = 'codex' in crewai_model.lower() or getattr(self.llm, 'provider', '') == 'hal'
 
         if not use_direct_llm:
             try:

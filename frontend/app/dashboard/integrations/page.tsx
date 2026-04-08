@@ -5,7 +5,8 @@ import { apiFetch } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
 
 type IntegrationConfig = {
-  provider: 'jira' | 'azure' | 'openai' | 'gemini' | 'github' | 'playbook' | 'slack' | 'teams' | 'telegram';
+  provider: 'jira' | 'azure' | 'openai' | 'gemini' | 'github' | 'playbook' | 'slack' | 'teams' | 'telegram' | 'hal';
+  extra_config?: Record<string, string> | null;
   base_url: string;
   project?: string | null;
   username?: string | null;
@@ -76,6 +77,12 @@ export default function IntegrationsPage() {
   const [telegramChatId, setTelegramChatId] = useState('');
   const [telegramPreview, setTelegramPreview] = useState('');
   const [telegramSetupMsg, setTelegramSetupMsg] = useState('');
+  const [halServiceUrl, setHalServiceUrl] = useState('');
+  const [halLoginUrl, setHalLoginUrl] = useState('');
+  const [halChatUrl, setHalChatUrl] = useState('');
+  const [halUsername, setHalUsername] = useState('');
+  const [halPassword, setHalPassword] = useState('');
+  const [halPasswordPreview, setHalPasswordPreview] = useState('');
   const [notifyTesting, setNotifyTesting] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
@@ -183,6 +190,15 @@ export default function IntegrationsPage() {
       link: 'https://core.telegram.org/bots#botfather',
       note: 'ChatOps commands: /fix, /status, /queue, /recent, /stats',
     },
+    hal: {
+      title: t('integrations.helpHalTitle'),
+      steps: [
+        t('integrations.helpHalStep1'),
+        t('integrations.helpHalStep2'),
+        t('integrations.helpHalStep3'),
+        t('integrations.helpHalStep4'),
+      ],
+    },
   };
 
   async function loadIntegrationState() {
@@ -208,9 +224,16 @@ export default function IntegrationsPage() {
     if (openai) { setOpenaiBaseUrl(openai.base_url); }
     if (gemini) { setGeminiBaseUrl(gemini.base_url); }
     const telegram = data.find((c) => c.provider === 'telegram');
+    const hal = data.find((c) => c.provider === 'hal');
     if (slack) { setSlackWebhook(''); setSlackBotToken(''); setSlackSigningSecret(''); }
     if (teams) { setTeamsWebhook(''); setTeamsBotAppId(teams.project ?? ''); setTeamsBotSecret(''); }
     if (telegram) { setTelegramToken(''); setTelegramChatId(telegram.username ?? ''); }
+    if (hal) {
+      setHalServiceUrl(hal.base_url || '');
+      setHalUsername(hal.username ?? '');
+      setHalLoginUrl(hal.extra_config?.login_url ?? '');
+      setHalChatUrl(hal.extra_config?.chat_url ?? '');
+    }
   }
 
   useEffect(() => {
@@ -222,6 +245,7 @@ export default function IntegrationsPage() {
     setSlackPreview(loadSecretPreview('slack'));
     setTeamsPreview(loadSecretPreview('teams'));
     setTelegramPreview(loadSecretPreview('telegram'));
+    setHalPasswordPreview(loadSecretPreview('hal'));
     void loadIntegrationState().catch(() => {});
   }, []);
 
@@ -424,6 +448,31 @@ export default function IntegrationsPage() {
     } catch (e) { setError(e instanceof Error ? e.message : 'Save failed'); }
   }
 
+  async function saveHal() {
+    try {
+      await apiFetch('/integrations/hal', {
+        method: 'PUT',
+        body: JSON.stringify({
+          base_url: halServiceUrl || undefined,
+          username: halUsername || undefined,
+          secret: halPassword || undefined,
+          extra_config: {
+            login_url: halLoginUrl || undefined,
+            chat_url: halChatUrl || undefined,
+          },
+        }),
+      });
+      if (halPassword.trim()) {
+        const preview = maskSecretPreview(halPassword);
+        setHalPasswordPreview(preview);
+        saveSecretPreview('hal', preview);
+      }
+      setHalPassword('');
+      await loadIntegrationState();
+      setMsg(t('integrations.savedHal'));
+    } catch (e) { setError(e instanceof Error ? e.message : t('integrations.saveFailed')); }
+  }
+
   async function sendTestNotification() {
     setNotifyTesting(true);
     setError('');
@@ -454,6 +503,7 @@ export default function IntegrationsPage() {
   const slackConfig = configs.find((c) => c.provider === 'slack');
   const teamsConfig = configs.find((c) => c.provider === 'teams');
   const telegramConfig = configs.find((c) => c.provider === 'telegram');
+  const halConfig = configs.find((c) => c.provider === 'hal');
 
   return (
     <div style={{ display: 'grid', gap: 28 }}>
@@ -715,6 +765,45 @@ export default function IntegrationsPage() {
           {configs.find(c => c.provider === 'jira')?.has_secret && (
             <button onClick={() => void deleteIntegration('jira')} style={{ width: '100%', marginTop: 6, padding: '8px', borderRadius: 10, border: '1px solid rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.08)', color: '#f87171', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
               {t('integrations.deleteJiraConnection')}
+            </button>
+          )}
+        </IntegrationCard>}
+
+        {/* HAL */}
+        {activeTab === 'ai' && <IntegrationCard
+          title={t('integrations.providerHal')}
+          icon='🤖'
+          color='#f472b6'
+          connected={halConfig?.has_secret ?? false}
+          updatedAt={halConfig?.updated_at}
+          onHelp={() => setHelp(helpByProvider.hal)}
+        >
+          <FieldGroup label={t('integrations.halServiceUrl')}>
+            <input value={halServiceUrl} onChange={(e) => setHalServiceUrl(e.target.value)} placeholder={t('integrations.halServiceUrlPlaceholder')} />
+          </FieldGroup>
+          <FieldGroup label={t('integrations.halLoginUrl')}>
+            <input value={halLoginUrl} onChange={(e) => setHalLoginUrl(e.target.value)} placeholder={t('integrations.halLoginUrlPlaceholder')} />
+          </FieldGroup>
+          <FieldGroup label={t('integrations.halChatUrl')}>
+            <input value={halChatUrl} onChange={(e) => setHalChatUrl(e.target.value)} placeholder={t('integrations.halChatUrlPlaceholder')} />
+          </FieldGroup>
+          <FieldGroup label={t('integrations.email')}>
+            <input value={halUsername} onChange={(e) => setHalUsername(e.target.value)} placeholder='username@company.com' />
+          </FieldGroup>
+          <FieldGroup label={t('integrations.halPassword')}>
+            <input
+              type='password'
+              value={halPassword}
+              onChange={(e) => setHalPassword(e.target.value)}
+              placeholder={halConfig?.has_secret ? `${halConfig?.secret_preview || halPasswordPreview || '****'} (${t('integrations.keepExisting')})` : t('integrations.halPasswordPlaceholder')}
+            />
+          </FieldGroup>
+          <button className='button button-primary' onClick={() => void saveHal()} style={{ width: '100%', justifyContent: 'center', marginTop: 4 }}>
+            {t('integrations.saveHal')}
+          </button>
+          {halConfig?.has_secret && (
+            <button onClick={() => void deleteIntegration('hal')} style={{ width: '100%', marginTop: 6, padding: '8px', borderRadius: 10, border: '1px solid rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.08)', color: '#f87171', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
+              {t('integrations.deleteHalConnection')}
             </button>
           )}
         </IntegrationCard>}

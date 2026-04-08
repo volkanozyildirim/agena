@@ -287,6 +287,7 @@ async def upsert_integration(
             project=payload.project,
             username=payload.username,
             secret=payload.secret,
+            extra_config=payload.extra_config,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

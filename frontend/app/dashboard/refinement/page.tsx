@@ -7,7 +7,7 @@ import { apiFetch, cachedApiFetch, loadPrefs, loadPromptCatalog } from '@/lib/ap
 import { useLocale } from '@/lib/i18n';
 
 type Provider = 'azure' | 'jira';
-type AgentProvider = 'openai' | 'gemini';
+type AgentProvider = 'openai' | 'gemini' | 'hal';
 
 type Opt = {
   id: string;
@@ -365,7 +365,9 @@ const GEMINI_MODELS: ModelOption[] = [
 ];
 
 function modelsForProvider(provider: AgentProvider): ModelOption[] {
-  return provider === 'gemini' ? GEMINI_MODELS : OPENAI_MODELS;
+  if (provider === 'gemini') return GEMINI_MODELS;
+  if (provider === 'hal') return [];
+  return OPENAI_MODELS;
 }
 
 function hasEstimate(item: ExternalTask): boolean {
@@ -500,7 +502,7 @@ export default function RefinementPage() {
         const settings = ((prefs?.profile_settings || {}) as Record<string, unknown>);
         const preferredProvider = typeof settings.preferred_provider === 'string' ? settings.preferred_provider : 'openai';
         const preferredModel = typeof settings.preferred_model === 'string' ? settings.preferred_model : 'gpt-5.1-codex-mini';
-        setAgentProvider(preferredProvider === 'gemini' ? 'gemini' : 'openai');
+        setAgentProvider(preferredProvider === 'gemini' ? 'gemini' : preferredProvider === 'hal' ? 'hal' : 'openai');
         setAgentModel(preferredModel || 'gpt-5.1-codex-mini');
 
         const prefAzureProject = prefs?.azure_project || '';
@@ -988,13 +990,16 @@ export default function RefinementPage() {
               >
                 <option value='openai'>OpenAI</option>
                 <option value='gemini'>Gemini</option>
+                <option value='hal'>HAL</option>
               </select>
             </Field>
-            <Field label={copy.agentModel}>
-              <select value={agentModel} onChange={(e) => setAgentModel(e.target.value)} style={inputStyle}>
-                {availableModels.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-              </select>
-            </Field>
+            {agentProvider !== 'hal' && (
+              <Field label={copy.agentModel}>
+                <select value={agentModel} onChange={(e) => setAgentModel(e.target.value)} style={inputStyle}>
+                  {availableModels.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+                </select>
+              </Field>
+            )}
             <Field label={copy.limit}>
               <input
                 type='number'
@@ -1010,23 +1015,25 @@ export default function RefinementPage() {
             </Field>
           </div>
 
-          <div style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', padding: 14 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-35)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>
-              Available Models
+          {agentProvider !== 'hal' && (
+            <div style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', padding: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-35)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>
+                Available Models
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {availableModels.map((item) => (
+                  <button
+                    key={item.id}
+                    type='button'
+                    onClick={() => setAgentModel(item.id)}
+                    style={item.id === agentModel ? activeModelChip : modelChip}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {availableModels.map((item) => (
-                <button
-                  key={item.id}
-                  type='button'
-                  onClick={() => setAgentModel(item.id)}
-                  style={item.id === agentModel ? activeModelChip : modelChip}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
+          )}
 
           <div style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', padding: 0, overflow: 'hidden' }}>
             <button
