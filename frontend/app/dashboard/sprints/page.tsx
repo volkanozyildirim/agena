@@ -731,7 +731,7 @@ export default function SprintsPage() {
         }),
       });
       setAiResult(t('sprints.aiAssigned'));
-      setTimeout(() => router.push('/dashboard/tasks/' + String(taskId)), 800);
+      setTimeout(() => router.push('/tasks/' + String(taskId)), 800);
     } catch (e) {
       setAiResult(t('sprints.aiAssignFailed') + (e instanceof Error ? e.message : t('sprints.errorDefault')));
     } finally {

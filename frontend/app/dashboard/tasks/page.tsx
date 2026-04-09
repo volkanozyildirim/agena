@@ -8,6 +8,18 @@ import { TaskItem, type RepoAssignment } from '@/components/TaskTable';
 import { useLocale, type TranslationKey } from '@/lib/i18n';
 import RemoteRepoSelector from '@/components/RemoteRepoSelector';
 
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${breakpoint}px)`);
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [breakpoint]);
+  return isMobile;
+}
+
 const STATUS_FILTERS = ['all', 'new', 'queued', 'running', 'completed', 'failed'];
 const SOURCE_FILTERS = ['all', 'internal', 'azure', 'jira'];
 
@@ -37,6 +49,7 @@ function sourceLabel(s: string, t: (key: TranslationKey, vars?: Record<string, s
 
 export default function DashboardTasksPage() {
   const { t } = useLocale();
+  const mob = useIsMobile();
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [total, setTotal] = useState(0);
   const [queueItems, setQueueItems] = useState<{
@@ -236,7 +249,7 @@ export default function DashboardTasksPage() {
     setMcpPopupTaskId(id);
   }
 
-  async function doAssignMCP(id: number, repoMeta?: string, repoMappingIds?: number[]) {
+  async function doAssignMCP(id: number, repoMeta?: string, repoMappingIds?: number[], mcpModel?: string, mcpProvider?: string) {
     setMcpPopupTaskId(null);
     try {
       await apiFetch('/tasks/' + id + '/assign', {
@@ -246,6 +259,8 @@ export default function DashboardTasksPage() {
           mode: 'mcp_agent',
           extra_description: repoMeta || undefined,
           repo_mapping_ids: repoMappingIds || undefined,
+          agent_model: mcpModel || undefined,
+          agent_provider: mcpProvider || undefined,
         }),
       });
       setMsg(t('tasks.assignedMcp' as TranslationKey)); await load();
@@ -313,18 +328,18 @@ export default function DashboardTasksPage() {
   return (
     <div style={{ display: 'grid', gap: 24 }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: mob ? 10 : 16 }}>
         <div>
           <div className='section-label'>{t('nav.tasks')}</div>
-          <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--ink-90)', marginTop: 8, marginBottom: 4 }}>
+          <h1 style={{ fontSize: mob ? 22 : 28, fontWeight: 800, color: 'var(--ink-90)', marginTop: 8, marginBottom: 4 }}>
             {t('tasks.title')}
           </h1>
-          <p style={{ color: 'var(--ink-35)', fontSize: 14 }}>{t('tasks.total', { n: total.toLocaleString() })}</p>
+          <p style={{ color: 'var(--ink-35)', fontSize: mob ? 12 : 14 }}>{t('tasks.total', { n: total.toLocaleString() })}</p>
         </div>
         <button
           className='button button-primary'
           onClick={() => setShowCreate(!showCreate)}
-          style={{ alignSelf: 'flex-start' }}
+          style={{ alignSelf: 'flex-start', fontSize: mob ? 13 : undefined }}
         >
           + {t('tasks.new')}
         </button>
@@ -443,20 +458,20 @@ export default function DashboardTasksPage() {
       )}
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', border: '1px solid var(--panel-border-2)', borderRadius: 12, padding: 10, background: 'var(--panel)' }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', border: '1px solid var(--panel-border-2)', borderRadius: 12, padding: mob ? 8 : 10, background: 'var(--panel)' }}>
         <input
           value={search}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setSearch(e.target.value); setPage(1); }}
           placeholder={t('tasks.searchPlaceholder')}
-          style={{ width: 220, padding: '8px 14px', fontSize: 13 }}
+          style={{ width: mob ? '100%' : 220, padding: '8px 14px', fontSize: 13 }}
         />
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: mob ? 4 : 6, flexWrap: 'wrap' }}>
           {STATUS_FILTERS.map((s) => (
             <button
               key={s}
               onClick={() => { setFilter(s); setPage(1); }}
               style={{
-                padding: '6px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600,
+                padding: mob ? '5px 10px' : '6px 14px', borderRadius: 999, fontSize: mob ? 11 : 12, fontWeight: 600,
                 border: filter === s ? `1px solid ${s === 'all' ? '#5eead4' : statusColor(s)}` : '1px solid var(--panel-border-2)',
                 background: filter === s ? (s === 'all' ? 'rgba(94,234,212,0.12)' : `${statusColor(s)}18`) : 'transparent',
                 color: filter === s ? (s === 'all' ? '#5eead4' : statusColor(s)) : 'var(--ink-42)',
@@ -467,13 +482,13 @@ export default function DashboardTasksPage() {
             </button>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: mob ? 4 : 6, flexWrap: 'wrap' }}>
           {SOURCE_FILTERS.map((s) => (
             <button
               key={s}
               onClick={() => { setSourceFilter(s); setPage(1); }}
               style={{
-                padding: '6px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700,
+                padding: mob ? '5px 8px' : '6px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700,
                 border: sourceFilter === s ? '1px solid rgba(129,140,248,0.5)' : '1px solid var(--panel-border-2)',
                 background: sourceFilter === s ? 'rgba(129,140,248,0.16)' : 'transparent',
                 color: sourceFilter === s ? '#c4b5fd' : 'var(--ink-45)',
@@ -484,36 +499,40 @@ export default function DashboardTasksPage() {
             </button>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {[7, 30].map((d) => (
-            <button
-              key={d}
-              className='button button-outline'
-              onClick={() => applyRange(d)}
-              style={{ padding: '5px 8px', fontSize: 11 }}
-            >
-              {t('tasks.lastDays', { d })}
-            </button>
-          ))}
-        </div>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 10, border: '1px solid var(--panel-border-2)' }}>
-          <span style={{ fontSize: 11, color: 'var(--ink-45)' }}>{t('tasks.from')}</span>
-        <input
-          type='date'
-          value={dateFrom}
-          onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
-            style={{ padding: '4px 6px', fontSize: 11, minWidth: 130 }}
-        />
-        </div>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 10, border: '1px solid var(--panel-border-2)' }}>
-          <span style={{ fontSize: 11, color: 'var(--ink-45)' }}>{t('tasks.to')}</span>
-        <input
-          type='date'
-          value={dateTo}
-          onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
-            style={{ padding: '4px 6px', fontSize: 11, minWidth: 130 }}
-        />
-        </div>
+        {!mob && (
+          <>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {[7, 30].map((d) => (
+                <button
+                  key={d}
+                  className='button button-outline'
+                  onClick={() => applyRange(d)}
+                  style={{ padding: '5px 8px', fontSize: 11 }}
+                >
+                  {t('tasks.lastDays', { d })}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 10, border: '1px solid var(--panel-border-2)' }}>
+              <span style={{ fontSize: 11, color: 'var(--ink-45)' }}>{t('tasks.from')}</span>
+              <input
+                type='date'
+                value={dateFrom}
+                onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+                style={{ padding: '4px 6px', fontSize: 11, minWidth: 130 }}
+              />
+            </div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 10, border: '1px solid var(--panel-border-2)' }}>
+              <span style={{ fontSize: 11, color: 'var(--ink-45)' }}>{t('tasks.to')}</span>
+              <input
+                type='date'
+                value={dateTo}
+                onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+                style={{ padding: '4px 6px', fontSize: 11, minWidth: 130 }}
+              />
+            </div>
+          </>
+        )}
         <button
           className='button button-outline'
           onClick={() => { setDateFrom(''); setDateTo(''); setSearch(''); setFilter('all'); setSourceFilter('all'); setPage(1); }}
@@ -549,36 +568,51 @@ export default function DashboardTasksPage() {
           <div style={{ padding: '12px 14px', fontSize: 13, color: 'var(--ink-42)' }}>{t('tasks.noQueued')}</div>
         ) : (
           queueItems.map((q) => (
-            <div key={q.task_id} style={{ padding: '10px 14px', borderBottom: '1px solid var(--panel-border)', display: 'grid', gridTemplateColumns: '52px minmax(0,1fr) auto auto', gap: 10, alignItems: 'center' }}>
+            <div key={q.task_id} style={{ padding: mob ? '8px 10px' : '10px 14px', borderBottom: '1px solid var(--panel-border)', display: 'grid', gridTemplateColumns: mob ? '36px 1fr' : '52px minmax(0,1fr) auto auto', gap: mob ? 6 : 10, alignItems: mob ? 'start' : 'center' }}>
               <div style={{ fontSize: 12, color: '#f59e0b', fontWeight: 800 }}>#{q.position}</div>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 13, color: 'var(--ink-90)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: mob ? 12 : 13, color: 'var(--ink-90)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {q.title}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--ink-45)' }}>
                   {t('tasks.taskWithId', { id: q.task_id })} • {sourceLabel(q.source, t)}
                 </div>
+                {mob && (
+                  <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                    <Link href={`/tasks/${q.task_id}`} className='button button-outline' style={{ padding: '4px 8px', fontSize: 11 }}>{t('tasks.open')}</Link>
+                    <button className='button button-outline' onClick={() => void onRemoveFromQueue(q.task_id)} style={{ padding: '4px 8px', fontSize: 11, borderColor: 'rgba(248,113,113,0.35)', color: '#f87171' }}>{t('tasks.remove')}</button>
+                  </div>
+                )}
               </div>
-              <Link href={`/tasks/${q.task_id}`} className='button button-outline' style={{ padding: '5px 9px', fontSize: 12, whiteSpace: 'nowrap' }}>
-                {t('tasks.open')}
-              </Link>
-              <button className='button button-outline' onClick={() => void onRemoveFromQueue(q.task_id)} style={{ padding: '5px 9px', fontSize: 12, whiteSpace: 'nowrap', borderColor: 'rgba(248,113,113,0.35)', color: '#f87171', minHeight: 30 }}>
-                {t('tasks.remove')}
-              </button>
+              {!mob && (
+                <>
+                  <Link href={`/tasks/${q.task_id}`} className='button button-outline' style={{ padding: '5px 9px', fontSize: 12, whiteSpace: 'nowrap' }}>
+                    {t('tasks.open')}
+                  </Link>
+                  <button className='button button-outline' onClick={() => void onRemoveFromQueue(q.task_id)} style={{ padding: '5px 9px', fontSize: 12, whiteSpace: 'nowrap', borderColor: 'rgba(248,113,113,0.35)', color: '#f87171', minHeight: 30 }}>
+                    {t('tasks.remove')}
+                  </button>
+                </>
+              )}
             </div>
           ))
         )}
       </div>
 
       {/* Task list */}
-      <div style={{ borderRadius: 20, border: '1px solid var(--panel-border)', background: 'var(--panel)', overflowX: 'auto' }}>
-        <div style={{ minWidth: 1040 }}>
-        <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--panel-border)', display: 'grid', gridTemplateColumns: 'minmax(0,1.45fr) 80px 98px 88px 88px 70px 92px 78px minmax(180px,0.85fr)', gap: 10 }}>
-          {[t('tasks.col.task'), t('tasks.col.source'), t('tasks.col.status'), t('tasks.col.run'), t('tasks.col.queue'), t('tasks.col.retry'), t('tasks.col.tokens'), t('tasks.col.pr'), t('tasks.col.actions')].map((h) => (
-            <span key={h} style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-25)', textTransform: 'uppercase', letterSpacing: 1 }}>{h}</span>
-          ))}
-        </div>
+      <div style={{ borderRadius: mob ? 14 : 20, border: '1px solid var(--panel-border)', background: 'var(--panel)', overflowX: mob ? 'hidden' : 'auto' }}>
+        {!mob && (
+          <div style={{ minWidth: 1040 }}>
+            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--panel-border)', display: 'grid', gridTemplateColumns: 'minmax(0,1.45fr) 80px 98px 88px 88px 70px 92px 78px minmax(180px,0.85fr)', gap: 10 }}>
+              {[t('tasks.col.task'), t('tasks.col.source'), t('tasks.col.status'), t('tasks.col.run'), t('tasks.col.queue'), t('tasks.col.retry'), t('tasks.col.tokens'), t('tasks.col.pr'), t('tasks.col.actions')].map((h) => (
+                <span key={h} style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-25)', textTransform: 'uppercase', letterSpacing: 1 }}>{h}</span>
+              ))}
+            </div>
+          </div>
+        )}
 
+        {!mob && (
+          <div style={{ minWidth: 1040 }}>
         {tasks.length === 0 ? (
           <div style={{ padding: '40px 24px', textAlign: 'center', color: 'var(--ink-25)', fontSize: 14 }}>
             {t('tasks.empty')}
@@ -719,7 +753,96 @@ export default function DashboardTasksPage() {
             </div>
           ))
         )}
-        </div>
+          </div>
+        )}
+
+        {/* Mobile card layout */}
+        {mob && (
+          tasks.length === 0 ? (
+            <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--ink-25)', fontSize: 13 }}>
+              {t('tasks.empty')}
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: 0 }}>
+              {tasks.map((task) => {
+                const busy = task.status === 'queued' || task.status === 'running';
+                const prUrl = task.repo_assignments?.[0]?.pr_url || task.pr_url;
+                return (
+                  <div key={task.id} style={{
+                    padding: '12px 14px', borderBottom: '1px solid var(--panel-border)',
+                    borderLeft: task.status === 'running' ? '3px solid #38bdf8' : '3px solid transparent',
+                    background: task.status === 'running' ? 'rgba(56,189,248,0.04)' : undefined,
+                  }}>
+                    {/* Row 1: title + status */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        padding: '3px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700,
+                        background: `${statusColor(task.status)}18`,
+                        border: `1px solid ${statusColor(task.status)}40`,
+                        color: statusColor(task.status), flexShrink: 0, textTransform: 'capitalize',
+                      }}>
+                        <span style={{ width: 5, height: 5, borderRadius: '50%', background: statusColor(task.status), animation: task.status === 'running' ? 'pulse-brand 1.5s infinite' : 'none' }} />
+                        {statusLabel(task.status, t)}
+                      </span>
+                      <span style={{ fontSize: 10, color: 'var(--ink-35)', fontWeight: 600, textTransform: 'capitalize' }}>{sourceLabel(task.source, t)}</span>
+                      {prUrl && (
+                        <a href={prUrl} target='_blank' rel='noreferrer' style={{ fontSize: 10, color: '#5eead4', textDecoration: 'none', marginLeft: 'auto', flexShrink: 0 }}>PR ↗</a>
+                      )}
+                    </div>
+                    {/* Row 2: title */}
+                    <div style={{ fontWeight: 600, color: 'var(--ink-78)', fontSize: 13, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {task.title}
+                    </div>
+                    {/* Row 3: badges */}
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 2 }}>
+                      {(task.dependency_blockers && task.dependency_blockers.length > 0) && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 6px', borderRadius: 999, fontSize: 9, fontWeight: 700, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b' }}>
+                          {t('tasks.deps.depCount' as TranslationKey, { n: task.dependency_blockers.length })}
+                        </span>
+                      )}
+                      {(task.dependent_task_ids && task.dependent_task_ids.length > 0) && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, padding: '1px 6px', borderRadius: 999, fontSize: 9, fontWeight: 700, background: 'rgba(94,234,212,0.1)', border: '1px solid rgba(94,234,212,0.25)', color: '#5eead4' }}>
+                          &rarr;{task.dependent_task_ids.length}
+                        </span>
+                      )}
+                    </div>
+                    {/* Row 4: stats */}
+                    <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--ink-45)', marginBottom: 8 }}>
+                      <span>{fmtDuration(task.run_duration_sec ?? task.duration_sec)}</span>
+                      {(task.total_tokens !== null && task.total_tokens !== undefined) && <span>{task.total_tokens.toLocaleString()} tok</span>}
+                      {(task.retry_count !== null && task.retry_count !== undefined && task.retry_count > 0) && <span>retry: {task.retry_count}</span>}
+                    </div>
+                    {/* Row 5: actions */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5 }}>
+                      <button className='button button-primary' disabled={busy} onClick={() => void onAssignAI(task.id)}
+                        style={{ padding: '7px 0', fontSize: 10, fontWeight: 700, opacity: busy ? 0.5 : 1, cursor: busy ? 'not-allowed' : 'pointer', textAlign: 'center' }}>
+                        {busy ? statusLabel(task.status, t) : 'AI'}
+                      </button>
+                      <button disabled={busy} onClick={() => void onAssignMCP(task.id)}
+                        style={{ padding: '7px 0', fontSize: 10, fontWeight: 700, borderRadius: 8, border: 'none', background: busy ? 'var(--panel)' : 'linear-gradient(135deg, #0891b2, #06b6d4)', color: busy ? 'var(--ink-35)' : '#fff', opacity: busy ? 0.5 : 1, cursor: busy ? 'not-allowed' : 'pointer', textAlign: 'center' }}>
+                        MCP
+                      </button>
+                      <button disabled={busy} onClick={() => void onAssignFlow(task.id)}
+                        style={{ padding: '7px 0', fontSize: 10, fontWeight: 700, borderRadius: 8, border: 'none', background: busy ? 'var(--panel)' : 'linear-gradient(135deg, #7c3aed, #a78bfa)', color: busy ? 'var(--ink-35)' : '#fff', opacity: busy ? 0.5 : 1, cursor: busy ? 'not-allowed' : 'pointer', textAlign: 'center' }}>
+                        Flow
+                      </button>
+                      <Link href={`/tasks/${task.id}`} style={{ padding: '7px 0', fontSize: 10, fontWeight: 600, borderRadius: 8, border: '1px solid var(--panel-border-2)', background: 'transparent', color: 'var(--ink-50)', textAlign: 'center', textDecoration: 'none', display: 'block' }}>
+                        {t('tasks.details')}
+                      </Link>
+                      {task.status !== 'running' && (
+                        <button onClick={() => setDeleteConfirmTask(task)}
+                          style={{ padding: '7px 0', fontSize: 10, borderRadius: 8, border: '1px solid rgba(239,68,68,0.3)', background: 'transparent', color: '#ef4444', cursor: 'pointer', textAlign: 'center' }}>
+                          🗑
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
+        )}
       </div>
 
       {/* Pagination */}
@@ -795,8 +918,8 @@ export default function DashboardTasksPage() {
           tasks={tasks}
           agents={agentConfigs}
           flows={savedFlows}
-          onAssignAI={(id, _agent, repoMeta, repoMappingIds) => {
-            void doAssignMCP(id, repoMeta, repoMappingIds);
+          onAssignAI={(id, agent, repoMeta, repoMappingIds) => {
+            void doAssignMCP(id, repoMeta, repoMappingIds, agent.model, agent.provider);
           }}
           onAssignFlow={() => {}}
           onClose={() => setMcpPopupTaskId(null)}
@@ -831,6 +954,74 @@ export default function DashboardTasksPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+const MCP_MODELS = [
+  { label: 'GPT-4o', model: 'gpt-4o', provider: 'openai' },
+  { label: 'GPT-4.1', model: 'gpt-4.1', provider: 'openai' },
+  { label: 'GPT-4.1 mini', model: 'gpt-4.1-mini', provider: 'openai' },
+  { label: 'o3', model: 'o3', provider: 'openai' },
+  { label: 'o4-mini', model: 'o4-mini', provider: 'openai' },
+  { label: 'Claude Sonnet 4', model: 'claude-sonnet-4-20250514', provider: 'anthropic' },
+  { label: 'Claude Opus 4', model: 'claude-opus-4-20250514', provider: 'anthropic' },
+  { label: 'Gemini 2.5 Pro', model: 'gemini-2.5-pro', provider: 'gemini' },
+  { label: 'Gemini 2.5 Flash', model: 'gemini-2.5-flash-preview-05-20', provider: 'gemini' },
+];
+
+function McpModelSelect({ taskId, agents, hasRepo, repoSel, mappingIds, onAssignAI, t }: {
+  taskId: number;
+  agents: { role: string; model: string; provider: string; enabled: boolean }[];
+  hasRepo: boolean;
+  repoSel: { meta: string } | null;
+  mappingIds: number[] | undefined;
+  onAssignAI: (id: number, agent: { role: string; model: string; provider: string }, repoMeta?: string, repoMappingIds?: number[]) => void;
+  t: (key: TranslationKey, vars?: Record<string, string | number>) => string;
+}) {
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const canRun = hasRepo || repoSel || (mappingIds && mappingIds.length > 0);
+  const chosen = MCP_MODELS[selectedIdx];
+
+  return (
+    <div style={{ display: 'grid', gap: 8 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)' }}>{t('tasks.assignMcp' as TranslationKey)}</div>
+      <div style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(8,145,178,0.2)', background: 'rgba(8,145,178,0.06)', fontSize: 12, color: 'var(--ink-50)', lineHeight: 1.5 }}>
+        {t('tasks.mcpDesc' as TranslationKey)}
+      </div>
+
+      {/* Model selector */}
+      <div>
+        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 6 }}>Model</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          {MCP_MODELS.map((m, i) => {
+            const active = i === selectedIdx;
+            const provColor = m.provider === 'openai' ? '#22c55e' : m.provider === 'anthropic' ? '#f59e0b' : '#38bdf8';
+            return (
+              <button key={m.model} type="button" onClick={() => setSelectedIdx(i)}
+                style={{
+                  padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: active ? 700 : 500, cursor: 'pointer',
+                  border: active ? `1px solid ${provColor}80` : '1px solid var(--panel-border-2)',
+                  background: active ? `${provColor}18` : 'transparent',
+                  color: active ? provColor : 'var(--ink-50)',
+                }}>
+                {m.label}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ fontSize: 10, color: 'var(--ink-30)', marginTop: 4 }}>
+          {chosen.provider} · {chosen.model}
+        </div>
+      </div>
+
+      <button
+        onClick={() => onAssignAI(taskId, { role: 'mcp_agent', model: chosen.model, provider: chosen.provider }, !hasRepo ? repoSel?.meta : undefined, mappingIds)}
+        disabled={!canRun}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, border: 'none', background: canRun ? 'linear-gradient(135deg, #0891b2, #06b6d4)' : 'var(--panel)', cursor: canRun ? 'pointer' : 'not-allowed', width: '100%', opacity: canRun ? 1 : 0.5, color: canRun ? '#fff' : 'var(--ink-35)', fontSize: 13, fontWeight: 700 }}>
+        {t('tasks.runMcpAgent' as TranslationKey)} — {chosen.label}
+        <span style={{ fontSize: 16 }}>→</span>
+      </button>
     </div>
   );
 }
@@ -920,8 +1111,8 @@ function AssignPopup({ taskId, mode, tasks, agents, flows, onAssignAI, onAssignF
             </div>
           )}
 
-          {/* Repo selector — only if task has no repo config and no backend mappings selected */}
-          {!hasRepo && selectedMappingIds.length === 0 && (
+          {/* Repo selector — show unless task already has repo configured */}
+          {!hasRepo && (
             <div>
               <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 6 }}>Target Repository</div>
               <RemoteRepoSelector compact onChange={(sel) => setRepoSel(sel ? { meta: sel.meta } : null)} />
@@ -942,7 +1133,7 @@ function AssignPopup({ taskId, mode, tasks, agents, flows, onAssignAI, onAssignF
                 const canAssign = hasRepo || repoSel || selectedMappingIds.length > 0;
                 return (
                 <button key={agent.role}
-                  onClick={() => onAssignAI(taskId, agent, !hasRepo && selectedMappingIds.length === 0 ? repoSel?.meta : undefined, mappingIds)}
+                  onClick={() => onAssignAI(taskId, agent, !hasRepo ? repoSel?.meta : undefined, mappingIds)}
                   disabled={!canAssign}
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--panel-border-3)', background: 'var(--panel)', cursor: !canAssign ? 'not-allowed' : 'pointer', textAlign: 'left', width: '100%', opacity: !canAssign ? 0.5 : 1 }}>
                   <div>
@@ -956,21 +1147,7 @@ function AssignPopup({ taskId, mode, tasks, agents, flows, onAssignAI, onAssignF
             </div>
           )}
           {mode === 'mcp_agent' && (
-            <div style={{ display: 'grid', gap: 6 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)' }}>{t('tasks.assignMcp' as TranslationKey)}</div>
-              <div style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(8,145,178,0.2)', background: 'rgba(8,145,178,0.06)', fontSize: 12, color: 'var(--ink-50)', lineHeight: 1.5 }}>
-                {t('tasks.mcpDesc' as TranslationKey)}
-              </div>
-              {(() => { const canRun = hasRepo || repoSel || selectedMappingIds.length > 0; return (
-              <button
-                onClick={() => onAssignAI(taskId, { role: 'mcp_agent', model: '', provider: '' }, !hasRepo && selectedMappingIds.length === 0 ? repoSel?.meta : undefined, mappingIds)}
-                disabled={!canRun}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', borderRadius: 10, border: 'none', background: canRun ? 'linear-gradient(135deg, #0891b2, #06b6d4)' : 'var(--panel)', cursor: canRun ? 'pointer' : 'not-allowed', width: '100%', opacity: canRun ? 1 : 0.5, color: canRun ? '#fff' : 'var(--ink-35)', fontSize: 13, fontWeight: 700 }}>
-                {t('tasks.runMcpAgent' as TranslationKey)}
-                <span style={{ fontSize: 16 }}>→</span>
-              </button>
-              ); })()}
-            </div>
+            <McpModelSelect taskId={taskId} agents={agents} hasRepo={hasRepo} repoSel={repoSel} mappingIds={mappingIds} onAssignAI={onAssignAI} t={t} />
           )}
           {mode === 'flow' && (
             <div style={{ display: 'grid', gap: 6 }}>
@@ -981,7 +1158,7 @@ function AssignPopup({ taskId, mode, tasks, agents, flows, onAssignAI, onAssignF
                 const canAssignFlow = hasRepo || repoSel || selectedMappingIds.length > 0;
                 return (
                 <button key={flow.id}
-                  onClick={() => onAssignFlow(taskId, flow.id, flow.name, !hasRepo && selectedMappingIds.length === 0 ? repoSel?.meta : undefined, mappingIds)}
+                  onClick={() => onAssignFlow(taskId, flow.id, flow.name, !hasRepo ? repoSel?.meta : undefined, mappingIds)}
                   disabled={!canAssignFlow}
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(124,58,237,0.3)', background: 'rgba(124,58,237,0.06)', cursor: !canAssignFlow ? 'not-allowed' : 'pointer', textAlign: 'left', width: '100%', opacity: !canAssignFlow ? 0.5 : 1 }}>
                   <div>

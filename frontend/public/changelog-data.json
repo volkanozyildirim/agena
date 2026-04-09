@@ -1,5 +1,37 @@
 [
   {
+    "hash": "6187190",
+    "short": "6187190",
+    "message": "MCP engine, tool executors, orchestration enhancements + dashboard updates",
+    "date": "2026-04-08",
+    "author": "root",
+    "type": "feat"
+  },
+  {
+    "hash": "4aee5dc",
+    "short": "4aee5dc",
+    "message": "Merge pull request #7 from obfox/feat/hal-integration",
+    "date": "2026-04-08",
+    "author": "aozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "aa7c21e",
+    "short": "aa7c21e",
+    "message": "HAL AI provider integration + flexible extra_config on integration_configs",
+    "date": "2026-04-08",
+    "author": "omer.bolatan",
+    "type": "feat"
+  },
+  {
+    "hash": "cdd05ea",
+    "short": "cdd05ea",
+    "message": "make repo_mapping_id nullable to match ON DELETE SET NULL constraint",
+    "date": "2026-04-06",
+    "author": "Ali Ozyildirim",
+    "type": "fix"
+  },
+  {
     "hash": "300f930",
     "short": "300f930",
     "message": "VS comparison pages + SEO optimization",
@@ -766,37 +798,5 @@
     "date": "2026-04-02",
     "author": "root",
     "type": "feat"
-  },
-  {
-    "hash": "8311f4f",
-    "short": "8311f4f",
-    "message": "Azure DevOps node for flows + remove lead_developer role lock",
-    "date": "2026-04-02",
-    "author": "root",
-    "type": "feat"
-  },
-  {
-    "hash": "e0c1e52",
-    "short": "e0c1e52",
-    "message": "add mobile floating + button for flow node picker",
-    "date": "2026-04-02",
-    "author": "root",
-    "type": "fix"
-  },
-  {
-    "hash": "85e3198",
-    "short": "85e3198",
-    "message": "n8n-style flow node configuration overhaul",
-    "date": "2026-04-02",
-    "author": "root",
-    "type": "feat"
-  },
-  {
-    "hash": "eed78f5",
-    "short": "eed78f5",
-    "message": "DORA sync no longer creates repo mappings, add delete confirmation",
-    "date": "2026-04-02",
-    "author": "root",
-    "type": "fix"
   }
 ]

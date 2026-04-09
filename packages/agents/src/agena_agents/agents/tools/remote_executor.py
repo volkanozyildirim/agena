@@ -194,10 +194,10 @@ class RemoteToolExecutor:
     ) -> str:
         """Search code in remote repo.
 
-        To avoid downloading every file, we search in two passes:
-        1. Search files already in cache (previously read).
-        2. If glob is given, fetch up to 10 matching uncached files and search those.
-        This keeps API calls bounded.
+        Three-pass strategy:
+        1. Search files already in cache (free — no API calls).
+        2. Fetch files whose *path* matches the search pattern (smart guess).
+        3. Fetch glob-matched or likely-relevant uncached files and search.
         """
         max_results = min(max_results, MAX_SEARCH_RESULTS)
         try:
@@ -207,6 +207,7 @@ class RemoteToolExecutor:
 
         import fnmatch
         BINARY_EXT = {'png', 'jpg', 'jpeg', 'gif', 'ico', 'woff', 'woff2', 'ttf', 'eot', 'zip', 'tar', 'gz', 'pdf', 'bin', 'exe', 'dll', 'so', 'dylib'}
+        LARGE_GENERATED = {'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'go.sum', 'Cargo.lock', 'poetry.lock'}
         results: list[str] = []
 
         def _matches_glob(fpath: str, fname: str) -> bool:
@@ -217,6 +218,9 @@ class RemoteToolExecutor:
         def _is_binary(fname: str) -> bool:
             ext = fname.rsplit('.', 1)[-1].lower() if '.' in fname else ''
             return ext in BINARY_EXT
+
+        def _is_large_generated(fname: str) -> bool:
+            return fname in LARGE_GENERATED
 
         def _search_content(fpath: str, content: str) -> None:
             for lno, line in enumerate(content.splitlines(), 1):
@@ -234,16 +238,27 @@ class RemoteToolExecutor:
             if len(results) >= max_results:
                 break
 
-        # Pass 2: if not enough results and glob is given, fetch a few matching files
-        if len(results) < max_results and glob:
-            files = await self._ensure_file_list()
-            fetched = 0
-            max_fetch = 10  # limit new API calls
+        if len(results) >= max_results:
+            return f'Found {len(results)} match(es):\n' + '\n'.join(results)
+
+        # Pass 2: smart file-path matching — if the pattern looks like it
+        # could be a filename or path fragment, fetch files whose path matches
+        files = await self._ensure_file_list()
+        fetched = 0
+        max_fetch_path = 15
+        # Extract a simpler substring for path matching (strip regex chars)
+        path_hint = re.sub(r'[\\.*+?^${}()|[\]]', '', pattern).strip().lower()
+        if len(path_hint) >= 2 and len(results) < max_results:
             for fpath in files:
                 if fpath in self._remote_cache or fpath in self._writes:
-                    continue  # already searched in pass 1
+                    continue
                 fname = fpath.rsplit('/', 1)[-1] if '/' in fpath else fpath
-                if not _matches_glob(fpath, fname) or _is_binary(fname):
+                if _is_binary(fname) or _is_large_generated(fname):
+                    continue
+                if not _matches_glob(fpath, fname):
+                    continue
+                # Check if path contains the hint (e.g. pattern="data" matches "cmd/data.go")
+                if path_hint not in fpath.lower():
                     continue
                 try:
                     content = await self._read_content(fpath)
@@ -251,12 +266,49 @@ class RemoteToolExecutor:
                 except Exception:
                     continue
                 _search_content(fpath, content)
-                if len(results) >= max_results or fetched >= max_fetch:
+                if len(results) >= max_results or fetched >= max_fetch_path:
                     break
 
+        if len(results) >= max_results:
+            return f'Found {len(results)} match(es):\n' + '\n'.join(results)
+
+        # Pass 3: fetch glob-matched or source files and search them
+        fetched_p3 = 0
+        max_fetch = 25
+        SOURCE_EXT = {'go', 'py', 'js', 'ts', 'tsx', 'jsx', 'java', 'rs', 'rb', 'cs',
+                       'cpp', 'c', 'h', 'hpp', 'swift', 'kt', 'scala', 'php', 'vue',
+                       'svelte', 'yaml', 'yml', 'toml', 'json', 'xml', 'sql', 'sh',
+                       'bash', 'tf', 'hcl', 'proto', 'graphql', 'gql', 'md', 'txt'}
+        for fpath in files:
+            if fpath in self._remote_cache or fpath in self._writes:
+                continue
+            fname = fpath.rsplit('/', 1)[-1] if '/' in fpath else fpath
+            if _is_binary(fname) or _is_large_generated(fname):
+                continue
+            ext = fname.rsplit('.', 1)[-1].lower() if '.' in fname else ''
+            if glob:
+                if not _matches_glob(fpath, fname):
+                    continue
+            else:
+                # No glob: only fetch source-code files to keep API calls bounded
+                if ext not in SOURCE_EXT:
+                    continue
+            try:
+                content = await self._read_content(fpath)
+                fetched_p3 += 1
+            except Exception:
+                continue
+            _search_content(fpath, content)
+            if len(results) >= max_results or fetched_p3 >= max_fetch:
+                break
+
+        total_fetched = fetched + fetched_p3
         if not results:
-            hint = ' (only searched cached + glob-matched files to save API calls)' if glob else ' (only searched previously-read files)'
-            return f'No matches found for: {pattern}{hint}\nTip: use read_file to load specific files first, then search again.'
+            return (
+                f'No matches found for: {pattern} '
+                f'(searched {len(self._remote_cache)} cached + {total_fetched} fetched files)\n'
+                f'Tip: try a different pattern, or use read_file on specific files you see in the file tree.'
+            )
         return f'Found {len(results)} match(es):\n' + '\n'.join(results)
 
     def _tool_write_file(self, path: str, content: str) -> str:
@@ -269,6 +321,16 @@ class RemoteToolExecutor:
         action = 'Created' if self._originals[cleaned] is None else 'Updated'
         return f'{action} {path} ({len(content.splitlines())} lines)'
 
+    @staticmethod
+    def _strip_line_numbers(text: str) -> str:
+        """Strip line number prefixes from text copied from read_file output."""
+        import re
+        lines = text.split('\n')
+        numbered = sum(1 for l in lines if re.match(r'^\d+\t', l))
+        if numbered >= len(lines) * 0.6 and numbered >= 2:
+            return '\n'.join(re.sub(r'^\d+\t', '', l) for l in lines)
+        return text
+
     def _tool_edit_file(self, path: str, old_text: str, new_text: str) -> str:
         cleaned = path.lstrip('/')
         # Must have been read before
@@ -279,10 +341,42 @@ class RemoteToolExecutor:
                 'Use read_file first, then edit_file.'
             )
         count = content.count(old_text)
+        # Auto-strip line number prefixes if no match found
         if count == 0:
+            stripped_old = self._strip_line_numbers(old_text)
+            if stripped_old != old_text and content.count(stripped_old) > 0:
+                old_text = stripped_old
+                new_text = self._strip_line_numbers(new_text)
+                count = content.count(old_text)
+        if count == 0:
+            # Show a snippet of actual content to help agent find the right text
+            lines = content.splitlines()
+            # Try to find the closest match by checking first line of old_text
+            first_line = old_text.strip().split('\n')[0].strip()
+            hint_lines: list[str] = []
+            for i, line in enumerate(lines):
+                if first_line and first_line[:30] in line:
+                    start = max(0, i - 1)
+                    end = min(len(lines), i + 4)
+                    hint_lines = [f'{n+1}\t{lines[n]}' for n in range(start, end)]
+                    break
+            hint = ''
+            if hint_lines:
+                hint = (
+                    f'\n\nClosest match found near:\n' + '\n'.join(hint_lines) +
+                    '\n\nCopy the EXACT text from read_file output — do not type from memory.'
+                )
+            else:
+                # Show first 10 lines as context
+                preview = '\n'.join(f'{n+1}\t{lines[n]}' for n in range(min(10, len(lines))))
+                hint = (
+                    f'\n\nFile starts with:\n{preview}'
+                    '\n\nRe-read the file with read_file and copy the exact text you want to change.'
+                )
             return (
                 f'Error: old_text not found in {path}. '
-                'Ensure the text matches exactly including whitespace and indentation.'
+                'The text does not match the actual file content.'
+                f'{hint}'
             )
         if count > 1:
             return (

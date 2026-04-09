@@ -417,16 +417,61 @@ class ToolExecutor:
         action = 'Created' if self._originals[cleaned] is None else 'Updated'
         return f'{action} {path} ({len(content.splitlines())} lines)'
 
+    @staticmethod
+    def _strip_line_numbers(text: str) -> str:
+        """Strip line number prefixes from text copied from read_file output.
+
+        read_file returns lines as "42\\tcontent", and agents often copy these
+        prefixes into edit_file old_text/new_text by mistake.  Detect and strip
+        them so the match succeeds.
+        """
+        import re
+        lines = text.split('\n')
+        # Check if most lines start with digits followed by a tab
+        numbered = sum(1 for l in lines if re.match(r'^\d+\t', l))
+        if numbered >= len(lines) * 0.6 and numbered >= 2:
+            return '\n'.join(re.sub(r'^\d+\t', '', l) for l in lines)
+        return text
+
     def _tool_edit_file(self, path: str, old_text: str, new_text: str) -> str:
         try:
             content = self._read_content(path)
         except FileNotFoundError:
             return f'Error: File not found: {path}'
         count = content.count(old_text)
+        # Auto-strip line number prefixes if no match found
         if count == 0:
+            stripped_old = self._strip_line_numbers(old_text)
+            if stripped_old != old_text and content.count(stripped_old) > 0:
+                old_text = stripped_old
+                new_text = self._strip_line_numbers(new_text)
+                count = content.count(old_text)
+        if count == 0:
+            lines = content.splitlines()
+            first_line = old_text.strip().split('\n')[0].strip()
+            hint_lines: list[str] = []
+            for i, line in enumerate(lines):
+                if first_line and first_line[:30] in line:
+                    start = max(0, i - 1)
+                    end = min(len(lines), i + 4)
+                    hint_lines = [f'{n+1}\t{lines[n]}' for n in range(start, end)]
+                    break
+            hint = ''
+            if hint_lines:
+                hint = (
+                    f'\n\nClosest match found near:\n' + '\n'.join(hint_lines) +
+                    '\n\nCopy the EXACT text from read_file output — do not type from memory.'
+                )
+            else:
+                preview = '\n'.join(f'{n+1}\t{lines[n]}' for n in range(min(10, len(lines))))
+                hint = (
+                    f'\n\nFile starts with:\n{preview}'
+                    '\n\nRe-read the file with read_file and copy the exact text you want to change.'
+                )
             return (
                 f'Error: old_text not found in {path}. '
-                'Ensure the text matches exactly including whitespace and indentation.'
+                'The text does not match the actual file content.'
+                f'{hint}'
             )
         if count > 1:
             return (

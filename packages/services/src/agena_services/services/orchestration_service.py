@@ -354,11 +354,17 @@ class OrchestrationService:
                 _fc = len(mcp_result.get('file_changes', []))
                 _tc = mcp_result.get('tool_calls_count', 0)
                 _dur = mcp_result.get('duration_sec', 0)
+                _summary = mcp_result.get('completion_summary', '') or ''
                 await task_service.add_log(
                     task.id, organization_id, 'agent',
                     f'MCP Agent completed: {_tc} tool calls, {_fc} files changed, {_dur}s\n'
-                    f'Summary: {mcp_result.get("completion_summary", "")[:500]}',
+                    f'Summary: {_summary[:500]}',
                 )
+                # If MCP produced no changes and no tool calls, treat as failure
+                if _fc == 0 and _tc == 0:
+                    _fail_reason = _summary[:500] if _summary else 'MCP Agent failed to execute — 0 tool calls, 0 file changes. Check provider/model configuration.'
+                    await task_service.add_log(task.id, organization_id, 'agent', f'MCP Agent completed analysis but produced no file changes.')
+                    raise ValueError(_fail_reason)
             else:
                 orchestrator = await self._build_orchestrator(organization_id, routing)
                 task_description_for_ai = task.description or ''
@@ -2049,11 +2055,16 @@ class OrchestrationService:
     async def _resolve_llm_runtime(self, organization_id: int, routing: TaskRouting) -> LLMRuntimeConfig | None:
         provider = (routing.preferred_agent_provider or '').strip().lower()
         preferred_model = (routing.preferred_agent_model or '').strip() or None
-        if provider not in {'openai', 'gemini'}:
+        # Normalize provider aliases
+        if provider == 'google':
+            provider = 'gemini'
+        if provider not in {'openai', 'gemini', 'anthropic'}:
             provider = 'openai'
 
         cfg_service = IntegrationConfigService(self.db_session)
-        selected_cfg = await cfg_service.get_config(organization_id, provider)
+        # For anthropic, check anthropic integration first, then fall back to env
+        cfg_provider = provider
+        selected_cfg = await cfg_service.get_config(organization_id, cfg_provider)
         selected_key = ((selected_cfg.secret if selected_cfg else '') or '').strip()
         selected_base = ((selected_cfg.base_url if selected_cfg else '') or '').strip()
 
@@ -2072,6 +2083,13 @@ class OrchestrationService:
                 provider='gemini',
                 api_key=selected_key,
                 base_url=selected_base or 'https://generativelanguage.googleapis.com',
+                model=preferred_model,
+            )
+        if provider == 'anthropic':
+            return LLMRuntimeConfig(
+                provider='anthropic',
+                api_key=selected_key,
+                base_url=selected_base or 'https://api.anthropic.com',
                 model=preferred_model,
             )
         return LLMRuntimeConfig(

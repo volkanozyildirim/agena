@@ -33,7 +33,7 @@ from agena_core.settings import get_settings
 logger = logging.getLogger(__name__)
 
 # ---- Defaults ----
-MAX_ITERATIONS = 25
+MAX_ITERATIONS = 40
 MAX_OUTPUT_TOKENS = 16_384
 TOOL_RESULT_LIMIT = 10_000          # truncate tool results beyond this
 CONTEXT_COMPRESS_THRESHOLD = 40_000  # compress old messages when total chars exceed this
@@ -76,8 +76,15 @@ Goal: Read the specific files related to the task and understand the \
 existing patterns deeply.
 
 1. search_code for keywords from the task (function names, class names, \
-   route paths, error messages, UI labels).
+   route paths, error messages, UI labels).  ALWAYS use the glob \
+   parameter to filter by file extension (e.g. "*.go", "*.py", "*.ts") — \
+   this dramatically improves search accuracy.  Run multiple searches \
+   with different keywords if the first search returns no results.
 2. read_file each relevant hit — read the FULL file, not just the match.
+2b. Study the file tree carefully — identify ALL files that could be \
+   related to the task based on their names and directory structure. \
+   If a file's name strongly suggests it's relevant (e.g. "data.go" \
+   for a data-related task), read it even if search didn't find it.
 3. For every file you plan to change, also read:
    - Its imports → follow them one level deep to understand interfaces.
    - Its tests → know what is already tested.
@@ -115,10 +122,14 @@ PHASE 4 · IMPLEMENT
 Goal: Make the changes — precisely, following every convention.
 
 Rules for writing code:
-- **edit_file** for modifying existing files.  Provide enough surrounding \
-  context in old_text so the match is unique (3-5 lines of context around \
-  the change).  If edit_file fails because old_text is not found, \
-  re-read the file and try again with the actual current content.
+- **edit_file** for modifying existing files.  CRITICAL: the old_text \
+  parameter must be copied EXACTLY from the read_file output — never \
+  type it from memory or guess.  Include 3-5 lines of surrounding \
+  context so the match is unique.  If edit_file fails because old_text \
+  is not found, ALWAYS re-read the file first, then copy the exact \
+  text from the fresh read output.  Never retry with the same old_text.
+- For large changes (>50% of file), prefer **write_file** with the \
+  complete new content — it is more reliable than multiple edit_file calls.
 - **write_file** only for brand-new files or complete rewrites.
 - Match the EXACT style of surrounding code:
   · Same indentation (if the file uses 2 spaces, you use 2 spaces).
@@ -184,6 +195,14 @@ CRITICAL RULES
 class MCPAgentEngine:
     """Run a tool-use agent loop for code generation tasks."""
 
+    # Provider → OpenAI-compatible base URL mapping
+    _PROVIDER_BASE_URLS: dict[str, str] = {
+        'openai': 'https://api.openai.com/v1',
+        'gemini': 'https://generativelanguage.googleapis.com/v1beta/openai/',
+        'google': 'https://generativelanguage.googleapis.com/v1beta/openai/',
+        'anthropic': 'https://api.anthropic.com/v1/',
+    }
+
     def __init__(
         self,
         provider: str = 'openai',
@@ -193,16 +212,34 @@ class MCPAgentEngine:
     ) -> None:
         settings = get_settings()
         self.provider = (provider or 'openai').strip().lower()
-        self.api_key = (api_key or settings.openai_api_key or '').strip()
-        self.base_url = (base_url or settings.openai_base_url or '').strip()
+
+        # Resolve API key per provider
+        if self.provider in ('gemini', 'google'):
+            self.api_key = (api_key or os.getenv('GEMINI_API_KEY', '') or settings.openai_api_key or '').strip()
+        elif self.provider == 'anthropic':
+            self.api_key = (api_key or os.getenv('ANTHROPIC_API_KEY', '') or '').strip()
+        else:
+            self.api_key = (api_key or settings.openai_api_key or '').strip()
+
+        # Resolve base URL — use provider's OpenAI-compatible endpoint
+        default_base = self._PROVIDER_BASE_URLS.get(self.provider, self._PROVIDER_BASE_URLS['openai'])
+        self.base_url = (base_url or '').strip()
+        # Don't use non-OpenAI-compatible base URLs (e.g. generativelanguage without /openai/)
+        if self.base_url and 'generativelanguage.googleapis.com' in self.base_url and '/openai' not in self.base_url:
+            self.base_url = self._PROVIDER_BASE_URLS['gemini']
+        if not self.base_url:
+            self.base_url = default_base
+
         self.model = (model or settings.llm_large_model or 'gpt-4o').strip()
 
         _ssl_verify = os.getenv('SSL_VERIFY', 'true').strip().lower() not in ('false', '0', 'no')
         self.client = AsyncOpenAI(
             api_key=self.api_key,
-            base_url=self.base_url or None,
+            base_url=self.base_url,
             http_client=httpx.AsyncClient(verify=_ssl_verify),
         )
+        logger.info('MCPAgentEngine initialized: provider=%s, model=%s, base_url=%s',
+                     self.provider, self.model, self.base_url)
 
     # ------------------------------------------------------------------ #
     #                         Public entry point                          #
@@ -303,7 +340,11 @@ class MCPAgentEngine:
                     max_tokens=MAX_OUTPUT_TOKENS,
                 )
             except Exception as exc:
-                logger.error('MCP agent LLM call failed (iter %d): %s', iteration, exc)
+                logger.error('MCP agent LLM call failed (iter %d): %s %s', iteration, type(exc).__name__, exc)
+                # Store error for completion summary
+                if not executor.is_completed:
+                    executor._completed = True
+                    executor._completion_summary = f'LLM call failed: {type(exc).__name__}: {exc}'
                 break
 
             # Accumulate usage
@@ -368,17 +409,20 @@ class MCPAgentEngine:
             # Nudge: push the agent to start writing if it's only been reading
             _has_writes = bool(executor.get_file_changes())
             if not _has_writes and not executor.is_completed:
-                if iteration == int(max_iterations * 0.35):
+                if iteration == int(max_iterations * 0.25):
                     messages.append({
                         'role': 'user',
                         'content': (
                             'You have read enough files to understand the codebase. '
                             'Stop exploring and START IMPLEMENTING NOW. Use edit_file '
                             'to modify existing files or write_file to create new ones. '
-                            'Do not read any more files unless absolutely necessary.'
+                            'Do not read any more files unless absolutely necessary.\n\n'
+                            'IMPORTANT: Before calling edit_file, ALWAYS re-read the '
+                            'exact section you want to change. Copy the old_text '
+                            'EXACTLY from the read output — never type it from memory.'
                         ),
                     })
-                elif iteration == int(max_iterations * 0.6):
+                elif iteration == int(max_iterations * 0.45):
                     messages.append({
                         'role': 'user',
                         'content': (
@@ -388,11 +432,11 @@ class MCPAgentEngine:
                             'with an explanation. Do NOT continue reading files.'
                         ),
                     })
-                elif iteration == max_iterations - 2:
+                elif iteration == max_iterations - 3:
                     messages.append({
                         'role': 'user',
                         'content': (
-                            'FINAL WARNING: 2 iterations left. Call edit_file/write_file '
+                            'FINAL WARNING: 3 iterations left. Call edit_file/write_file '
                             'immediately or call task_complete. No more exploration.'
                         ),
                     })
