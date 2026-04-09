@@ -203,15 +203,43 @@ class MCPAgentEngine:
         'anthropic': 'https://api.anthropic.com/v1/',
     }
 
+    # Google OAuth2 token endpoint for refresh token → access token exchange
+    _GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
+    # Default client ID/secret for "Google Auth Library" (public, used by gcloud CLI)
+    _GOOGLE_CLIENT_ID = '764086051850-6qr4p6gpi6hn506pt8ejuq83di341hur.apps.googleusercontent.com'
+    _GOOGLE_CLIENT_SECRET = 'd-FL95Q19q7MQmFpd7hHD0Ty'
+
+    @staticmethod
+    def _exchange_google_refresh_token(refresh_token: str) -> str:
+        """Exchange a Google OAuth2 refresh token for an access token."""
+        import urllib.request
+        import urllib.parse
+        data = urllib.parse.urlencode({
+            'grant_type': 'refresh_token',
+            'refresh_token': refresh_token,
+            'client_id': MCPAgentEngine._GOOGLE_CLIENT_ID,
+            'client_secret': MCPAgentEngine._GOOGLE_CLIENT_SECRET,
+        }).encode()
+        req = urllib.request.Request(MCPAgentEngine._GOOGLE_TOKEN_URL, data=data,
+                                     headers={'Content-Type': 'application/x-www-form-urlencoded'})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            import json as _json
+            body = _json.loads(resp.read())
+            return body['access_token']
+
     def __init__(
         self,
         provider: str = 'openai',
         api_key: str | None = None,
         base_url: str | None = None,
         model: str | None = None,
+        *,
+        vertex_project: str | None = None,
+        vertex_region: str | None = None,
     ) -> None:
         settings = get_settings()
         self.provider = (provider or 'openai').strip().lower()
+        self._is_vertex = False
 
         # Resolve API key per provider
         if self.provider in ('gemini', 'google'):
@@ -221,33 +249,66 @@ class MCPAgentEngine:
         else:
             self.api_key = (api_key or settings.openai_api_key or '').strip()
 
-        # Resolve base URL — use provider's OpenAI-compatible endpoint
-        default_base = self._PROVIDER_BASE_URLS.get(self.provider, self._PROVIDER_BASE_URLS['openai'])
-        self.base_url = (base_url or '').strip()
-        # Don't use non-OpenAI-compatible base URLs (e.g. generativelanguage without /openai/)
-        if self.base_url and 'generativelanguage.googleapis.com' in self.base_url and '/openai' not in self.base_url:
-            self.base_url = self._PROVIDER_BASE_URLS['gemini']
-        if not self.base_url:
-            self.base_url = default_base
+        # Detect Vertex AI: refresh tokens start with common OAuth prefixes,
+        # API keys start with AIza
+        _is_refresh_token = (
+            self.provider in ('gemini', 'google')
+            and self.api_key
+            and not self.api_key.startswith('AIza')
+        )
+
+        if _is_refresh_token:
+            self._is_vertex = True
+            # Exchange refresh token for access token
+            try:
+                access_token = self._exchange_google_refresh_token(self.api_key)
+                logger.info('Vertex AI: exchanged refresh token for access token')
+            except Exception as exc:
+                logger.error('Failed to exchange Google refresh token: %s', exc)
+                raise ValueError(
+                    f'Google refresh token exchange failed: {exc}. '
+                    'Ensure the token is valid or use an AIzaSy... API key instead.'
+                ) from exc
+            self.api_key = access_token
+            # Vertex AI OpenAI-compat endpoint
+            _region = (vertex_region or os.getenv('VERTEX_REGION', '') or 'us-central1').strip()
+            _project = (vertex_project or os.getenv('VERTEX_PROJECT', '') or '').strip()
+            if not _project:
+                # Try to extract project from base_url if provided
+                _bu = (base_url or '').strip()
+                if 'projects/' in _bu:
+                    _project = _bu.split('projects/')[1].split('/')[0]
+            if not _project:
+                raise ValueError(
+                    'Vertex AI requires a Google Cloud Project ID. '
+                    'Set it in the Gemini integration Base URL field as: '
+                    'https://{region}-aiplatform.googleapis.com/v1beta1/projects/{PROJECT_ID}/locations/{region}/endpoints/openapi'
+                )
+            self.base_url = (
+                f'https://{_region}-aiplatform.googleapis.com/v1beta1/'
+                f'projects/{_project}/locations/{_region}/endpoints/openapi'
+            )
+        else:
+            # Standard provider base URL resolution
+            default_base = self._PROVIDER_BASE_URLS.get(self.provider, self._PROVIDER_BASE_URLS['openai'])
+            self.base_url = (base_url or '').strip()
+            if self.base_url and 'generativelanguage.googleapis.com' in self.base_url and '/openai' not in self.base_url:
+                self.base_url = self._PROVIDER_BASE_URLS['gemini']
+            if not self.base_url:
+                self.base_url = default_base
 
         self.model = (model or settings.llm_large_model or 'gpt-4o').strip()
 
         _ssl_verify = os.getenv('SSL_VERIFY', 'true').strip().lower() not in ('false', '0', 'no')
-        _extra_headers: dict[str, str] = {}
-        _client_api_key = self.api_key
-        # Gemini's OpenAI-compat endpoint needs the key as x-goog-api-key header
-        # instead of the standard Authorization: Bearer header
-        if self.provider in ('gemini', 'google'):
-            _extra_headers['x-goog-api-key'] = self.api_key
-            _client_api_key = 'GEMINI'  # dummy — real key is in header
+        # All providers (including Gemini OpenAI-compat) use standard
+        # Authorization: Bearer header — no special headers needed.
         self.client = AsyncOpenAI(
-            api_key=_client_api_key,
+            api_key=self.api_key,
             base_url=self.base_url,
-            default_headers=_extra_headers or None,
             http_client=httpx.AsyncClient(verify=_ssl_verify),
         )
-        logger.info('MCPAgentEngine initialized: provider=%s, model=%s, base_url=%s',
-                     self.provider, self.model, self.base_url)
+        logger.info('MCPAgentEngine initialized: provider=%s, model=%s, base_url=%s, vertex=%s',
+                     self.provider, self.model, self.base_url, self._is_vertex)
 
     # ------------------------------------------------------------------ #
     #                         Public entry point                          #

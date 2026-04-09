@@ -1,5 +1,13 @@
 [
   {
+    "hash": "efa5230",
+    "short": "efa5230",
+    "message": "Gemini OpenAI-compat auth — use x-goog-api-key header",
+    "date": "2026-04-09",
+    "author": "root",
+    "type": "fix"
+  },
+  {
     "hash": "9538f3d",
     "short": "9538f3d",
     "message": "set default language to English",
@@ -790,13 +798,5 @@
     "date": "2026-04-02",
     "author": "root",
     "type": "feat"
-  },
-  {
-    "hash": "d28000b",
-    "short": "d28000b",
-    "message": "update CLAUDE.md for monorepo package structure",
-    "date": "2026-04-02",
-    "author": "root",
-    "type": "docs"
   }
 ]
