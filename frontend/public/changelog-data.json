@@ -1,5 +1,13 @@
 [
   {
+    "hash": "9538f3d",
+    "short": "9538f3d",
+    "message": "set default language to English",
+    "date": "2026-04-09",
+    "author": "root",
+    "type": "fix"
+  },
+  {
     "hash": "0683832",
     "short": "0683832",
     "message": "MCP multi-provider support, edit reliability, mobile responsive UI",
@@ -22,14 +30,6 @@
     "date": "2026-04-08",
     "author": "root",
     "type": "feat"
-  },
-  {
-    "hash": "4aee5dc",
-    "short": "4aee5dc",
-    "message": "Merge pull request #7 from obfox/feat/hal-integration",
-    "date": "2026-04-08",
-    "author": "aozyildirim",
-    "type": "other"
   },
   {
     "hash": "aa7c21e",
@@ -114,7 +114,7 @@
   {
     "hash": "59365c2",
     "short": "59365c2",
-    "message": "unified item list for refinement \u2014 single responsive list for mobile+desktop",
+    "message": "unified item list for refinement — single responsive list for mobile+desktop",
     "date": "2026-04-05",
     "author": "root",
     "type": "fix"
@@ -122,7 +122,7 @@
   {
     "hash": "1c61965",
     "short": "1c61965",
-    "message": "mobile cards \u2014 remove inline display:none, explicit text colors, word-break",
+    "message": "mobile cards — remove inline display:none, explicit text colors, word-break",
     "date": "2026-04-05",
     "author": "root",
     "type": "fix"
@@ -130,7 +130,7 @@
   {
     "hash": "eb76606",
     "short": "eb76606",
-    "message": "refinement mobile \u2014 portal overlay, title wrap, z-index boost",
+    "message": "refinement mobile — portal overlay, title wrap, z-index boost",
     "date": "2026-04-05",
     "author": "root",
     "type": "fix"
@@ -162,7 +162,7 @@
   {
     "hash": "296efbe",
     "short": "296efbe",
-    "message": "improve refinement prompts \u2014 no more 0 points, unique per-item analysis",
+    "message": "improve refinement prompts — no more 0 points, unique per-item analysis",
     "date": "2026-04-05",
     "author": "root",
     "type": "fix"
@@ -213,7 +213,7 @@
     "message": "update changelog-data.json with today's features",
     "date": "2026-04-05",
     "author": "root",
-    "type": "other"
+    "type": "chore"
   },
   {
     "hash": "daa3312",
@@ -226,7 +226,7 @@
   {
     "hash": "ecc1d25",
     "short": "ecc1d25",
-    "message": "fix task dependencies \u2014 runtime check, auto-unblock, full UI",
+    "message": "fix task dependencies — runtime check, auto-unblock, full UI",
     "date": "2026-04-05",
     "author": "root",
     "type": "feat"
@@ -242,7 +242,7 @@
   {
     "hash": "711a6e5",
     "short": "711a6e5",
-    "message": "multi-repo orchestration \u2014 1 task, N repos, parallel PRs",
+    "message": "multi-repo orchestration — 1 task, N repos, parallel PRs",
     "date": "2026-04-05",
     "author": "root",
     "type": "feat"
@@ -285,7 +285,7 @@
     "message": "add SDK docs translations for 6 languages",
     "date": "2026-04-04",
     "author": "root",
-    "type": "other"
+    "type": "feat"
   },
   {
     "hash": "5d86095",
@@ -309,7 +309,7 @@
     "message": "update TR docs with improved translations",
     "date": "2026-04-04",
     "author": "root",
-    "type": "other"
+    "type": "docs"
   },
   {
     "hash": "7a74699",
@@ -317,7 +317,7 @@
     "message": "i18n: docs content in 7 languages + navbar links translated",
     "date": "2026-04-04",
     "author": "root",
-    "type": "other"
+    "type": "docs"
   },
   {
     "hash": "e5fed66",
@@ -325,7 +325,7 @@
     "message": "i18n: docs page sidebar and navigation translated in 7 languages (38 keys)",
     "date": "2026-04-04",
     "author": "root",
-    "type": "other"
+    "type": "docs"
   },
   {
     "hash": "613c279",
@@ -341,7 +341,7 @@
     "message": "i18n: footer fully translated in 7 languages, add roadmap + API docs links",
     "date": "2026-04-04",
     "author": "root",
-    "type": "other"
+    "type": "feat"
   },
   {
     "hash": "820c7ff",
@@ -397,7 +397,7 @@
     "message": "add 10 blog posts in 5 languages: ES, DE, ZH, IT, JA (2 per language)",
     "date": "2026-04-04",
     "author": "root",
-    "type": "other"
+    "type": "feat"
   },
   {
     "hash": "a5c8a8a",
@@ -413,7 +413,7 @@
     "message": "i18n: add 7-language translations for all public pages + fix contact mobile layout",
     "date": "2026-04-04",
     "author": "root",
-    "type": "other"
+    "type": "feat"
   },
   {
     "hash": "5db5d75",
@@ -453,7 +453,7 @@
     "message": "add search to docs sidebar with instant results dropdown",
     "date": "2026-04-04",
     "author": "root",
-    "type": "other"
+    "type": "feat"
   },
   {
     "hash": "06f95a8",
@@ -469,7 +469,7 @@
     "message": "add reading progress bar, TOC sidebar, and share buttons to blog posts",
     "date": "2026-04-04",
     "author": "root",
-    "type": "other"
+    "type": "feat"
   },
   {
     "hash": "ac652ea",
@@ -477,7 +477,7 @@
     "message": "add fade-up page transition animation between routes",
     "date": "2026-04-04",
     "author": "root",
-    "type": "other"
+    "type": "feat"
   },
   {
     "hash": "2d3f25c",
@@ -485,7 +485,7 @@
     "message": "add per-page OG images for docs, blog, contact, changelog, use-cases, status",
     "date": "2026-04-04",
     "author": "root",
-    "type": "other"
+    "type": "feat"
   },
   {
     "hash": "e0e6a49",
@@ -493,7 +493,7 @@
     "message": "add /status to sitemap, remove /pricing",
     "date": "2026-04-04",
     "author": "root",
-    "type": "other"
+    "type": "feat"
   },
   {
     "hash": "c2c7ea3",
@@ -578,7 +578,7 @@
   {
     "hash": "70e3225",
     "short": "70e3225",
-    "message": "SEO sitelinks \u2014 SearchAction, SiteNavigationElement, breadcrumbs",
+    "message": "SEO sitelinks — SearchAction, SiteNavigationElement, breadcrumbs",
     "date": "2026-04-03",
     "author": "root",
     "type": "feat"
@@ -594,7 +594,7 @@
   {
     "hash": "c38a590",
     "short": "c38a590",
-    "message": "resolve local dev issues \u2014 icon.svg 500, hydration mismatch, X-Frame-Options",
+    "message": "resolve local dev issues — icon.svg 500, hydration mismatch, X-Frame-Options",
     "date": "2026-04-03",
     "author": "Ali Ozyildirim",
     "type": "fix"
@@ -618,7 +618,7 @@
   {
     "hash": "1bcdd09",
     "short": "1bcdd09",
-    "message": "full ChatOps \u2014 Slack Events API + Teams Bot Framework + UI fields",
+    "message": "full ChatOps — Slack Events API + Teams Bot Framework + UI fields",
     "date": "2026-04-03",
     "author": "root",
     "type": "feat"
@@ -642,7 +642,7 @@
   {
     "hash": "9b6f83b",
     "short": "9b6f83b",
-    "message": "Teams ChatOps \u2014 command tasks from Teams channel",
+    "message": "Teams ChatOps — command tasks from Teams channel",
     "date": "2026-04-03",
     "author": "root",
     "type": "feat"
@@ -682,7 +682,7 @@
   {
     "hash": "5dc826e",
     "short": "5dc826e",
-    "message": "hide org-level nav for platform admins \u2014 admin-only sidebar",
+    "message": "hide org-level nav for platform admins — admin-only sidebar",
     "date": "2026-04-03",
     "author": "root",
     "type": "fix"
@@ -698,7 +698,7 @@
   {
     "hash": "980659d",
     "short": "980659d",
-    "message": "admin-first sidebar \u2014 platform admins see admin nav on top",
+    "message": "admin-first sidebar — platform admins see admin nav on top",
     "date": "2026-04-03",
     "author": "root",
     "type": "feat"
@@ -706,7 +706,7 @@
   {
     "hash": "dca9a93",
     "short": "dca9a93",
-    "message": "agena CLI tool \u2014 admin:user:create, admin:user:list, admin:user:promote",
+    "message": "agena CLI tool — admin:user:create, admin:user:list, admin:user:promote",
     "date": "2026-04-03",
     "author": "root",
     "type": "feat"
@@ -730,7 +730,7 @@
   {
     "hash": "2670a17",
     "short": "2670a17",
-    "message": "platform admin panel \u2014 orgs, users, contact, newsletter management",
+    "message": "platform admin panel — orgs, users, contact, newsletter management",
     "date": "2026-04-03",
     "author": "root",
     "type": "feat"
@@ -757,7 +757,7 @@
     "message": "seo: 3 Turkish blog posts + README backlinks for keyword targeting",
     "date": "2026-04-03",
     "author": "root",
-    "type": "other"
+    "type": "docs"
   },
   {
     "hash": "c1a6238",
@@ -773,14 +773,14 @@
     "message": "Redis cache for Azure/Jira sprint endpoints + parallel Azure requests",
     "date": "2026-04-03",
     "author": "root",
-    "type": "other"
+    "type": "perf"
   },
   {
     "hash": "56dd9ff",
     "short": "56dd9ff",
     "message": "repo mapping agent.md path changed",
     "date": "2026-04-03",
-    "author": "Orhan G\u00f6k\u00e7e",
+    "author": "Orhan Gökçe",
     "type": "other"
   },
   {

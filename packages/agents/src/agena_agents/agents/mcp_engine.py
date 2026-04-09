@@ -233,9 +233,17 @@ class MCPAgentEngine:
         self.model = (model or settings.llm_large_model or 'gpt-4o').strip()
 
         _ssl_verify = os.getenv('SSL_VERIFY', 'true').strip().lower() not in ('false', '0', 'no')
+        _extra_headers: dict[str, str] = {}
+        _client_api_key = self.api_key
+        # Gemini's OpenAI-compat endpoint needs the key as x-goog-api-key header
+        # instead of the standard Authorization: Bearer header
+        if self.provider in ('gemini', 'google'):
+            _extra_headers['x-goog-api-key'] = self.api_key
+            _client_api_key = 'GEMINI'  # dummy — real key is in header
         self.client = AsyncOpenAI(
-            api_key=self.api_key,
+            api_key=_client_api_key,
             base_url=self.base_url,
+            default_headers=_extra_headers or None,
             http_client=httpx.AsyncClient(verify=_ssl_verify),
         )
         logger.info('MCPAgentEngine initialized: provider=%s, model=%s, base_url=%s',
