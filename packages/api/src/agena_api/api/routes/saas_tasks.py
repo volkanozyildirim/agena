@@ -425,6 +425,47 @@ async def assign_task(
                 task_record.repo_mapping_id = mapping.id
                 await db.commit()
 
+    # ── Flow mode: run a visual flow instead of default pipeline ──
+    if payload.flow_id:
+        from agena_models.models.user_preference import UserPreference
+        pref_result = await db.execute(
+            select(UserPreference).where(UserPreference.user_id == tenant.user_id)
+        )
+        pref = pref_result.scalar_one_or_none()
+        flow = None
+        if pref and pref.flows_json:
+            import json as _json
+            for f in _json.loads(pref.flows_json):
+                if f.get('id') == payload.flow_id:
+                    flow = f
+                    break
+        if not flow:
+            raise HTTPException(status_code=404, detail=f'Flow not found: {payload.flow_id}')
+
+        from agena_models.models.task_record import TaskRecord as _TR
+        task_row = (await db.execute(
+            select(_TR).where(_TR.id == task_id, _TR.organization_id == tenant.organization_id)
+        )).scalar_one_or_none()
+        if not task_row:
+            raise HTTPException(status_code=404, detail='Task not found')
+
+        from agena_services.services.flow_executor import run_flow
+        flow_run = await run_flow(
+            flow=flow,
+            task={
+                'id': task_row.id,
+                'title': task_row.title,
+                'description': task_row.description or '',
+                'source': task_row.source or 'internal',
+                'state': task_row.status,
+                'acceptance_criteria': task_row.acceptance_criteria,
+            },
+            user_id=tenant.user_id,
+            organization_id=tenant.organization_id,
+            db=db,
+        )
+        return AssignTaskResponse(queued=True, queue_key=f'flow:{flow_run.id}')
+
     # Single-repo or legacy flow
     try:
         queue_key = await service.assign_task_to_ai(
