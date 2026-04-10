@@ -613,11 +613,12 @@ async def _run_agent_node(
         if task_id is None:
             return {'status': 'error', 'message': 'Task id could not be resolved for pipeline execution'}
 
-        # Product Review çıktısı varsa task record'a yaz
-        review: dict[str, Any] = context.get('product_review_output') or {}
-        if review:
-            task_row = await db.get(TaskRecord, task_id)
-            if task_row is not None:
+        # Inject previous flow node outputs into task record so the pipeline sees them
+        task_row = await db.get(TaskRecord, task_id)
+        if task_row is not None:
+            # Product Review / Analyzer output → story_context, acceptance_criteria, edge_cases
+            review: dict[str, Any] = context.get('product_review_output') or {}
+            if review:
                 if review.get('story_context') and not task_row.story_context:
                     task_row.story_context = str(review['story_context'])
                 if review.get('acceptance_criteria'):
@@ -628,7 +629,22 @@ async def _run_agent_node(
                     edges = review['edge_cases']
                     formatted_edges = '\n'.join(f'- {e}' for e in edges) if isinstance(edges, list) else str(edges)
                     task_row.edge_cases = formatted_edges
-                await db.commit()
+
+            # Planner output → append implementation plan to description
+            outputs = context.get('outputs', {})
+            plan_output = None
+            for nid, out in outputs.items():
+                if isinstance(out, dict) and out.get('status') == 'ok':
+                    # Look for planner node output (has 'plan' or 'result' with file info)
+                    result_text = str(out.get('result', ''))
+                    if ('file' in result_text.lower() and ('change' in result_text.lower() or 'modif' in result_text.lower())) or 'plan' in result_text.lower():
+                        plan_output = result_text
+            if plan_output and len(plan_output) > 20:
+                desc = task_row.description or ''
+                if '=== IMPLEMENTATION PLAN ===' not in desc:
+                    task_row.description = desc + f'\n\n=== IMPLEMENTATION PLAN ===\n{plan_output}\n=== END PLAN ==='
+
+            await db.commit()
 
         service = OrchestrationService(db)
         # Pass agent model/provider from node config or resolved defaults

@@ -37,7 +37,8 @@ class ClaudeCLIService:
             '- Do NOT search for compilers, runtimes, or tools (go, node, python, etc.).\n'
             '- Do NOT install packages or dependencies.\n'
             '- Do NOT run any commands other than reading/editing files.\n'
-            '- Stop immediately after editing and summarizing — do not do extra work.\n\n'
+            '- Stop immediately after editing and summarizing — do not do extra work.\n'
+            '- If an IMPLEMENTATION PLAN is provided, follow it exactly — edit every file listed.\n\n'
             f'Task title: {task_title}\n'
             f'Task description:\n{task_description}\n'
         )
