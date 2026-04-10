@@ -15,6 +15,16 @@ class TaskCreateRequest(BaseModel):
     repo_mapping_ids: list[int] | None = None  # pre-select target repos at creation time
 
 
+class TaskUpdateRequest(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    story_context: str | None = None
+    acceptance_criteria: str | None = None
+    edge_cases: str | None = None
+    max_tokens: int | None = None
+    max_cost_usd: float | None = None
+
+
 class TaskResponse(BaseModel):
     id: int
     title: str
