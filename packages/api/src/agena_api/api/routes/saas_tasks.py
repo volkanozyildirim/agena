@@ -13,6 +13,7 @@ from agena_core.database import get_db_session
 from agena_models.schemas.saas_task import (
     AssignTaskRequest,
     AssignTaskResponse,
+    TaskUpdateRequest,
     AzureImportRequest,
     JiraImportRequest,
     ImportTasksResponse,
@@ -300,16 +301,6 @@ async def get_task(
     if task is None:
         raise HTTPException(status_code=404, detail='Task not found')
     return await _to_task_response(service, tenant.organization_id, task)
-
-
-class TaskUpdateRequest(BaseModel):
-    title: str | None = None
-    description: str | None = None
-    story_context: str | None = None
-    acceptance_criteria: str | None = None
-    edge_cases: str | None = None
-    max_tokens: int | None = None
-    max_cost_usd: float | None = None
 
 
 @router.put('/{task_id}', response_model=TaskResponse)
