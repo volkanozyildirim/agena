@@ -1528,8 +1528,8 @@ function RunConfigModal({ task, onRun, onClose }: {
             </div>
           </div>
 
-          {/* Agent selection */}
-          <div>
+          {/* Agent selection (hidden in flow mode) */}
+          {runMode !== 'flow' && <div>
             <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 6 }}>Agent</div>
             {agentConfigs.length > 0 ? (
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -1550,7 +1550,7 @@ function RunConfigModal({ task, onRun, onClose }: {
                 No agents configured. <a href="/dashboard/agents" style={{ color: '#5eead4', textDecoration: 'underline' }}>Configure agents</a>
               </div>
             )}
-          </div>
+          </div>}
 
           {/* Flow selection (only visible in Flow mode) */}
           {runMode === 'flow' && flows.length > 0 && (
