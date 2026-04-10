@@ -74,6 +74,7 @@ class AssignTaskRequest(BaseModel):
     agent_provider: str | None = None
     extra_description: str | None = None  # appended to task description before assign
     repo_mapping_ids: list[int] | None = None  # multi-repo: assign to multiple repos
+    flow_id: str | None = None  # if set, run this flow instead of default pipeline
 
 
 class TaskLogItem(BaseModel):

@@ -404,7 +404,15 @@ async def _run_product_review_node(
         large_model=model,
     )
 
-    system_prompt = await PromptService.get(db, 'flow_product_review_system_prompt')
+    # Use custom prompt if specified in node, otherwise fall back to system default
+    _prompt_slug = (node.get('prompt_slug') or '').strip()
+    if _prompt_slug:
+        try:
+            system_prompt = await PromptService.get(db, _prompt_slug)
+        except Exception:
+            system_prompt = await PromptService.get(db, 'flow_product_review_system_prompt')
+    else:
+        system_prompt = await PromptService.get(db, 'flow_product_review_system_prompt')
     user_prompt = (
         f"Task title: {task.get('title', '')}\n"
         f"Task description: {task.get('description', '')}\n"
