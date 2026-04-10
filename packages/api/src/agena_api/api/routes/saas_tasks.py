@@ -90,6 +90,8 @@ async def _to_task_response(service: TaskService, organization_id: int, task) ->
         pr_risk_level=insights['pr_risk_level'],
         pr_risk_reason=insights['pr_risk_reason'],
         total_tokens=insights['total_tokens'],
+        sprint_name=getattr(task, 'sprint_name', None),
+        sprint_path=getattr(task, 'sprint_path', None),
         repo_assignments=repo_assignments,
     )
 
@@ -297,6 +299,45 @@ async def get_task(
     task = await service.get_task(tenant.organization_id, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail='Task not found')
+    return await _to_task_response(service, tenant.organization_id, task)
+
+
+class TaskUpdateRequest(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    story_context: str | None = None
+    acceptance_criteria: str | None = None
+    edge_cases: str | None = None
+    max_tokens: int | None = None
+    max_cost_usd: float | None = None
+
+
+@router.put('/{task_id}', response_model=TaskResponse)
+async def update_task(
+    task_id: int,
+    payload: TaskUpdateRequest,
+    tenant: CurrentTenant = Depends(require_permission('tasks:write')),
+    db: AsyncSession = Depends(get_db_session),
+) -> TaskResponse:
+    service = TaskService(db)
+    task = await service.get_task(tenant.organization_id, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail='Task not found')
+    if payload.title is not None:
+        task.title = payload.title
+    if payload.description is not None:
+        task.description = payload.description
+    if payload.story_context is not None:
+        task.story_context = payload.story_context or None
+    if payload.acceptance_criteria is not None:
+        task.acceptance_criteria = payload.acceptance_criteria or None
+    if payload.edge_cases is not None:
+        task.edge_cases = payload.edge_cases or None
+    if payload.max_tokens is not None:
+        task.max_tokens = max(1, payload.max_tokens) if payload.max_tokens > 0 else None
+    if payload.max_cost_usd is not None:
+        task.max_cost_usd = payload.max_cost_usd if payload.max_cost_usd > 0 else None
+    await db.commit()
     return await _to_task_response(service, tenant.organization_id, task)
 
 

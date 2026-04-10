@@ -86,6 +86,8 @@ class TaskService:
         external_id: str,
         title: str,
         description: str,
+        sprint_name: str | None = None,
+        sprint_path: str | None = None,
     ) -> TaskRecord:
         if self.db is None:
             raise ValueError('DB session required')
@@ -112,6 +114,8 @@ class TaskService:
             title=title,
             description=description or '',
             status='new',
+            sprint_name=sprint_name or None,
+            sprint_path=sprint_path or None,
         )
         self.db.add(task)
         await self.db.commit()
