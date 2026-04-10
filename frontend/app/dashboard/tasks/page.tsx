@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { apiFetch, loadPrefs, type BackendRepoMapping, type RepoMapping } from '@/lib/api';
 import { TaskItem, type RepoAssignment } from '@/components/TaskTable';
 import { useLocale, type TranslationKey } from '@/lib/i18n';
@@ -49,6 +50,7 @@ function sourceLabel(s: string, t: (key: TranslationKey, vars?: Record<string, s
 
 export default function DashboardTasksPage() {
   const { t } = useLocale();
+  const router = useRouter();
   const mob = useIsMobile();
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -279,7 +281,7 @@ export default function DashboardTasksPage() {
           agent_provider: mcpProvider || undefined,
         }),
       });
-      setMsg(t('tasks.assignedMcp' as TranslationKey)); await load();
+      router.push(`/tasks/${id}`);
     } catch (e) { setError(e instanceof Error ? e.message : t('tasks.assignFailed')); }
   }
 
@@ -298,7 +300,7 @@ export default function DashboardTasksPage() {
           repo_mapping_ids: repoMappingIds || undefined,
         }),
       });
-      setMsg(`${t('tasks.assignedAi')} (${agent.role} / ${agent.provider}:${agent.model})`); await load();
+      router.push(`/tasks/${id}`);
     } catch (e) { setError(e instanceof Error ? e.message : t('tasks.assignFailed')); }
   }
 
@@ -306,7 +308,7 @@ export default function DashboardTasksPage() {
     setFlowPopupTaskId(null);
     try {
       await apiFetch('/tasks/' + id + '/assign', { method: 'POST', body: JSON.stringify({ create_pr: createPr ?? defaultCreatePr, mode: 'flow', flow_id: flowId, extra_description: extraDesc || undefined, repo_mapping_ids: repoMappingIds || undefined }) });
-      setMsg(`${t('tasks.assignedFlow')} (${flowName})`); await load();
+      router.push(`/tasks/${id}`);
     } catch (e) { setError(e instanceof Error ? e.message : t('tasks.assignFailed')); }
   }
 
