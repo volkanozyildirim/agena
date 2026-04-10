@@ -1862,10 +1862,40 @@ async def run_flow(
             step.output_json = json.dumps(output, ensure_ascii=False, default=str)
             context['outputs'][node_id] = output
 
-            # Boss mode: log step completion
+            # Boss mode: log step completion with output details
             if node_type == 'agent':
                 done_msg = _ROLE_DONE_MSG.get(node_role, f'{node.get("label", node_role)} finished')
                 await _flow_log('agent', done_msg)
+
+                # Log meaningful output details per role
+                if isinstance(output, dict) and output.get('status') == 'ok':
+                    result_text = str(output.get('result', ''))
+                    if node_role in ('analyzer', 'pm', 'product_review'):
+                        # Log spec summary
+                        spec = output.get('spec') or output.get('result')
+                        if isinstance(spec, dict):
+                            reqs = spec.get('requirements', [])
+                            criteria = spec.get('acceptance_criteria', [])
+                            if reqs:
+                                await _flow_log('agent', f'Analyzer requirements: {", ".join(str(r) for r in reqs[:5])}')
+                            if criteria:
+                                await _flow_log('agent', f'Acceptance criteria: {", ".join(str(c) for c in criteria[:5])}')
+                        elif result_text:
+                            await _flow_log('agent', f'Analyzer output: {result_text[:300]}')
+                    elif node_role == 'planner':
+                        # Log planned files
+                        if result_text:
+                            import re as _re
+                            # Extract file paths from plan
+                            file_refs = _re.findall(r'[\w/._-]+\.(?:go|py|ts|tsx|js|jsx|java|rs|rb|cs|html|css|sql)', result_text)
+                            unique_files = list(dict.fromkeys(file_refs))[:15]
+                            if unique_files:
+                                await _flow_log('agent', f'Planned files ({len(unique_files)}): {", ".join(unique_files)}')
+                            await _flow_log('agent', f'Plan detail: {result_text[:400]}')
+                    elif node_role in ('developer', 'dev'):
+                        pr_url = output.get('pr_url', '')
+                        if pr_url:
+                            await _flow_log('agent', f'PR created: {pr_url}')
 
             # Condition node → apply branching
             if node_type == 'condition':
