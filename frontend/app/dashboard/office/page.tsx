@@ -286,10 +286,11 @@ type RepoMappingItem = { id: string; name: string; local_path: string; azure_rep
 type SprintOption = { id: string; name: string; path?: string; is_current?: boolean; timeframe?: string | null; start_date?: string | null; finish_date?: string | null };
 
 function AssignTaskModal({
-  agent, tasks, onClose, t,
+  agent, tasks, flows, onClose, t,
 }: {
   agent: OfficeAgent;
   tasks: TaskItem[];
+  flows: { id: string; name: string }[];
   onClose: () => void;
   t: (key: TranslationKey) => string;
 }) {
@@ -302,6 +303,8 @@ function AssignTaskModal({
   const [selModel, setSelModel] = useState(agent.model || '');
   const [customModel, setCustomModel] = useState('');
   const [createPr, setCreatePr] = useState(agent.create_pr ?? false);
+  const [runMode, setRunMode] = useState<'ai' | 'mcp_agent' | 'flow'>('ai');
+  const [selFlowId, setSelFlowId] = useState<string>('');
   const [sprintItems, setSprintItems] = useState<SprintWorkItem[]>([]);
   const [sprintLoading, setSprintLoading] = useState(false);
   const [sprintAssigning, setSprintAssigning] = useState<string | null>(null);
@@ -432,7 +435,9 @@ function AssignTaskModal({
 
   const assignBody = (mode: string = 'ai') => {
     const body: Record<string, unknown> = { create_pr: createPr, mode };
-    if (mode !== 'mcp_agent') {
+    if (mode === 'flow') {
+      if (selFlowId) body.flow_id = selFlowId;
+    } else if (mode !== 'mcp_agent') {
       if (selProvider) body.agent_provider = selProvider;
       const m = selModel || customModel;
       if (m) body.agent_model = m;
@@ -491,31 +496,76 @@ function AssignTaskModal({
           </div>
         )}
 
-        {/* Provider & Model selector */}
+        {/* Mode switcher: AI / MCP / Flow */}
         <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', marginBottom: 6 }}>{t('office.typeModel')}</div>
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
-            {PROVIDERS.map((p) => (
-              <button key={p.id} onClick={() => { setSelProvider(p.id); setSelModel(''); setCustomModel(''); }}
-                style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: selProvider === p.id ? `1px solid ${agent.color}60` : '1px solid var(--panel-border-2)', background: selProvider === p.id ? `${agent.color}15` : 'var(--panel)', color: selProvider === p.id ? agent.color : 'var(--ink-50)' }}>
-                {p.icon} {t(`office.provider.${p.id}` as TranslationKey)}
-              </button>
-            ))}
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', marginBottom: 6 }}>Mode</div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {([
+              { key: 'ai' as const, label: 'AI Agent', color: agent.color },
+              { key: 'mcp_agent' as const, label: 'Local CLI', color: '#22d3ee' },
+              { key: 'flow' as const, label: 'Flow', color: '#c084fc' },
+            ]).map((m) => {
+              const active = runMode === m.key;
+              return (
+                <button key={m.key} onClick={() => setRunMode(m.key)}
+                  style={{ flex: 1, padding: '7px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                    border: active ? `1px solid ${m.color}80` : '1px solid var(--panel-border-2)',
+                    background: active ? `${m.color}18` : 'var(--panel)',
+                    color: active ? m.color : 'var(--ink-50)', transition: 'all 0.15s' }}>
+                  {m.label}
+                </button>
+              );
+            })}
           </div>
-          {availModels.length > 0 ? (
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              {availModels.map((m) => (
-                <button key={m.id} onClick={() => setSelModel(m.id)}
-                  style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', border: selModel === m.id ? `1px solid ${agent.color}50` : '1px solid var(--panel-border)', background: selModel === m.id ? `${agent.color}12` : 'transparent', color: selModel === m.id ? agent.color : 'var(--ink-40)' }}>
-                  {selModel === m.id && '✓ '}{m.label}
+        </div>
+
+        {/* Provider & Model selector (AI / MCP mode) */}
+        {runMode !== 'flow' && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', marginBottom: 6 }}>{t('office.typeModel')}</div>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
+              {PROVIDERS.map((p) => (
+                <button key={p.id} onClick={() => { setSelProvider(p.id); setSelModel(''); setCustomModel(''); }}
+                  style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: selProvider === p.id ? `1px solid ${agent.color}60` : '1px solid var(--panel-border-2)', background: selProvider === p.id ? `${agent.color}15` : 'var(--panel)', color: selProvider === p.id ? agent.color : 'var(--ink-50)' }}>
+                  {p.icon} {t(`office.provider.${p.id}` as TranslationKey)}
                 </button>
               ))}
             </div>
-          ) : (selProvider === 'custom' || selProvider === 'codex_cli' || selProvider === 'claude_cli') ? (
-            <input value={customModel} onChange={(e) => setCustomModel(e.target.value)} placeholder={t('office.modelPlaceholder')}
-              style={{ width: '100%', padding: '7px 10px', borderRadius: 8, fontSize: 11, border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--ink-90)', outline: 'none', boxSizing: 'border-box' }} />
-          ) : null}
-        </div>
+            {availModels.length > 0 ? (
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {availModels.map((m) => (
+                  <button key={m.id} onClick={() => setSelModel(m.id)}
+                    style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', border: selModel === m.id ? `1px solid ${agent.color}50` : '1px solid var(--panel-border)', background: selModel === m.id ? `${agent.color}12` : 'transparent', color: selModel === m.id ? agent.color : 'var(--ink-40)' }}>
+                    {selModel === m.id && '✓ '}{m.label}
+                  </button>
+                ))}
+              </div>
+            ) : (selProvider === 'custom' || selProvider === 'codex_cli' || selProvider === 'claude_cli') ? (
+              <input value={customModel} onChange={(e) => setCustomModel(e.target.value)} placeholder={t('office.modelPlaceholder')}
+                style={{ width: '100%', padding: '7px 10px', borderRadius: 8, fontSize: 11, border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--ink-90)', outline: 'none', boxSizing: 'border-box' }} />
+            ) : null}
+          </div>
+        )}
+
+        {/* Flow selector (Flow mode) */}
+        {runMode === 'flow' && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', marginBottom: 6 }}>{t('tasks.assignFlow')}</div>
+            {flows.length > 0 ? (
+              <select value={selFlowId} onChange={(e) => setSelFlowId(e.target.value)}
+                style={{ width: '100%', padding: '8px 10px', borderRadius: 8, fontSize: 12, fontWeight: 600, border: '1px solid rgba(168,85,247,0.35)', background: 'rgba(124,58,237,0.06)', color: selFlowId ? '#c084fc' : 'var(--ink-50)', outline: 'none', boxSizing: 'border-box', cursor: 'pointer' }}>
+                <option value=''>— {t('tasks.assignFlow')} —</option>
+                {flows.map((f) => (
+                  <option key={f.id} value={f.id}>{f.name}</option>
+                ))}
+              </select>
+            ) : (
+              <div style={{ padding: '10px 12px', borderRadius: 10, border: '1px dashed var(--panel-border)', background: 'var(--panel)', fontSize: 11, color: 'var(--ink-50)', textAlign: 'center' }}>
+                No saved flows yet — <a href='/dashboard/flows' style={{ color: '#c084fc', fontWeight: 600 }}>create one</a>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Create PR toggle */}
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, fontSize: 12, color: 'var(--ink-60)', cursor: 'pointer', userSelect: 'none' }}>
@@ -551,14 +601,23 @@ function AssignTaskModal({
                       <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600, fontSize: 13, color: 'var(--ink-78)' }}>{task.title}</div>
                       <div style={{ fontSize: 11, color: 'var(--ink-25)', marginTop: 2 }}>#{task.id} · {task.status}</div>
                     </div>
-                    <button onClick={() => handleAssign(task.id, 'mcp_agent')} disabled={assigning === task.id}
-                      style={{ fontSize: 11, fontWeight: 700, flexShrink: 0, padding: '4px 8px', borderRadius: 8, background: 'rgba(8,145,178,0.12)', border: '1px solid rgba(6,182,212,0.3)', color: '#22d3ee', cursor: 'pointer' }}>
-                      {assigning === task.id ? '...' : '⚡ MCP'}
-                    </button>
-                    <button onClick={() => handleAssign(task.id)} disabled={assigning === task.id}
-                      style={{ fontSize: 11, fontWeight: 700, flexShrink: 0, padding: '4px 8px', borderRadius: 8, background: `${agent.color}15`, border: `1px solid ${agent.color}30`, color: agent.color, cursor: 'pointer' }}>
-                      {assigning === task.id ? '...' : t('office.run')}
-                    </button>
+                    {runMode === 'flow' ? (
+                      <button onClick={() => handleAssign(task.id, 'flow')} disabled={assigning === task.id || !selFlowId}
+                        style={{ fontSize: 11, fontWeight: 700, flexShrink: 0, padding: '4px 10px', borderRadius: 8, background: selFlowId ? 'rgba(168,85,247,0.15)' : 'var(--panel-alt)', border: '1px solid rgba(168,85,247,0.35)', color: selFlowId ? '#c084fc' : 'var(--ink-25)', cursor: selFlowId ? 'pointer' : 'not-allowed' }}>
+                        {assigning === task.id ? '...' : '▶ Run Flow'}
+                      </button>
+                    ) : (
+                      <>
+                        <button onClick={() => handleAssign(task.id, 'mcp_agent')} disabled={assigning === task.id}
+                          style={{ fontSize: 11, fontWeight: 700, flexShrink: 0, padding: '4px 8px', borderRadius: 8, background: 'rgba(8,145,178,0.12)', border: '1px solid rgba(6,182,212,0.3)', color: '#22d3ee', cursor: 'pointer' }}>
+                          {assigning === task.id ? '...' : '⚡ MCP'}
+                        </button>
+                        <button onClick={() => handleAssign(task.id)} disabled={assigning === task.id}
+                          style={{ fontSize: 11, fontWeight: 700, flexShrink: 0, padding: '4px 8px', borderRadius: 8, background: `${agent.color}15`, border: `1px solid ${agent.color}30`, color: agent.color, cursor: 'pointer' }}>
+                          {assigning === task.id ? '...' : t('office.run')}
+                        </button>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
@@ -932,6 +991,75 @@ function AddAgentModal({
   );
 }
 
+/* ── Quick Flow Picker (side panel rows) ─────────────────────────── */
+
+function FlowPickerPopup({ taskId, taskTitle, flows, onClose, t }: {
+  taskId: number;
+  taskTitle: string;
+  flows: { id: string; name: string }[];
+  onClose: () => void;
+  t: (key: TranslationKey) => string;
+}) {
+  const [selFlowId, setSelFlowId] = useState<string>(flows[0]?.id || '');
+  const [createPr, setCreatePr] = useState(true);
+  const [running, setRunning] = useState(false);
+
+  const handleRun = async () => {
+    if (!selFlowId) return;
+    setRunning(true);
+    try {
+      await apiFetch(`/tasks/${taskId}/assign`, {
+        method: 'POST',
+        body: JSON.stringify({ create_pr: createPr, mode: 'flow', flow_id: selFlowId }),
+      });
+      onClose();
+    } catch { /* silent */ } finally { setRunning(false); }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20 }} onClick={onClose}>
+      <div style={{ width: 'min(380px, 100%)', borderRadius: 18, border: '1px solid rgba(168,85,247,0.35)', background: 'var(--surface)', padding: 22 }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ height: 3, margin: '-22px -22px 16px', background: 'linear-gradient(90deg, #7c3aed, #a78bfa)', borderRadius: '18px 18px 0 0' }} />
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', color: '#c084fc', marginBottom: 6 }}>{t('tasks.assignFlow')}</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink-90)', marginBottom: 16, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>#{taskId} · {taskTitle}</div>
+
+        {flows.length > 0 ? (
+          <select value={selFlowId} onChange={(e) => setSelFlowId(e.target.value)}
+            style={{ width: '100%', padding: '9px 10px', borderRadius: 8, fontSize: 12, fontWeight: 600, border: '1px solid rgba(168,85,247,0.35)', background: 'rgba(124,58,237,0.06)', color: selFlowId ? '#c084fc' : 'var(--ink-50)', outline: 'none', boxSizing: 'border-box', cursor: 'pointer', marginBottom: 12 }}>
+            <option value=''>— {t('tasks.assignFlow')} —</option>
+            {flows.map((f) => (
+              <option key={f.id} value={f.id}>{f.name}</option>
+            ))}
+          </select>
+        ) : (
+          <div style={{ padding: '14px 12px', borderRadius: 10, border: '1px dashed var(--panel-border)', background: 'var(--panel)', fontSize: 11, color: 'var(--ink-50)', textAlign: 'center', marginBottom: 12 }}>
+            No saved flows — <a href='/dashboard/flows' style={{ color: '#c084fc', fontWeight: 600 }}>create one</a>
+          </div>
+        )}
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 12, color: 'var(--ink-60)', cursor: 'pointer', userSelect: 'none' }}>
+          <input type='checkbox' checked={createPr} onChange={(e) => setCreatePr(e.target.checked)}
+            style={{ accentColor: '#c084fc', width: 16, height: 16, cursor: 'pointer' }} />
+          {t('office.createPr')}
+        </label>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onClose}
+            style={{ flex: 1, padding: '10px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: 'var(--panel)', border: '1px solid var(--panel-border)', color: 'var(--ink-50)' }}>
+            {t('office.back')}
+          </button>
+          <button onClick={handleRun} disabled={!selFlowId || running}
+            style={{ flex: 2, padding: '10px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: selFlowId && !running ? 'pointer' : 'not-allowed',
+              background: selFlowId && !running ? 'linear-gradient(135deg, #7c3aed, #a78bfa)' : 'var(--panel-alt)',
+              border: 'none', color: selFlowId && !running ? '#fff' : 'var(--ink-25)' }}>
+            {running ? '...' : `▶ ${t('office.run')}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Main Component ──────────────────────────────────────────────── */
 
 export default function OfficePage() {
@@ -946,6 +1074,8 @@ export default function OfficePage() {
   const [assignAgent, setAssignAgent] = useState<OfficeAgent | null>(null);
   const [showAddAgent, setShowAddAgent] = useState(false);
   const [previewTaskId, setPreviewTaskId] = useState<number | null>(null);
+  const [savedFlows, setSavedFlows] = useState<{ id: string; name: string }[]>([]);
+  const [flowPickerTaskId, setFlowPickerTaskId] = useState<number | null>(null);
   const [previewLogs, setPreviewLogs] = useState<Array<{ stage: string; message: string }>>([]);
   const [previewLoading, setPreviewLoading] = useState(false);
   const officeAgentsRef = useRef<OfficeAgent[]>([]);
@@ -1011,7 +1141,14 @@ export default function OfficePage() {
   // Keep ref in sync with state
   useEffect(() => { officeAgentsRef.current = officeAgents; }, [officeAgents]);
 
-  // Load agent configs
+  // Load agent configs + flows from DB (/preferences)
+  const refreshFlows = useCallback(async () => {
+    try {
+      const prefs = await loadPrefs();
+      setSavedFlows(((prefs.flows as { id: string; name: string }[] | undefined) || []).map((f) => ({ id: f.id, name: f.name })));
+    } catch { /* silent */ }
+  }, []);
+
   useEffect(() => {
     const boot = async () => {
       let configs = loadAgentConfigs();
@@ -1021,11 +1158,17 @@ export default function OfficePage() {
           localStorage.setItem(LS_AGENTS, JSON.stringify(prefs.agents));
           configs = (prefs.agents as AgentConfig[]).filter((a) => a.enabled !== false);
         }
+        setSavedFlows(((prefs.flows as { id: string; name: string }[] | undefined) || []).map((f) => ({ id: f.id, name: f.name })));
       } catch { /* silent */ }
       setAgentConfigs(configs);
     };
     void boot();
   }, []);
+
+  // Refresh flows from DB whenever modal/picker opens — picks up flows created in other tabs
+  useEffect(() => {
+    if (assignAgent || flowPickerTaskId !== null) void refreshFlows();
+  }, [assignAgent, flowPickerTaskId, refreshFlows]);
 
   // Poll tasks and build office agents with live status
   useEffect(() => {
@@ -1223,9 +1366,13 @@ export default function OfficePage() {
                   {t('office.queue')} ({queued.length})
                 </div>
                 {queued.slice(0, 5).map((task, i) => (
-                  <div key={task.id} onClick={() => openTaskPreview(task.id)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 8, marginBottom: 2, fontSize: 12, color: 'var(--ink-50)' }}>
+                  <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 8, marginBottom: 2, fontSize: 12, color: 'var(--ink-50)' }}>
                     <span style={{ color: '#f59e0b', fontWeight: 700, fontSize: 10, width: 16, textAlign: 'center', flexShrink: 0 }}>{i + 1}</span>
-                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</span>
+                    <span onClick={() => openTaskPreview(task.id)} style={{ cursor: 'pointer', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</span>
+                    <button onClick={(e) => { e.stopPropagation(); setFlowPickerTaskId(task.id); }} title={t('tasks.assignFlow')}
+                      style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 6, border: '1px solid rgba(168,85,247,0.35)', background: 'rgba(124,58,237,0.08)', color: '#c084fc', cursor: 'pointer', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
+                      ▶
+                    </button>
                   </div>
                 ))}
               </div>
@@ -1238,9 +1385,13 @@ export default function OfficePage() {
                   {t('office.failed')}
                 </div>
                 {failed.map((task) => (
-                  <div key={task.id} onClick={() => openTaskPreview(task.id)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 8, marginBottom: 2, fontSize: 12, color: 'var(--ink-50)' }}>
+                  <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 8, marginBottom: 2, fontSize: 12, color: 'var(--ink-50)' }}>
                     <span style={{ color: '#ef4444', fontSize: 11, flexShrink: 0 }}>✕</span>
-                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</span>
+                    <span onClick={() => openTaskPreview(task.id)} style={{ cursor: 'pointer', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</span>
+                    <button onClick={(e) => { e.stopPropagation(); setFlowPickerTaskId(task.id); }} title={t('tasks.assignFlow')}
+                      style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 6, border: '1px solid rgba(168,85,247,0.35)', background: 'rgba(124,58,237,0.08)', color: '#c084fc', cursor: 'pointer', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
+                      ▶
+                    </button>
                   </div>
                 ))}
               </div>
@@ -1272,7 +1423,17 @@ export default function OfficePage() {
         )}
       </div>
 
-      {assignAgent && <AssignTaskModal agent={assignAgent} tasks={tasks} onClose={() => setAssignAgent(null)} t={t} />}
+      {assignAgent && <AssignTaskModal agent={assignAgent} tasks={tasks} flows={savedFlows} onClose={() => setAssignAgent(null)} t={t} />}
+
+      {flowPickerTaskId !== null && (
+        <FlowPickerPopup
+          taskId={flowPickerTaskId}
+          taskTitle={tasks.find((tk) => tk.id === flowPickerTaskId)?.title || ''}
+          flows={savedFlows}
+          onClose={() => setFlowPickerTaskId(null)}
+          t={t}
+        />
+      )}
 
       {/* Task Preview Panel */}
       {previewTask && (
