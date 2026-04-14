@@ -23,6 +23,11 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
+def _lock_retry_delay_seconds(retry_count: int) -> int:
+    # 1,2,4,8,16,30,... seconds
+    return min(30, max(1, 2 ** min(max(0, retry_count), 5)))
+
+
 def _is_transient_failure(message: str) -> bool:
     lowered = (message or '').lower()
     transient_markers = (
@@ -231,12 +236,19 @@ async def _run_single_task(payload: dict) -> None:
             if blockers:
                 blocker_str = ', '.join(f'#{b}' for b in blockers)
                 logger.info('Task %s blocked by dependencies: %s — re-queuing', task_id, blocker_str)
-                await task_service.add_log(task.id, organization_id, 'queued', f'Blocked by dependencies: {blocker_str}')
+                dep_delay = _lock_retry_delay_seconds(lock_retries)
+                await task_service.add_log(
+                    task.id,
+                    organization_id,
+                    'queued',
+                    f'Blocked by dependencies: {blocker_str} (retry in ~{dep_delay}s)',
+                )
                 task.status = 'queued'
                 await session.commit()
-                # Re-queue with delay via lock_retries (will be retried)
+                # Re-queue with bounded backoff to avoid hot-looping.
                 payload['lock_retries'] = lock_retries + 1
                 queue_service = QueueService()
+                await asyncio.sleep(dep_delay)
                 await queue_service.enqueue(payload)
                 return
 
@@ -282,23 +294,15 @@ async def _run_single_task(payload: dict) -> None:
                     acquired = await queue_service.acquire_lock(lock_key, lock_owner, ttl_sec=1800)
 
             if not acquired:
-                if lock_retries >= settings.queue_lock_max_retries:
-                    fail_reason = 'Repo lock busy for too long; task aborted after retries'
-                    if assignment:
-                        assignment.status = 'failed'
-                        assignment.failure_reason = fail_reason
-                        await session.commit()
-                        await _update_multi_repo_task_status(session, task_id, organization_id)
-                    else:
-                        task.status = 'failed'
-                        task.failure_reason = fail_reason
-                        await session.commit()
-                    await task_service.add_log(task.id, organization_id, 'failed', fail_reason)
-                    publish_fire_and_forget(organization_id, 'task_status', {
-                        'task_id': task_id, 'status': 'failed', 'title': task.title,
-                    })
-                    return
-                await task_service.add_log(task.id, organization_id, 'queued', 'Repo lock busy, re-queued')
+                # Keep waiting in queue instead of failing hard on lock contention.
+                delay_sec = _lock_retry_delay_seconds(lock_retries)
+                owner_hint = f' owner={current_owner}' if current_owner else ''
+                await task_service.add_log(
+                    task.id,
+                    organization_id,
+                    'queued',
+                    f'Repo lock busy, re-queued (retry in ~{delay_sec}s){owner_hint}',
+                )
                 if assignment:
                     assignment.status = 'queued'
                     await session.commit()
@@ -306,6 +310,7 @@ async def _run_single_task(payload: dict) -> None:
                     task.status = 'queued'
                     await session.commit()
                 payload['lock_retries'] = lock_retries + 1
+                await asyncio.sleep(delay_sec)
                 await queue_service.enqueue(payload)
                 return
 
