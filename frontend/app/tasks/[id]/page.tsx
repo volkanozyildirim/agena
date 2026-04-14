@@ -551,6 +551,7 @@ export default function TaskDetailPage() {
       if (msg.includes('REPO_CONFLICT:')) {
         setShowRunConfig(false);
         setConflictModal({ info: msg.replace('REPO_CONFLICT:', '').trim(), body });
+        window.scrollTo({ top: 0, behavior: 'instant' });
       } else {
         setError(msg || t('taskDetail.errorRerun'));
       }
