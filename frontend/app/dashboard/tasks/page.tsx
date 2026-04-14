@@ -22,7 +22,7 @@ function useIsMobile(breakpoint = 768) {
 }
 
 const STATUS_FILTERS = ['all', 'new', 'queued', 'running', 'completed', 'failed'];
-const SOURCE_FILTERS = ['all', 'internal', 'azure', 'jira'];
+const SOURCE_FILTERS = ['all', 'internal', 'azure', 'jira', 'newrelic'];
 
 function statusColor(s: string) {
   const m: Record<string, string> = { new: '#94a3b8', queued: '#f59e0b', running: '#38bdf8', completed: '#22c55e', failed: '#f87171' };

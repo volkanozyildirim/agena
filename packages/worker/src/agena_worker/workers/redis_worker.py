@@ -46,6 +46,46 @@ async def _fail_stale_running_tasks() -> None:
         logger.warning('Marked %s stale running task(s) as failed', len(stale_tasks))
 
 
+async def _poll_newrelic_auto_imports() -> None:
+    """Check for NR entity mappings with auto_import=True that are due for polling."""
+    from agena_models.models.newrelic_entity_mapping import NewRelicEntityMapping
+    from sqlalchemy import or_
+
+    async with SessionLocal() as session:
+        now = datetime.utcnow()
+        stmt = select(NewRelicEntityMapping).where(
+            NewRelicEntityMapping.auto_import.is_(True),
+            NewRelicEntityMapping.is_active.is_(True),
+        )
+        mappings = list((await session.execute(stmt)).scalars().all())
+        if not mappings:
+            return
+
+        task_service = TaskService(session)
+        for mapping in mappings:
+            if mapping.last_import_at:
+                next_due = mapping.last_import_at + timedelta(minutes=mapping.import_interval_minutes)
+                if now < next_due:
+                    continue
+
+            try:
+                imported, skipped = await task_service.import_from_newrelic(
+                    mapping.organization_id,
+                    user_id=0,
+                    entity_guid=mapping.entity_guid,
+                    since=f'{mapping.import_interval_minutes} minutes ago',
+                )
+                mapping.last_import_at = now
+                await session.commit()
+                if imported > 0:
+                    logger.info(
+                        'NR auto-import org=%s entity=%s imported=%s skipped=%s',
+                        mapping.organization_id, mapping.entity_name, imported, skipped,
+                    )
+            except Exception:
+                logger.exception('NR auto-import failed for entity %s', mapping.entity_guid)
+
+
 async def _cleanup_stale_repo_locks() -> None:
     """Best-effort cleanup for leaked repo locks from crashed/interrupted workers."""
     queue_service = QueueService()
@@ -321,6 +361,7 @@ async def process_queue() -> None:
     max_workers = max(1, settings.max_workers)
     active_tasks: set[asyncio.Task] = set()
     last_health_check = 0.0
+    last_nr_poll = 0.0
 
     while True:
         now = asyncio.get_running_loop().time()
@@ -328,6 +369,13 @@ async def process_queue() -> None:
             await _fail_stale_running_tasks()
             await _cleanup_stale_repo_locks()
             last_health_check = now
+
+        if now - last_nr_poll >= 300:  # 5 minutes
+            try:
+                await _poll_newrelic_auto_imports()
+            except Exception:
+                logger.exception('NR auto-import poll failed')
+            last_nr_poll = now
 
         queue_size = await queue_service.queue_size()
         desired_concurrency = min(max_workers, max(1, queue_size))

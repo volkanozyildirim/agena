@@ -7,7 +7,7 @@ from typing import Any
 PLANS: dict[str, dict[str, Any]] = {
     'free': {
         'name': 'Free',
-        'max_tasks_per_month': 50,
+        'max_tasks_per_month': 5000,
         'max_members': 10,
         'max_agents': 10,
         'features': ['basic_orchestration', 'advanced_analytics', 'custom_agents'],

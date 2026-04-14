@@ -195,6 +195,9 @@ async def execute_node(
     elif node_type == 'local_apply':
         return await _run_local_apply_node(node, context, db, organization_id)
 
+    elif node_type == 'newrelic':
+        return await _run_newrelic_node(node, context, db, organization_id)
+
     else:
         return {'status': 'skipped', 'message': f'Unknown node type: {node_type}'}
 
@@ -1766,6 +1769,79 @@ def _run_condition_node(node: dict[str, Any], context: dict[str, Any]) -> dict[s
         'true_target': node.get('true_target', ''),
         'false_target': node.get('false_target', ''),
     }
+
+
+# ── New Relic node ────────────────────────────────────────────────────────────
+
+async def _run_newrelic_node(
+    node: dict[str, Any],
+    context: dict[str, Any],
+    db: AsyncSession,
+    organization_id: int,
+) -> dict[str, Any]:
+    """Fetch New Relic errors/violations and inject into flow context."""
+    from agena_models.models.newrelic_entity_mapping import NewRelicEntityMapping
+    from agena_services.integrations.newrelic_client import NewRelicClient
+    from agena_services.services.task_service import TaskService
+
+    action = node.get('nr_action', 'fetch_errors')
+    entity_guid = _substitute_variables(node.get('entity_guid', ''), context)
+    since = node.get('since', '24 hours ago') or '24 hours ago'
+    min_occurrences = int(node.get('min_occurrences', 1) or 1)
+
+    config_service = IntegrationConfigService(db)
+    config = await config_service.get_config(organization_id, 'newrelic')
+    if not config or not config.secret:
+        return {'status': 'error', 'message': 'New Relic integration not configured'}
+
+    cfg = {'api_key': config.secret, 'base_url': config.base_url or 'https://api.newrelic.com/graphql'}
+    client = NewRelicClient()
+
+    if not entity_guid:
+        return {'status': 'error', 'message': 'entity_guid is required'}
+
+    mapping = (await db.execute(
+        select(NewRelicEntityMapping).where(
+            NewRelicEntityMapping.organization_id == organization_id,
+            NewRelicEntityMapping.entity_guid == entity_guid,
+        )
+    )).scalar_one_or_none()
+
+    if action == 'fetch_errors':
+        if not mapping:
+            return {'status': 'error', 'message': f'No entity mapping for guid {entity_guid}'}
+        errors = await client.fetch_errors(cfg, account_id=mapping.account_id, app_name=mapping.entity_name, since=since)
+        filtered = [e for e in errors if e.get('occurrences', 0) >= min_occurrences]
+        return {
+            'status': 'ok',
+            'action': 'fetch_errors',
+            'entity_name': mapping.entity_name,
+            'error_count': len(filtered),
+            'errors': filtered,
+        }
+
+    elif action == 'import_errors':
+        user_id = context.get('user_id', 0)
+        task_service = TaskService(db)
+        imported, skipped = await task_service.import_from_newrelic(
+            organization_id, user_id,
+            entity_guid=entity_guid, since=since, min_occurrences=min_occurrences,
+        )
+        return {'status': 'ok', 'action': 'import_errors', 'imported': imported, 'skipped': skipped}
+
+    elif action == 'fetch_violations':
+        if not mapping:
+            return {'status': 'error', 'message': f'No entity mapping for guid {entity_guid}'}
+        violations = await client.fetch_violations(cfg, account_id=mapping.account_id, entity_guid=entity_guid, since=since)
+        return {
+            'status': 'ok',
+            'action': 'fetch_violations',
+            'entity_name': mapping.entity_name,
+            'violation_count': len(violations),
+            'violations': violations,
+        }
+
+    return {'status': 'error', 'message': f'Unknown nr_action: {action}'}
 
 
 # ── Main runner ───────────────────────────────────────────────────────────────

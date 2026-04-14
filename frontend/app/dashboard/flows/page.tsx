@@ -6,7 +6,7 @@ import { useLocale } from '@/lib/i18n';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type AgentRole = 'lead_developer' | 'pm' | 'qa' | 'manager' | 'developer' | string;
-type NodeType = 'agent' | 'trigger' | 'http' | 'azure_update' | 'azure_devops' | 'github' | 'notify' | 'condition' | 'local_apply';
+type NodeType = 'agent' | 'trigger' | 'http' | 'azure_update' | 'azure_devops' | 'github' | 'notify' | 'condition' | 'local_apply' | 'newrelic';
 
 interface FlowNode {
   id: string;
@@ -78,6 +78,11 @@ interface FlowNode {
   repo_path?: string;
   branch_prefix?: string;
   local_create_pr?: boolean;
+  // newrelic node
+  nr_action?: string;
+  entity_guid?: string;
+  since?: string;
+  min_occurrences?: number;
 }
 
 interface FlowEdge {
@@ -127,6 +132,7 @@ const NODE_TYPE_PRESETS: { type: NodeType; icon: string; color: string }[] = [
   { type: 'notify', icon: '🔔', color: '#fb923c' },
   { type: 'condition', icon: '🔀', color: '#22c55e' },
   { type: 'local_apply', icon: '📂', color: '#22c55e' },
+  { type: 'newrelic', icon: '📊', color: '#1CE783' },
 ];
 
 function agentRoleLabel(role: AgentRole, t: ReturnType<typeof useLocale>['t']) {
@@ -150,6 +156,7 @@ function nodeTypeLabel(type: NodeType, t: ReturnType<typeof useLocale>['t']) {
   if (type === 'notify') return t('flows.nodeTypeNotify');
   if (type === 'condition') return t('flows.nodeTypeCondition');
   if (type === 'local_apply') return 'Local Apply';
+  if (type === 'newrelic') return 'New Relic';
   return type;
 }
 
@@ -1575,6 +1582,7 @@ function NodeEditPanel({ node, onChange, onClose, flow }: {
             <option value="notify">{t('flows.nodeTypeNotify')}</option>
             <option value="condition">{t('flows.nodeTypeCondition')}</option>
             <option value="local_apply">Local Apply</option>
+            <option value="newrelic">New Relic</option>
           </select>
         </div>
 
@@ -2143,6 +2151,34 @@ function NodeEditPanel({ node, onChange, onClose, flow }: {
             </div>
             <span style={{ fontSize: 13, color: 'var(--ink-58)' }}>Create PR after apply</span>
           </label>
+        </>)}
+
+        {node.type === 'newrelic' && (<>
+          <div>
+            <label style={pLbl}>Action</label>
+            <select value={node.nr_action ?? 'fetch_errors'} onChange={(e) => onChange({ nr_action: e.target.value })}
+              style={{ ...pInp, cursor: 'pointer' }}>
+              <option value="fetch_errors">Fetch Errors</option>
+              <option value="import_errors">Import Errors as Tasks</option>
+              <option value="fetch_violations">Fetch Violations</option>
+            </select>
+          </div>
+          <div>
+            <label style={pLbl}>Entity GUID</label>
+            <input value={node.entity_guid ?? ''} onChange={(e) => onChange({ entity_guid: e.target.value })}
+              placeholder="NR entity GUID" style={pInp} />
+            <div style={{ fontSize: 9, color: 'var(--ink-25)', marginTop: 3 }}>{'Supports {{outputs.node_id.guid}} variables'}</div>
+          </div>
+          <div>
+            <label style={pLbl}>Since</label>
+            <input value={node.since ?? '24 hours ago'} onChange={(e) => onChange({ since: e.target.value })}
+              placeholder="24 hours ago" style={pInp} />
+          </div>
+          <div>
+            <label style={pLbl}>Min Occurrences</label>
+            <input type="number" value={node.min_occurrences ?? 1} onChange={(e) => onChange({ min_occurrences: parseInt(e.target.value) || 1 })}
+              min={1} style={pInp} />
+          </div>
         </>)}
 
       </div>

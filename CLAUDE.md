@@ -198,6 +198,7 @@ Visual automation flows with n8n-style node configuration:
 - **GitHub** — Create branch, create PR, merge PR (with reviewers, labels)
 - **HTTP** — REST calls with auth (bearer/api-key/basic), timeout, response variables
 - **Condition** — Branch logic (10 operators: eq/neq/gt/lt/contains/regex/empty etc.) with true/false targets
+- **New Relic** — Fetch errors/violations from NR entities, import as tasks (`fetch_errors`, `import_errors`, `fetch_violations`)
 - **Notify** — Webhook/Slack/Email notifications
 - **Trigger** — Flow entry point
 
@@ -217,6 +218,38 @@ Nodes pass data via `context['outputs'][node_id]`. Use `{{outputs.node_id.field}
 - System prompts stored in DB `prompts` table — edit via Prompt Studio UI or PromptService
 - Corporate SSL cert bundled in `docker/FLOMcAfeeWG.crt` for proxy environments
 - When adding new ORM models, register them in `packages/models/src/agena_models/models/__init__.py`
+
+## New Relic Integration
+
+Auto-imports production errors from New Relic APM entities and creates tasks for AI agents to fix.
+
+### Architecture
+```
+New Relic NerdGraph API (GraphQL) → NewRelicClient → TaskService.import_from_newrelic()
+  → ExternalTask (deduplicated by fingerprint) → TaskRecord (source='newrelic')
+  → Worker auto-import every 5 min (for entities with auto_import=True)
+```
+
+### Key Components
+- **`NewRelicClient`** (`packages/services/.../integrations/newrelic_client.py`) — NerdGraph GraphQL client for entity search, NRQL error queries, and error-to-task conversion
+- **`NewRelicEntityMapping`** model (`packages/models/.../newrelic_entity_mapping.py`) — maps NR entity GUID to RepoMapping (which repo to target for fixes)
+- **API routes** (`packages/api/.../routes/newrelic.py`) — entity browse, error fetch, mapping CRUD
+- **Import endpoint** (`POST /tasks/import/newrelic`) — in `saas_tasks.py`
+- **Flow node** — `newrelic` node type in `flow_executor.py` (actions: `fetch_errors`, `import_errors`, `fetch_violations`)
+- **Worker polling** — `_poll_newrelic_auto_imports()` in `redis_worker.py`, runs every 5 min
+- **Frontend** — `/dashboard/integrations/newrelic` entity browser + mapping page
+
+### Error-to-Task Enrichment
+- Parses file path and line number from PHP error messages (`/path/to/File.php:123`)
+- Fetches sample transactions (endpoint, method, URI) per error group
+- Generates errors inbox link: `https://one.eu.newrelic.com/nr1-core/errors-inbox/entity-inbox/{guid}?account={id}`
+- Deduplication via SHA-256 fingerprint of `(entity_name, error_class, error_message)`
+
+### Configuration
+- Integration config stored in `integration_configs` table (provider='newrelic')
+- `secret` = NR API key (NRAK-...)
+- `base_url` = `https://api.newrelic.com/graphql` (US) or `https://api.eu.newrelic.com/graphql` (EU)
+- `extra_config.account_id` = NR account ID
 
 ### SDK (@agena/sdk) Rules
 

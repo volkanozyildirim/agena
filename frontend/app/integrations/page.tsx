@@ -44,6 +44,13 @@ export default function IntegrationsPage() {
       ],
     },
     {
+      icon: '\u{1F4CA}',
+      catKey: 'cat7',
+      items: [
+        { key: 'newrelic', docsId: 'newrelic-integration' },
+      ],
+    },
+    {
       icon: '\u{1F4AC}',
       catKey: 'cat4',
       items: [

@@ -16,6 +16,7 @@ from agena_models.schemas.saas_task import (
     TaskUpdateRequest,
     AzureImportRequest,
     JiraImportRequest,
+    NewRelicImportRequest,
     ImportTasksResponse,
     RepoAssignmentResponse,
     TaskListResponse,
@@ -297,6 +298,41 @@ async def import_jira_tasks(
             )
             raise HTTPException(status_code=401, detail='Jira API token is invalid or expired') from exc
         raise HTTPException(status_code=502, detail=f'Jira request failed ({exc.response.status_code})') from exc
+    return ImportTasksResponse(imported=imported, skipped=skipped)
+
+
+@router.post('/import/newrelic', response_model=ImportTasksResponse)
+async def import_newrelic_errors(
+    request: NewRelicImportRequest = Body(default_factory=NewRelicImportRequest),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> ImportTasksResponse:
+    service = TaskService(db)
+    try:
+        imported, skipped = await service.import_from_newrelic(
+            tenant.organization_id,
+            tenant.user_id,
+            entity_guid=request.entity_guid,
+            since=request.since,
+            min_occurrences=request.min_occurrences,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 401:
+            notifier = NotificationService(db)
+            await notifier.notify_event(
+                organization_id=tenant.organization_id,
+                user_id=tenant.user_id,
+                event_type='integration_auth_expired',
+                title='New Relic authorization expired',
+                message='Please update your New Relic API key in Integrations.',
+                severity='error',
+            )
+            raise HTTPException(status_code=401, detail='New Relic API key is invalid or expired') from exc
+        raise HTTPException(status_code=502, detail=f'New Relic request failed ({exc.response.status_code})') from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f'New Relic connection failed: {exc}') from exc
     return ImportTasksResponse(imported=imported, skipped=skipped)
 
 

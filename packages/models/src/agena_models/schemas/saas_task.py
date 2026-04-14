@@ -117,6 +117,12 @@ class JiraImportRequest(BaseModel):
     state: str | None = None
 
 
+class NewRelicImportRequest(BaseModel):
+    entity_guid: str | None = None
+    since: str = '24 hours ago'
+    min_occurrences: int = 1
+
+
 class TaskDependencyUpdateRequest(BaseModel):
     depends_on_task_ids: list[int]
 

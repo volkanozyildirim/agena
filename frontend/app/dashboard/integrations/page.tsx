@@ -5,7 +5,7 @@ import { apiFetch } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
 
 type IntegrationConfig = {
-  provider: 'jira' | 'azure' | 'openai' | 'gemini' | 'github' | 'playbook' | 'slack' | 'teams' | 'telegram' | 'hal';
+  provider: 'jira' | 'azure' | 'openai' | 'gemini' | 'github' | 'playbook' | 'slack' | 'teams' | 'telegram' | 'hal' | 'newrelic';
   extra_config?: Record<string, string> | null;
   base_url: string;
   project?: string | null;
@@ -83,6 +83,10 @@ export default function IntegrationsPage() {
   const [halUsername, setHalUsername] = useState('');
   const [halPassword, setHalPassword] = useState('');
   const [halPasswordPreview, setHalPasswordPreview] = useState('');
+  const [newrelicApiKey, setNewrelicApiKey] = useState('');
+  const [newrelicApiKeyPreview, setNewrelicApiKeyPreview] = useState('');
+  const [newrelicAccountId, setNewrelicAccountId] = useState('');
+  const [newrelicRegion, setNewrelicRegion] = useState('eu');
   const [notifyTesting, setNotifyTesting] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
@@ -199,6 +203,16 @@ export default function IntegrationsPage() {
         t('integrations.helpHalStep4'),
       ],
     },
+    newrelic: {
+      title: t('integrations.helpNewrelicTitle'),
+      steps: [
+        t('integrations.helpNewrelicStep1'),
+        t('integrations.helpNewrelicStep2'),
+        t('integrations.helpNewrelicStep3'),
+        t('integrations.helpNewrelicStep4'),
+      ],
+      link: 'https://docs.newrelic.com/docs/apis/intro-apis/new-relic-api-keys/',
+    },
   };
 
   async function loadIntegrationState() {
@@ -234,6 +248,11 @@ export default function IntegrationsPage() {
       setHalLoginUrl(hal.extra_config?.login_url ?? '');
       setHalChatUrl(hal.extra_config?.chat_url ?? '');
     }
+    const newrelic = data.find((c) => c.provider === 'newrelic');
+    if (newrelic) {
+      setNewrelicAccountId(newrelic.extra_config?.account_id ?? '');
+      setNewrelicRegion(newrelic.base_url?.includes('eu.newrelic') ? 'eu' : 'us');
+    }
   }
 
   useEffect(() => {
@@ -246,6 +265,7 @@ export default function IntegrationsPage() {
     setTeamsPreview(loadSecretPreview('teams'));
     setTelegramPreview(loadSecretPreview('telegram'));
     setHalPasswordPreview(loadSecretPreview('hal'));
+    setNewrelicApiKeyPreview(loadSecretPreview('newrelic'));
     void loadIntegrationState().catch(() => {});
   }, []);
 
@@ -473,6 +493,28 @@ export default function IntegrationsPage() {
     } catch (e) { setError(e instanceof Error ? e.message : t('integrations.saveFailed')); }
   }
 
+  async function saveNewrelic() {
+    try {
+      const nrBaseUrl = newrelicRegion === 'eu' ? 'https://api.eu.newrelic.com/graphql' : 'https://api.newrelic.com/graphql';
+      await apiFetch('/integrations/newrelic', {
+        method: 'PUT',
+        body: JSON.stringify({
+          base_url: nrBaseUrl,
+          secret: newrelicApiKey || undefined,
+          extra_config: { account_id: newrelicAccountId || undefined },
+        }),
+      });
+      if (newrelicApiKey.trim()) {
+        const preview = maskSecretPreview(newrelicApiKey);
+        setNewrelicApiKeyPreview(preview);
+        saveSecretPreview('newrelic', preview);
+      }
+      setNewrelicApiKey('');
+      await loadIntegrationState();
+      setMsg(t('integrations.savedNewrelic'));
+    } catch (e) { setError(e instanceof Error ? e.message : t('integrations.saveFailed')); }
+  }
+
   async function sendTestNotification() {
     setNotifyTesting(true);
     setError('');
@@ -504,6 +546,7 @@ export default function IntegrationsPage() {
   const teamsConfig = configs.find((c) => c.provider === 'teams');
   const telegramConfig = configs.find((c) => c.provider === 'telegram');
   const halConfig = configs.find((c) => c.provider === 'hal');
+  const newrelicConfig = configs.find((c) => c.provider === 'newrelic');
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
@@ -580,8 +623,8 @@ export default function IntegrationsPage() {
                 }
               }}
               style={{
-                padding: '5px 12px',
-                borderRadius: 8,
+                padding: '7px 14px',
+                borderRadius: 9,
                 fontSize: 12,
                 fontWeight: active ? 700 : 500,
                 border: 'none',
@@ -590,9 +633,9 @@ export default function IntegrationsPage() {
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 5,
+                gap: 6,
                 transition: 'all 0.2s',
-                boxShadow: active ? `inset 0 0 0 1px ${tab.color}30` : 'none',
+                boxShadow: active ? `inset 0 0 0 1px ${tab.color}25` : 'none',
               }}
             >
               <span style={{ fontSize: 12 }}>{tab.icon}</span>
@@ -623,11 +666,11 @@ export default function IntegrationsPage() {
               placeholder={openaiConfig?.has_secret ? `${openaiConfig?.secret_preview || openaiKeyPreview || '****'} (${t('integrations.keepExisting')})` : t('integrations.openaiKeyPlaceholder')}
             />
           </FieldGroup>
-          <button className='button button-primary' onClick={() => void saveOpenAI()} style={{ width: '100%', justifyContent: 'center', marginTop: 2, padding: '6px 0', fontSize: 11 }}>
+          <button className='button button-primary' onClick={() => void saveOpenAI()} style={{ width: '100%', justifyContent: 'center', marginTop: 4, padding: '8px 0', fontSize: 12 }}>
             {t('integrations.saveOpenai')}
           </button>
           {configs.find(c => c.provider === 'openai')?.has_secret && (
-            <button onClick={() => void deleteIntegration('openai')} style={{ width: '100%', marginTop: 2, padding: '5px', borderRadius: 6, border: '1px solid rgba(248,113,113,0.15)', background: 'transparent', color: '#f87171', fontSize: 10, cursor: 'pointer', fontWeight: 600 }}>
+            <button onClick={() => void deleteIntegration('openai')} style={{ width: '100%', marginTop: 4, padding: '7px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.15)', background: 'transparent', color: '#f87171', fontSize: 11, cursor: 'pointer', fontWeight: 600, transition: 'all 0.15s' }}>
               {t('integrations.deleteOpenaiConnection')}
             </button>
           )}
@@ -653,7 +696,7 @@ export default function IntegrationsPage() {
               placeholder={geminiConfig?.has_secret ? `${geminiConfig?.secret_preview || geminiKeyPreview || '****'} (${t('integrations.keepExisting')})` : t('integrations.geminiKeyPlaceholder')}
             />
           </FieldGroup>
-          <button className='button button-primary' onClick={() => void saveGemini()} style={{ width: '100%', justifyContent: 'center', marginTop: 2, padding: '6px 0', fontSize: 11 }}>
+          <button className='button button-primary' onClick={() => void saveGemini()} style={{ width: '100%', justifyContent: 'center', marginTop: 4, padding: '8px 0', fontSize: 12 }}>
             {t('integrations.saveGemini')}
           </button>
         </IntegrationCard>}
@@ -681,11 +724,11 @@ export default function IntegrationsPage() {
               placeholder={azureConfig?.has_secret ? `${azureConfig?.secret_preview || azurePatPreview || '****'} (${t('integrations.keepExisting')})` : t('integrations.patPlaceholder')}
             />
           </FieldGroup>
-          <button className='button button-primary' onClick={() => void saveAzure()} style={{ width: '100%', justifyContent: 'center', marginTop: 2, padding: '6px 0', fontSize: 11 }}>
+          <button className='button button-primary' onClick={() => void saveAzure()} style={{ width: '100%', justifyContent: 'center', marginTop: 4, padding: '8px 0', fontSize: 12 }}>
             {t('integrations.saveAzure')}
           </button>
           {configs.find(c => c.provider === 'azure')?.has_secret && (
-            <button onClick={() => void deleteIntegration('azure')} style={{ width: '100%', marginTop: 2, padding: '5px', borderRadius: 6, border: '1px solid rgba(248,113,113,0.15)', background: 'transparent', color: '#f87171', fontSize: 10, cursor: 'pointer', fontWeight: 600 }}>
+            <button onClick={() => void deleteIntegration('azure')} style={{ width: '100%', marginTop: 4, padding: '7px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.15)', background: 'transparent', color: '#f87171', fontSize: 11, cursor: 'pointer', fontWeight: 600, transition: 'all 0.15s' }}>
               {t('integrations.deleteAzureConnection')}
             </button>
           )}
@@ -714,11 +757,11 @@ export default function IntegrationsPage() {
               placeholder={githubConfig?.has_secret ? `${githubConfig?.secret_preview || githubTokenPreview || '****'} (${t('integrations.keepExisting')})` : t('integrations.githubTokenPlaceholder')}
             />
           </FieldGroup>
-          <button className='button button-primary' onClick={() => void saveGithub()} style={{ width: '100%', justifyContent: 'center', marginTop: 2, padding: '6px 0', fontSize: 11 }}>
+          <button className='button button-primary' onClick={() => void saveGithub()} style={{ width: '100%', justifyContent: 'center', marginTop: 4, padding: '8px 0', fontSize: 12 }}>
             {t('integrations.saveGithub')}
           </button>
           {configs.find(c => c.provider === 'github')?.has_secret && (
-            <button onClick={() => void deleteIntegration('github')} style={{ width: '100%', marginTop: 2, padding: '5px', borderRadius: 6, border: '1px solid rgba(248,113,113,0.15)', background: 'transparent', color: '#f87171', fontSize: 10, cursor: 'pointer', fontWeight: 600 }}>
+            <button onClick={() => void deleteIntegration('github')} style={{ width: '100%', marginTop: 4, padding: '7px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.15)', background: 'transparent', color: '#f87171', fontSize: 11, cursor: 'pointer', fontWeight: 600, transition: 'all 0.15s' }}>
               {t('integrations.deleteGithubConnection')}
             </button>
           )}
@@ -747,12 +790,48 @@ export default function IntegrationsPage() {
               placeholder={jiraConfig?.has_secret ? `${jiraConfig?.secret_preview || jiraTokenPreview || '****'} (${t('integrations.keepExisting')})` : t('integrations.apiTokenPlaceholder')}
             />
           </FieldGroup>
-          <button className='button button-primary' onClick={() => void saveJira()} style={{ width: '100%', justifyContent: 'center', marginTop: 2, padding: '6px 0', fontSize: 11 }}>
+          <button className='button button-primary' onClick={() => void saveJira()} style={{ width: '100%', justifyContent: 'center', marginTop: 4, padding: '8px 0', fontSize: 12 }}>
             {t('integrations.saveJira')}
           </button>
           {configs.find(c => c.provider === 'jira')?.has_secret && (
-            <button onClick={() => void deleteIntegration('jira')} style={{ width: '100%', marginTop: 2, padding: '5px', borderRadius: 6, border: '1px solid rgba(248,113,113,0.15)', background: 'transparent', color: '#f87171', fontSize: 10, cursor: 'pointer', fontWeight: 600 }}>
+            <button onClick={() => void deleteIntegration('jira')} style={{ width: '100%', marginTop: 4, padding: '7px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.15)', background: 'transparent', color: '#f87171', fontSize: 11, cursor: 'pointer', fontWeight: 600, transition: 'all 0.15s' }}>
               {t('integrations.deleteJiraConnection')}
+            </button>
+          )}
+        </IntegrationCard>}
+
+        {/* New Relic */}
+        {activeTab === 'task' && <IntegrationCard
+          title={t('integrations.providerNewrelic')}
+          icon='📊'
+          color='#1CE783'
+          connected={newrelicConfig?.has_secret ?? false}
+          updatedAt={newrelicConfig?.updated_at}
+          onHelp={() => setHelp(helpByProvider.newrelic)}
+        >
+          <FieldGroup label="Region">
+            <select value={newrelicRegion} onChange={(e) => setNewrelicRegion(e.target.value)} style={{ width: '100%', padding: '7px 10px', borderRadius: 8, border: '1px solid var(--panel-border)', background: 'var(--glass)', color: 'var(--ink)', fontSize: 13 }}>
+              <option value="eu">EU (api.eu.newrelic.com)</option>
+              <option value="us">US (api.newrelic.com)</option>
+            </select>
+          </FieldGroup>
+          <FieldGroup label={t('integrations.newrelicAccountId')}>
+            <input value={newrelicAccountId} onChange={(e) => setNewrelicAccountId(e.target.value)} placeholder={t('integrations.newrelicAccountIdPlaceholder')} />
+          </FieldGroup>
+          <FieldGroup label={t('integrations.newrelicApiKey')}>
+            <input
+              type='password'
+              value={newrelicApiKey}
+              onChange={(e) => setNewrelicApiKey(e.target.value)}
+              placeholder={newrelicConfig?.has_secret ? `${newrelicConfig?.secret_preview || newrelicApiKeyPreview || '****'} (${t('integrations.keepExisting')})` : t('integrations.newrelicApiKeyPlaceholder')}
+            />
+          </FieldGroup>
+          <button className='button button-primary' onClick={() => void saveNewrelic()} style={{ width: '100%', justifyContent: 'center', marginTop: 4, padding: '8px 0', fontSize: 12 }}>
+            {t('integrations.saveNewrelic')}
+          </button>
+          {configs.find(c => c.provider === 'newrelic')?.has_secret && (
+            <button onClick={() => void deleteIntegration('newrelic')} style={{ width: '100%', marginTop: 4, padding: '7px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.15)', background: 'transparent', color: '#f87171', fontSize: 11, cursor: 'pointer', fontWeight: 600, transition: 'all 0.15s' }}>
+              {t('integrations.deleteNewrelicConnection')}
             </button>
           )}
         </IntegrationCard>}
@@ -786,11 +865,11 @@ export default function IntegrationsPage() {
               placeholder={halConfig?.has_secret ? `${halConfig?.secret_preview || halPasswordPreview || '****'} (${t('integrations.keepExisting')})` : t('integrations.halPasswordPlaceholder')}
             />
           </FieldGroup>
-          <button className='button button-primary' onClick={() => void saveHal()} style={{ width: '100%', justifyContent: 'center', marginTop: 2, padding: '6px 0', fontSize: 11 }}>
+          <button className='button button-primary' onClick={() => void saveHal()} style={{ width: '100%', justifyContent: 'center', marginTop: 4, padding: '8px 0', fontSize: 12 }}>
             {t('integrations.saveHal')}
           </button>
           {halConfig?.has_secret && (
-            <button onClick={() => void deleteIntegration('hal')} style={{ width: '100%', marginTop: 2, padding: '5px', borderRadius: 6, border: '1px solid rgba(248,113,113,0.15)', background: 'transparent', color: '#f87171', fontSize: 10, cursor: 'pointer', fontWeight: 600 }}>
+            <button onClick={() => void deleteIntegration('hal')} style={{ width: '100%', marginTop: 4, padding: '7px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.15)', background: 'transparent', color: '#f87171', fontSize: 11, cursor: 'pointer', fontWeight: 600, transition: 'all 0.15s' }}>
               {t('integrations.deleteHalConnection')}
             </button>
           )}
@@ -813,7 +892,7 @@ export default function IntegrationsPage() {
               placeholder={t('integrations.playbookPlaceholder')}
             />
           </FieldGroup>
-          <button className='button button-primary' onClick={() => void savePlaybook()} style={{ width: '100%', justifyContent: 'center', marginTop: 2, padding: '6px 0', fontSize: 11 }}>
+          <button className='button button-primary' onClick={() => void savePlaybook()} style={{ width: '100%', justifyContent: 'center', marginTop: 4, padding: '8px 0', fontSize: 12 }}>
             {isPlaybookSaving ? t('integrations.saving') : t('integrations.savePlaybook')}
           </button>
           <div style={{ fontSize: 10, color: 'var(--ink-35)', marginTop: 4 }}>
@@ -853,7 +932,7 @@ export default function IntegrationsPage() {
               placeholder='e.g. a1b2c3d4e5...'
             />
           </FieldGroup>
-          <button className='button button-primary' onClick={() => void saveSlack()} style={{ width: '100%', justifyContent: 'center', marginTop: 2, padding: '6px 0', fontSize: 11 }}>
+          <button className='button button-primary' onClick={() => void saveSlack()} style={{ width: '100%', justifyContent: 'center', marginTop: 4, padding: '8px 0', fontSize: 12 }}>
             {t('integrations.saveSlack')}
           </button>
           <div style={{ fontSize: 11, color: 'var(--ink-35)', marginTop: 8, lineHeight: 1.5 }}>
@@ -892,7 +971,7 @@ export default function IntegrationsPage() {
               placeholder={teamsConfig?.has_secret ? `${teamsConfig?.secret_preview || teamsPreview || '****'} (keep existing)` : 'App Secret from Azure'}
             />
           </FieldGroup>
-          <button className='button button-primary' onClick={() => void saveTeams()} style={{ width: '100%', justifyContent: 'center', marginTop: 2, padding: '6px 0', fontSize: 11 }}>
+          <button className='button button-primary' onClick={() => void saveTeams()} style={{ width: '100%', justifyContent: 'center', marginTop: 4, padding: '8px 0', fontSize: 12 }}>
             {t('integrations.saveTeams')}
           </button>
           <div style={{ fontSize: 11, color: 'var(--ink-35)', marginTop: 8, lineHeight: 1.5 }}>
@@ -923,7 +1002,7 @@ export default function IntegrationsPage() {
               placeholder='e.g. -100123456789'
             />
           </FieldGroup>
-          <button className='button button-primary' onClick={() => void saveTelegram()} style={{ width: '100%', justifyContent: 'center', marginTop: 2, padding: '6px 0', fontSize: 11 }}>
+          <button className='button button-primary' onClick={() => void saveTelegram()} style={{ width: '100%', justifyContent: 'center', marginTop: 4, padding: '8px 0', fontSize: 12 }}>
             Save Telegram
           </button>
           {telegramSetupMsg && <div style={{ fontSize: 11, color: '#5eead4', marginTop: 6 }}>{telegramSetupMsg}</div>}
@@ -1259,22 +1338,58 @@ export default function IntegrationsPage() {
         .integrations-grid {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 8px;
+          gap: 12px;
           align-items: stretch;
         }
         @media (max-width: 1320px) {
           .integrations-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
         @media (max-width: 768px) {
-          .integrations-grid { grid-template-columns: 1fr; gap: 8px; }
+          .integrations-grid { grid-template-columns: 1fr; gap: 10px; }
+        }
+        .integrations-grid :global(.int-card:hover) {
+          border-color: var(--border);
+          box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        }
+        .integrations-grid :global(input),
+        .integrations-grid :global(select) {
+          width: 100%;
+          padding: 8px 12px;
+          border-radius: 8px;
+          border: 1px solid var(--panel-border);
+          background: var(--glass);
+          color: var(--ink);
+          font-size: 12px;
+          transition: border-color 0.15s, box-shadow 0.15s;
+          outline: none;
+        }
+        .integrations-grid :global(input:focus),
+        .integrations-grid :global(select:focus) {
+          border-color: var(--border);
+          box-shadow: 0 0 0 2px rgba(99,102,241,0.1);
+        }
+        .integrations-grid :global(input::placeholder) {
+          color: var(--ink-20);
+          font-size: 11px;
+        }
+        .integrations-grid :global(.button-primary) {
+          padding: 8px 0 !important;
+          font-size: 12px !important;
+          border-radius: 8px;
+          font-weight: 600;
+          letter-spacing: 0.2px;
+          transition: opacity 0.15s;
+        }
+        .integrations-grid :global(.button-primary:hover) {
+          opacity: 0.85;
         }
         .connected-dot {
-          animation: connectedPulse 1.8s ease-out infinite;
+          animation: connectedPulse 2s ease-out infinite;
           box-shadow: 0 0 0 rgba(34, 197, 94, 0.55);
         }
         @keyframes connectedPulse {
           0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55); }
-          70% { transform: scale(1.12); box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+          70% { transform: scale(1.1); box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
           100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
         }
         @keyframes toastSlideUp {
@@ -1283,9 +1398,9 @@ export default function IntegrationsPage() {
         }
         .int-tab-bar {
           display: inline-flex;
-          gap: 2px;
-          padding: 3px;
-          border-radius: 10px;
+          gap: 3px;
+          padding: 4px;
+          border-radius: 12px;
           background: var(--panel);
           border: 1px solid var(--panel-border);
         }
@@ -1311,30 +1426,64 @@ function IntegrationCard({
 }) {
   const { t } = useLocale();
   return (
-    <div style={{
-      borderRadius: 10, border: `1px solid ${connected ? 'rgba(34,197,94,0.35)' : 'var(--panel-border)'}`,
-      background: 'var(--panel)', padding: '10px 12px',
-      position: 'relative', overflow: 'hidden',
+    <div className="int-card" style={{
+      borderRadius: 14,
+      border: `1px solid ${connected ? 'rgba(34,197,94,0.3)' : 'var(--panel-border)'}`,
+      background: 'var(--panel)',
+      padding: '16px 18px',
+      position: 'relative',
+      overflow: 'hidden',
       height: '100%',
       display: 'flex',
       flexDirection: 'column',
+      transition: 'border-color 0.2s, box-shadow 0.2s',
     }}>
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1.5, background: connected ? `linear-gradient(90deg, transparent, rgba(34,197,94,0.5), transparent)` : `linear-gradient(90deg, transparent, ${color}25, transparent)` }} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
-        <span style={{ fontSize: 14, lineHeight: 1 }}>{icon}</span>
-        <span style={{ fontWeight: 700, color: 'var(--ink-90)', fontSize: 12, flex: 1 }}>{title}</span>
-        <span className={connected ? 'connected-dot' : ''} style={{ width: 5, height: 5, borderRadius: '50%', background: connected ? '#22c55e' : 'var(--ink-15)', flexShrink: 0 }} />
-        <span style={{ fontSize: 9, color: connected ? '#22c55e' : 'var(--ink-25)', fontWeight: 600 }}>
-          {connected ? t('integrations.connected') : t('integrations.notConfigured')}
-        </span>
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, height: 2,
+        background: connected
+          ? 'linear-gradient(90deg, transparent 5%, rgba(34,197,94,0.6) 50%, transparent 95%)'
+          : `linear-gradient(90deg, transparent 5%, ${color}40 50%, transparent 95%)`,
+      }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        <div style={{
+          width: 32, height: 32, borderRadius: 10,
+          background: `${color}12`,
+          border: `1px solid ${color}20`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 16, lineHeight: 1, flexShrink: 0,
+        }}>{icon}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 700, color: 'var(--ink)', fontSize: 13 }}>{title}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 2 }}>
+            <span className={connected ? 'connected-dot' : ''} style={{
+              width: 6, height: 6, borderRadius: '50%',
+              background: connected ? '#22c55e' : 'var(--ink-15)', flexShrink: 0,
+            }} />
+            <span style={{ fontSize: 10, color: connected ? '#22c55e' : 'var(--ink-25)', fontWeight: 600 }}>
+              {connected ? t('integrations.connected') : t('integrations.notConfigured')}
+            </span>
+            {connected && updatedAt && (
+              <span style={{ fontSize: 9, color: 'var(--ink-20)' }}>
+                {new Date(updatedAt).toLocaleDateString()}
+              </span>
+            )}
+          </div>
+        </div>
         {onHelp && (
           <button type='button' onClick={onHelp} title={t('integrations.help')}
-            style={{ width: 18, height: 18, borderRadius: '50%', border: '1px solid var(--panel-border-2)', background: 'transparent', color: 'var(--ink-30)', fontSize: 9, fontWeight: 800, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            style={{
+              width: 24, height: 24, borderRadius: 8,
+              border: '1px solid var(--panel-border-2)',
+              background: 'var(--glass)', color: 'var(--ink-35)',
+              fontSize: 11, fontWeight: 800, cursor: 'pointer', flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all 0.15s',
+            }}>
             ?
           </button>
         )}
       </div>
-      <div style={{ display: 'grid', gap: 6, flex: 1 }}>{children}</div>
+      <div style={{ display: 'grid', gap: 10, flex: 1 }}>{children}</div>
     </div>
   );
 }
@@ -1342,7 +1491,11 @@ function IntegrationCard({
 function FieldGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label style={{ fontSize: 9, color: 'var(--ink-30)', fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase', display: 'block', marginBottom: 3 }}>
+      <label style={{
+        fontSize: 10, color: 'var(--ink-40)', fontWeight: 600,
+        letterSpacing: 0.3, textTransform: 'uppercase',
+        display: 'block', marginBottom: 5,
+      }}>
         {label}
       </label>
       {children}

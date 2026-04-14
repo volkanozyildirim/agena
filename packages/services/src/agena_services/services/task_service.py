@@ -11,6 +11,7 @@ from agena_core.settings import get_settings
 from agena_services.services.event_bus import publish_fire_and_forget
 from agena_services.integrations.azure_client import AzureDevOpsClient
 from agena_services.integrations.jira_client import JiraClient
+from agena_services.integrations.newrelic_client import NewRelicClient
 from agena_models.models.agent_log import AgentLog
 from agena_models.models.ai_usage_event import AIUsageEvent
 from agena_models.models.run_record import RunRecord
@@ -31,6 +32,7 @@ class TaskService:
         self.settings = get_settings()
         self.jira_client = JiraClient()
         self.azure_client = AzureDevOpsClient()
+        self.newrelic_client = NewRelicClient()
         self.queue_service = QueueService()
 
     async def get_jira_tasks(self) -> list[ExternalTask]:
@@ -241,6 +243,93 @@ class TaskService:
                 imported += 1
             except PermissionError as pe:
                 raise ValueError(f'Task quota exceeded: {pe}') from pe
+
+        return imported, skipped
+
+    async def import_from_newrelic(
+        self,
+        organization_id: int,
+        user_id: int,
+        *,
+        entity_guid: str | None = None,
+        since: str = '24 hours ago',
+        min_occurrences: int = 1,
+    ) -> tuple[int, int]:
+        if self.db is None:
+            raise ValueError('DB session required')
+
+        config_service = IntegrationConfigService(self.db)
+        config = await config_service.get_config(organization_id, 'newrelic')
+        if config is None:
+            raise ValueError('New Relic integration not configured for this organization')
+
+        nr_cfg = {
+            'api_key': config.secret,
+            'base_url': config.base_url or 'https://api.newrelic.com/graphql',
+        }
+
+        from agena_models.models.newrelic_entity_mapping import NewRelicEntityMapping
+
+        if entity_guid:
+            stmt = select(NewRelicEntityMapping).where(
+                NewRelicEntityMapping.organization_id == organization_id,
+                NewRelicEntityMapping.entity_guid == entity_guid,
+            )
+            row = (await self.db.execute(stmt)).scalar_one_or_none()
+            mappings = [row] if row else []
+            if not mappings:
+                raise ValueError(f'No entity mapping found for guid {entity_guid}')
+        else:
+            stmt = select(NewRelicEntityMapping).where(
+                NewRelicEntityMapping.organization_id == organization_id,
+                NewRelicEntityMapping.is_active.is_(True),
+            )
+            mappings = list((await self.db.execute(stmt)).scalars().all())
+            if not mappings:
+                raise ValueError('No active New Relic entity mappings found')
+
+        imported = 0
+        skipped = 0
+
+        for mapping in mappings:
+            errors = await self.newrelic_client.fetch_errors_with_details(
+                nr_cfg,
+                account_id=mapping.account_id,
+                app_name=mapping.entity_name,
+                since=since,
+            )
+            filtered = [e for e in errors if e.get('occurrences', 0) >= min_occurrences]
+            ext_tasks = self.newrelic_client.errors_to_external_tasks(
+                filtered, entity_name=mapping.entity_name, account_id=mapping.account_id,
+                entity_guid=mapping.entity_guid,
+            )
+            for item in ext_tasks:
+                try:
+                    before = await self.db.execute(
+                        select(TaskRecord.id).where(
+                            TaskRecord.organization_id == organization_id,
+                            TaskRecord.source == 'newrelic',
+                            TaskRecord.external_id == item.id,
+                        )
+                    )
+                    if before.scalar_one_or_none() is not None:
+                        skipped += 1
+                        continue
+
+                    task = await self.create_task_from_external(
+                        organization_id=organization_id,
+                        user_id=user_id,
+                        source='newrelic',
+                        external_id=item.id,
+                        title=item.title,
+                        description=item.description,
+                    )
+                    if mapping.repo_mapping_id:
+                        task.repo_mapping_id = mapping.repo_mapping_id
+                        await self.db.commit()
+                    imported += 1
+                except PermissionError as pe:
+                    raise ValueError(f'Task quota exceeded: {pe}') from pe
 
         return imported, skipped
 
