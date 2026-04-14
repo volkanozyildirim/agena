@@ -1077,15 +1077,17 @@ export default function DashboardTasksPage() {
       {/* Repo conflict modal */}
       {conflictModal && (
         <div onClick={() => setConflictModal(null)} style={{
-          position: 'fixed', inset: 0, zIndex: 9999,
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999,
           background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 16, overflowY: 'auto',
         }}>
           <div onClick={(e) => e.stopPropagation()} style={{
             width: '100%', maxWidth: 440, borderRadius: 16,
             border: '1px solid var(--panel-border)',
             background: 'var(--surface)', padding: 24,
             boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+            margin: 'auto',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
               <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>&#9888;</div>
