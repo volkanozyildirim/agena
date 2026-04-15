@@ -273,6 +273,9 @@ async function runCLIStream(bin, name, data, res) {
 }
 
 async function submitLoginCode(cli, data) {
+  if (cli === 'claude') {
+    return { status: 'error', message: 'Claude code entry is not supported in bridge mode. Use Sign in URL flow.' };
+  }
   const code = String((data || {}).code || '').trim();
   if (!code) return { status: 'error', message: 'code is required' };
   const proc = loginProcesses[cli];
@@ -438,10 +441,15 @@ async function startLogin(cli, deviceAuth = false) {
       const clean = text.replace(/\x1b\[[0-9;]*m/g, '');
       output += clean;
       console.log(`[${cli} login] ${clean.trim()}`);
-      // Extract URL — prefer https
-      const httpsMatch = clean.match(/(https:\/\/[^\s]+)/);
-      if (httpsMatch) { loginUrl = httpsMatch[1]; }
-      else if (!loginUrl) { const httpMatch = clean.match(/(http:\/\/[^\s]+)/); if (httpMatch) loginUrl = httpMatch[1]; }
+      // Extract OAuth authorize URL reliably.
+      const compact = clean.replace(/\s+/g, '');
+      const oauthMatch = compact.match(/(https:\/\/[^ ]*oauth\/authorize[^ ]*)/i)
+        || compact.match(/(https:\/\/[^ ]*\/cai\/oauth\/authorize[^ ]*)/i);
+      if (oauthMatch) loginUrl = oauthMatch[1];
+      else if (!loginUrl) {
+        const httpsMatch = clean.match(/(https:\/\/[^\s]+)/);
+        if (httpsMatch) loginUrl = httpsMatch[1];
+      }
       // Extract device code (e.g. "XINP-1N30B" — alphanumeric with dash)
       const codeMatch = clean.match(/^\s+([A-Z0-9]{4,5}-[A-Z0-9]{4,5})\s*$/m);
       if (codeMatch) { deviceCode = codeMatch[1].trim(); }
