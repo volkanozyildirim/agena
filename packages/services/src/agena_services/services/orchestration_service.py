@@ -1414,6 +1414,12 @@ class OrchestrationService:
         # Sanitize branch name
         branch_name = re.sub(r'[^a-zA-Z0-9/_#.-]', '-', branch_name).strip('-')
 
+        auth_error = self._extract_cli_auth_error(reviewed_code)
+        if auth_error:
+            raise RuntimeError(
+                f'{auth_error}. Reconnect CLI authentication from Integrations > CLI Agents and retry.'
+            )
+
         parsed_files = self._parse_reviewed_output_to_files(reviewed_code, local_repo_path=local_repo_path)
         if not parsed_files and local_repo_path:
             # CLI agents (Claude/Codex) may edit files directly and return a summary
@@ -1442,6 +1448,18 @@ class OrchestrationService:
             commit_message=f"feat(ai): implement task {task.get('id', '')}",
             files=parsed_files,
         )
+
+    def _extract_cli_auth_error(self, text: str) -> str | None:
+        low = (text or '').lower()
+        if not low:
+            return None
+        if 'invalid authentication credentials' in low or 'authentication_error' in low:
+            return 'CLI authentication failed: invalid authentication credentials'
+        if 'failed to authenticate' in low:
+            return 'CLI authentication failed'
+        if 'api key invalid' in low or 'unauthorized' in low:
+            return 'CLI authentication failed: unauthorized'
+        return None
 
     def _with_strict_file_block_format(self, description: str) -> str:
         return (
