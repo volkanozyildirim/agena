@@ -1483,29 +1483,32 @@ export default function IntegrationsPage() {
         .integrations-grid {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 14px;
+          gap: 12px;
           align-items: stretch;
           position: relative;
           z-index: 1;
         }
-        @media (max-width: 1320px) {
+        @media (max-width: 1500px) {
           .integrations-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
         @media (max-width: 768px) {
           .integrations-grid { grid-template-columns: 1fr; gap: 10px; }
         }
         .integrations-grid :global(.int-card:hover) {
-          border-color: color-mix(in oklab, var(--border) 80%, white 20%);
-          box-shadow: 0 10px 28px rgba(15, 23, 42, 0.1);
-          transform: translateY(-1px);
+          border-color: color-mix(in oklab, var(--border) 82%, white 18%);
+          box-shadow: 0 18px 40px rgba(2, 6, 23, 0.18);
+          transform: translateY(-2px);
+        }
+        .integrations-grid :global(.int-card) {
+          backdrop-filter: blur(8px);
         }
         .integrations-grid :global(input),
         .integrations-grid :global(select) {
           width: 100%;
-          padding: 9px 12px;
+          padding: 8px 10px;
           border-radius: 10px;
           border: 1px solid var(--panel-border-2);
-          background: color-mix(in oklab, var(--glass) 86%, white 14%);
+          background: color-mix(in oklab, var(--glass) 78%, white 22%);
           color: var(--ink);
           font-size: 12px;
           transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
@@ -1522,16 +1525,34 @@ export default function IntegrationsPage() {
           font-size: 11px;
         }
         .integrations-grid :global(.button-primary) {
-          padding: 9px 0 !important;
-          font-size: 12px !important;
+          min-height: 32px;
+          padding: 6px 10px !important;
+          font-size: 11px !important;
           border-radius: 10px;
           font-weight: 700;
-          letter-spacing: 0.2px;
+          letter-spacing: 0.1px;
           transition: opacity 0.15s, transform 0.15s;
         }
         .integrations-grid :global(.button-primary:hover) {
           opacity: 0.92;
-          transform: translateY(-1px);
+          transform: translateY(-0.5px);
+        }
+        .integrations-grid :global(.button-outline) {
+          min-height: 32px;
+          padding: 6px 10px !important;
+          font-size: 11px !important;
+          border-radius: 10px;
+        }
+        .integrations-grid :global(textarea) {
+          width: 100%;
+          padding: 9px 10px;
+          border-radius: 10px;
+          border: 1px solid var(--panel-border-2);
+          background: color-mix(in oklab, var(--glass) 78%, white 22%);
+          color: var(--ink);
+          font-size: 12px;
+          line-height: 1.5;
+          resize: vertical;
         }
         .connected-dot {
           animation: connectedPulse 2s ease-out infinite;
@@ -1627,45 +1648,69 @@ function IntegrationCard({
   title: string; icon: string; color: string; connected: boolean; updatedAt?: string; children: React.ReactNode; onHelp?: () => void;
 }) {
   const { t } = useLocale();
+  const statusText = connected ? t('integrations.connected') : t('integrations.notConfigured');
   return (
     <div className="int-card" style={{
-      borderRadius: 16,
-      border: `1px solid ${connected ? 'rgba(34,197,94,0.3)' : 'var(--panel-border)'}`,
-      background: `linear-gradient(180deg, color-mix(in oklab, ${color} 6%, transparent), transparent 40%), var(--panel)`,
-      padding: '16px 16px',
+      borderRadius: 18,
+      border: `1px solid ${connected ? 'color-mix(in oklab, #22c55e 40%, var(--panel-border))' : 'var(--panel-border)'}`,
+      background: `linear-gradient(140deg, color-mix(in oklab, ${color} 10%, transparent), transparent 46%), var(--surface)`,
+      padding: '12px 12px 12px 16px',
       position: 'relative',
       overflow: 'hidden',
       height: '100%',
       display: 'flex',
       flexDirection: 'column',
-      transition: 'border-color 0.2s, box-shadow 0.2s, transform 0.2s',
+      transition: 'border-color 0.2s, box-shadow 0.2s, transform 0.2s, background 0.2s',
     }}>
       <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, height: 2,
-        background: connected
-          ? 'linear-gradient(90deg, transparent 5%, rgba(34,197,94,0.6) 50%, transparent 95%)'
-          : `linear-gradient(90deg, transparent 5%, ${color}40 50%, transparent 95%)`,
+        position: 'absolute',
+        top: 10,
+        left: 6,
+        bottom: 10,
+        width: 3,
+        borderRadius: 999,
+        background: connected ? '#22c55e' : color,
+        opacity: connected ? 0.95 : 0.7,
       }} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '2px 2px 10px 4px',
+        borderBottom: '1px dashed var(--panel-border-2)',
+      }}>
         <div style={{
-          width: 34, height: 34, borderRadius: 11,
-          background: `${color}16`,
-          border: `1px solid ${color}2f`,
+          width: 34, height: 34, borderRadius: 10,
+          background: `linear-gradient(150deg, ${color}2f, ${color}14)`,
+          border: `1px solid ${color}4a`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 16, lineHeight: 1, flexShrink: 0,
+          fontSize: 15, lineHeight: 1, flexShrink: 0,
         }}>{icon}</div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 800, color: 'var(--ink)', fontSize: 13 }}>{title}</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 2 }}>
-            <span className={connected ? 'connected-dot' : ''} style={{
-              width: 6, height: 6, borderRadius: '50%',
-              background: connected ? '#22c55e' : 'var(--ink-15)', flexShrink: 0,
-            }} />
-            <span style={{ fontSize: 10, color: connected ? '#22c55e' : 'var(--ink-25)', fontWeight: 600 }}>
-              {connected ? t('integrations.connected') : t('integrations.notConfigured')}
+          <div style={{ fontWeight: 800, color: 'var(--ink)', fontSize: 13, letterSpacing: 0.1 }}>{title}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              borderRadius: 999,
+              border: `1px solid ${connected ? 'rgba(34,197,94,0.35)' : 'var(--panel-border-2)'}`,
+              background: connected ? 'rgba(34,197,94,0.1)' : 'var(--panel)',
+              color: connected ? '#22c55e' : 'var(--ink-35)',
+              fontSize: 9,
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: 0.25,
+              padding: '2px 7px',
+            }}>
+              <span className={connected ? 'connected-dot' : ''} style={{
+                width: 5, height: 5, borderRadius: '50%',
+                background: connected ? '#22c55e' : 'var(--ink-20)', flexShrink: 0,
+              }} />
+              {statusText}
             </span>
             {connected && updatedAt && (
-              <span style={{ fontSize: 9, color: 'var(--ink-20)' }}>
+              <span style={{ fontSize: 9, color: 'var(--ink-30)', fontWeight: 600 }}>
                 {new Date(updatedAt).toLocaleDateString()}
               </span>
             )}
@@ -1674,8 +1719,8 @@ function IntegrationCard({
         {onHelp && (
           <button type='button' onClick={onHelp} title={t('integrations.help')}
             style={{
-              width: 24, height: 24, borderRadius: 8,
-              border: '1px solid var(--panel-border-2)',
+              width: 22, height: 22, borderRadius: 7,
+              border: `1px solid ${color}52`,
               background: 'var(--glass)', color: 'var(--ink-35)',
               fontSize: 11, fontWeight: 800, cursor: 'pointer', flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1685,7 +1730,12 @@ function IntegrationCard({
           </button>
         )}
       </div>
-      <div style={{ display: 'grid', gap: 10, flex: 1 }}>{children}</div>
+      <div style={{
+        display: 'grid',
+        gap: 9,
+        flex: 1,
+        padding: '12px 6px 4px 4px',
+      }}>{children}</div>
     </div>
   );
 }
@@ -1694,8 +1744,8 @@ function FieldGroup({ label, children }: { label: string; children: React.ReactN
   return (
     <div>
       <label style={{
-        fontSize: 10, color: 'var(--ink-40)', fontWeight: 600,
-        letterSpacing: 0.3, textTransform: 'uppercase',
+        fontSize: 10, color: 'var(--ink-45)', fontWeight: 700,
+        letterSpacing: 0.2, textTransform: 'uppercase',
         display: 'block', marginBottom: 5,
       }}>
         {label}
