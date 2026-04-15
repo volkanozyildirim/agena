@@ -406,22 +406,92 @@ class TaskService:
                 query=query,
                 limit=limit,
             )
-            external_items = self.sentry_client.issues_to_external_tasks(
-                issues,
-                organization_slug=org_slug,
-                project_slug=str(mapping.project_slug),
-            )
-            for item in external_items:
+            project = str(mapping.project_slug)
+            for issue in issues:
+                issue_id = str(issue.get('id') or '').strip()
+                if not issue_id:
+                    continue
+                external_id = f'{project}:{issue_id}'
                 try:
                     before = await self.db.execute(
-                        select(TaskRecord.id).where(
+                        select(TaskRecord).where(
                             TaskRecord.organization_id == organization_id,
                             TaskRecord.source == 'sentry',
-                            TaskRecord.external_id == item.id,
+                            TaskRecord.external_id == external_id,
                         )
                     )
-                    if before.scalar_one_or_none() is not None:
+                    existing_task = before.scalar_one_or_none()
+                    if existing_task is not None:
+                        # Backfill older imported Sentry tasks with richer event context.
+                        if 'Stack Trace (latest frames):' not in (existing_task.description or ''):
+                            event_id: str | None = None
+                            event_json: dict | None = None
+                            try:
+                                issue_events = await self.sentry_client.list_issue_events(
+                                    sentry_cfg,
+                                    organization_slug=org_slug,
+                                    issue_id=issue_id,
+                                    limit=1,
+                                )
+                                if issue_events:
+                                    raw_id = issue_events[0].get('eventID') or issue_events[0].get('id')
+                                    event_id = str(raw_id or '').strip() or None
+                                if event_id:
+                                    event_json = await self.sentry_client.get_event_json(
+                                        sentry_cfg,
+                                        organization_slug=org_slug,
+                                        project_slug=project,
+                                        event_id=event_id,
+                                    )
+                            except Exception:
+                                event_id = None
+                                event_json = None
+
+                            enriched = self.sentry_client.issue_to_external_task(
+                                issue,
+                                organization_slug=org_slug,
+                                project_slug=project,
+                                event_id=event_id,
+                                event_json=event_json,
+                            )
+                            if enriched is not None and enriched.description:
+                                existing_task.description = enriched.description
+                                await self.db.commit()
                         skipped += 1
+                        continue
+                    event_id: str | None = None
+                    event_json: dict | None = None
+                    try:
+                        # Pull the latest event for richer debugging context.
+                        issue_events = await self.sentry_client.list_issue_events(
+                            sentry_cfg,
+                            organization_slug=org_slug,
+                            issue_id=issue_id,
+                            limit=1,
+                        )
+                        if issue_events:
+                            raw_id = issue_events[0].get('eventID') or issue_events[0].get('id')
+                            event_id = str(raw_id or '').strip() or None
+                        if event_id:
+                            event_json = await self.sentry_client.get_event_json(
+                                sentry_cfg,
+                                organization_slug=org_slug,
+                                project_slug=project,
+                                event_id=event_id,
+                            )
+                    except Exception:
+                        # Import should not fail just because event enrichment failed.
+                        event_id = None
+                        event_json = None
+
+                    item = self.sentry_client.issue_to_external_task(
+                        issue,
+                        organization_slug=org_slug,
+                        project_slug=project,
+                        event_id=event_id,
+                        event_json=event_json,
+                    )
+                    if item is None:
                         continue
                     task = await self.create_task_from_external(
                         organization_id=organization_id,
