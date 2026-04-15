@@ -7,7 +7,7 @@ from agena_models.models.integration_config import IntegrationConfig
 
 
 class IntegrationConfigService:
-    SUPPORTED_PROVIDERS = {'jira', 'azure', 'openai', 'gemini', 'github', 'playbook', 'slack', 'teams', 'telegram', 'hal', 'newrelic'}
+    SUPPORTED_PROVIDERS = {'jira', 'azure', 'openai', 'gemini', 'github', 'playbook', 'slack', 'teams', 'telegram', 'hal', 'newrelic', 'sentry'}
     DEFAULT_BASE_URLS = {
         'openai': 'https://api.openai.com/v1',
         'gemini': 'https://generativelanguage.googleapis.com',
@@ -16,6 +16,7 @@ class IntegrationConfigService:
         'slack': 'https://hooks.slack.com/services',
         'teams': 'https://outlook.office.com/webhook',
         'newrelic': 'https://api.newrelic.com/graphql',
+        'sentry': 'https://sentry.io/api/0',
     }
 
     def __init__(self, db: AsyncSession) -> None:

@@ -124,6 +124,11 @@ class NewRelicImportRequest(BaseModel):
     min_occurrences: int = 1
 
 
+class SentryImportRequest(BaseModel):
+    query: str = 'is:unresolved'
+    limit: int = 50
+
+
 class TaskDependencyUpdateRequest(BaseModel):
     depends_on_task_ids: list[int]
 

@@ -5,7 +5,7 @@ import { apiFetch } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
 
 type IntegrationConfig = {
-  provider: 'jira' | 'azure' | 'openai' | 'gemini' | 'github' | 'playbook' | 'slack' | 'teams' | 'telegram' | 'hal' | 'newrelic';
+  provider: 'jira' | 'azure' | 'openai' | 'gemini' | 'github' | 'playbook' | 'slack' | 'teams' | 'telegram' | 'hal' | 'newrelic' | 'sentry';
   extra_config?: Record<string, string> | null;
   base_url: string;
   project?: string | null;
@@ -87,6 +87,11 @@ export default function IntegrationsPage() {
   const [newrelicApiKeyPreview, setNewrelicApiKeyPreview] = useState('');
   const [newrelicAccountId, setNewrelicAccountId] = useState('');
   const [newrelicRegion, setNewrelicRegion] = useState('eu');
+  const [sentryBaseUrl, setSentryBaseUrl] = useState('https://sentry.io/api/0');
+  const [sentryToken, setSentryToken] = useState('');
+  const [sentryTokenPreview, setSentryTokenPreview] = useState('');
+  const [sentryOrgSlug, setSentryOrgSlug] = useState('');
+  const [sentryProjectSlug, setSentryProjectSlug] = useState('');
   const [notifyTesting, setNotifyTesting] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
@@ -213,6 +218,16 @@ export default function IntegrationsPage() {
       ],
       link: 'https://docs.newrelic.com/docs/apis/intro-apis/new-relic-api-keys/',
     },
+    sentry: {
+      title: t('integrations.helpSentryTitle'),
+      steps: [
+        t('integrations.helpSentryStep1'),
+        t('integrations.helpSentryStep2'),
+        t('integrations.helpSentryStep3'),
+        t('integrations.helpSentryStep4'),
+      ],
+      link: 'https://docs.sentry.io/api/guides/create-auth-token/',
+    },
   };
 
   async function loadIntegrationState() {
@@ -253,6 +268,12 @@ export default function IntegrationsPage() {
       setNewrelicAccountId(newrelic.extra_config?.account_id ?? '');
       setNewrelicRegion(newrelic.base_url?.includes('eu.newrelic') ? 'eu' : 'us');
     }
+    const sentry = data.find((c) => c.provider === 'sentry');
+    if (sentry) {
+      setSentryBaseUrl(sentry.base_url || 'https://sentry.io/api/0');
+      setSentryOrgSlug(sentry.extra_config?.organization_slug ?? '');
+      setSentryProjectSlug(sentry.extra_config?.project_slug ?? '');
+    }
   }
 
   useEffect(() => {
@@ -266,6 +287,7 @@ export default function IntegrationsPage() {
     setTelegramPreview(loadSecretPreview('telegram'));
     setHalPasswordPreview(loadSecretPreview('hal'));
     setNewrelicApiKeyPreview(loadSecretPreview('newrelic'));
+    setSentryTokenPreview(loadSecretPreview('sentry'));
     void loadIntegrationState().catch(() => {});
   }, []);
 
@@ -515,6 +537,30 @@ export default function IntegrationsPage() {
     } catch (e) { setError(e instanceof Error ? e.message : t('integrations.saveFailed')); }
   }
 
+  async function saveSentry() {
+    try {
+      await apiFetch('/integrations/sentry', {
+        method: 'PUT',
+        body: JSON.stringify({
+          base_url: sentryBaseUrl || 'https://sentry.io/api/0',
+          secret: sentryToken || undefined,
+          extra_config: {
+            organization_slug: sentryOrgSlug || undefined,
+            project_slug: sentryProjectSlug || undefined,
+          },
+        }),
+      });
+      if (sentryToken.trim()) {
+        const preview = maskSecretPreview(sentryToken);
+        setSentryTokenPreview(preview);
+        saveSecretPreview('sentry', preview);
+      }
+      setSentryToken('');
+      await loadIntegrationState();
+      setMsg(t('integrations.savedSentry'));
+    } catch (e) { setError(e instanceof Error ? e.message : t('integrations.saveFailed')); }
+  }
+
   async function sendTestNotification() {
     setNotifyTesting(true);
     setError('');
@@ -547,6 +593,7 @@ export default function IntegrationsPage() {
   const telegramConfig = configs.find((c) => c.provider === 'telegram');
   const halConfig = configs.find((c) => c.provider === 'hal');
   const newrelicConfig = configs.find((c) => c.provider === 'newrelic');
+  const sentryConfig = configs.find((c) => c.provider === 'sentry');
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
@@ -832,6 +879,42 @@ export default function IntegrationsPage() {
           {configs.find(c => c.provider === 'newrelic')?.has_secret && (
             <button onClick={() => void deleteIntegration('newrelic')} style={{ width: '100%', marginTop: 4, padding: '7px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.15)', background: 'transparent', color: '#f87171', fontSize: 11, cursor: 'pointer', fontWeight: 600, transition: 'all 0.15s' }}>
               {t('integrations.deleteNewrelicConnection')}
+            </button>
+          )}
+        </IntegrationCard>}
+
+        {/* Sentry */}
+        {activeTab === 'task' && <IntegrationCard
+          title={t('integrations.providerSentry')}
+          icon='🚨'
+          color='#f97316'
+          connected={sentryConfig?.has_secret ?? false}
+          updatedAt={sentryConfig?.updated_at}
+          onHelp={() => setHelp(helpByProvider.sentry)}
+        >
+          <FieldGroup label={t('integrations.baseUrl')}>
+            <input value={sentryBaseUrl} onChange={(e) => setSentryBaseUrl(e.target.value)} placeholder='https://sentry.io/api/0' />
+          </FieldGroup>
+          <FieldGroup label={t('integrations.sentryOrgSlug')}>
+            <input value={sentryOrgSlug} onChange={(e) => setSentryOrgSlug(e.target.value)} placeholder={t('integrations.sentryOrgSlugPlaceholder')} />
+          </FieldGroup>
+          <FieldGroup label={t('integrations.sentryProjectSlug')}>
+            <input value={sentryProjectSlug} onChange={(e) => setSentryProjectSlug(e.target.value)} placeholder={t('integrations.sentryProjectSlugPlaceholder')} />
+          </FieldGroup>
+          <FieldGroup label={t('integrations.sentryApiToken')}>
+            <input
+              type='password'
+              value={sentryToken}
+              onChange={(e) => setSentryToken(e.target.value)}
+              placeholder={sentryConfig?.has_secret ? `${sentryConfig?.secret_preview || sentryTokenPreview || '****'} (${t('integrations.keepExisting')})` : t('integrations.sentryApiTokenPlaceholder')}
+            />
+          </FieldGroup>
+          <button className='button button-primary' onClick={() => void saveSentry()} style={{ width: '100%', justifyContent: 'center', marginTop: 4, padding: '8px 0', fontSize: 12 }}>
+            {t('integrations.saveSentry')}
+          </button>
+          {configs.find(c => c.provider === 'sentry')?.has_secret && (
+            <button onClick={() => void deleteIntegration('sentry')} style={{ width: '100%', marginTop: 4, padding: '7px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.15)', background: 'transparent', color: '#f87171', fontSize: 11, cursor: 'pointer', fontWeight: 600, transition: 'all 0.15s' }}>
+              {t('integrations.deleteSentryConnection')}
             </button>
           )}
         </IntegrationCard>}

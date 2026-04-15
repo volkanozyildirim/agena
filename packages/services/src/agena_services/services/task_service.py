@@ -12,6 +12,7 @@ from agena_services.services.event_bus import publish_fire_and_forget
 from agena_services.integrations.azure_client import AzureDevOpsClient
 from agena_services.integrations.jira_client import JiraClient
 from agena_services.integrations.newrelic_client import NewRelicClient
+from agena_services.integrations.sentry_client import SentryClient
 from agena_models.models.agent_log import AgentLog
 from agena_models.models.ai_usage_event import AIUsageEvent
 from agena_models.models.run_record import RunRecord
@@ -33,6 +34,7 @@ class TaskService:
         self.jira_client = JiraClient()
         self.azure_client = AzureDevOpsClient()
         self.newrelic_client = NewRelicClient()
+        self.sentry_client = SentryClient()
         self.queue_service = QueueService()
 
     async def get_jira_tasks(self) -> list[ExternalTask]:
@@ -330,6 +332,75 @@ class TaskService:
                     imported += 1
                 except PermissionError as pe:
                     raise ValueError(f'Task quota exceeded: {pe}') from pe
+
+        return imported, skipped
+
+    async def import_from_sentry(
+        self,
+        organization_id: int,
+        user_id: int,
+        *,
+        query: str = 'is:unresolved',
+        limit: int = 50,
+    ) -> tuple[int, int]:
+        if self.db is None:
+            raise ValueError('DB session required')
+
+        config_service = IntegrationConfigService(self.db)
+        config = await config_service.get_config(organization_id, 'sentry')
+        if config is None:
+            raise ValueError('Sentry integration not configured for this organization')
+        if not config.secret:
+            raise ValueError('Sentry API token is missing in integration settings')
+
+        extra = config.extra_config or {}
+        org_slug = str(extra.get('organization_slug') or '').strip()
+        project_slug = str(extra.get('project_slug') or '').strip()
+        if not org_slug or not project_slug:
+            raise ValueError('Sentry organization slug and project slug are required in integration settings')
+
+        sentry_cfg = {
+            'api_token': config.secret,
+            'base_url': config.base_url or 'https://sentry.io/api/0',
+        }
+        issues = await self.sentry_client.list_issues(
+            sentry_cfg,
+            organization_slug=org_slug,
+            project_slug=project_slug,
+            query=query,
+            limit=limit,
+        )
+        external_items = self.sentry_client.issues_to_external_tasks(
+            issues,
+            organization_slug=org_slug,
+            project_slug=project_slug,
+        )
+
+        imported = 0
+        skipped = 0
+        for item in external_items:
+            try:
+                before = await self.db.execute(
+                    select(TaskRecord.id).where(
+                        TaskRecord.organization_id == organization_id,
+                        TaskRecord.source == 'sentry',
+                        TaskRecord.external_id == item.id,
+                    )
+                )
+                if before.scalar_one_or_none() is not None:
+                    skipped += 1
+                    continue
+                await self.create_task_from_external(
+                    organization_id=organization_id,
+                    user_id=user_id,
+                    source='sentry',
+                    external_id=item.id,
+                    title=item.title,
+                    description=item.description,
+                )
+                imported += 1
+            except PermissionError as pe:
+                raise ValueError(f'Task quota exceeded: {pe}') from pe
 
         return imported, skipped
 
