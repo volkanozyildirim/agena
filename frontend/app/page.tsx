@@ -273,6 +273,7 @@ export default function HomePage() {
     { key: 'slack', logo: '/media/slack-logo.svg', name: t('landing.integrationSlack') },
     { key: 'teams', logo: '/media/teams-logo.svg', name: t('landing.integrationTeams') },
     { key: 'newrelic', logo: '/media/newrelic-logo.svg', name: t('landing.integrationNewrelic') },
+    { key: 'sentry', logo: '/media/sentry-logo.svg', name: t('landing.integrationSentry') },
   ];
 
   return (
@@ -1029,6 +1030,22 @@ export default function HomePage() {
             </div>
             <code style={{ fontSize: 11, color: 'var(--ink-50)', background: 'var(--glass)', padding: '6px 12px', borderRadius: 8 }}>
               Trigger → New Relic → Condition → Developer → PR
+            </code>
+          </div>
+
+          <div style={{
+            marginTop: 14, padding: '20px 24px', borderRadius: 14,
+            border: '1px solid rgba(249,115,22,0.25)',
+            background: 'rgba(249,115,22,0.06)',
+            display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
+          }}>
+            <div style={{ fontSize: 28 }}>🚨</div>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#f97316' }}>{t('landing.sentryFlowTitle')}</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-45)', marginTop: 4 }}>{t('landing.sentryFlowDesc')}</div>
+            </div>
+            <code style={{ fontSize: 11, color: 'var(--ink-50)', background: 'var(--glass)', padding: '6px 12px', borderRadius: 8 }}>
+              Trigger → Sentry → Condition → Developer → PR
             </code>
           </div>
         </section>
