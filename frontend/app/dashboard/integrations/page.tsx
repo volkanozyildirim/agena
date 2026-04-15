@@ -1308,6 +1308,29 @@ export default function IntegrationsPage() {
                           }).catch(() => setError(t('integrations.cliBridgeConnectionFailed')));
                       }}>{t('integrations.connectWithAnthropic')}</button>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--muted)' }}><div style={{ flex: 1, height: 1, background: 'var(--panel-border-3)' }} /> {t('integrations.or')} <div style={{ flex: 1, height: 1, background: 'var(--panel-border-3)' }} /></div>
+                      <div style={{ display: 'grid', gap: 6 }}>
+                        <div style={{ fontSize: 11, color: '#f59e0b', lineHeight: 1.5 }}>
+                          If login page gives a callback URL/code, paste the full URL here and press Complete.
+                        </div>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <input id='claude-callback-url' type='text' placeholder='https://.../auth/callback?code=...&state=...' style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(245,158,11,0.4)', background: 'var(--glass)', color: 'var(--ink)', fontSize: 10, fontFamily: 'monospace' }} />
+                          <button className='button button-primary' style={{ padding: '7px 12px', fontSize: 11, flexShrink: 0 }} onClick={() => {
+                            const cbUrl = (document.getElementById('claude-callback-url') as HTMLInputElement)?.value;
+                            if (!cbUrl || !cbUrl.includes('code=')) { setError(t('integrations.validCallbackRequired')); return; }
+                            try {
+                              const parsed = new URL(cbUrl);
+                              fetch(`http://localhost:9876/auth/callback${parsed.search}`).then(() => {
+                                setMsg(t('integrations.loginCompleting'));
+                                setTimeout(() => fetch('http://localhost:9876/health').then(r => r.json()).then(h => {
+                                  if (h.claude_auth) { setMsg(t('integrations.claudeLoginSuccess')); setCliBridgeStatus(s => s ? { ...s, claude_auth: true } : s); }
+                                  else setMsg(t('integrations.waitFewSeconds'));
+                                }), 2000);
+                              });
+                            } catch { setError(t('integrations.invalidUrl')); }
+                          }}>{t('integrations.complete')}</button>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--muted)' }}><div style={{ flex: 1, height: 1, background: 'var(--panel-border-3)' }} /> {t('integrations.or')} <div style={{ flex: 1, height: 1, background: 'var(--panel-border-3)' }} /></div>
                       <div style={{ display: 'flex', gap: 6 }}>
                         <input id='claude-key' type='password' placeholder={t('integrations.claudeApiKeyPlaceholder')} style={{ flex: 1, padding: '7px 12px', borderRadius: 8, border: '1px solid var(--panel-border-3)', background: 'var(--glass)', color: 'var(--ink)', fontSize: 12 }} />
                         <button className='button button-outline' style={{ padding: '7px 14px', fontSize: 12 }} onClick={() => {

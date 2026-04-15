@@ -445,7 +445,7 @@ async function startLogin(cli, deviceAuth = false) {
           resolved = true;
           clearInterval(checkUrl);
           // Save callback port for proxying
-          const portMatch = output.match(/localhost:(\d+)/);
+          const portMatch = output.match(/(?:localhost|127\.0\.0\.1):(\d+)/);
           if (portMatch) {
             activeCallbackPort = parseInt(portMatch[1]);
             console.log(`[login] Callback port: ${activeCallbackPort}`);
