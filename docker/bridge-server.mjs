@@ -158,9 +158,16 @@ async function runCLIStream(bin, name, data, res) {
 
   console.log(`[${name} stream] running in ${repo_path} (model=${model || 'default'}, timeout=${timeout}s)`);
 
+  const cliEnv = { ...process.env, NO_COLOR: '1', NODE_EXTRA_CA_CERTS: '/etc/ssl/certs/ca-certificates.crt' };
+  if (name === 'claude') {
+    // Force Claude CLI to use OAuth session when available; stale API keys in env can cause 401.
+    delete cliEnv.ANTHROPIC_API_KEY;
+    delete cliEnv.CLAUDE_API_KEY;
+  }
+
   const proc = spawn(bin, args, {
     cwd: repo_path,
-    env: { ...process.env, NO_COLOR: '1', NODE_EXTRA_CA_CERTS: '/etc/ssl/certs/ca-certificates.crt' },
+    env: cliEnv,
   });
 
   let fullText = '';
@@ -303,9 +310,22 @@ async function runCLI(bin, name, data) {
     }
 
     const result = await new Promise((resolve, reject) => {
+      const cliEnv = {
+        ...process.env,
+        NO_COLOR: '1',
+        NODE_EXTRA_CA_CERTS: '/etc/ssl/certs/ca-certificates.crt',
+        ...(apiKey ? { OPENAI_API_KEY: apiKey } : {}),
+        ...(data.api_base_url ? { OPENAI_BASE_URL: data.api_base_url } : {}),
+      };
+      if (name === 'claude') {
+        // Prefer interactive OAuth session; invalid env API keys produce auth 401.
+        delete cliEnv.ANTHROPIC_API_KEY;
+        delete cliEnv.CLAUDE_API_KEY;
+      }
+
       const proc = spawn(bin, args, {
         cwd: repo_path,
-        env: { ...process.env, NO_COLOR: '1', NODE_EXTRA_CA_CERTS: '/etc/ssl/certs/ca-certificates.crt', ...(apiKey ? { OPENAI_API_KEY: apiKey } : {}), ...(data.api_base_url ? { OPENAI_BASE_URL: data.api_base_url } : {}) },
+        env: cliEnv,
       });
       let stdout = '', stderr = '';
       proc.stdout.on('data', (d) => { stdout += d.toString(); });
@@ -372,11 +392,29 @@ async function startLogin(cli, deviceAuth = false) {
       ? (deviceAuth ? ['login', '--device-auth'] : ['login'])
       : ['auth', 'login'];
 
-    console.log(`[${cli}] starting login: ${bin} ${args.join(' ')}`);
-    const proc = spawn(bin, args, {
-      env: { ...process.env, NO_COLOR: '1', BROWSER: 'echo' },
-    });
-    loginProcesses[cli] = proc;
+    const spawnLogin = () => {
+      console.log(`[${cli}] starting login: ${bin} ${args.join(' ')}`);
+      const proc = spawn(bin, args, {
+        env: { ...process.env, NO_COLOR: '1', BROWSER: 'echo' },
+      });
+      loginProcesses[cli] = proc;
+      return proc;
+    };
+
+    const startAfterReset = async () => {
+      // Claude can report loggedIn=true while token is stale; force clean re-login.
+      if (cli === 'claude') {
+        try {
+          await execFileAsync(bin, ['auth', 'logout'], { env: { ...process.env, NO_COLOR: '1' }, timeout: 10000 });
+        } catch {}
+        for (const p of [`${HOME}/.claude/.credentials.json`, `${HOME}/.claude/credentials.json`]) {
+          try { if (existsSync(p)) unlinkSync(p); } catch {}
+        }
+      }
+      return spawnLogin();
+    };
+
+    let proc;
 
     function parseOutput(text) {
       // Strip ANSI escape codes
@@ -392,54 +430,57 @@ async function startLogin(cli, deviceAuth = false) {
       if (codeMatch) { deviceCode = codeMatch[1].trim(); }
     }
 
-    proc.stdout.on('data', (chunk) => parseOutput(chunk.toString()));
-    proc.stderr.on('data', (chunk) => parseOutput(chunk.toString()));
+    Promise.resolve(startAfterReset()).then((p) => {
+      proc = p;
+      proc.stdout.on('data', (chunk) => parseOutput(chunk.toString()));
+      proc.stderr.on('data', (chunk) => parseOutput(chunk.toString()));
 
-    // Return URL as soon as found, start callback proxy
-    let resolved = false;
-    const checkUrl = setInterval(() => {
-      if (resolved) return;
-      if (loginUrl) {
-        // For device auth, wait a bit longer for the device code to appear
-        if (deviceAuth && !deviceCode) return;
-        resolved = true;
-        clearInterval(checkUrl);
-        // Save callback port for proxying
-        const portMatch = output.match(/localhost:(\d+)/);
-        if (portMatch) {
-          activeCallbackPort = parseInt(portMatch[1]);
-          console.log(`[login] Callback port: ${activeCallbackPort}`);
+      // Return URL as soon as found, start callback proxy
+      let resolved = false;
+      const checkUrl = setInterval(() => {
+        if (resolved) return;
+        if (loginUrl) {
+          // For device auth, wait a bit longer for the device code to appear
+          if (deviceAuth && !deviceCode) return;
+          resolved = true;
+          clearInterval(checkUrl);
+          // Save callback port for proxying
+          const portMatch = output.match(/localhost:(\d+)/);
+          if (portMatch) {
+            activeCallbackPort = parseInt(portMatch[1]);
+            console.log(`[login] Callback port: ${activeCallbackPort}`);
+          }
+          resolve({ status: 'ok', login_url: loginUrl, callback_port: activeCallbackPort, device_code: deviceCode || '', message: deviceCode ? `Enter code: ${deviceCode}` : `Open this URL to login` });
         }
-        // Don't rewrite URL — OpenAI only accepts registered redirect_uri
-        // Instead, Docker must forward the callback port
-        resolve({ status: 'ok', login_url: loginUrl, callback_port: activeCallbackPort, device_code: deviceCode || '', message: deviceCode ? `Enter code: ${deviceCode}` : `Open this URL to login` });
-      }
-    }, 500);
+      }, 500);
 
-    // Timeout after 15 seconds if no URL found
-    setTimeout(() => {
-      if (resolved) return;
-      resolved = true;
-      clearInterval(checkUrl);
-      if (output.includes('Already logged in') || output.includes('authenticated')) {
-        resolve({ status: 'ok', message: 'Already logged in', already_auth: true });
-      } else {
-        resolve({ status: 'pending', output: output.trim(), message: 'Login started but no URL found' });
-      }
-    }, 15000);
-
-    proc.on('close', (code) => {
-      console.log(`[${cli} login] exited with code ${code}`);
-      delete loginProcesses[cli];
-      if (!resolved) {
+      // Timeout after 15 seconds if no URL found
+      setTimeout(() => {
+        if (resolved) return;
         resolved = true;
         clearInterval(checkUrl);
-        if (code === 0) {
-          resolve({ status: 'ok', message: 'Login completed successfully', already_auth: true });
+        if (output.includes('Already logged in') || output.includes('authenticated')) {
+          resolve({ status: 'ok', message: 'Already logged in', already_auth: true });
         } else {
-          resolve({ status: 'error', message: output.trim() || `Login exited with code ${code}` });
+          resolve({ status: 'pending', output: output.trim(), message: 'Login started but no URL found' });
         }
-      }
+      }, 15000);
+
+      proc.on('close', (code) => {
+        console.log(`[${cli} login] exited with code ${code}`);
+        delete loginProcesses[cli];
+        if (!resolved) {
+          resolved = true;
+          clearInterval(checkUrl);
+          if (code === 0) {
+            resolve({ status: 'ok', message: 'Login completed successfully', already_auth: true });
+          } else {
+            resolve({ status: 'error', message: output.trim() || `Login exited with code ${code}` });
+          }
+        }
+      });
+    }).catch((e) => {
+      resolve({ status: 'error', message: e?.message || 'Failed to start login' });
     });
   });
 }

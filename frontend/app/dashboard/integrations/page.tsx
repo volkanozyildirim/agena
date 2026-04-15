@@ -1199,11 +1199,13 @@ export default function IntegrationsPage() {
                   {cliBridgeStatus?.codex && !cliBridgeStatus?.codex_auth && (
                     <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
                       <button style={{ width: '100%', padding: '11px 14px', fontSize: 13, fontWeight: 700, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #0d9488, #22c55e)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }} onClick={() => {
+                        const popup = window.open('', '_blank');
                         setMsg('Starting device auth...');
                         fetch('http://localhost:9876/codex/device-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
                           .then(r => r.json()).then(d => {
                             if (d.login_url) {
-                              window.open(d.login_url, '_blank');
+                              if (popup) popup.location.href = d.login_url;
+                              else window.open(d.login_url, '_blank');
                               const codeEl = document.getElementById('codex-device-code');
                               const section = document.getElementById('codex-device-section');
                               if (codeEl && d.device_code) (codeEl as HTMLElement).textContent = d.device_code;
@@ -1287,11 +1289,13 @@ export default function IntegrationsPage() {
                   {cliBridgeStatus?.claude && !cliBridgeStatus?.claude_auth && (
                     <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
                       <button className='button button-primary' style={{ width: '100%', padding: '9px 14px', fontSize: 12, justifyContent: 'center' }} onClick={() => {
+                        const popup = window.open('', '_blank');
                         setMsg(t('integrations.claudeLoginStarting'));
                         fetch('http://localhost:9876/claude/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
                           .then(r => r.json()).then(d => {
                             if (d.login_url) {
-                              window.open(d.login_url, '_blank');
+                              if (popup) popup.location.href = d.login_url;
+                              else window.open(d.login_url, '_blank');
                               setMsg(t('integrations.claudeLoginPageOpened'));
                               const poll = setInterval(() => {
                                 fetch('http://localhost:9876/health').then(r => r.json()).then(h => {

@@ -263,6 +263,8 @@ class ClaudeCLIService:
                 await log_callback(f'CLI completed: {total_chars} chars output')
 
             content = ''.join(collected_text).strip()
+            if 'Failed to authenticate' in content and 'API Error: 401' in content:
+                raise RuntimeError('Claude CLI authentication failed (401). Reconnect Claude from Integrations and try again.')
             if not content:
                 raise RuntimeError('claude bridge returned empty output')
             return content
