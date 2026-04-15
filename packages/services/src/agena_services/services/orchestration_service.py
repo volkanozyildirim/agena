@@ -201,6 +201,24 @@ class OrchestrationService:
                         api_key=None,
                         api_base_url=None,
                     )
+                    parsed_blocks = self._parse_reviewed_output_to_files(final_code, local_repo_path=routing.local_repo_path)
+                    if not parsed_blocks:
+                        git_changes = await self._collect_git_changes(routing.local_repo_path)
+                        if not git_changes:
+                            await task_service.add_log(
+                                task.id,
+                                organization_id,
+                                'agent',
+                                'Codex CLI output missing file blocks and git diff is empty; retrying with strict format prompt.',
+                            )
+                            final_code = await self.codex_cli_service.generate_file_markdown(
+                                repo_path=routing.local_repo_path,
+                                task_title=task.title,
+                                task_description=self._with_strict_file_block_format(effective_description),
+                                model=routing.preferred_agent_model,
+                                api_key=None,
+                                api_base_url=None,
+                            )
                 except Exception as codex_exc:
                     await task_service.add_log(
                         task.id,
@@ -248,6 +266,24 @@ class OrchestrationService:
                         log_callback=_cli_log,
                         task_id=str(task.id),
                     )
+                    parsed_blocks = self._parse_reviewed_output_to_files(final_code, local_repo_path=routing.local_repo_path)
+                    if not parsed_blocks:
+                        git_changes = await self._collect_git_changes(routing.local_repo_path)
+                        if not git_changes:
+                            await task_service.add_log(
+                                task.id,
+                                organization_id,
+                                'agent',
+                                'Claude CLI output missing file blocks and git diff is empty; retrying with strict format prompt.',
+                            )
+                            final_code = await self.claude_cli_service.generate_file_markdown(
+                                repo_path=routing.local_repo_path,
+                                task_title=task.title,
+                                task_description=self._with_strict_file_block_format(effective_description),
+                                model=routing.preferred_agent_model,
+                                log_callback=_cli_log,
+                                task_id=str(task.id),
+                            )
                 except Exception as claude_exc:
                     await task_service.add_log(
                         task.id,
@@ -1405,6 +1441,18 @@ class OrchestrationService:
             base_branch=self.settings.github_default_base_branch,
             commit_message=f"feat(ai): implement task {task.get('id', '')}",
             files=parsed_files,
+        )
+
+    def _with_strict_file_block_format(self, description: str) -> str:
+        return (
+            f"{description.rstrip()}\n\n"
+            "OUTPUT FORMAT (STRICT, REQUIRED):\n"
+            "Return ONLY file blocks, no extra commentary.\n"
+            "Each change MUST use exactly this structure:\n"
+            "**File: relative/path.ext**\n"
+            "```language\n"
+            "<full final file content>\n"
+            "```\n"
         )
 
     async def _collect_git_changes(self, local_repo_path: str) -> list[GitHubFileChange]:
