@@ -591,33 +591,47 @@ export default function IntegrationsPage() {
   const halConfig = configs.find((c) => c.provider === 'hal');
   const newrelicConfig = configs.find((c) => c.provider === 'newrelic');
   const sentryConfig = configs.find((c) => c.provider === 'sentry');
+  const taskProviders: IntegrationConfig['provider'][] = ['azure', 'github', 'jira', 'newrelic', 'sentry'];
+  const aiProviders: IntegrationConfig['provider'][] = ['openai', 'gemini', 'hal', 'playbook'];
+  const notificationProviders: IntegrationConfig['provider'][] = ['slack', 'teams', 'telegram'];
+  const connectedCount = configs.filter((c) => c.has_secret).length;
+  const totalCount = configs.length;
+  const tabMeta = {
+    ai: { icon: '⚡', color: '#34d399', label: t('integrations.tabAi'), count: configs.filter((c) => aiProviders.includes(c.provider)).filter((c) => c.has_secret).length },
+    task: { icon: '🔗', color: '#60a5fa', label: t('integrations.tabTask'), count: configs.filter((c) => taskProviders.includes(c.provider)).filter((c) => c.has_secret).length },
+    notifications: { icon: '🔔', color: '#fb923c', label: t('integrations.tabNotifications'), count: configs.filter((c) => notificationProviders.includes(c.provider)).filter((c) => c.has_secret).length },
+    cli: { icon: '⌨', color: '#a855f7', label: t('integrations.tabCli'), count: Number(Boolean(cliBridgeStatus?.ok)) },
+  } as const;
 
   return (
-    <div style={{ display: 'grid', gap: 12 }}>
-      {/* Header */}
-      <div>
+    <div className='integrations-root' style={{ display: 'grid', gap: 14 }}>
+      <div className='int-hero'>
         <div className='section-label'>{t('integrations.section')}</div>
-        <h1 style={{ fontSize: 20, fontWeight: 800, color: 'var(--ink-90)', marginTop: 6, marginBottom: 2 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 900, color: 'var(--ink-90)', marginTop: 8, marginBottom: 4 }}>
           {t('integrations.title')}
         </h1>
-        <p style={{ color: 'var(--ink-35)', fontSize: 12 }}>
+        <p style={{ color: 'var(--ink-45)', fontSize: 13, maxWidth: 680, lineHeight: 1.5 }}>
           {t('integrations.subtitle')}
         </p>
-      </div>
-
-      {/* Notification */}
-      {(msg || error) && (
-        <div style={{
-          padding: '8px 12px', borderRadius: 10, fontSize: 12,
-          background: error ? 'rgba(248,113,113,0.06)' : 'rgba(34,197,94,0.06)',
-          border: `1px solid ${error ? 'rgba(248,113,113,0.2)' : 'rgba(34,197,94,0.2)'}`,
-          color: error ? '#f87171' : '#22c55e',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8,
-        }}>
-          <span style={{ fontSize: 12, lineHeight: 1.4 }}>{error || msg}</span>
-          <button onClick={() => { setError(''); setMsg(''); }} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 16, flexShrink: 0, padding: 4 }}>×</button>
+        <div className='int-summary'>
+          <div className='summary-pill'>
+            <span>Connected</span>
+            <strong>{connectedCount}/{totalCount}</strong>
+          </div>
+          <div className='summary-pill'>
+            <span>Task Stack</span>
+            <strong>{tabMeta.task.count}</strong>
+          </div>
+          <div className='summary-pill'>
+            <span>AI Stack</span>
+            <strong>{tabMeta.ai.count}</strong>
+          </div>
+          <div className='summary-pill'>
+            <span>Notify Stack</span>
+            <strong>{tabMeta.notifications.count}</strong>
+          </div>
         </div>
-      )}
+      </div>
 
       {(msg || error) && (
         <div
@@ -649,41 +663,26 @@ export default function IntegrationsPage() {
       )}
 
       <div className='int-tab-bar'>
-        {([
-          { key: 'ai' as const, color: '#34d399', label: t('integrations.tabAi'), icon: '⚡' },
-          { key: 'task' as const, color: '#60a5fa', label: t('integrations.tabTask'), icon: '🔗' },
-          { key: 'notifications' as const, color: '#fb923c', label: t('integrations.tabNotifications'), icon: '🔔' },
-          { key: 'cli' as const, color: '#a855f7', label: t('integrations.tabCli'), icon: '⌨' },
-        ] as const).map(tab => {
-          const active = activeTab === tab.key;
+        {(['ai', 'task', 'notifications', 'cli'] as const).map((key) => {
+          const tab = tabMeta[key];
+          const active = activeTab === key;
           return (
             <button
-              key={tab.key}
+              key={key}
               type='button'
               onClick={() => {
-                setActiveTab(tab.key);
-                if (tab.key === 'cli') {
+                setActiveTab(key);
+                if (key === 'cli') {
                   fetch('http://localhost:9876/health').then(r => r.json()).then(d => setCliBridgeStatus({ ok: true, codex: d.codex, claude: d.claude, codex_auth: d.codex_auth, claude_auth: d.claude_auth })).catch(() => setCliBridgeStatus({ ok: false, codex: false, claude: false, codex_auth: false, claude_auth: false }));
                 }
               }}
-              style={{
-                padding: '7px 14px',
-                borderRadius: 9,
-                fontSize: 12,
-                fontWeight: active ? 700 : 500,
-                border: 'none',
-                background: active ? `${tab.color}15` : 'transparent',
-                color: active ? tab.color : 'var(--ink-45)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                transition: 'all 0.2s',
-                boxShadow: active ? `inset 0 0 0 1px ${tab.color}25` : 'none',
-              }}
+              className='int-tab-btn'
+              data-active={active ? '1' : '0'}
+              style={{ ['--tab-color' as string]: tab.color }}
             >
-              <span style={{ fontSize: 12 }}>{tab.icon}</span>
-              {tab.label}
+              <span className='int-tab-icon'>{tab.icon}</span>
+              <span>{tab.label}</span>
+              <span className='int-tab-count'>{tab.count}</span>
             </button>
           );
         })}
@@ -1412,11 +1411,82 @@ export default function IntegrationsPage() {
         </div>
       )}
       <style jsx>{`
+        .integrations-root {
+          position: relative;
+        }
+        .integrations-root::before {
+          content: '';
+          position: absolute;
+          top: -80px;
+          right: -120px;
+          width: 340px;
+          height: 340px;
+          border-radius: 999px;
+          background: radial-gradient(circle at center, rgba(56, 189, 248, 0.22) 0%, rgba(56, 189, 248, 0) 65%);
+          pointer-events: none;
+        }
+        .integrations-root::after {
+          content: '';
+          position: absolute;
+          top: 120px;
+          left: -110px;
+          width: 300px;
+          height: 300px;
+          border-radius: 999px;
+          background: radial-gradient(circle at center, rgba(251, 146, 60, 0.16) 0%, rgba(251, 146, 60, 0) 62%);
+          pointer-events: none;
+        }
+        .int-hero {
+          border: 1px solid var(--panel-border);
+          border-radius: 18px;
+          padding: 18px 18px 16px;
+          background:
+            linear-gradient(120deg, rgba(28, 231, 131, 0.06), rgba(96, 165, 250, 0.05)),
+            var(--surface);
+          position: relative;
+          overflow: hidden;
+        }
+        .int-hero::after {
+          content: '';
+          position: absolute;
+          width: 280px;
+          height: 280px;
+          right: -90px;
+          top: -140px;
+          border-radius: 999px;
+          background: radial-gradient(circle at center, rgba(167, 139, 250, 0.25), rgba(167, 139, 250, 0));
+          pointer-events: none;
+        }
+        .int-summary {
+          display: flex;
+          gap: 8px;
+          margin-top: 12px;
+          flex-wrap: wrap;
+        }
+        .summary-pill {
+          border-radius: 999px;
+          border: 1px solid var(--panel-border-2);
+          background: var(--glass);
+          color: var(--ink-55);
+          font-size: 11px;
+          font-weight: 600;
+          padding: 6px 11px;
+          display: inline-flex;
+          gap: 8px;
+          align-items: center;
+        }
+        .summary-pill strong {
+          color: var(--ink);
+          font-size: 12px;
+          letter-spacing: 0.2px;
+        }
         .integrations-grid {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 12px;
+          gap: 14px;
           align-items: stretch;
+          position: relative;
+          z-index: 1;
         }
         @media (max-width: 1320px) {
           .integrations-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1425,40 +1495,43 @@ export default function IntegrationsPage() {
           .integrations-grid { grid-template-columns: 1fr; gap: 10px; }
         }
         .integrations-grid :global(.int-card:hover) {
-          border-color: var(--border);
-          box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+          border-color: color-mix(in oklab, var(--border) 80%, white 20%);
+          box-shadow: 0 10px 28px rgba(15, 23, 42, 0.1);
+          transform: translateY(-1px);
         }
         .integrations-grid :global(input),
         .integrations-grid :global(select) {
           width: 100%;
-          padding: 8px 12px;
-          border-radius: 8px;
-          border: 1px solid var(--panel-border);
-          background: var(--glass);
+          padding: 9px 12px;
+          border-radius: 10px;
+          border: 1px solid var(--panel-border-2);
+          background: color-mix(in oklab, var(--glass) 86%, white 14%);
           color: var(--ink);
           font-size: 12px;
-          transition: border-color 0.15s, box-shadow 0.15s;
+          transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
           outline: none;
         }
         .integrations-grid :global(input:focus),
         .integrations-grid :global(select:focus) {
           border-color: var(--border);
-          box-shadow: 0 0 0 2px rgba(99,102,241,0.1);
+          box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
+          background: color-mix(in oklab, var(--surface) 92%, white 8%);
         }
         .integrations-grid :global(input::placeholder) {
           color: var(--ink-20);
           font-size: 11px;
         }
         .integrations-grid :global(.button-primary) {
-          padding: 8px 0 !important;
+          padding: 9px 0 !important;
           font-size: 12px !important;
-          border-radius: 8px;
-          font-weight: 600;
+          border-radius: 10px;
+          font-weight: 700;
           letter-spacing: 0.2px;
-          transition: opacity 0.15s;
+          transition: opacity 0.15s, transform 0.15s;
         }
         .integrations-grid :global(.button-primary:hover) {
-          opacity: 0.85;
+          opacity: 0.92;
+          transform: translateY(-1px);
         }
         .connected-dot {
           animation: connectedPulse 2s ease-out infinite;
@@ -1475,11 +1548,60 @@ export default function IntegrationsPage() {
         }
         .int-tab-bar {
           display: inline-flex;
-          gap: 3px;
-          padding: 4px;
-          border-radius: 12px;
-          background: var(--panel);
-          border: 1px solid var(--panel-border);
+          gap: 8px;
+          padding: 6px;
+          border-radius: 14px;
+          background: color-mix(in oklab, var(--panel) 90%, white 10%);
+          border: 1px solid var(--panel-border-2);
+          width: fit-content;
+          max-width: 100%;
+        }
+        .int-tab-btn {
+          --tab-color: #22d3ee;
+          border: 1px solid transparent;
+          background: transparent;
+          border-radius: 11px;
+          min-width: 126px;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          color: var(--ink-45);
+          cursor: pointer;
+          padding: 8px 12px;
+          transition: all 0.2s ease;
+          font-size: 12px;
+          font-weight: 600;
+        }
+        .int-tab-btn[data-active='1'] {
+          border-color: color-mix(in oklab, var(--tab-color) 35%, transparent);
+          color: var(--tab-color);
+          background: color-mix(in oklab, var(--tab-color) 12%, transparent);
+          box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--tab-color) 22%, transparent);
+        }
+        .int-tab-icon {
+          width: 20px;
+          height: 20px;
+          border-radius: 8px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: color-mix(in oklab, var(--tab-color) 16%, transparent);
+          font-size: 11px;
+          line-height: 1;
+          flex-shrink: 0;
+        }
+        .int-tab-count {
+          margin-left: auto;
+          min-width: 18px;
+          height: 18px;
+          border-radius: 999px;
+          border: 1px solid color-mix(in oklab, var(--tab-color) 35%, transparent);
+          background: color-mix(in oklab, var(--tab-color) 16%, transparent);
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 10px;
+          font-weight: 700;
         }
         @media (max-width: 768px) {
           .int-tab-bar {
@@ -1487,9 +1609,12 @@ export default function IntegrationsPage() {
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
             scrollbar-width: none;
+            width: 100%;
           }
           .int-tab-bar::-webkit-scrollbar { display: none; }
           .int-tab-bar button { white-space: nowrap; flex-shrink: 0; }
+          .int-tab-btn { min-width: 112px; }
+          .int-hero { padding: 14px; }
         }
       `}</style>
     </div>
@@ -1504,16 +1629,16 @@ function IntegrationCard({
   const { t } = useLocale();
   return (
     <div className="int-card" style={{
-      borderRadius: 14,
+      borderRadius: 16,
       border: `1px solid ${connected ? 'rgba(34,197,94,0.3)' : 'var(--panel-border)'}`,
-      background: 'var(--panel)',
-      padding: '16px 18px',
+      background: `linear-gradient(180deg, color-mix(in oklab, ${color} 6%, transparent), transparent 40%), var(--panel)`,
+      padding: '16px 16px',
       position: 'relative',
       overflow: 'hidden',
       height: '100%',
       display: 'flex',
       flexDirection: 'column',
-      transition: 'border-color 0.2s, box-shadow 0.2s',
+      transition: 'border-color 0.2s, box-shadow 0.2s, transform 0.2s',
     }}>
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0, height: 2,
@@ -1523,14 +1648,14 @@ function IntegrationCard({
       }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
         <div style={{
-          width: 32, height: 32, borderRadius: 10,
-          background: `${color}12`,
-          border: `1px solid ${color}20`,
+          width: 34, height: 34, borderRadius: 11,
+          background: `${color}16`,
+          border: `1px solid ${color}2f`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 16, lineHeight: 1, flexShrink: 0,
         }}>{icon}</div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 700, color: 'var(--ink)', fontSize: 13 }}>{title}</div>
+          <div style={{ fontWeight: 800, color: 'var(--ink)', fontSize: 13 }}>{title}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 2 }}>
             <span className={connected ? 'connected-dot' : ''} style={{
               width: 6, height: 6, borderRadius: '50%',
