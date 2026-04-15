@@ -289,14 +289,16 @@ async function submitLoginCode(cli, data) {
   if (!code) return { status: 'error', message: 'code is required' };
 
   if (cli === 'claude') {
-    // Always use setup-token flow for pasted codes; auth-login flow is browser-only.
-    if (!claudeBin) return { status: 'error', message: 'claude not installed' };
     const active = loginProcesses[cli];
+    // Prefer submitting code to the currently active login process.
     if (active && !active.killed && active.exitCode == null) {
-      try { active.kill('SIGTERM'); } catch {}
-      delete loginProcesses[cli];
-      delete loginState[cli];
+      try {
+        active.stdin.write(`${code}\n`);
+        return { status: 'ok', message: 'Code submitted. Completing login...' };
+      } catch {}
     }
+    // Fallback to setup-token flow when no active session exists.
+    if (!claudeBin) return { status: 'error', message: 'claude not installed' };
     const stripAnsi = (s) => (s || '')
       .replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '')
       .replace(/\x1B\][^\x07]*(\x07|\x1B\\)/g, '');
