@@ -274,26 +274,29 @@ async function runCLIStream(bin, name, data, res) {
 
 async function submitLoginCode(cli, data) {
   const raw = String((data || {}).code || '').trim();
-  // Accept common pasted variants:
-  // - "<code>#<state>"
-  // - "...?code=<code>&state=<state>"
+  // Accept URL pasted variants. If raw token is pasted (including #state), keep it as-is.
   let code = raw;
-  if (code.includes('#')) code = code.split('#')[0];
-  if (code.includes('code=')) {
+  if (raw.includes('code=')) {
     try {
-      const u = new URL(code);
-      code = (u.searchParams.get('code') || code).trim();
+      const u = new URL(raw);
+      code = (u.searchParams.get('code') || raw).trim();
     } catch {
-      const m = code.match(/[?&]code=([^&#]+)/);
+      const m = raw.match(/[?&]code=([^&#]+)/);
       if (m) code = decodeURIComponent(m[1]);
     }
   }
   code = code.trim();
   if (!code) return { status: 'error', message: 'code is required' };
-  const proc = loginProcesses[cli];
-  if ((!proc || proc.killed) && cli === 'claude') {
-    // Fallback: recover from lost in-memory session by running a fresh code-flow login.
+
+  if (cli === 'claude') {
+    // Always use setup-token flow for pasted codes; auth-login flow is browser-only.
     if (!claudeBin) return { status: 'error', message: 'claude not installed' };
+    const active = loginProcesses[cli];
+    if (active && !active.killed && active.exitCode == null) {
+      try { active.kill('SIGTERM'); } catch {}
+      delete loginProcesses[cli];
+      delete loginState[cli];
+    }
     const stripAnsi = (s) => (s || '')
       .replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '')
       .replace(/\x1B\][^\x07]*(\x07|\x1B\\)/g, '');
@@ -304,13 +307,19 @@ async function submitLoginCode(cli, data) {
       let out = '';
       p.stdout.on('data', (d) => { out += stripAnsi(String(d)); });
       p.stderr.on('data', (d) => { out += stripAnsi(String(d)); });
-      const writeTimer = setTimeout(() => { try { p.stdin.write(`${code}\n`); } catch {} }, 1200);
+      // Prompt timing varies; retry code submission a few times.
+      let attempts = 0;
+      const writer = setInterval(() => {
+        attempts += 1;
+        try { p.stdin.write(`${code}\n`); } catch {}
+        if (attempts >= 8) clearInterval(writer);
+      }, 1500);
       const killTimer = setTimeout(() => {
         try { p.kill('SIGTERM'); } catch {}
         resolve({ status: 'error', message: 'Login timed out while submitting code' });
-      }, 120000);
+      }, 35000);
       p.on('close', async () => {
-        clearTimeout(writeTimer);
+        clearInterval(writer);
         clearTimeout(killTimer);
         const authed = await detectClaudeAuth();
         if (authed) resolve({ status: 'ok', message: 'Code submitted. Login completed.' });
@@ -318,6 +327,8 @@ async function submitLoginCode(cli, data) {
       });
     });
   }
+
+  const proc = loginProcesses[cli];
   if (!proc || proc.killed) {
     return { status: 'error', message: 'No active login session. Start login first.' };
   }
