@@ -718,8 +718,8 @@ export default function DashboardTasksPage() {
               padding: '14px 20px', borderBottom: '1px solid var(--panel-border)',
               display: 'grid', gridTemplateColumns: 'minmax(0,1.45fr) 80px 98px 88px 88px 70px 92px 78px minmax(180px,0.85fr)', gap: 10, alignItems: 'center',
               transition: 'background 0.2s',
-              borderLeft: task.status === 'running' ? '3px solid #38bdf8' : '3px solid transparent',
-              background: task.status === 'running' ? 'rgba(56,189,248,0.04)' : undefined,
+              borderLeft: task.description?.includes('Status: resolved') ? '3px solid #a855f7' : task.status === 'running' ? '3px solid #38bdf8' : '3px solid transparent',
+              background: task.description?.includes('Status: resolved') ? 'rgba(168,85,247,0.04)' : task.status === 'running' ? 'rgba(56,189,248,0.04)' : undefined,
               animation: task.status === 'running' ? 'running-glow 2s ease-in-out infinite' : undefined,
             }}>
               <div style={{ minWidth: 0 }}>
