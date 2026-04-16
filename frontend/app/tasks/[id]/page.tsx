@@ -1401,7 +1401,7 @@ export default function TaskDetailPage() {
         document.body,
       )}
 
-      {repoConflict && (
+      {repoConflict && typeof document !== 'undefined' && createPortal(
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20 }} onClick={() => setRepoConflict(null)}>
           <div style={{ width: 'min(420px, calc(100% - 40px))', borderRadius: 16, background: 'var(--surface)', border: '1px solid var(--panel-border)', padding: 24, boxSizing: 'border-box' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
@@ -1427,7 +1427,8 @@ export default function TaskDetailPage() {
               }} style={{ flex: 1, padding: '10px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', background: '#f59e0b', border: 'none', color: '#000' }}>Queue Task</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
