@@ -2360,7 +2360,7 @@ class OrchestrationService:
             return None
 
         # Load prompt template from Prompt Studio
-        prompt_slug = 'sentry_fix' if task.source == 'sentry' else 'newrelic_fix'
+        prompt_slug = 'SENTRY_FIX_PROMPT' if task.source == 'sentry' else 'NEWRELIC_FIX_PROMPT'
         try:
             from agena_services.services.prompt_service import PromptService
             template = await PromptService.get(self.db_session, prompt_slug)

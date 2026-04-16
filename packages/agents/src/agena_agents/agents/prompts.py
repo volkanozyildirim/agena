@@ -247,6 +247,46 @@ REFINEMENT_EXPECTED_OUTPUT = (
     '}}'
 )
 
+SENTRY_FIX_PROMPT = (
+    'You are fixing a production error reported by Sentry.\n\n'
+    '## Error Details\n'
+    '- **Error**: {{error_message}}\n'
+    '- **Level**: {{level}}\n'
+    '- **File**: {{file_path}}:{{line_number}}\n'
+    '- **Culprit**: {{culprit}}\n'
+    '- **Events**: {{event_count}} occurrences, {{user_count}} users affected\n'
+    '- **First Seen**: {{first_seen}}\n\n'
+    '## Stack Trace\n{{stack_trace}}\n\n'
+    '## Source File ({{file_path}})\n```\n{{file_content}}\n```\n\n'
+    '## Instructions\n'
+    '1. Analyze the error and stack trace above\n'
+    '2. Fix ONLY the specific error in the file shown\n'
+    '3. Keep changes minimal — fix the bug, nothing else\n'
+    '4. Return ONLY the fixed file in this format:\n\n'
+    '**File: {{file_path}}**\n```\n...fixed content...\n```\n\n'
+    'Do NOT modify any other files. Do NOT add comments explaining the fix.'
+)
+
+NEWRELIC_FIX_PROMPT = (
+    'You are fixing a production error reported by New Relic APM.\n\n'
+    '## Error Details\n'
+    '- **Error Class**: {{error_class}}\n'
+    '- **Error Message**: {{error_message}}\n'
+    '- **File**: {{file_path}}:{{line_number}}\n'
+    '- **Transaction**: {{transaction}}\n'
+    '- **Occurrences**: {{event_count}}\n'
+    '- **Entity**: {{entity_name}}\n\n'
+    '## Stack Trace\n{{stack_trace}}\n\n'
+    '## Source File ({{file_path}})\n```\n{{file_content}}\n```\n\n'
+    '## Instructions\n'
+    '1. Analyze the error and stack trace above\n'
+    '2. Fix ONLY the specific error in the file shown\n'
+    '3. Keep changes minimal — fix the bug, nothing else\n'
+    '4. Return ONLY the fixed file in this format:\n\n'
+    '**File: {{file_path}}**\n```\n...fixed content...\n```\n\n'
+    'Do NOT modify any other files. Do NOT add comments explaining the fix.'
+)
+
 PROMPT_DEFAULTS: dict[str, str] = {
     'FETCH_CONTEXT_SYSTEM_PROMPT': FETCH_CONTEXT_SYSTEM_PROMPT,
     'PM_SYSTEM_PROMPT': PM_SYSTEM_PROMPT,
@@ -262,6 +302,8 @@ PROMPT_DEFAULTS: dict[str, str] = {
     'REFINEMENT_SYSTEM_PROMPT': REFINEMENT_SYSTEM_PROMPT,
     'REFINEMENT_DESCRIPTION_PROMPT': REFINEMENT_DESCRIPTION_PROMPT,
     'REFINEMENT_EXPECTED_OUTPUT': REFINEMENT_EXPECTED_OUTPUT,
+    'SENTRY_FIX_PROMPT': SENTRY_FIX_PROMPT,
+    'NEWRELIC_FIX_PROMPT': NEWRELIC_FIX_PROMPT,
 }
 
 
