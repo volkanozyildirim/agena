@@ -357,7 +357,6 @@ class SentryClient:
             if meta_function:
                 desc_lines.append(f'Function: {meta_function}')
             desc_lines = [l for l in desc_lines if l]
-        ]
         if culprit:
             desc_lines.append(f'Culprit: {culprit}')
         if last_seen:
