@@ -1244,7 +1244,6 @@ class OrchestrationService:
             if task.source == 'sentry' and task.external_id and pr_url:
                 try:
                     from agena_services.integrations.sentry_client import SentryClient
-                    from agena_services.services.integration_config_service import IntegrationConfigService
                     sentry_config = await IntegrationConfigService(self.db_session).get_config(organization_id, 'sentry')
                     if sentry_config and sentry_config.secret:
                         extra = sentry_config.extra_config or {}
