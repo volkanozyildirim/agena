@@ -259,15 +259,12 @@ class CodexCLIService:
         import json as _json
 
         # Use streaming endpoint for real-time logs
-        try:
-            collected_text: list[str] = []
-            error_msg = None
-            async with httpx.AsyncClient(timeout=httpx.Timeout(self.EXEC_TIMEOUT_SEC + 10, connect=10)) as client:
-                async with client.stream(
-                    'POST',
-                    f'{bridge_url}/codex/stream',
-                    json=payload,
-                ) as resp:
+        async def _stream_codex(p: dict) -> tuple[list[str], str | None]:
+            texts: list[str] = []
+            err: str | None = None
+            stderr_all: list[str] = []
+            async with httpx.AsyncClient(timeout=httpx.Timeout(self.EXEC_TIMEOUT_SEC + 10, connect=10)) as c:
+                async with c.stream('POST', f'{bridge_url}/codex/stream', json=p) as resp:
                     async for raw_line in resp.aiter_lines():
                         if not raw_line.startswith('data: '):
                             continue
@@ -277,48 +274,39 @@ class CodexCLIService:
                             continue
                         evt_type = event.get('type', '')
                         if evt_type == 'text':
-                            collected_text.append(event.get('text', ''))
+                            texts.append(event.get('text', ''))
                         elif evt_type == 'line':
-                            collected_text.append(event.get('text', '') + '\n')
+                            texts.append(event.get('text', '') + '\n')
                         elif evt_type == 'tool':
                             if log_callback:
                                 await log_callback(event.get('summary', ''))
                         elif evt_type == 'stderr':
                             stderr_text = event.get('text', '')
-                            if log_callback and stderr_text:
-                                await log_callback(f'stderr: {stderr_text[:200]}')
+                            if stderr_text:
+                                stderr_all.append(stderr_text)
+                                if log_callback:
+                                    await log_callback(f'stderr: {stderr_text[:200]}')
                         elif evt_type == 'error':
-                            error_msg = event.get('message', 'unknown error')
+                            err = event.get('message', 'unknown error')
                         elif evt_type == 'done':
                             break
+            # Check stderr for unsupported model errors even if no explicit error event
+            if not err and not texts:
+                combined_stderr = ' '.join(stderr_all)
+                if self._is_unsupported_model_error(combined_stderr):
+                    err = combined_stderr
+            return texts, err
+
+        try:
+            collected_text, error_msg = await _stream_codex(payload)
 
             if error_msg:
                 # Retry with default model if unsupported model error
                 if self._is_unsupported_model_error(str(error_msg)) and payload.get('model'):
                     payload['model'] = ''
-                    collected_text.clear()
-                    error_msg = None
-                    async with httpx.AsyncClient(timeout=httpx.Timeout(self.EXEC_TIMEOUT_SEC + 10, connect=10)) as client:
-                        async with client.stream('POST', f'{bridge_url}/codex/stream', json=payload) as resp:
-                            async for raw_line in resp.aiter_lines():
-                                if not raw_line.startswith('data: '):
-                                    continue
-                                try:
-                                    event = _json.loads(raw_line[6:])
-                                except (ValueError, TypeError):
-                                    continue
-                                evt_type = event.get('type', '')
-                                if evt_type == 'text':
-                                    collected_text.append(event.get('text', ''))
-                                elif evt_type == 'line':
-                                    collected_text.append(event.get('text', '') + '\n')
-                                elif evt_type == 'tool':
-                                    if log_callback:
-                                        await log_callback(event.get('summary', ''))
-                                elif evt_type == 'error':
-                                    error_msg = event.get('message', 'unknown error')
-                                elif evt_type == 'done':
-                                    break
+                    if log_callback:
+                        await log_callback('Model not supported with ChatGPT account, retrying with default model...')
+                    collected_text, error_msg = await _stream_codex(payload)
                     if error_msg:
                         raise RuntimeError(f'{cli} bridge error: {error_msg}')
                 else:
