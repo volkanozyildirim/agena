@@ -356,6 +356,22 @@ async function runCodexStream(bin, data, res) {
             fullText += content;
             res.write(`data: ${JSON.stringify({ type: 'text', text: content })}\n\n`);
           }
+        } else if (eventType === 'item.completed') {
+          const item = event.item || {};
+          const text = item.text || '';
+          if (text) {
+            fullText += text;
+            res.write(`data: ${JSON.stringify({ type: 'text', text })}\n\n`);
+          }
+          // Tool call results
+          if (item.type === 'function_call' || item.type === 'tool_call') {
+            const name = item.name || 'tool';
+            res.write(`data: ${JSON.stringify({ type: 'tool', tool: name, summary: `[Tool: ${name}]` })}\n\n`);
+          }
+          if (item.type === 'function_call_output') {
+            const output = (item.output || '').slice(0, 300);
+            if (output) res.write(`data: ${JSON.stringify({ type: 'event', event_type: 'tool_result' })}\n\n`);
+          }
         } else if (eventType === 'function_call' || eventType === 'tool_call') {
           const name = event.name || event.function?.name || 'tool';
           const toolArgs = event.arguments || event.function?.arguments || '';
