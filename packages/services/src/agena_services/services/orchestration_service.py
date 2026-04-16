@@ -193,6 +193,9 @@ class OrchestrationService:
                 try:
                     # Codex CLI uses ChatGPT login session (~/.codex/auth.json).
                     # Do NOT pass API key — it breaks the responses WebSocket auth flow.
+                    async def _codex_log(msg: str) -> None:
+                        await task_service.add_log(task.id, organization_id, 'agent', msg)
+
                     final_code = await self.codex_cli_service.generate_file_markdown(
                         repo_path=routing.local_repo_path,
                         task_title=task.title,
@@ -200,6 +203,7 @@ class OrchestrationService:
                         model=routing.preferred_agent_model,
                         api_key=None,
                         api_base_url=None,
+                        log_callback=_codex_log,
                     )
                     parsed_blocks = self._parse_reviewed_output_to_files(final_code, local_repo_path=routing.local_repo_path)
                     if not parsed_blocks:
@@ -218,6 +222,7 @@ class OrchestrationService:
                                 model=routing.preferred_agent_model,
                                 api_key=None,
                                 api_base_url=None,
+                                log_callback=_codex_log,
                             )
                 except Exception as codex_exc:
                     await task_service.add_log(
