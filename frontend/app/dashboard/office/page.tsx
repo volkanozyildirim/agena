@@ -300,8 +300,9 @@ function AssignTaskModal({
   const [creating, setCreating] = useState(false);
   const [assigning, setAssigning] = useState<number | null>(null);
   const [selProvider, setSelProvider] = useState(agent.provider || '');
-  const [selModel, setSelModel] = useState(agent.model || '');
-  const [customModel, setCustomModel] = useState('');
+  const needsCustom = ['custom', 'codex_cli', 'claude_cli'].includes(agent.provider || '');
+  const [selModel, setSelModel] = useState(needsCustom ? '' : (agent.model || ''));
+  const [customModel, setCustomModel] = useState(needsCustom ? (agent.model || agent.custom_model || '') : '');
   const [createPr, setCreatePr] = useState(agent.create_pr ?? false);
   const [runMode, setRunMode] = useState<'ai' | 'mcp_agent' | 'flow'>('ai');
   const [selFlowId, setSelFlowId] = useState<string>('');
