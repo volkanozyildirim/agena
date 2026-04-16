@@ -255,12 +255,6 @@ export default function TaskDetailPage() {
   const [activeCodeTab, setActiveCodeTab] = useState(0);
   const [isRerunBusy, setIsRerunBusy] = useState(false);
   const [showRunConfig, setShowRunConfig] = useState(false);
-
-  // Lock body scroll when modal is open
-  useEffect(() => {
-    document.body.style.overflow = showRunConfig ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
-  }, [showRunConfig]);
   const [isCancelBusy, setIsCancelBusy] = useState(false);
   const [isDepsBusy, setIsDepsBusy] = useState(false);
   const [selectedDependencyIds, setSelectedDependencyIds] = useState<number[]>([]);
@@ -278,6 +272,15 @@ export default function TaskDetailPage() {
   const [repoConflict, setRepoConflict] = useState<{ info: string; body: Record<string, unknown> } | null>(null);
   const [loading, setLoading] = useState(true);
   const [streamState, setStreamState] = useState<'live' | 'reconnecting' | 'offline'>('offline');
+  const hasAnyModalOpen = showRunConfig || Boolean(repoConflict);
+
+  // Lock body scroll while any task-level modal is open
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const prev = document.body.style.overflow;
+    if (hasAnyModalOpen) document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [hasAnyModalOpen]);
 
   async function loadData() {
     try {
@@ -1402,8 +1405,8 @@ export default function TaskDetailPage() {
       )}
 
       {repoConflict && typeof document !== 'undefined' && createPortal(
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20 }} onClick={() => setRepoConflict(null)}>
-          <div style={{ width: 'min(420px, calc(100% - 40px))', borderRadius: 16, background: 'var(--surface)', border: '1px solid var(--panel-border)', padding: 24, boxSizing: 'border-box' }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001, padding: 16, overflowY: 'auto' }} onClick={() => setRepoConflict(null)}>
+          <div style={{ width: '100%', maxWidth: 440, borderRadius: 16, background: 'var(--surface)', border: '1px solid var(--panel-border)', padding: 24, boxSizing: 'border-box', margin: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
               <span style={{ fontSize: 20 }}>⏳</span>
               <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-90)' }}>Repo Busy</div>
