@@ -9,7 +9,7 @@ from pathlib import Path
 
 class CodexCLIService:
     FALLBACK_MODEL = 'gpt-4o'
-    EXEC_TIMEOUT_SEC = 180
+    EXEC_TIMEOUT_SEC = 1200
     TRANSIENT_RETRIES = 3
 
     async def generate_file_markdown(
