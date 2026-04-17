@@ -61,11 +61,12 @@ class TaskService:
         usage = UsageService(self.db)
         await usage.check_task_quota(organization_id)
 
+        import uuid
         task = TaskRecord(
             organization_id=organization_id,
             created_by_user_id=user_id,
             source='internal',
-            external_id='internal',
+            external_id=f'int-{uuid.uuid4().hex[:12]}',
             title=title,
             description=description,
             story_context=(story_context or '').strip() or None,
