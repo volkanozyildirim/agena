@@ -2595,5 +2595,6 @@
   "vs.codex.metaTitle": "AGENA vs OpenAI Codex – AI Code Generation Platform Alternative",
   "vs.codex.metaDesc": "Compare AGENA and OpenAI Codex CLI. See how AGENA's full-stack AI platform with dashboard, team features, and PR automation goes beyond CLI-based coding.",
   "nav.bitbucket": "Bitbucket",
-  "nav.gitlab": "GitLab"
+  "nav.gitlab": "GitLab",
+  "nav.datadog": "Datadog"
 }
