@@ -598,9 +598,9 @@ export default function IntegrationsPage() {
 
   // Map providers to modules for filtering
   const providerModule: Record<string, string> = {
-    openai: 'openai', gemini: 'gemini', hal: 'core', playbook: 'core',
+    openai: 'openai', gemini: 'gemini', hal: 'hal', playbook: 'playbook',
     azure: 'azure', github: 'github', jira: 'jira', newrelic: 'newrelic', sentry: 'sentry',
-    slack: 'notifications', teams: 'notifications', telegram: 'notifications',
+    slack: 'slack', teams: 'teams', telegram: 'telegram',
   };
   const isProviderEnabled = (p: string) => !providerModule[p] || enabledModules.has(providerModule[p]);
 
