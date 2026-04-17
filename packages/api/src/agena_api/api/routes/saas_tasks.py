@@ -19,6 +19,7 @@ from agena_models.schemas.saas_task import (
     NewRelicImportRequest,
     SentryImportRequest,
     DatadogImportRequest,
+    AppDynamicsImportRequest,
     ImportTasksResponse,
     RepoAssignmentResponse,
     TaskListResponse,
@@ -401,6 +402,31 @@ async def import_datadog_issues(
         raise HTTPException(status_code=502, detail=f'Datadog request failed ({exc.response.status_code})') from exc
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f'Datadog connection failed: {exc}') from exc
+    return ImportTasksResponse(imported=imported, skipped=skipped)
+
+
+@router.post('/import/appdynamics', response_model=ImportTasksResponse)
+async def import_appdynamics_errors(
+    request: AppDynamicsImportRequest = Body(default_factory=AppDynamicsImportRequest),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> ImportTasksResponse:
+    service = TaskService(db)
+    try:
+        imported, skipped = await service.import_from_appdynamics(
+            tenant.organization_id,
+            tenant.user_id,
+            app_name=request.app_name,
+            limit=request.limit,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code in (401, 403):
+            raise HTTPException(status_code=401, detail='AppDynamics API token is invalid or expired') from exc
+        raise HTTPException(status_code=502, detail=f'AppDynamics request failed ({exc.response.status_code})') from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f'AppDynamics connection failed: {exc}') from exc
     return ImportTasksResponse(imported=imported, skipped=skipped)
 
 

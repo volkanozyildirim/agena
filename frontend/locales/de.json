@@ -2575,5 +2575,6 @@
   "modules.useCases": "Anwendungsfalle",
   "nav.bitbucket": "Bitbucket",
   "nav.gitlab": "GitLab",
-  "nav.datadog": "Datadog"
+  "nav.datadog": "Datadog",
+  "nav.appdynamics": "AppDynamics"
 }

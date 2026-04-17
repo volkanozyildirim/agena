@@ -72,7 +72,8 @@ def upgrade() -> None:
         ('notifications', 'Notifications', 'Slack, Teams, Telegram integrations', '🔔', 0, 0, 21),
         ('gitlab', 'GitLab', 'GitLab integration, MR creation, branch management', '🦊', 0, 0, 22),
         ('bitbucket', 'Bitbucket', 'Bitbucket integration, PR creation, branch management', '🪣', 0, 0, 23),
-        ('datadog', 'Datadog', 'Import and auto-fix Datadog APM error tracking issues', '🐶', 0, 0, 24)
+        ('datadog', 'Datadog', 'Import and auto-fix Datadog APM error tracking issues', '🐶', 0, 0, 24),
+        ('appdynamics', 'AppDynamics', 'Import and auto-fix AppDynamics APM error snapshots', '📊', 0, 0, 25)
     """))
 
 

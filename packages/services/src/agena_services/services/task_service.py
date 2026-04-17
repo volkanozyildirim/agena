@@ -606,6 +606,77 @@ class TaskService:
 
         return imported, skipped
 
+    async def import_from_appdynamics(
+        self,
+        organization_id: int,
+        user_id: int,
+        *,
+        app_name: str | None = None,
+        limit: int = 50,
+    ) -> tuple[int, int]:
+        if self.db is None:
+            raise ValueError('DB session required')
+
+        config_service = IntegrationConfigService(self.db)
+        config = await config_service.get_config(organization_id, 'appdynamics')
+        if config is None:
+            raise ValueError('AppDynamics integration not configured')
+        if not config.secret:
+            raise ValueError('AppDynamics API token is missing')
+
+        extra = config.extra_config or {}
+        app_id = str(extra.get('app_id') or '').strip()
+        if not app_id:
+            raise ValueError('AppDynamics Application ID is required')
+        if not app_name:
+            app_name = str(extra.get('app_name') or app_id)
+
+        ad_cfg = {
+            'api_token': config.secret,
+            'base_url': config.base_url or 'https://your-controller.saas.appdynamics.com',
+        }
+
+        from agena_services.integrations.appdynamics_client import AppDynamicsClient
+        client = AppDynamicsClient()
+
+        imported = 0
+        skipped = 0
+
+        try:
+            errors = await client.list_errors(ad_cfg, app_id=app_id, limit=limit)
+        except Exception as exc:
+            raise ValueError(f'AppDynamics API error: {exc}') from exc
+
+        for error in errors:
+            item = client.error_to_external_task(error, app_name=app_name)
+            if item is None:
+                continue
+            try:
+                existing = await self.db.execute(
+                    select(TaskRecord).where(
+                        TaskRecord.organization_id == organization_id,
+                        TaskRecord.source == 'appdynamics',
+                        TaskRecord.external_id == item.id,
+                    )
+                )
+                if existing.scalar_one_or_none() is not None:
+                    skipped += 1
+                    continue
+                await self.create_task_from_external(
+                    organization_id=organization_id,
+                    user_id=user_id,
+                    source='appdynamics',
+                    external_id=item.id,
+                    title=item.title,
+                    description=item.description,
+                    priority=item.priority,
+                )
+                imported += 1
+            except PermissionError as pe:
+                raise ValueError(f'Task quota exceeded: {pe}') from pe
+
+        return imported, skipped
+
     async def list_tasks(self, organization_id: int) -> list[TaskRecord]:
         if self.db is None:
             raise ValueError('DB session required')

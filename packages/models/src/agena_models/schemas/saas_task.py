@@ -140,6 +140,11 @@ class DatadogImportRequest(BaseModel):
     limit: int = 50
 
 
+class AppDynamicsImportRequest(BaseModel):
+    app_name: str | None = None
+    limit: int = 50
+
+
 class TaskDependencyUpdateRequest(BaseModel):
     depends_on_task_ids: list[int]
 
