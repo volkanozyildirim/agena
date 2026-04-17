@@ -262,10 +262,15 @@ function DashboardInner({ children }: { children: ReactNode }) {
       }).catch(() => {});
 
       // Fetch enabled modules
-      apiFetch<Array<{ slug: string; enabled: boolean }>>('/modules').then((mods) => {
-        if (!active) return;
-        setEnabledModules(new Set(mods.filter((m) => m.enabled).map((m) => m.slug)));
-      }).catch(() => {});
+      const refreshModules = () => {
+        apiFetch<Array<{ slug: string; enabled: boolean }>>('/modules').then((mods) => {
+          setEnabledModules(new Set(mods.filter((m) => m.enabled).map((m) => m.slug)));
+        }).catch(() => {});
+      };
+      refreshModules();
+      // Listen for module toggle events from /dashboard/modules page
+      const onModulesChanged = () => refreshModules();
+      window.addEventListener('agena:modules-changed', onModulesChanged);
 
       // Fetch task counts and compute unseen badges
       apiFetch<Array<{ status: string }>>('/tasks').then((tasks) => {
@@ -351,6 +356,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
 
     return () => {
       active = false;
+      window.removeEventListener('agena:modules-changed', onModulesChanged);
     };
   }, [router, shouldOpenOnboarding]);
 

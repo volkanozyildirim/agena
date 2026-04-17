@@ -36,6 +36,8 @@ export default function ModulesPage() {
         body: JSON.stringify({ enabled }),
       });
       setModules((prev) => prev.map((m) => m.slug === slug ? { ...m, enabled: updated.enabled } : m));
+      // Notify layout to refresh sidebar
+      window.dispatchEvent(new CustomEvent('agena:modules-changed'));
       setMsg(`${updated.name} ${updated.enabled ? 'enabled' : 'disabled'}`);
       setTimeout(() => setMsg(''), 2000);
     } catch {
