@@ -90,11 +90,11 @@ type LiveResponse = {
 
 /* ── Provider / Model constants ─────────────────────────────────── */
 
-const PROVIDERS: { id: string; icon: string }[] = [
-  { id: 'openai', icon: '⚡' },
-  { id: 'gemini', icon: '✦' },
-  { id: 'codex_cli', icon: '⌘' },
-  { id: 'claude_cli', icon: '✎' },
+const PROVIDERS: { id: string; icon: string; module?: string }[] = [
+  { id: 'openai', icon: '⚡', module: 'openai' },
+  { id: 'gemini', icon: '✦', module: 'gemini' },
+  { id: 'codex_cli', icon: '⌘', module: 'cli_agents' },
+  { id: 'claude_cli', icon: '✎', module: 'cli_agents' },
   { id: 'custom', icon: '🔧' },
 ];
 
@@ -1081,6 +1081,7 @@ export default function OfficePage() {
   const [previewTaskId, setPreviewTaskId] = useState<number | null>(null);
   const [savedFlows, setSavedFlows] = useState<{ id: string; name: string }[]>([]);
   const [flowPickerTaskId, setFlowPickerTaskId] = useState<number | null>(null);
+  const [enabledModules, setEnabledModules] = useState<Set<string>>(new Set(['core', 'openai']));
   const [previewLogs, setPreviewLogs] = useState<Array<{ stage: string; message: string }>>([]);
   const [previewLoading, setPreviewLoading] = useState(false);
   const officeAgentsRef = useRef<OfficeAgent[]>([]);
@@ -1166,6 +1167,11 @@ export default function OfficePage() {
         setSavedFlows(((prefs.flows as { id: string; name: string }[] | undefined) || []).map((f) => ({ id: f.id, name: f.name })));
       } catch { /* silent */ }
       setAgentConfigs(configs);
+      // Load enabled modules
+      try {
+        const mods = await apiFetch<Array<{ slug: string; enabled: boolean }>>('/modules');
+        setEnabledModules(new Set(mods.filter((m) => m.enabled).map((m) => m.slug)));
+      } catch {}
     };
     void boot();
   }, []);

@@ -44,6 +44,7 @@ export default function IntegrationsPage() {
   const { t } = useLocale();
   const [activeTab, setActiveTab] = useState<'ai' | 'task' | 'notifications' | 'cli'>('ai');
   const [cliBridgeStatus, setCliBridgeStatus] = useState<{ ok: boolean; codex: boolean; claude: boolean; codex_auth?: boolean; claude_auth?: boolean } | null>(null);
+  const [enabledModules, setEnabledModules] = useState<Set<string>>(new Set(['core', 'openai']));
   const [jiraBaseUrl, setJiraBaseUrl] = useState('');
   const [jiraEmail, setJiraEmail] = useState('');
   const [jiraSecret, setJiraSecret] = useState('');
@@ -287,6 +288,9 @@ export default function IntegrationsPage() {
     setNewrelicApiKeyPreview(loadSecretPreview('newrelic'));
     setSentryTokenPreview(loadSecretPreview('sentry'));
     void loadIntegrationState().catch(() => {});
+    apiFetch<Array<{ slug: string; enabled: boolean }>>('/modules').then((mods) => {
+      setEnabledModules(new Set(mods.filter((m) => m.enabled).map((m) => m.slug)));
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -591,16 +595,25 @@ export default function IntegrationsPage() {
   const halConfig = configs.find((c) => c.provider === 'hal');
   const newrelicConfig = configs.find((c) => c.provider === 'newrelic');
   const sentryConfig = configs.find((c) => c.provider === 'sentry');
-  const taskProviders: IntegrationConfig['provider'][] = ['azure', 'github', 'jira', 'newrelic', 'sentry'];
-  const aiProviders: IntegrationConfig['provider'][] = ['openai', 'gemini', 'hal', 'playbook'];
-  const notificationProviders: IntegrationConfig['provider'][] = ['slack', 'teams', 'telegram'];
+
+  // Map providers to modules for filtering
+  const providerModule: Record<string, string> = {
+    openai: 'openai', gemini: 'gemini', hal: 'hal', playbook: 'playbook',
+    azure: 'azure', github: 'github', jira: 'jira', newrelic: 'newrelic', sentry: 'sentry',
+    slack: 'slack', teams: 'teams', telegram: 'telegram',
+  };
+  const isProviderEnabled = (p: string) => !providerModule[p] || enabledModules.has(providerModule[p]);
+
+  const taskProviders: IntegrationConfig['provider'][] = (['azure', 'github', 'jira', 'newrelic', 'sentry'] as const).filter(isProviderEnabled);
+  const aiProviders: IntegrationConfig['provider'][] = (['openai', 'gemini', 'hal', 'playbook'] as const).filter(isProviderEnabled);
+  const notificationProviders: IntegrationConfig['provider'][] = (['slack', 'teams', 'telegram'] as const).filter(isProviderEnabled);
   const connectedCount = configs.filter((c) => c.has_secret).length;
   const totalCount = configs.length;
   const tabMeta = {
-    ai: { icon: '⚡', color: '#34d399', label: t('integrations.tabAi'), count: configs.filter((c) => aiProviders.includes(c.provider)).filter((c) => c.has_secret).length },
-    task: { icon: '🔗', color: '#60a5fa', label: t('integrations.tabTask'), count: configs.filter((c) => taskProviders.includes(c.provider)).filter((c) => c.has_secret).length },
-    notifications: { icon: '🔔', color: '#fb923c', label: t('integrations.tabNotifications'), count: configs.filter((c) => notificationProviders.includes(c.provider)).filter((c) => c.has_secret).length },
-    cli: { icon: '⌨', color: '#a855f7', label: t('integrations.tabCli'), count: Number(Boolean(cliBridgeStatus?.ok)) },
+    ai: { icon: '⚡', color: '#34d399', label: t('integrations.tabAi'), count: configs.filter((c) => aiProviders.includes(c.provider)).filter((c) => c.has_secret).length, visible: aiProviders.length > 0 },
+    task: { icon: '🔗', color: '#60a5fa', label: t('integrations.tabTask'), count: configs.filter((c) => taskProviders.includes(c.provider)).filter((c) => c.has_secret).length, visible: taskProviders.length > 0 },
+    notifications: { icon: '🔔', color: '#fb923c', label: t('integrations.tabNotifications'), count: configs.filter((c) => notificationProviders.includes(c.provider)).filter((c) => c.has_secret).length, visible: notificationProviders.length > 0 },
+    cli: { icon: '⌨', color: '#a855f7', label: t('integrations.tabCli'), count: Number(Boolean(cliBridgeStatus?.ok)), visible: enabledModules.has('cli_agents') },
   } as const;
 
   return (
@@ -644,7 +657,7 @@ export default function IntegrationsPage() {
       )}
 
       <div className='int-tab-bar'>
-        {(['ai', 'task', 'notifications', 'cli'] as const).map((key) => {
+        {(['ai', 'task', 'notifications', 'cli'] as const).filter((key) => tabMeta[key].visible).map((key) => {
           const tab = tabMeta[key];
           const active = activeTab === key;
           return (
@@ -671,7 +684,7 @@ export default function IntegrationsPage() {
 
       <div className='integrations-grid'>
         {/* OpenAI */}
-        {activeTab === 'ai' && <IntegrationCard
+        {activeTab === 'ai' && isProviderEnabled('openai') && <IntegrationCard
           title={t('integrations.providerOpenai')}
           icon='⚡'
           color='#34d399'
@@ -701,7 +714,7 @@ export default function IntegrationsPage() {
         </IntegrationCard>}
 
         {/* Gemini */}
-        {activeTab === 'ai' && <IntegrationCard
+        {activeTab === 'ai' && isProviderEnabled('gemini') && <IntegrationCard
           title={t('integrations.providerGemini')}
           icon='✨'
           color='#22d3ee'
@@ -726,7 +739,7 @@ export default function IntegrationsPage() {
         </IntegrationCard>}
 
         {/* Azure DevOps */}
-        {activeTab === 'task' && <IntegrationCard
+        {activeTab === 'task' && isProviderEnabled('azure') && <IntegrationCard
           title={t('integrations.providerAzure')}
           icon='🔷'
           color='#60a5fa'
@@ -759,7 +772,7 @@ export default function IntegrationsPage() {
         </IntegrationCard>}
 
         {/* GitHub */}
-        {activeTab === 'task' && <IntegrationCard
+        {activeTab === 'task' && isProviderEnabled('github') && <IntegrationCard
           title={t('integrations.providerGithub')}
           icon='🐙'
           color='#a78bfa'
@@ -792,7 +805,7 @@ export default function IntegrationsPage() {
         </IntegrationCard>}
 
         {/* Jira */}
-        {activeTab === 'task' && <IntegrationCard
+        {activeTab === 'task' && isProviderEnabled('jira') && <IntegrationCard
           title={t('integrations.providerJira')}
           icon='🟦'
           color='#818cf8'
@@ -825,7 +838,7 @@ export default function IntegrationsPage() {
         </IntegrationCard>}
 
         {/* New Relic */}
-        {activeTab === 'task' && <IntegrationCard
+        {activeTab === 'task' && isProviderEnabled('newrelic') && <IntegrationCard
           title={t('integrations.providerNewrelic')}
           icon='📊'
           color='#1CE783'
@@ -861,7 +874,7 @@ export default function IntegrationsPage() {
         </IntegrationCard>}
 
         {/* Sentry */}
-        {activeTab === 'task' && <IntegrationCard
+        {activeTab === 'task' && isProviderEnabled('sentry') && <IntegrationCard
           title={t('integrations.providerSentry')}
           icon='🚨'
           color='#f97316'
@@ -894,7 +907,7 @@ export default function IntegrationsPage() {
         </IntegrationCard>}
 
         {/* HAL */}
-        {activeTab === 'ai' && <IntegrationCard
+        {activeTab === 'ai' && isProviderEnabled('hal') && <IntegrationCard
           title={t('integrations.providerHal')}
           icon='🤖'
           color='#f472b6'
@@ -933,7 +946,7 @@ export default function IntegrationsPage() {
         </IntegrationCard>}
 
         {/* Tenant Playbook */}
-        {activeTab === 'ai' && <IntegrationCard
+        {activeTab === 'ai' && isProviderEnabled('playbook') && <IntegrationCard
           title={t('integrations.providerPlaybook')}
           icon='📘'
           color='#f59e0b'
@@ -957,7 +970,7 @@ export default function IntegrationsPage() {
           </div>
         </IntegrationCard>}
 
-        {activeTab === 'notifications' && <IntegrationCard
+        {activeTab === 'notifications' && isProviderEnabled('slack') && <IntegrationCard
           title={t('integrations.providerSlack')}
           icon='💬'
           color='#22c55e'
@@ -997,7 +1010,7 @@ export default function IntegrationsPage() {
           </div>
         </IntegrationCard>}
 
-        {activeTab === 'notifications' && <IntegrationCard
+        {activeTab === 'notifications' && isProviderEnabled('teams') && <IntegrationCard
           title={t('integrations.providerTeams')}
           icon='🟪'
           color='#60a5fa'
