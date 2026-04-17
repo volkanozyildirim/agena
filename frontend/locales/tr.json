@@ -2596,5 +2596,6 @@
   "vs.codex.metaDesc": "AGENA ve OpenAI Codex CLI'yi karsilastirin.",
   "nav.bitbucket": "Bitbucket",
   "nav.gitlab": "GitLab",
-  "nav.datadog": "Datadog"
+  "nav.datadog": "Datadog",
+  "nav.appdynamics": "AppDynamics"
 }
