@@ -12,43 +12,46 @@ import { useLocale } from '@/lib/i18n';
 import { RoleContext, canAccess, type Role } from '@/lib/rbac';
 import { WebSocketProvider } from '@/lib/useWebSocket';
 
-type NavChild = { href: string; key: string; icon: string; permission?: string };
-type NavItem = { href: string; key: string; icon: string; permission?: string; children?: NavChild[] };
+type NavChild = { href: string; key: string; icon: string; permission?: string; module?: string };
+type NavItem = { href: string; key: string; icon: string; permission?: string; children?: NavChild[]; module?: string };
 
 const NOTIF_EVENT = 'agena:notification';
 const NOTIF_SYNC_EVENT = 'agena:notification-sync';
 const LS_UNREAD_KEY = 'agena_notification_unread_count';
 const LS_SIDEBAR_COLLAPSED = 'agena_sidebar_collapsed';
 
-type NavGroup = { labelKey: string; items: NavItem[]; defaultOpen?: boolean };
+type NavGroup = { labelKey: string; items: NavItem[]; defaultOpen?: boolean; module?: string };
 
 const NAV_GROUPS: NavGroup[] = [
   {
     labelKey: 'nav.group.workspace',
     defaultOpen: true,
+    module: 'core',
     items: [
-      { href: '/dashboard/office', key: 'nav.office', icon: '🏠' },
-      { href: '/dashboard/tasks', key: 'nav.tasks', icon: '📋', permission: 'tasks:read' as const },
-      { href: '/dashboard/sprints', key: 'nav.sprints', icon: '🗂', permission: 'tasks:read' as const },
-      { href: '/dashboard/refinement', key: 'nav.refinement', icon: '🔬', permission: 'tasks:read' as const },
+      { href: '/dashboard/office', key: 'nav.office', icon: '🏠', module: 'core' },
+      { href: '/dashboard/tasks', key: 'nav.tasks', icon: '📋', permission: 'tasks:read' as const, module: 'core' },
+      { href: '/dashboard/sprints', key: 'nav.sprints', icon: '🗂', permission: 'tasks:read' as const, module: 'sprints' },
+      { href: '/dashboard/refinement', key: 'nav.refinement', icon: '🔬', permission: 'tasks:read' as const, module: 'sprints' },
     ],
   },
   {
     labelKey: 'nav.group.ai',
     defaultOpen: true,
+    module: 'core',
     items: [
-      { href: '/dashboard/agents', key: 'nav.agents', icon: '🤖' },
-      { href: '/dashboard/flows', key: 'nav.flows', icon: '🔀' },
-      { href: '/dashboard/prompt-studio', key: 'nav.promptStudio', icon: '✏️' },
-      { href: '/dashboard/templates', key: 'nav.templates', icon: '📦' },
+      { href: '/dashboard/agents', key: 'nav.agents', icon: '🤖', module: 'core' },
+      { href: '/dashboard/flows', key: 'nav.flows', icon: '🔀', module: 'flows' },
+      { href: '/dashboard/prompt-studio', key: 'nav.promptStudio', icon: '✏️', module: 'prompt_studio' },
+      { href: '/dashboard/templates', key: 'nav.templates', icon: '📦', module: 'flows' },
     ],
   },
   {
     labelKey: 'nav.group.analytics',
     defaultOpen: false,
+    module: 'analytics',
     items: [
-      { href: '/dashboard/sprint-performance', key: 'nav.sprintPerformance', icon: '📈', permission: 'tasks:read' as const },
-      { href: '/dashboard/dora', key: 'nav.dora', icon: '📊', children: [
+      { href: '/dashboard/sprint-performance', key: 'nav.sprintPerformance', icon: '📈', permission: 'tasks:read' as const, module: 'analytics' },
+      { href: '/dashboard/dora', key: 'nav.dora', icon: '📊', module: 'analytics', children: [
         { href: '/dashboard/dora', key: 'nav.doraOverview', icon: '📊' },
         { href: '/dashboard/dora/project', key: 'nav.doraProject', icon: '📋' },
         { href: '/dashboard/dora/development', key: 'nav.doraDev', icon: '⚡' },
@@ -61,16 +64,17 @@ const NAV_GROUPS: NavGroup[] = [
   {
     labelKey: 'nav.group.settings',
     defaultOpen: false,
+    module: 'core',
     items: [
-      { href: '/dashboard/integrations', key: 'nav.integrations', icon: '🔌', permission: 'integrations:manage' as const, children: [
+      { href: '/dashboard/integrations', key: 'nav.integrations', icon: '🔌', permission: 'integrations:manage' as const, module: 'core', children: [
         { href: '/dashboard/integrations', key: 'nav.integrationsOverview', icon: '⚙️', permission: 'integrations:manage' as const },
-        { href: '/dashboard/integrations/newrelic', key: 'nav.newrelic', icon: '📡', permission: 'integrations:manage' as const },
-        { href: '/dashboard/integrations/sentry', key: 'nav.sentry', icon: '🚨', permission: 'integrations:manage' as const },
+        { href: '/dashboard/integrations/newrelic', key: 'nav.newrelic', icon: '📡', permission: 'integrations:manage' as const, module: 'newrelic' },
+        { href: '/dashboard/integrations/sentry', key: 'nav.sentry', icon: '🚨', permission: 'integrations:manage' as const, module: 'sentry' },
       ]},
-      { href: '/dashboard/mappings', key: 'nav.mappings', icon: '🗺' },
-      { href: '/dashboard/webhooks', key: 'nav.webhooks', icon: '🔗', permission: 'integrations:manage' as const },
-      { href: '/dashboard/team', key: 'nav.team', icon: '👥', permission: 'team:manage' as const },
-      { href: '/dashboard/permissions', key: 'nav.permissions', icon: '🔒', permission: 'roles:manage' as const },
+      { href: '/dashboard/mappings', key: 'nav.mappings', icon: '🗺', module: 'core' },
+      { href: '/dashboard/webhooks', key: 'nav.webhooks', icon: '🔗', permission: 'integrations:manage' as const, module: 'notifications' },
+      { href: '/dashboard/team', key: 'nav.team', icon: '👥', permission: 'team:manage' as const, module: 'core' },
+      { href: '/dashboard/permissions', key: 'nav.permissions', icon: '🔒', permission: 'roles:manage' as const, module: 'core' },
     ],
   },
 ];
@@ -100,6 +104,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
   const notifBellRef = useRef<HTMLButtonElement>(null);
   const [userRole, setUserRole] = useState<Role>('viewer');
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+  const [enabledModules, setEnabledModules] = useState<Set<string>>(new Set(['core', 'sprints', 'flows', 'prompt_studio', 'analytics', 'sentry', 'newrelic', 'notifications']));
   const [orgSlug, setOrgSlugState] = useState('');
   const [orgNameDisplay, setOrgNameDisplay] = useState('');
   const [expandedNav, setExpandedNav] = useState<string | null>(null);
@@ -254,6 +259,12 @@ function DashboardInner({ children }: { children: ReactNode }) {
           const me = members.find((m) => m.email === u.email);
           if (me) setUserRole(me.role as Role);
         }).catch(() => {});
+      }).catch(() => {});
+
+      // Fetch enabled modules
+      apiFetch<Array<{ slug: string; enabled: boolean }>>('/modules').then((mods) => {
+        if (!active) return;
+        setEnabledModules(new Set(mods.filter((m) => m.enabled).map((m) => m.slug)));
       }).catch(() => {});
 
       // Fetch task counts and compute unseen badges
@@ -553,7 +564,10 @@ function DashboardInner({ children }: { children: ReactNode }) {
           })()}
 
           {!isPlatformAdmin && NAV_GROUPS.map((group, gi) => {
-            const visibleItems = group.items.filter((item) => !item.permission || canAccess(userRole, item.permission as Parameters<typeof canAccess>[1]));
+            const visibleItems = group.items
+              .filter((item) => !item.module || enabledModules.has(item.module))
+              .filter((item) => !item.permission || canAccess(userRole, item.permission as Parameters<typeof canAccess>[1]))
+              .map((item) => item.children ? { ...item, children: item.children.filter((c) => !c.module || enabledModules.has(c.module)) } : item);
             if (!visibleItems.length) return null;
             const groupHasActive = visibleItems.some((item) => pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href)));
             const isGroupOpen = collapsedGroups[group.labelKey] !== undefined ? !collapsedGroups[group.labelKey] : (groupHasActive || (group.defaultOpen ?? true));
