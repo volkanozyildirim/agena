@@ -192,6 +192,7 @@ class OrchestrationService:
             'description': effective_description,
             'source': routing.effective_source,
             'organization_id': organization_id,
+            'created_by_user_id': task.created_by_user_id,
         }
 
         state: dict[str, Any] = {}
