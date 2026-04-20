@@ -42,6 +42,8 @@ class TaskResponse(BaseModel):
     is_unhandled: bool | None = None
     substatus: str | None = None
     first_seen_at: datetime | None = None
+    last_seen_at: datetime | None = None
+    occurrences: int | None = None
     status: str
     pr_url: str | None = None
     branch_name: str | None = None
@@ -127,22 +129,27 @@ class NewRelicImportRequest(BaseModel):
     entity_guid: str | None = None
     since: str = '24 hours ago'
     min_occurrences: int = 1
+    fingerprints: list[str] | None = None
 
 
 class SentryImportRequest(BaseModel):
     project_slug: str | None = None
     query: str = 'is:unresolved'
     limit: int = 50
+    issue_ids: list[str] | None = None
+    stats_period: str | None = None
 
 
 class DatadogImportRequest(BaseModel):
     query: str = 'status:open'
     limit: int = 50
+    time_from: str = '-24h'
 
 
 class AppDynamicsImportRequest(BaseModel):
     app_name: str | None = None
     limit: int = 50
+    duration_minutes: int = 1440
 
 
 class TaskDependencyUpdateRequest(BaseModel):

@@ -89,6 +89,8 @@ async def _to_task_response(service: TaskService, organization_id: int, task) ->
         is_unhandled=getattr(task, 'is_unhandled', None),
         substatus=getattr(task, 'substatus', None),
         first_seen_at=getattr(task, 'first_seen_at', None),
+        last_seen_at=getattr(task, 'last_seen_at', None),
+        occurrences=getattr(task, 'occurrences', None),
         status=task.status,
         pr_url=task.pr_url,
         branch_name=task.branch_name,
@@ -324,6 +326,7 @@ async def import_newrelic_errors(
             entity_guid=request.entity_guid,
             since=request.since,
             min_occurrences=request.min_occurrences,
+            fingerprints=request.fingerprints,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -359,6 +362,8 @@ async def import_sentry_issues(
             project_slug=request.project_slug,
             query=request.query,
             limit=request.limit,
+            issue_ids=request.issue_ids,
+            stats_period=request.stats_period,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -393,6 +398,7 @@ async def import_datadog_issues(
             tenant.user_id,
             query=request.query,
             limit=request.limit,
+            time_from=request.time_from,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -418,6 +424,7 @@ async def import_appdynamics_errors(
             tenant.user_id,
             app_name=request.app_name,
             limit=request.limit,
+            duration_minutes=request.duration_minutes,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

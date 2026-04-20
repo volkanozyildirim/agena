@@ -278,6 +278,26 @@ class JiraClient:
                 response = await client.post(comment_url, json=comment_payload, auth=(email, api_token))
                 response.raise_for_status()
 
+    async def add_label_to_issue(
+        self,
+        *,
+        cfg: dict[str, str] | None,
+        issue_key: str,
+        label: str,
+    ) -> None:
+        """Append a label to a Jira issue. Idempotent — uses the 'update' op to avoid duplicates."""
+        base_url, email, api_token = self._resolve_config(cfg)
+        key = str(issue_key or '').strip()
+        label_value = str(label or '').strip()
+        if not base_url or not key or not label_value:
+            return
+
+        url = f"{base_url.rstrip('/')}/rest/api/3/issue/{key}"
+        payload = {'update': {'labels': [{'add': label_value}]}}
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.put(url, json=payload, auth=(email, api_token))
+            response.raise_for_status()
+
     @staticmethod
     def _format_comment_adf(text: str) -> dict:
         """Convert plain-text refinement comment to Jira ADF (Atlassian Document Format)."""

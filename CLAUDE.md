@@ -56,8 +56,7 @@ curl localhost:9876/health          # Check status
 ```
 
 - Bridge authenticates via the host's `claude auth login` session — no API key needed
-- `docker-compose up` does NOT start cli-bridge (it uses a Docker profile `bridge-docker`)
-- If you need the Docker bridge instead: `docker-compose --profile bridge-docker up cli-bridge`
+- Bridge is **host-only** now — not defined in docker-compose. Started by `./start.sh`.
 
 Backend code is volume-mounted (`./packages:/app/packages`) — hot-reloads via `pip install -e` on container start. Worker needs manual restart.
 

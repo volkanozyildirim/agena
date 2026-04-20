@@ -756,6 +756,20 @@ export default function DashboardTasksPage() {
                     {task.fixability_score != null && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: 'rgba(168,85,247,0.1)', color: '#a855f7' }}>fix {Math.round(task.fixability_score * 100)}%</span>}
                   </div>
                 )}
+                {(task.source === 'newrelic' || task.source === 'sentry') && (task.occurrences != null || task.last_seen_at) && (
+                  <div style={{ display: 'flex', gap: 6, marginTop: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {task.occurrences != null && (
+                      <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: 'rgba(248,113,113,0.12)', color: '#f87171' }}>
+                        {task.occurrences.toLocaleString()}× {t('tasks.occurrences') || 'times'}
+                      </span>
+                    )}
+                    {task.last_seen_at && (
+                      <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--ink-35)' }}>
+                        {t('tasks.lastSeen') || 'Last seen'}: {new Date(task.last_seen_at).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: 5,

@@ -2653,3 +2653,45 @@ html.light {
   --cookie-border: rgba(0,0,0,0.1);
   --cookie-shadow: 0 8px 32px rgba(0,0,0,0.12);
 }
+
+/* Integration pages (newrelic/sentry/datadog/appdynamics) — mobile layout */
+@media (max-width: 640px) {
+  .integrations-page .int-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .integrations-page .int-row > * {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .integrations-page .int-row select,
+  .integrations-page .int-row input[type="text"],
+  .integrations-page .int-row input[type="search"] {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+  .integrations-page .int-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-start;
+  }
+  .integrations-page .int-actions > * {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .integrations-page h2 {
+    font-size: 17px !important;
+  }
+  .integrations-page h3 {
+    font-size: 13px !important;
+  }
+  .integrations-page .int-table-row {
+    grid-template-columns: 1fr !important;
+    gap: 4px !important;
+  }
+  .integrations-page .int-table-header {
+    display: none !important;
+  }
+}
+

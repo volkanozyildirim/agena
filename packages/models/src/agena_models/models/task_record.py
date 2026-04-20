@@ -35,6 +35,8 @@ class TaskRecord(Base):
     is_unhandled: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     substatus: Mapped[str | None] = mapped_column(String(32), nullable=True)
     first_seen_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    occurrences: Mapped[int | None] = mapped_column(Integer, nullable=True)
     sprint_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     sprint_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

@@ -150,6 +150,42 @@ class AzureDevOpsClient:
             response = await client.patch(url, headers=headers, json=patch_ops)
             response.raise_for_status()
 
+    async def add_tag_to_work_item(
+        self,
+        *,
+        cfg: dict[str, str],
+        work_item_id: str,
+        tag: str,
+    ) -> None:
+        """Append a tag to an Azure DevOps work item's System.Tags field (semicolon-separated)."""
+        org_url = (cfg.get('org_url') or self.settings.azure_org_url or '').strip()
+        pat = (cfg.get('pat') or self.settings.azure_pat or '').strip()
+        if not org_url or not pat:
+            raise ValueError('Azure org_url or PAT is missing')
+        item_id = str(work_item_id or '').strip()
+        tag_value = str(tag or '').strip()
+        if not item_id or not tag_value:
+            return
+
+        url_get = f"{org_url.rstrip('/')}/_apis/wit/workitems/{item_id}?fields=System.Tags&api-version=7.1-preview.3"
+        headers = self._headers(pat)
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(url_get, headers=headers)
+            resp.raise_for_status()
+            current_tags = str((resp.json().get('fields') or {}).get('System.Tags') or '').strip()
+
+            existing = [t.strip() for t in current_tags.split(';') if t.strip()]
+            if tag_value in existing:
+                return
+            existing.append(tag_value)
+            new_tags = '; '.join(existing)
+
+            url_patch = f"{org_url.rstrip('/')}/_apis/wit/workitems/{item_id}?api-version=7.1-preview.3"
+            patch_headers = {**headers, 'Content-Type': 'application/json-patch+json'}
+            patch_ops = [{'op': 'add', 'path': '/fields/System.Tags', 'value': new_tags}]
+            patch_resp = await client.patch(url_patch, headers=patch_headers, json=patch_ops)
+            patch_resp.raise_for_status()
+
     @staticmethod
     def _format_comment_html(text: str) -> str:
         """Convert plain-text refinement comment to formatted HTML for Azure DevOps."""

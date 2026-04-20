@@ -98,6 +98,8 @@ class TaskService:
         is_unhandled: bool | None = None,
         substatus: str | None = None,
         first_seen_at: str | None = None,
+        last_seen_at: str | None = None,
+        occurrences: int | None = None,
     ) -> TaskRecord:
         if self.db is None:
             raise ValueError('DB session required')
@@ -116,13 +118,23 @@ class TaskService:
         if exists:
             return exists
 
-        parsed_first_seen = None
-        if first_seen_at:
+        from datetime import datetime as _dt
+
+        def _parse_ts(value: str | None) -> 'datetime | None':
+            if not value:
+                return None
             try:
-                from datetime import datetime as _dt
-                parsed_first_seen = _dt.fromisoformat(first_seen_at.replace('Z', '+00:00'))
+                if value.isdigit() or (value.replace('.', '', 1).isdigit() and value.count('.') <= 1):
+                    ts = float(value)
+                    if ts > 1e12:
+                        ts = ts / 1000.0
+                    return _dt.utcfromtimestamp(ts)
+                return _dt.fromisoformat(value.replace('Z', '+00:00'))
             except (ValueError, TypeError):
-                pass
+                return None
+
+        parsed_first_seen = _parse_ts(first_seen_at)
+        parsed_last_seen = _parse_ts(last_seen_at)
 
         task = TaskRecord(
             organization_id=organization_id,
@@ -137,6 +149,8 @@ class TaskService:
             is_unhandled=is_unhandled,
             substatus=substatus or None,
             first_seen_at=parsed_first_seen,
+            last_seen_at=parsed_last_seen,
+            occurrences=occurrences,
             sprint_name=sprint_name or None,
             sprint_path=sprint_path or None,
         )
@@ -275,6 +289,7 @@ class TaskService:
         entity_guid: str | None = None,
         since: str = '24 hours ago',
         min_occurrences: int = 1,
+        fingerprints: list[str] | None = None,
     ) -> tuple[int, int]:
         if self.db is None:
             raise ValueError('DB session required')
@@ -312,6 +327,8 @@ class TaskService:
         imported = 0
         skipped = 0
 
+        fp_filter = set(fingerprints) if fingerprints else None
+
         for mapping in mappings:
             errors = await self.newrelic_client.fetch_errors_with_details(
                 nr_cfg,
@@ -320,6 +337,8 @@ class TaskService:
                 since=since,
             )
             filtered = [e for e in errors if e.get('occurrences', 0) >= min_occurrences]
+            if fp_filter is not None:
+                filtered = [e for e in filtered if e.get('fingerprint') in fp_filter]
             ext_tasks = self.newrelic_client.errors_to_external_tasks(
                 filtered, entity_name=mapping.entity_name, account_id=mapping.account_id,
                 entity_guid=mapping.entity_guid,
@@ -344,6 +363,8 @@ class TaskService:
                         external_id=item.id,
                         title=item.title,
                         description=item.description,
+                        occurrences=item.occurrences,
+                        last_seen_at=item.last_seen_at,
                     )
                     if mapping.repo_mapping_id:
                         task.repo_mapping_id = mapping.repo_mapping_id
@@ -362,6 +383,8 @@ class TaskService:
         project_slug: str | None = None,
         query: str = 'is:unresolved',
         limit: int = 50,
+        issue_ids: list[str] | None = None,
+        stats_period: str | None = None,
     ) -> tuple[int, int]:
         if self.db is None:
             raise ValueError('DB session required')
@@ -417,6 +440,8 @@ class TaskService:
         imported = 0
         skipped = 0
 
+        id_filter = set(issue_ids) if issue_ids else None
+
         for mapping in mappings:
             issues = await self.sentry_client.list_issues(
                 sentry_cfg,
@@ -424,11 +449,14 @@ class TaskService:
                 project_slug=str(mapping.project_slug),
                 query=query,
                 limit=limit,
+                stats_period=stats_period,
             )
             project = str(mapping.project_slug)
             for issue in issues:
                 issue_id = str(issue.get('id') or '').strip()
                 if not issue_id:
+                    continue
+                if id_filter is not None and issue_id not in id_filter:
                     continue
                 external_id = f'{project}:{issue_id}'
                 try:
@@ -524,6 +552,8 @@ class TaskService:
                         is_unhandled=item.is_unhandled,
                         substatus=item.substatus,
                         first_seen_at=item.first_seen_at,
+                        last_seen_at=item.last_seen_at,
+                        occurrences=item.occurrences,
                     )
                     if getattr(mapping, 'repo_mapping_id', None):
                         task.repo_mapping_id = int(mapping.repo_mapping_id)
@@ -541,6 +571,7 @@ class TaskService:
         *,
         query: str = 'status:open',
         limit: int = 50,
+        time_from: str = '-24h',
     ) -> tuple[int, int]:
         if self.db is None:
             raise ValueError('DB session required')
@@ -570,7 +601,7 @@ class TaskService:
         skipped = 0
 
         try:
-            issues = await client.list_error_tracking_issues(dd_cfg, query=query, limit=limit)
+            issues = await client.list_error_tracking_issues(dd_cfg, query=query, limit=limit, time_from=time_from)
         except Exception as exc:
             raise ValueError(f'Datadog API error: {exc}') from exc
 
@@ -613,6 +644,7 @@ class TaskService:
         *,
         app_name: str | None = None,
         limit: int = 50,
+        duration_minutes: int = 1440,
     ) -> tuple[int, int]:
         if self.db is None:
             raise ValueError('DB session required')
@@ -644,7 +676,7 @@ class TaskService:
         skipped = 0
 
         try:
-            errors = await client.list_errors(ad_cfg, app_id=app_id, limit=limit)
+            errors = await client.list_errors(ad_cfg, app_id=app_id, limit=limit, duration_minutes=duration_minutes)
         except Exception as exc:
             raise ValueError(f'AppDynamics API error: {exc}') from exc
 

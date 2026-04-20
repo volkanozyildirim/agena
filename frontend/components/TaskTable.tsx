@@ -39,6 +39,12 @@ export type TaskItem = {
   repo_mapping_name?: string | null;
   sprint_name?: string | null;
   repo_assignments?: RepoAssignment[];
+  is_unhandled?: boolean | null;
+  substatus?: string | null;
+  fixability_score?: number | null;
+  first_seen_at?: string | null;
+  last_seen_at?: string | null;
+  occurrences?: number | null;
 };
 
 type Props = {
