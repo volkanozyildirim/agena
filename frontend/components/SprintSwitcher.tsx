@@ -208,8 +208,8 @@ export default function SprintSwitcher() {
     return t('sprintSwitcher.noSprint');
   })();
 
-  const activeColor = provider === 'jira' ? '#a5b4fc' : '#5eead4';
-  const activeBg = provider === 'jira' ? 'rgba(99,102,241,0.12)' : 'rgba(13,148,136,0.12)';
+  const activeColor = provider === 'jira' ? 'var(--tab-jira)' : 'var(--tab-azure)';
+  const activeBg = provider === 'jira' ? 'var(--tab-jira-bg)' : 'var(--tab-azure-bg)';
   const activeBorder = provider === 'jira' ? 'rgba(99,102,241,0.3)' : 'rgba(13,148,136,0.3)';
   const hasActiveSprint = provider === 'jira' ? Boolean(jiraSprint) : Boolean(azSprint);
 
@@ -245,8 +245,8 @@ export default function SprintSwitcher() {
               {t('sprintSwitcher.title')}
             </div>
             <div style={{ display: 'flex', gap: 4, padding: 3, borderRadius: 10, background: 'var(--panel)', border: '1px solid var(--panel-border-3)' }}>
-              <TabBtn active={provider === 'azure'} onClick={() => setProvider('azure')} label='Azure' color='#5eead4' />
-              <TabBtn active={provider === 'jira'} onClick={() => setProvider('jira')} label='Jira' color='#a5b4fc' disabled={!jiraConnected} />
+              <TabBtn active={provider === 'azure'} onClick={() => setProvider('azure')} label='Azure' color='var(--tab-azure)' />
+              <TabBtn active={provider === 'jira'} onClick={() => setProvider('jira')} label='Jira' color='var(--tab-jira)' disabled={!jiraConnected} />
             </div>
           </div>
 
@@ -317,7 +317,7 @@ function TabBtn({ active, onClick, label, color, disabled }: { active: boolean; 
       onClick={onClick} disabled={disabled}
       style={{
         flex: 1, padding: '6px 8px', borderRadius: 7, border: 'none',
-        background: active ? `${color}22` : 'transparent',
+        background: active ? `color-mix(in srgb, ${color} 14%, transparent)` : 'transparent',
         color: active ? color : disabled ? 'var(--ink-25)' : 'var(--muted)',
         fontSize: 12, fontWeight: 700, cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.5 : 1,

@@ -2654,6 +2654,20 @@ html.light {
   --cookie-shadow: 0 8px 32px rgba(0,0,0,0.12);
 }
 
+/* Sprint-switcher provider colors (dark-mode defaults, light-mode overrides below) */
+:root {
+  --tab-azure: #5eead4;
+  --tab-azure-bg: rgba(94,234,212,0.14);
+  --tab-jira: #a5b4fc;
+  --tab-jira-bg: rgba(165,180,252,0.14);
+}
+html.light {
+  --tab-azure: #0d9488;
+  --tab-azure-bg: rgba(13,148,136,0.10);
+  --tab-jira: #4f46e5;
+  --tab-jira-bg: rgba(79,70,229,0.10);
+}
+
 /* Integration pages (newrelic/sentry/datadog/appdynamics) — mobile layout */
 @media (max-width: 640px) {
   .integrations-page .int-row {
