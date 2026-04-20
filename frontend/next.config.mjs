@@ -44,13 +44,18 @@ const nextConfig = {
 
 let exportedConfig = nextConfig;
 
+const isDev = process.env.NODE_ENV === 'development';
+const disableSentry = isDev || process.env.DISABLE_SENTRY === '1';
+
 const require = createRequire(import.meta.url);
 let withSentryConfig = null;
-try {
-  require.resolve('@sentry/nextjs/package.json');
-  ({ withSentryConfig } = await import('@sentry/nextjs'));
-} catch {
-  // Keep frontend booting even if Sentry dependency is not present yet.
+if (!disableSentry) {
+  try {
+    require.resolve('@sentry/nextjs/package.json');
+    ({ withSentryConfig } = await import('@sentry/nextjs'));
+  } catch {
+    // Keep frontend booting even if Sentry dependency is not present yet.
+  }
 }
 
 if (withSentryConfig) {
