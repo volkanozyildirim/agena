@@ -362,6 +362,8 @@ class NewRelicClient:
                 source='newrelic',
                 state='open',
                 web_url=nr_errors_url or None,
+                occurrences=int(occurrences) if occurrences is not None else None,
+                last_seen_at=str(last_seen_raw) if last_seen_raw else None,
             ))
         return tasks
 

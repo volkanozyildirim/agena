@@ -1276,6 +1276,37 @@ class OrchestrationService:
                 except Exception as exc:
                     logger.warning('Failed to post Sentry comment for task #%s: %s', task.id, exc)
 
+            # Apply configurable AI tag/label on source work item (Azure) or issue (Jira)
+            if task.source in ('azure', 'jira') and task.external_id:
+                try:
+                    provider = 'azure' if task.source == 'azure' else 'jira'
+                    source_config = await IntegrationConfigService(self.db_session).get_config(organization_id, provider)
+                    if source_config:
+                        extra = source_config.extra_config or {}
+                        if bool(extra.get('ai_tag_enabled')):
+                            tag_name = str(extra.get('ai_tag_name') or 'ai-agena').strip()
+                            if tag_name:
+                                if task.source == 'azure':
+                                    from agena_services.integrations.azure_client import AzureDevOpsClient
+                                    az_cfg = {'org_url': source_config.base_url or '', 'pat': source_config.secret or ''}
+                                    await AzureDevOpsClient().add_tag_to_work_item(
+                                        cfg=az_cfg, work_item_id=task.external_id, tag=tag_name,
+                                    )
+                                else:
+                                    from agena_services.integrations.jira_client import JiraClient
+                                    jr_cfg = {
+                                        'base_url': source_config.base_url or '',
+                                        'email': source_config.username or '',
+                                        'api_token': source_config.secret or '',
+                                    }
+                                    await JiraClient().add_label_to_issue(
+                                        cfg=jr_cfg, issue_key=task.external_id, label=tag_name,
+                                    )
+                                logger.info('Applied AI tag "%s" on %s %s for task #%s',
+                                            tag_name, task.source, task.external_id, task.id)
+                except Exception as exc:
+                    logger.warning('Failed to apply AI tag for task #%s: %s', task.id, exc)
+
             await usage_service.increment_tokens(organization_id, int(usage.get('total_tokens', 0)))
             run_finished_at = datetime.utcnow()
             duration_sec = round(time.perf_counter() - run_started_clock, 2)

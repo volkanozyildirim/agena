@@ -112,6 +112,7 @@ async def list_sentry_project_issues(
     project_slug: str,
     query: str = Query('is:unresolved'),
     limit: int = Query(50, ge=1, le=100),
+    stats_period: str | None = Query(None),
     tenant: CurrentTenant = Depends(get_current_tenant),
     db: AsyncSession = Depends(get_db_session),
 ) -> SentryIssueListResponse:
@@ -124,6 +125,7 @@ async def list_sentry_project_issues(
             project_slug=project_slug.strip(),
             query=query,
             limit=limit,
+            stats_period=stats_period,
         )
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code in (401, 403):

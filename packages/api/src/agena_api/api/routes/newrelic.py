@@ -131,7 +131,7 @@ async def list_entity_errors(
                 error_class=e['error_class'],
                 error_message=e['error_message'],
                 occurrences=e['occurrences'],
-                last_seen=e.get('last_seen'),
+                last_seen=str(e['last_seen']) if e.get('last_seen') is not None else None,
                 fingerprint=e['fingerprint'],
             )
             for e in errors

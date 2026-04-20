@@ -6,7 +6,7 @@ import { useLocale } from '@/lib/i18n';
 
 type IntegrationConfig = {
   provider: 'jira' | 'azure' | 'openai' | 'gemini' | 'github' | 'gitlab' | 'bitbucket' | 'playbook' | 'slack' | 'teams' | 'telegram' | 'hal' | 'newrelic' | 'sentry' | 'datadog' | 'appdynamics';
-  extra_config?: Record<string, string> | null;
+  extra_config?: Record<string, string | boolean | number | null | undefined> | null;
   base_url: string;
   project?: string | null;
   username?: string | null;
@@ -51,6 +51,10 @@ export default function IntegrationsPage() {
   const [azureOrgUrl, setAzureOrgUrl] = useState('');
   const [azureProject, setAzureProject] = useState('');
   const [azurePat, setAzurePat] = useState('');
+  const [azureAiTagEnabled, setAzureAiTagEnabled] = useState(false);
+  const [azureAiTagName, setAzureAiTagName] = useState('ai-agena');
+  const [jiraAiTagEnabled, setJiraAiTagEnabled] = useState(false);
+  const [jiraAiTagName, setJiraAiTagName] = useState('ai-agena');
   const [githubBaseUrl, setGithubBaseUrl] = useState('https://api.github.com');
   const [githubOwner, setGithubOwner] = useState('');
   const [githubToken, setGithubToken] = useState('');
@@ -259,8 +263,16 @@ export default function IntegrationsPage() {
     const gemini = data.find((c) => c.provider === 'gemini');
     const slack = data.find((c) => c.provider === 'slack');
     const teams = data.find((c) => c.provider === 'teams');
-    if (jira) { setJiraBaseUrl(jira.base_url); setJiraEmail(jira.username ?? ''); }
-    if (azure) { setAzureOrgUrl(azure.base_url); setAzureProject(azure.project ?? ''); }
+    if (jira) {
+      setJiraBaseUrl(jira.base_url); setJiraEmail(jira.username ?? '');
+      setJiraAiTagEnabled(Boolean(jira.extra_config?.ai_tag_enabled));
+      setJiraAiTagName(String(jira.extra_config?.ai_tag_name ?? 'ai-agena') || 'ai-agena');
+    }
+    if (azure) {
+      setAzureOrgUrl(azure.base_url); setAzureProject(azure.project ?? '');
+      setAzureAiTagEnabled(Boolean(azure.extra_config?.ai_tag_enabled));
+      setAzureAiTagName(String(azure.extra_config?.ai_tag_name ?? 'ai-agena') || 'ai-agena');
+    }
     if (github) {
       setGithubBaseUrl(github.base_url || 'https://api.github.com');
       setGithubOwner(github.username ?? '');
@@ -333,7 +345,12 @@ export default function IntegrationsPage() {
     Promise.all([
       apiFetch('/integrations/jira', {
         method: 'PUT',
-        body: JSON.stringify({ base_url: jiraBaseUrl, username: jiraEmail, secret: jiraSecret || undefined }),
+        body: JSON.stringify({
+          base_url: jiraBaseUrl,
+          username: jiraEmail,
+          secret: jiraSecret || undefined,
+          extra_config: { ai_tag_enabled: jiraAiTagEnabled, ai_tag_name: jiraAiTagName || 'ai-agena' },
+        }),
       }),
       loadIntegrationState(),
     ]).then(() => {
@@ -350,7 +367,12 @@ export default function IntegrationsPage() {
     Promise.all([
       apiFetch('/integrations/azure', {
         method: 'PUT',
-        body: JSON.stringify({ base_url: azureOrgUrl, project: azureProject, secret: azurePat || undefined }),
+        body: JSON.stringify({
+          base_url: azureOrgUrl,
+          project: azureProject,
+          secret: azurePat || undefined,
+          extra_config: { ai_tag_enabled: azureAiTagEnabled, ai_tag_name: azureAiTagName || 'ai-agena' },
+        }),
       }),
       loadIntegrationState(),
     ]).then(() => {
@@ -849,6 +871,18 @@ export default function IntegrationsPage() {
               placeholder={azureConfig?.has_secret ? `${azureConfig?.secret_preview || azurePatPreview || '****'} (${t('integrations.keepExisting')})` : t('integrations.patPlaceholder')}
             />
           </FieldGroup>
+          <FieldGroup label={t('integrations.aiTagLabel') || 'AI tag on completed work items'}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--ink-50)', marginBottom: 6, cursor: 'pointer' }}>
+              <input type='checkbox' checked={azureAiTagEnabled} onChange={(e) => setAzureAiTagEnabled(e.target.checked)} />
+              {t('integrations.aiTagEnabled') || 'Tag source work items handled by AI'}
+            </label>
+            <input
+              value={azureAiTagName}
+              onChange={(e) => setAzureAiTagName(e.target.value)}
+              placeholder='ai-agena'
+              disabled={!azureAiTagEnabled}
+            />
+          </FieldGroup>
           <button className='button button-primary' onClick={() => void saveAzure()} style={{ width: '100%', justifyContent: 'center', marginTop: 2 }}>
             {t('integrations.saveAzure')}
           </button>
@@ -913,6 +947,18 @@ export default function IntegrationsPage() {
               value={jiraSecret}
               onChange={(e) => setJiraSecret(e.target.value)}
               placeholder={jiraConfig?.has_secret ? `${jiraConfig?.secret_preview || jiraTokenPreview || '****'} (${t('integrations.keepExisting')})` : t('integrations.apiTokenPlaceholder')}
+            />
+          </FieldGroup>
+          <FieldGroup label={t('integrations.aiTagLabelJira') || 'AI label on completed issues'}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--ink-50)', marginBottom: 6, cursor: 'pointer' }}>
+              <input type='checkbox' checked={jiraAiTagEnabled} onChange={(e) => setJiraAiTagEnabled(e.target.checked)} />
+              {t('integrations.aiTagEnabledJira') || 'Label source issues handled by AI'}
+            </label>
+            <input
+              value={jiraAiTagName}
+              onChange={(e) => setJiraAiTagName(e.target.value)}
+              placeholder='ai-agena'
+              disabled={!jiraAiTagEnabled}
             />
           </FieldGroup>
           <button className='button button-primary' onClick={() => void saveJira()} style={{ width: '100%', justifyContent: 'center', marginTop: 2 }}>

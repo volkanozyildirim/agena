@@ -84,6 +84,7 @@ class SentryClient:
         project_slug: str,
         query: str = 'is:unresolved',
         limit: int = 50,
+        stats_period: str | None = None,
     ) -> list[dict[str, Any]]:
         base_url, token = self._resolve(cfg)
         if not token:
@@ -95,11 +96,19 @@ class SentryClient:
             'Authorization': f'Bearer {token}',
             'Accept': 'application/json',
         }
-        params = {
-            'query': query,
+        effective_query = query
+        if stats_period:
+            age_token = f'age:-{stats_period}'
+            if age_token not in effective_query:
+                effective_query = f'{effective_query} {age_token}'.strip()
+
+        params: dict[str, str] = {
+            'query': effective_query,
             'limit': str(max(1, min(limit, 100))),
             'sort': 'freq',
         }
+        if stats_period in ('24h', '14d'):
+            params['statsPeriod'] = stats_period
 
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.get(url, headers=headers, params=params)
@@ -368,6 +377,11 @@ class SentryClient:
         elif permalink:
             desc_lines.append(f'Sentry URL: {permalink}')
 
+        try:
+            count_int = int(count) if count and count.isdigit() else None
+        except (ValueError, TypeError):
+            count_int = None
+
         return ExternalTask(
             id=f'{project_slug}:{issue_id}',
             title=title,
@@ -379,6 +393,8 @@ class SentryClient:
             is_unhandled=is_unhandled,
             substatus=substatus,
             first_seen_at=first_seen,
+            last_seen_at=last_seen or None,
+            occurrences=count_int,
             created_date=None,
             web_url=permalink or None,
         )

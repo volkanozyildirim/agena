@@ -34,6 +34,7 @@ export default function DatadogPage() {
   const [issues, setIssues] = useState<DatadogIssue[]>([]);
   const [issuesLoading, setIssuesLoading] = useState(false);
   const [query, setQuery] = useState('status:open');
+  const [timeFrom, setTimeFrom] = useState('-30m');
   const [repos, setRepos] = useState<RepoMapping[]>([]);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number } | null>(null);
@@ -62,7 +63,8 @@ export default function DatadogPage() {
     setIssuesLoading(true);
     setError('');
     try {
-      const data = await apiFetch<DatadogIssue[]>('/datadog/issues?query=' + encodeURIComponent(query));
+      const params = new URLSearchParams({ query, time_from: timeFrom });
+      const data = await apiFetch<DatadogIssue[]>('/datadog/issues?' + params);
       setIssues(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to fetch issues');
@@ -77,7 +79,7 @@ export default function DatadogPage() {
     try {
       const result = await apiFetch<{ imported: number; skipped: number }>('/tasks/import/datadog', {
         method: 'POST',
-        body: JSON.stringify({ query, limit: 50 }),
+        body: JSON.stringify({ query, limit: 50, time_from: timeFrom }),
       });
       setImportResult(result);
       setMsg(`Imported ${result.imported} issues, ${result.skipped} skipped`);
@@ -89,14 +91,14 @@ export default function DatadogPage() {
   }
 
   return (
-    <div style={{ display: 'grid', gap: 16, maxWidth: 900 }}>
+    <div className='integrations-page' style={{ display: 'grid', gap: 16, maxWidth: 900 }}>
       {/* Header */}
       <div>
         <h1 style={{ fontSize: 18, fontWeight: 800, color: 'var(--ink-90)', margin: 0 }}>
-          <span style={{ marginRight: 8 }}>🐶</span>Datadog Error Tracking
+          <span style={{ marginRight: 8 }}>🐶</span>{t('integrations.datadog.title')}
         </h1>
         <p style={{ fontSize: 12, color: 'var(--ink-40)', marginTop: 4 }}>
-          Import error tracking issues from Datadog and let AI agents fix them automatically.
+          {t('integrations.datadog.subtitle')}
         </p>
       </div>
 
@@ -113,45 +115,57 @@ export default function DatadogPage() {
       )}
 
       {/* Query + Fetch */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div className='int-row' style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="status:open service:my-app"
+          placeholder={t('integrations.datadog.queryPlaceholder')}
           style={{ flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 12, border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--ink)', outline: 'none' }}
         />
+        <select
+          value={timeFrom}
+          onChange={(e) => setTimeFrom(e.target.value)}
+          style={{ padding: '8px 12px', borderRadius: 8, fontSize: 12, border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--ink)', outline: 'none' }}
+        >
+          <option value='-30m'>{t('integrations.newrelic.range30m') || 'Last 30 min'}</option>
+          <option value='-1h'>{t('integrations.newrelic.range1h') || 'Last 1 hour'}</option>
+          <option value='-3h'>{t('integrations.newrelic.range3h') || 'Last 3 hours'}</option>
+          <option value='-24h'>{t('integrations.newrelic.range24h') || 'Last 24 hours'}</option>
+          <option value='-7d'>{t('integrations.newrelic.range7d') || 'Last 7 days'}</option>
+        </select>
         <button onClick={fetchIssues} disabled={issuesLoading}
           style={{ padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: 'none', background: '#632ca6', color: '#fff', cursor: 'pointer' }}>
-          {issuesLoading ? 'Loading...' : 'Fetch Issues'}
+          {issuesLoading ? t('integrations.common.loading') : t('integrations.datadog.fetchIssues')}
         </button>
         <button onClick={importAll} disabled={importing}
           style={{ padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: '1px solid #632ca6', background: 'transparent', color: '#632ca6', cursor: 'pointer' }}>
-          {importing ? 'Importing...' : 'Import All'}
+          {importing ? t('integrations.datadog.importing') : t('integrations.common.importAll')}
         </button>
       </div>
 
       {/* Import result */}
       {importResult && (
         <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(99,44,166,0.08)', border: '1px solid rgba(99,44,166,0.2)', fontSize: 12 }}>
-          <strong style={{ color: '#632ca6' }}>{importResult.imported}</strong> imported,{' '}
-          <strong style={{ color: 'var(--ink-40)' }}>{importResult.skipped}</strong> skipped (already exists)
+          {t('integrations.datadog.importedSkipped')
+            .replace('{imported}', String(importResult.imported))
+            .replace('{skipped}', String(importResult.skipped))}
         </div>
       )}
 
       {/* Issues list */}
       {issues.length > 0 && (
         <div style={{ borderRadius: 12, border: '1px solid var(--panel-border)', overflow: 'hidden' }}>
-          <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--panel-border)', background: 'var(--panel)', display: 'grid', gridTemplateColumns: '1fr 100px 80px 80px 100px', gap: 8, fontSize: 10, fontWeight: 700, color: 'var(--ink-35)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-            <span>Error</span>
-            <span>Service</span>
-            <span>Status</span>
-            <span>Count</span>
-            <span>Last Seen</span>
+          <div className='int-table-header' style={{ padding: '10px 14px', borderBottom: '1px solid var(--panel-border)', background: 'var(--panel)', display: 'grid', gridTemplateColumns: '1fr 100px 80px 80px 100px', gap: 8, fontSize: 10, fontWeight: 700, color: 'var(--ink-35)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            <span>{t('integrations.common.error')}</span>
+            <span>{t('integrations.common.serviceColon')}</span>
+            <span>{t('integrations.common.statusColon')}</span>
+            <span>{t('integrations.common.countColon')}</span>
+            <span>{t('integrations.datadog.colLastSeen')}</span>
           </div>
           {issues.map((issue) => {
             const a = issue.attributes || {};
             return (
-              <div key={issue.id} style={{ padding: '10px 14px', borderBottom: '1px solid var(--panel-border)', display: 'grid', gridTemplateColumns: '1fr 100px 80px 80px 100px', gap: 8, alignItems: 'center', fontSize: 12 }}>
+              <div key={issue.id} className='int-table-row' style={{ padding: '10px 14px', borderBottom: '1px solid var(--panel-border)', display: 'grid', gridTemplateColumns: '1fr 100px 80px 80px 100px', gap: 8, alignItems: 'center', fontSize: 12 }}>
                 <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--ink-78)', fontWeight: 600 }}>
                   {a.title || issue.id}
                 </div>
@@ -175,7 +189,7 @@ export default function DatadogPage() {
 
       {issues.length === 0 && !issuesLoading && (
         <div style={{ textAlign: 'center', padding: 30, color: 'var(--ink-25)', fontSize: 13 }}>
-          Click "Fetch Issues" to load Datadog error tracking issues.
+          {t('integrations.datadog.fetchIssues')}
         </div>
       )}
 

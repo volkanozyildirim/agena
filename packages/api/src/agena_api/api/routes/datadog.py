@@ -17,6 +17,7 @@ router = APIRouter(prefix='/datadog', tags=['datadog'])
 async def list_datadog_issues(
     query: str = Query(default='status:open'),
     limit: int = Query(default=50, ge=1, le=100),
+    time_from: str = Query(default='-24h'),
     tenant: CurrentTenant = Depends(get_current_tenant),
     db: AsyncSession = Depends(get_db_session),
 ) -> list[dict[str, Any]]:
@@ -37,7 +38,7 @@ async def list_datadog_issues(
         'base_url': config.base_url or 'https://api.datadoghq.com',
     }
     try:
-        issues = await client.list_error_tracking_issues(dd_cfg, query=query, limit=limit)
+        issues = await client.list_error_tracking_issues(dd_cfg, query=query, limit=limit, time_from=time_from)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f'Datadog API error: {exc}') from exc
     return issues

@@ -41,6 +41,9 @@ type TaskDetail = {
   pr_risk_level?: string | null;
   pr_risk_reason?: string | null;
   total_tokens?: number | null;
+  occurrences?: number | null;
+  last_seen_at?: string | null;
+  first_seen_at?: string | null;
   repo_assignments?: {
     id: number;
     repo_mapping_id: number;
@@ -785,6 +788,21 @@ export default function TaskDetailPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
                 <StatusBadge status={task.status} />
                 <span style={{ color: 'var(--ink-50)', fontSize: 13, textTransform: 'capitalize' }}>{t('taskDetail.source')}: {task.source}</span>
+                {(task.source === 'newrelic' || task.source === 'sentry') && task.occurrences != null && (
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: 'rgba(248,113,113,0.12)', color: '#f87171' }}>
+                    {task.occurrences.toLocaleString()}× {t('tasks.occurrences') || 'times'}
+                  </span>
+                )}
+                {(task.source === 'newrelic' || task.source === 'sentry') && task.last_seen_at && (
+                  <span style={{ fontSize: 11, color: 'var(--ink-45)' }}>
+                    {t('tasks.lastSeen') || 'Last seen'}: {new Date(task.last_seen_at).toLocaleString()}
+                  </span>
+                )}
+                {(task.source === 'newrelic' || task.source === 'sentry') && task.first_seen_at && (
+                  <span style={{ fontSize: 11, color: 'var(--ink-35)' }}>
+                    {t('tasks.firstSeen') || 'First seen'}: {new Date(task.first_seen_at).toLocaleString()}
+                  </span>
+                )}
                 {(task.preferred_agent_provider || task.preferred_agent_model) ? (
                   <span style={{ color: 'var(--ink-50)', fontSize: 13 }}>
                     {t('agents.provider')}: {task.preferred_agent_provider || '—'} | {t('agents.model')}: {task.preferred_agent_model || '—'}
