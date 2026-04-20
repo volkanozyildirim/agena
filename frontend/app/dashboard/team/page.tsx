@@ -70,6 +70,13 @@ export default function TeamPage() {
   const [err, setErr] = useState('');
   const [confirmRemove, setConfirmRemove] = useState<AzureMember | null>(null);
 
+  // Import state
+  const [azureBaseUrl, setAzureBaseUrl] = useState('');
+  const [jiraBaseUrl, setJiraBaseUrl] = useState('');
+  const [importedIds, setImportedIds] = useState<Record<string, number>>({});
+  const [importingId, setImportingId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; kind: 'ok' | 'err' } | null>(null);
+
   useEffect(() => {
     const init = async () => {
       try {
@@ -84,6 +91,8 @@ export default function TeamPage() {
         const jiraConnected = Boolean(jiraCfg && (jiraCfg.has_secret || (jiraCfg.base_url || '').trim().length > 0 || (jiraCfg.username || '').trim().length > 0));
         setHasAzure(azureConnected);
         setHasJira(jiraConnected);
+        setAzureBaseUrl((azureCfg?.base_url || '').trim().replace(/\/$/, ''));
+        setJiraBaseUrl((jiraCfg?.base_url || '').trim().replace(/\/$/, ''));
 
         const rawSettings = (prefs.profile_settings || {}) as Record<string, unknown>;
         const jiraProject = typeof rawSettings.jira_project === 'string' ? rawSettings.jira_project : '';
@@ -263,6 +272,48 @@ export default function TeamPage() {
       m.uniqueName.toLowerCase().includes(search.toLowerCase())
     ), [allMembers, search]);
 
+  // Azure/Jira deep-link (work item detay sayfası)
+  function workItemUrl(item: WorkItem): string {
+    if (provider === 'jira') {
+      return jiraBaseUrl ? `${jiraBaseUrl}/browse/${encodeURIComponent(item.id)}` : '';
+    }
+    if (!azureBaseUrl || !project) return '';
+    return `${azureBaseUrl}/${encodeURIComponent(project)}/_workitems/edit/${encodeURIComponent(item.id)}`;
+  }
+
+  async function importSingleItem(item: WorkItem) {
+    if (importedIds[item.id]) {
+      setToast({ msg: t('sprints.alreadyImported'), kind: 'ok' });
+      setTimeout(() => setToast(null), 2500);
+      return;
+    }
+    setImportingId(item.id);
+    try {
+      const ctxParts = [
+        `External Source: ${provider === 'jira' ? `Jira #${item.id}` : `Azure #${item.id}`}`,
+        project ? `Project: ${project}` : '',
+        team ? `Team: ${team}` : '',
+        sprintPath ? `Sprint: ${sprintPath}` : '',
+        workItemUrl(item) ? `External URL: ${workItemUrl(item)}` : '',
+      ].filter(Boolean);
+      type TaskRec = { id: number };
+      const created = await apiFetch<TaskRec>('/tasks', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: `[${provider === 'jira' ? 'Jira' : 'Azure'} #${item.id}] ${item.title}`,
+          description: `${item.title}\n\n---\n${ctxParts.join('\n')}`,
+        }),
+      });
+      setImportedIds((prev) => ({ ...prev, [item.id]: created.id }));
+      setToast({ msg: t('sprints.importedSingle'), kind: 'ok' });
+    } catch (e) {
+      setToast({ msg: e instanceof Error ? e.message : t('sprints.importFailed'), kind: 'err' });
+    } finally {
+      setImportingId(null);
+      setTimeout(() => setToast(null), 2800);
+    }
+  }
+
   // İş detayı aç/kapat
   async function loadWorkItems(member: AzureMember) {
     if (expanded === member.id) { setExpanded(null); return; }
@@ -414,6 +465,20 @@ export default function TeamPage() {
         <div style={{ padding: '12px 16px', borderRadius: 10, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171', fontSize: 13 }}>{err}</div>
       )}
 
+      {toast && (
+        <div style={{
+          padding: '10px 14px',
+          borderRadius: 10,
+          background: toast.kind === 'ok' ? 'rgba(34,197,94,0.12)' : 'rgba(248,113,113,0.12)',
+          border: '1px solid ' + (toast.kind === 'ok' ? 'rgba(34,197,94,0.3)' : 'rgba(248,113,113,0.3)'),
+          color: toast.kind === 'ok' ? '#22c55e' : '#f87171',
+          fontSize: 13,
+          fontWeight: 600,
+        }}>
+          {toast.msg}
+        </div>
+      )}
+
       {/* Benim takımım — kart listesi */}
       {tab === 'sprint' && myTeam.length > 0 ? (
         <div style={{ display: 'grid', gap: 8 }}>
@@ -470,14 +535,52 @@ export default function TeamPage() {
                       <div style={{ padding: '14px 0', textAlign: 'center', color: 'var(--ink-25)', fontSize: 13 }}>{t('team.noItems')}</div>
                     ) : (
                       <div style={{ display: 'grid', gap: 6 }}>
-                        {items.map((item) => (
-                          <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, background: 'var(--panel-alt)', border: '1px solid var(--panel-alt)' }}>
-                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: sc(item.state), boxShadow: '0 0 5px ' + sc(item.state), flexShrink: 0 }} />
-                            <span style={{ flex: 1, fontSize: 13, color: 'var(--ink-78)' }}>{item.title}</span>
-                            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: sc(item.state) + '18', border: '1px solid ' + sc(item.state) + '35', color: sc(item.state), whiteSpace: 'nowrap' }}>{item.state}</span>
-                            <span style={{ fontSize: 10, color: 'var(--ink-25)', fontFamily: 'monospace' }}>#{item.id}</span>
-                          </div>
-                        ))}
+                        {items.map((item) => {
+                          const url = workItemUrl(item);
+                          const isImported = Boolean(importedIds[item.id]);
+                          const isImporting = importingId === item.id;
+                          return (
+                            <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, background: 'var(--panel-alt)', border: '1px solid var(--panel-alt)' }}>
+                              <span style={{ width: 7, height: 7, borderRadius: '50%', background: sc(item.state), boxShadow: '0 0 5px ' + sc(item.state), flexShrink: 0 }} />
+                              {url ? (
+                                <a
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title={t('team.openExternal')}
+                                  style={{ flex: 1, fontSize: 13, color: 'var(--ink-78)', textDecoration: 'none', cursor: 'pointer' }}
+                                  onMouseEnter={(e) => { (e.currentTarget.style.color = '#5eead4'); (e.currentTarget.style.textDecoration = 'underline'); }}
+                                  onMouseLeave={(e) => { (e.currentTarget.style.color = 'var(--ink-78)'); (e.currentTarget.style.textDecoration = 'none'); }}
+                                >
+                                  {item.title}
+                                </a>
+                              ) : (
+                                <span style={{ flex: 1, fontSize: 13, color: 'var(--ink-78)' }}>{item.title}</span>
+                              )}
+                              <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: sc(item.state) + '18', border: '1px solid ' + sc(item.state) + '35', color: sc(item.state), whiteSpace: 'nowrap' }}>{item.state}</span>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); void importSingleItem(item); }}
+                                disabled={isImporting || isImported}
+                                title={isImported ? t('sprints.alreadyImported') : t('team.importItem')}
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  padding: '3px 9px',
+                                  borderRadius: 999,
+                                  border: '1px solid ' + (isImported ? 'rgba(34,197,94,0.35)' : 'rgba(94,234,212,0.35)'),
+                                  background: isImported ? 'rgba(34,197,94,0.12)' : 'rgba(94,234,212,0.1)',
+                                  color: isImported ? '#22c55e' : '#5eead4',
+                                  cursor: isImporting || isImported ? 'default' : 'pointer',
+                                  opacity: isImporting ? 0.6 : 1,
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {isImporting ? '…' : isImported ? '✓ ' + t('team.imported') : '+ ' + t('team.import')}
+                              </button>
+                              <span style={{ fontSize: 10, color: 'var(--ink-25)', fontFamily: 'monospace' }}>#{item.id}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
