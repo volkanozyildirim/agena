@@ -708,7 +708,6 @@ async def cancel_task(
     import os
     bridge_url = os.getenv('CLI_BRIDGE_URL', 'http://host.docker.internal:9876')
     try:
-        # Find repo path from task's repo mapping
         repo_path = None
         if task.repo_mapping_id:
             from agena_models.models.repo_mapping import RepoMapping
@@ -716,7 +715,10 @@ async def cancel_task(
             if rm and rm.local_path:
                 repo_path = rm.local_path
         async with httpx.AsyncClient(timeout=5) as client:
-            await client.post(f'{bridge_url}/kill-stream', json={'repo_path': repo_path or ''})
+            await client.post(
+                f'{bridge_url}/kill-stream',
+                json={'task_id': str(task_id), 'repo_path': repo_path or ''},
+            )
     except Exception:
         pass  # best effort — task is already cancelled in DB
 
