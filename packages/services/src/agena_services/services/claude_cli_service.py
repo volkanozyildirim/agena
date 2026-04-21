@@ -202,6 +202,7 @@ class ClaudeCLIService:
                         'prompt': prompt,
                         'model': model or '',
                         'timeout': self.EXEC_TIMEOUT_SEC,
+                        'task_id': task_id,
                     },
                 ) as resp:
                     error_msg = None

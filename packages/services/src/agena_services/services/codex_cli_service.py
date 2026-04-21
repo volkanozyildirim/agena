@@ -22,6 +22,7 @@ class CodexCLIService:
         api_key: str | None = None,
         api_base_url: str | None = None,
         log_callback=None,
+        task_id: str = '',
     ) -> str:
         # Always let Codex CLI pick its own default model —
         # ChatGPT accounts don't support explicit model selection
@@ -39,6 +40,7 @@ class CodexCLIService:
                 api_key=api_key,
                 api_base_url=api_base_url,
                 log_callback=log_callback,
+                task_id=task_id,
             )
 
         repo = Path(repo_path).expanduser().resolve()
@@ -231,6 +233,7 @@ class CodexCLIService:
         api_key: str | None = None,
         api_base_url: str | None = None,
         log_callback=None,
+        task_id: str = '',
     ) -> str:
         """Call CLI bridge HTTP server running on host."""
         import httpx
@@ -256,6 +259,7 @@ class CodexCLIService:
             'prompt': prompt,
             'model': model or '',
             'timeout': self.EXEC_TIMEOUT_SEC,
+            'task_id': task_id,
         }
         if api_key:
             payload['api_key'] = api_key

@@ -219,6 +219,7 @@ class OrchestrationService:
                         api_key=None,
                         api_base_url=None,
                         log_callback=_codex_log,
+                        task_id=str(task.id),
                     )
                     parsed_blocks = self._parse_reviewed_output_to_files(final_code, local_repo_path=routing.local_repo_path)
                     if not parsed_blocks:
@@ -238,6 +239,7 @@ class OrchestrationService:
                                 api_key=None,
                                 api_base_url=None,
                                 log_callback=_codex_log,
+                                task_id=str(task.id),
                             )
                 except Exception as codex_exc:
                     await task_service.add_log(

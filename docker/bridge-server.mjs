@@ -120,18 +120,25 @@ const server = createServer(async (req, res) => {
   for await (const chunk of req) body += chunk;
   const data = JSON.parse(body || '{}');
 
-  // Kill active stream by repo_path
+  // Kill active stream by task_id (preferred) or repo_path
   if (url.pathname === '/kill-stream') {
-    const { repo_path } = JSON.parse(body || '{}');
-    const entry = repo_path ? activeStreams.get(repo_path) : null;
+    const { repo_path, task_id } = JSON.parse(body || '{}');
+    const taskKey = task_id ? `task:${task_id}` : null;
+    const entry = taskKey ? activeStreams.get(taskKey) : (repo_path ? activeStreams.get(repo_path) : null);
     if (entry) {
       try { entry.proc.kill('SIGTERM'); } catch {}
-      activeStreams.delete(repo_path);
-      console.log(`[kill] Killed ${entry.cli} stream for ${repo_path}`);
+      // Also hard-kill after 2s if still alive
+      setTimeout(() => { try { entry.proc.kill('SIGKILL'); } catch {} }, 2000);
+      // Clean both keys if present
+      if (entry.task_id) activeStreams.delete(`task:${entry.task_id}`);
+      if (entry.repo_path) activeStreams.delete(entry.repo_path);
+      if (taskKey) activeStreams.delete(taskKey);
+      if (repo_path) activeStreams.delete(repo_path);
+      console.log(`[kill] Killed ${entry.cli} stream (task_id=${entry.task_id || task_id || '-'}, repo=${entry.repo_path || repo_path || '-'})`);
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'killed', repo_path }));
-    } else {
-      // Kill all active streams if no repo_path match
+      res.end(JSON.stringify({ status: 'killed', task_id: task_id || null, repo_path: repo_path || null }));
+    } else if (!task_id && !repo_path) {
+      // Kill all active streams if no selector provided
       let killed = 0;
       for (const [rp, e] of activeStreams) {
         try { e.proc.kill('SIGTERM'); killed++; } catch {}
@@ -139,6 +146,9 @@ const server = createServer(async (req, res) => {
       }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ status: killed > 0 ? 'killed_all' : 'none_active', killed }));
+    } else {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'not_found', task_id: task_id || null, repo_path: repo_path || null }));
     }
     return;
   }
@@ -187,7 +197,7 @@ async function runCLIStream(bin, name, data, res) {
     res.end();
     return;
   }
-  const { repo_path, prompt, model, timeout = 300 } = data;
+  const { repo_path, prompt, model, timeout = 300, task_id = '' } = data;
   if (repo_path && !existsSync(repo_path)) {
     res.writeHead(200, { 'Content-Type': 'text/event-stream' });
     res.write(`data: ${JSON.stringify({ type: 'error', message: `repo path not found: ${repo_path}` })}\n\n`);
@@ -228,7 +238,8 @@ async function runCLIStream(bin, name, data, res) {
     cwd: repo_path,
     env: cliEnv,
   });
-  activeStreams.set(repo_path, { proc, cli: 'claude' });
+  activeStreams.set(repo_path, { proc, cli: 'claude', task_id });
+  if (task_id) activeStreams.set(`task:${task_id}`, { proc, cli: 'claude', repo_path, task_id });
 
   let fullText = '';
   let lineBuffer = '';
@@ -338,7 +349,7 @@ async function runCodexStream(bin, data, res) {
     res.end();
     return;
   }
-  const { repo_path, prompt, model, timeout = 1200 } = data;
+  const { repo_path, prompt, model, timeout = 1200, task_id = '' } = data;
   if (repo_path && !existsSync(repo_path)) {
     res.writeHead(200, { 'Content-Type': 'text/event-stream' });
     res.write(`data: ${JSON.stringify({ type: 'error', message: `repo path not found: ${repo_path}` })}\n\n`);
@@ -364,7 +375,8 @@ async function runCodexStream(bin, data, res) {
     cwd: repo_path,
     env: { ...process.env, NO_COLOR: '1' },
   });
-  activeStreams.set(repo_path, { proc, cli: 'codex' });
+  activeStreams.set(repo_path, { proc, cli: 'codex', task_id });
+  if (task_id) activeStreams.set(`task:${task_id}`, { proc, cli: 'codex', repo_path, task_id });
 
   let fullText = '';
   let lineBuffer = '';

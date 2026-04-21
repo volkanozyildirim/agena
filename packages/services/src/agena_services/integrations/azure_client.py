@@ -220,6 +220,7 @@ class AzureDevOpsClient:
         area_path: str | None = None,
         assigned_to: str | None = None,
         tags: str | None = None,
+        story_points: int | float | None = 2,
     ) -> dict[str, Any]:
         """Create an Azure DevOps work item and return the full response (including id & url)."""
         org_url = (cfg.get('org_url') or self.settings.azure_org_url or '').strip()
@@ -240,6 +241,8 @@ class AzureDevOpsClient:
             patch_ops.append({'op': 'add', 'path': '/fields/System.AreaPath', 'value': area_path})
         if assigned_to:
             patch_ops.append({'op': 'add', 'path': '/fields/System.AssignedTo', 'value': assigned_to})
+        if story_points is not None:
+            patch_ops.append({'op': 'add', 'path': '/fields/Microsoft.VSTS.Scheduling.StoryPoints', 'value': story_points})
         if tags:
             patch_ops.append({'op': 'add', 'path': '/fields/System.Tags', 'value': tags})
 
