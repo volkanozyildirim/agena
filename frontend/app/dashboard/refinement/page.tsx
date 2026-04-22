@@ -484,6 +484,7 @@ export default function RefinementPage() {
     skipped_no_sp?: number;
     total?: number;
     processed?: number;
+    capped?: boolean;
     error?: string;
   } | null>(null);
   const [promptExpanded, setPromptExpanded] = useState(false);
@@ -738,7 +739,7 @@ export default function RefinementPage() {
         project: azureProject,
         team: azureTeam,
         since_days: 730,
-        max_items: 1500,
+        max_items: 5000,
       };
       await apiFetch<{ status: string }>(
         '/refinement/history/backfill',
@@ -1331,7 +1332,7 @@ export default function RefinementPage() {
                   {backfillJob.status === 'queued' && 'Sıraya alındı'}
                   {backfillJob.status === 'fetching' && 'Azure DevOps taranıyor'}
                   {backfillJob.status === 'indexing' && `Qdrant\'a yazılıyor${backfillJob.total ? ` — ${backfillJob.processed || 0}/${backfillJob.total}` : ''}`}
-                  {backfillJob.status === 'completed' && `Tamamlandı — ${backfillJob.indexed ?? 0} iş indexlendi, ${backfillJob.skipped_no_sp ?? 0} SP\'siz atlandı`}
+                  {backfillJob.status === 'completed' && `Tamamlandı — ${backfillJob.indexed ?? 0} iş indexlendi${backfillJob.capped ? ' (üst sınıra takıldı, daha fazla olabilir)' : ''}`}
                   {backfillJob.status === 'failed' && `Başarısız: ${backfillJob.error || 'bilinmeyen hata'}`}
                 </div>
                 {backfillJob.message && backfillJob.status !== 'completed' && backfillJob.status !== 'failed' && (
