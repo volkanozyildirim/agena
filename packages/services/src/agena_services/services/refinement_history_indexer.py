@@ -128,16 +128,19 @@ class RefinementHistoryIndexer:
             if (idx + 1) % 10 == 0:
                 _emit(indexed=indexed, skipped_no_sp=skipped_no_sp, processed=idx + 1)
 
+        capped = bool(max_items and max_items > 0 and total_seen >= max_items)
         result = {
             'indexed': indexed,
             'skipped_no_sp': skipped_no_sp,
             'total_seen': total_seen,
+            'capped': capped,
             'source': src,
             'project': resolved_project,
             'since_days': since_days,
             'max_items': max_items,
         }
-        _emit(status='completed', **result, message=f'Bitti: {indexed} iş indexlendi, {skipped_no_sp} SP yok diye atlandı.')
+        suffix = ' (maks. limite takıldı — daha fazla var)' if capped else ''
+        _emit(status='completed', **result, message=f'Bitti: {indexed} iş indexlendi{suffix}.')
         return result
 
     @classmethod
