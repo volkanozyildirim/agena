@@ -262,7 +262,11 @@ class AzureDevOpsClient:
             {'op': 'add', 'path': '/fields/System.Title', 'value': title[:255]},
         ]
         if description:
-            patch_ops.append({'op': 'add', 'path': '/fields/System.Description', 'value': description})
+            patch_ops.append({
+                'op': 'add',
+                'path': '/fields/System.Description',
+                'value': self._markdown_to_html(description),
+            })
         if iteration_path:
             patch_ops.append({'op': 'add', 'path': '/fields/System.IterationPath', 'value': iteration_path})
         if area_path:
@@ -307,6 +311,147 @@ class AzureDevOpsClient:
                 return None
             items = (resp.json() or {}).get('value', []) or []
             return items[0] if items else None
+
+    @staticmethod
+    def _markdown_to_html(text: str) -> str:
+        """Lightweight markdown→HTML converter sufficient for Agena-generated
+        task descriptions (headings, bold, code, tables, bullets, links).
+        Azure DevOps System.Description expects HTML — passing raw markdown
+        shows the # and ** characters verbatim."""
+        import re as _re
+        import html as _html
+        if not text:
+            return ''
+
+        src = text.replace('\r\n', '\n').replace('\r', '\n')
+
+        # Extract fenced code blocks first (so we don't mangle their contents)
+        code_blocks: list[str] = []
+
+        def _stash_code(m: 're.Match[str]') -> str:
+            body = m.group(2)
+            escaped = _html.escape(body)
+            code_blocks.append(f'<pre style="background:#f4f4f4;padding:8px;border-radius:4px;overflow:auto"><code>{escaped}</code></pre>')
+            return f'\x00CODE{len(code_blocks) - 1}\x00'
+
+        src = _re.sub(r'```([\w-]*)\n(.*?)```', _stash_code, src, flags=_re.DOTALL)
+
+        # Extract inline code spans
+        inline_codes: list[str] = []
+
+        def _stash_inline(m: 're.Match[str]') -> str:
+            escaped = _html.escape(m.group(1))
+            inline_codes.append(f'<code style="background:#f4f4f4;padding:1px 4px;border-radius:3px">{escaped}</code>')
+            return f'\x00INL{len(inline_codes) - 1}\x00'
+
+        src = _re.sub(r'`([^`\n]+)`', _stash_inline, src)
+
+        lines = src.split('\n')
+        out: list[str] = []
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            stripped = line.strip()
+
+            if not stripped:
+                out.append('')
+                i += 1
+                continue
+
+            # Headings
+            h_match = _re.match(r'^(#{1,6})\s+(.*)$', stripped)
+            if h_match:
+                level = min(len(h_match.group(1)), 6)
+                content = h_match.group(2)
+                out.append(f'<h{level}>{AzureDevOpsClient._md_inline_transform(content)}</h{level}>')
+                i += 1
+                continue
+
+            # Tables — collect rows while the line matches pipe-separated cells
+            if '|' in stripped and stripped.startswith('|'):
+                table_rows: list[list[str]] = []
+                while i < len(lines):
+                    lstrip = lines[i].strip()
+                    if not lstrip.startswith('|') or '|' not in lstrip:
+                        break
+                    # Skip separator rows like |---|---|
+                    if _re.match(r'^\|\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$', lstrip):
+                        i += 1
+                        continue
+                    cells = [c.strip() for c in lstrip.strip('|').split('|')]
+                    table_rows.append(cells)
+                    i += 1
+                if table_rows:
+                    header = table_rows[0]
+                    body_rows = table_rows[1:]
+                    th = ''.join(f'<th style="border:1px solid #ddd;padding:4px 8px;text-align:left">{AzureDevOpsClient._md_inline_transform(c)}</th>' for c in header)
+                    trs = ''.join(
+                        '<tr>' + ''.join(f'<td style="border:1px solid #ddd;padding:4px 8px">{AzureDevOpsClient._md_inline_transform(c)}</td>' for c in row) + '</tr>'
+                        for row in body_rows
+                    )
+                    out.append(f'<table style="border-collapse:collapse;margin:6px 0"><thead><tr>{th}</tr></thead><tbody>{trs}</tbody></table>')
+                    continue
+
+            # Bullet lists
+            if _re.match(r'^[-*+]\s+', stripped):
+                items: list[str] = []
+                while i < len(lines) and _re.match(r'^[-*+]\s+', lines[i].strip()):
+                    items.append(_re.sub(r'^[-*+]\s+', '', lines[i].strip()))
+                    i += 1
+                lis = ''.join(f'<li>{AzureDevOpsClient._md_inline_transform(it)}</li>' for it in items)
+                out.append(f'<ul>{lis}</ul>')
+                continue
+
+            # Paragraph
+            out.append(f'<p>{AzureDevOpsClient._md_inline_transform(stripped)}</p>')
+            i += 1
+
+        html = '\n'.join(p for p in out if p != '')
+
+        # Restore code blocks / inline spans
+        for idx, block in enumerate(code_blocks):
+            html = html.replace(f'\x00CODE{idx}\x00', block)
+        for idx, span in enumerate(inline_codes):
+            html = html.replace(f'\x00INL{idx}\x00', span)
+
+        return html
+
+    @staticmethod
+    def _md_inline_transform(text: str) -> str:
+        """Inline markdown: bold, italic, link, auto-url. Code spans already stashed."""
+        import re as _re
+        import html as _html
+        # Escape HTML first (avoid double-escape of already-stashed code placeholders)
+        placeholders: list[str] = []
+
+        def _protect(m: 're.Match[str]') -> str:
+            placeholders.append(m.group(0))
+            return f'\x00PH{len(placeholders) - 1}\x00'
+
+        text = _re.sub(r'\x00(?:CODE|INL)\d+\x00', _protect, text)
+        text = _html.escape(text)
+
+        # Restore placeholders
+        for i, ph in enumerate(placeholders):
+            text = text.replace(f'\x00PH{i}\x00', ph)
+
+        # Markdown links [label](url)
+        text = _re.sub(
+            r'\[([^\]]+)\]\((https?://[^)\s]+)\)',
+            r'<a href="\2" target="_blank" rel="noreferrer">\1</a>',
+            text,
+        )
+        # Bold **text**
+        text = _re.sub(r'\*\*([^*\n]+)\*\*', r'<strong>\1</strong>', text)
+        # Italic *text* (avoid matching bold remnants — use word boundaries)
+        text = _re.sub(r'(?<![*\w])\*([^*\n]+)\*(?![*\w])', r'<em>\1</em>', text)
+        # Auto-link bare URLs
+        text = _re.sub(
+            r'(?<!["\'>])((?:https?)://[^\s<)]+)',
+            r'<a href="\1" target="_blank" rel="noreferrer">\1</a>',
+            text,
+        )
+        return text
 
     @staticmethod
     def _format_comment_html(text: str) -> str:
