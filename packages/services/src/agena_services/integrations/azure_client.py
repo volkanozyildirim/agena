@@ -134,63 +134,102 @@ class AzureDevOpsClient:
             f"{org_url.rstrip('/')}/{project}"
             '/_apis/wit/wiql?api-version=7.1-preview.2'
         )
-        # Filter to terminal states only. We also require StoryPoints > 0
-        # because the indexer skips unestimated items anyway, AND because
-        # Azure WIQL has a hard 20k-row cap per query — this filter cuts the
-        # result set to just items worth grounding future estimates on.
-        state_clauses = [
-            "[System.State] = 'Done'",
-            "[System.State] = 'Closed'",
-            "[System.State] = 'Resolved'",
-        ]
-        conditions = [
-            f"({' OR '.join(state_clauses)})",
-            '[Microsoft.VSTS.Scheduling.StoryPoints] > 0',
-        ]
-        if since_days and since_days > 0:
-            conditions.append(f'[System.ChangedDate] >= @Today-{int(since_days)}')
-        where_clause = ' AND '.join(conditions)
-        wiql_payload = {
-            'query': (
-                'Select [System.Id], [System.Title], [System.State] '
-                f'From WorkItems Where {where_clause} '
-                'Order By [System.ChangedDate] Desc'
-            )
-        }
+        fields_param = (
+            'System.Id,System.Title,System.Description,System.State,'
+            'System.AssignedTo,System.CreatedDate,'
+            'Microsoft.VSTS.Common.ActivatedDate,Microsoft.VSTS.Common.ClosedDate,'
+            'System.WorkItemType,System.IterationPath,'
+            'Microsoft.VSTS.Scheduling.StoryPoints,Microsoft.VSTS.Scheduling.Effort,'
+            'Microsoft.VSTS.Scheduling.Size,'
+            'Microsoft.VSTS.Common.AcceptanceCriteria,Microsoft.VSTS.TCM.ReproSteps'
+        )
         headers = self._headers(pat)
 
+        # Azure WIQL rejects queries whose result set exceeds 20k rows
+        # (VS402337). Busy projects blow through that even with filters,
+        # so we slice the time window into chunks and union results.
+        chunk_days = 90
+        window_days = int(since_days) if since_days and since_days > 0 else 730
+        # Build disjoint [lower, upper) day-offset ranges going back from today.
+        chunks: list[tuple[int, int]] = []
+        upper = 0
+        while upper < window_days:
+            lower = min(upper + chunk_days, window_days)
+            chunks.append((upper, lower))
+            upper = lower
+
+        seen_ids: set[int] = set()
+        details_payload: list[dict[str, Any]] = []
+
         async with httpx.AsyncClient(timeout=60) as client:
-            try:
-                details_payload = await self._fetch_details_from_wiql(
-                    client=client,
-                    wiql_url=wiql_url,
-                    headers=headers,
-                    wiql_payload=wiql_payload,
-                    org_url=org_url,
-                    fields_param=(
-                        'System.Id,System.Title,System.Description,System.State,'
-                        'System.AssignedTo,System.CreatedDate,'
-                        'Microsoft.VSTS.Common.ActivatedDate,Microsoft.VSTS.Common.ClosedDate,'
-                        'System.WorkItemType,System.IterationPath,'
-                        'Microsoft.VSTS.Scheduling.StoryPoints,Microsoft.VSTS.Scheduling.Effort,'
-                        'Microsoft.VSTS.Scheduling.Size,'
-                        'Microsoft.VSTS.Common.AcceptanceCriteria,Microsoft.VSTS.TCM.ReproSteps'
-                    ),
+            for idx, (newer_offset, older_offset) in enumerate(chunks):
+                state_clauses = [
+                    "[System.State] = 'Done'",
+                    "[System.State] = 'Closed'",
+                    "[System.State] = 'Resolved'",
+                ]
+                # ChangedDate is in [@Today-older, @Today-newer) — newer_offset=0
+                # on the most recent chunk.
+                date_filter = f'[System.ChangedDate] >= @Today-{older_offset}'
+                if newer_offset > 0:
+                    date_filter += f' AND [System.ChangedDate] < @Today-{newer_offset}'
+                where_clause = (
+                    f"({' OR '.join(state_clauses)})"
+                    ' AND [Microsoft.VSTS.Scheduling.StoryPoints] > 0'
+                    f' AND {date_filter}'
                 )
-            except httpx.HTTPStatusError as exc:
-                body = ''
+                wiql_payload = {
+                    'query': (
+                        'Select [System.Id], [System.Title], [System.State] '
+                        f'From WorkItems Where {where_clause} '
+                        'Order By [System.ChangedDate] Desc'
+                    )
+                }
                 try:
-                    body = exc.response.text[:500]
-                except Exception:
-                    pass
-                logger.error(
-                    'Azure WIQL request failed %s: body=%r query=%r',
-                    exc.response.status_code, body, wiql_payload['query'],
-                )
-                # Re-raise with a clearer message so the UI surfaces the actual
-                # Azure-side error (e.g. invalid field/state for the project).
-                detail = body or str(exc)
-                raise RuntimeError(f'Azure WIQL {exc.response.status_code}: {detail}') from exc
+                    chunk_rows = await self._fetch_details_from_wiql(
+                        client=client,
+                        wiql_url=wiql_url,
+                        headers=headers,
+                        wiql_payload=wiql_payload,
+                        org_url=org_url,
+                        fields_param=fields_param,
+                    )
+                except httpx.HTTPStatusError as exc:
+                    body = ''
+                    try:
+                        body = exc.response.text[:500]
+                    except Exception:
+                        pass
+                    logger.error(
+                        'Azure WIQL chunk %d (%d-%d days) failed %s: body=%r',
+                        idx, newer_offset, older_offset, exc.response.status_code, body,
+                    )
+                    # If a single chunk still overflows, give up on this chunk
+                    # rather than the whole backfill. Continue to the next.
+                    if '20000' in body or 'size limit' in body.lower():
+                        logger.warning(
+                            'Chunk %d exceeds 20k rows even after filters; skipping. '
+                            'Consider narrowing since_days or adding WorkItemType filter.',
+                            idx,
+                        )
+                        continue
+                    detail = body or str(exc)
+                    raise RuntimeError(f'Azure WIQL {exc.response.status_code}: {detail}') from exc
+
+                for row in chunk_rows:
+                    try:
+                        rid = int(row.get('id') or (row.get('fields') or {}).get('System.Id') or 0)
+                    except (TypeError, ValueError):
+                        rid = 0
+                    if rid and rid in seen_ids:
+                        continue
+                    if rid:
+                        seen_ids.add(rid)
+                    details_payload.append(row)
+
+                if max_items and max_items > 0 and len(details_payload) >= max_items:
+                    break
+
         if max_items and max_items > 0 and len(details_payload) > max_items:
             details_payload = details_payload[:max_items]
         return [self._to_external_task(item, org_url=org_url, project=project) for item in details_payload]
