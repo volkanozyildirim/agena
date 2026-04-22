@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from agena_agents.memory.qdrant import QdrantMemoryStore
 from agena_models.schemas.task import ExternalTask
 from agena_services.integrations.azure_client import AzureDevOpsClient
+from agena_services.integrations.jira_client import JiraClient
 from agena_services.services.integration_config_service import IntegrationConfigService
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,7 @@ class RefinementHistoryIndexer:
         self.db = db
         self.integration_service = IntegrationConfigService(db)
         self.azure_client = AzureDevOpsClient()
+        self.jira_client = JiraClient()
         self.memory = QdrantMemoryStore()
 
     async def backfill(
@@ -52,6 +54,7 @@ class RefinementHistoryIndexer:
         source: str = 'azure',
         project: str | None = None,
         team: str | None = None,
+        board_id: str | None = None,
         since_days: int | None = 365,
         max_items: int = 500,
         progress_cb: Callable[[dict[str, Any]], None] | None = None,
@@ -69,40 +72,74 @@ class RefinementHistoryIndexer:
             return {'indexed': 0, 'skipped_no_sp': 0, 'total_seen': 0, **err}
 
         src = (source or 'azure').strip().lower()
-        if src != 'azure':
-            err = {'error': f'Source {src!r} is not supported yet.'}
+        if src not in ('azure', 'jira'):
+            err = {'error': f'Source {src!r} is not supported; use azure or jira.'}
             _emit(**err, status='failed')
             return {'indexed': 0, 'skipped_no_sp': 0, 'total_seen': 0, **err}
 
-        config = await self.integration_service.get_config(organization_id, 'azure')
-        if config is None or not config.secret:
-            err = {'error': 'Azure entegrasyonu ayarlı değil. Önce Azure DevOps integration\'ı bağla.'}
-            _emit(**err, status='failed')
-            return {'indexed': 0, 'skipped_no_sp': 0, 'total_seen': 0, **err}
+        items: list[Any] = []
+        resolved_project = ''
 
-        resolved_project = (project or config.project or '').strip()
-        if not resolved_project:
-            err = {'error': 'Azure project seçilmedi. Tercihlere proje ekle ya da istek gövdesinde belirt.'}
-            _emit(**err, status='failed')
-            return {'indexed': 0, 'skipped_no_sp': 0, 'total_seen': 0, **err}
+        if src == 'azure':
+            config = await self.integration_service.get_config(organization_id, 'azure')
+            if config is None or not config.secret:
+                err = {'error': 'Azure entegrasyonu ayarlı değil. Önce Azure DevOps integration\'ı bağla.'}
+                _emit(**err, status='failed')
+                return {'indexed': 0, 'skipped_no_sp': 0, 'total_seen': 0, **err}
 
-        scope_msg = f'{resolved_project}' + (f' › {team}' if team else '')
-        _emit(status='fetching', phase='azure_wiql', message=f'Azure DevOps\'tan tamamlanmış işler çekiliyor ({scope_msg})...')
-        try:
-            items = await self.azure_client.fetch_completed_work_items(
-                {
-                    'org_url': config.base_url,
-                    'project': resolved_project,
-                    'pat': config.secret,
-                },
-                since_days=since_days,
-                max_items=max_items,
-                team=team,
-            )
-        except Exception as exc:
-            msg = f'Azure sorgulanamadı: {exc}'
-            _emit(status='failed', error=msg)
-            return {'indexed': 0, 'skipped_no_sp': 0, 'total_seen': 0, 'error': msg}
+            resolved_project = (project or config.project or '').strip()
+            if not resolved_project:
+                err = {'error': 'Azure project seçilmedi. Tercihlere proje ekle ya da istek gövdesinde belirt.'}
+                _emit(**err, status='failed')
+                return {'indexed': 0, 'skipped_no_sp': 0, 'total_seen': 0, **err}
+
+            scope_msg = f'{resolved_project}' + (f' › {team}' if team else '')
+            _emit(status='fetching', phase='azure_wiql', message=f'Azure DevOps\'tan tamamlanmış işler çekiliyor ({scope_msg})...')
+            try:
+                items = await self.azure_client.fetch_completed_work_items(
+                    {
+                        'org_url': config.base_url,
+                        'project': resolved_project,
+                        'pat': config.secret,
+                    },
+                    since_days=since_days,
+                    max_items=max_items,
+                    team=team,
+                )
+            except Exception as exc:
+                msg = f'Azure sorgulanamadı: {exc}'
+                _emit(status='failed', error=msg)
+                return {'indexed': 0, 'skipped_no_sp': 0, 'total_seen': 0, 'error': msg}
+        else:  # jira
+            config = await self.integration_service.get_config(organization_id, 'jira')
+            if config is None or not config.secret:
+                err = {'error': 'Jira entegrasyonu ayarlı değil. Önce Jira integration\'ı bağla.'}
+                _emit(**err, status='failed')
+                return {'indexed': 0, 'skipped_no_sp': 0, 'total_seen': 0, **err}
+
+            resolved_project = (project or '').strip()
+            if not resolved_project:
+                err = {'error': 'Jira project seçilmedi. İstek gövdesinde project key geçir.'}
+                _emit(**err, status='failed')
+                return {'indexed': 0, 'skipped_no_sp': 0, 'total_seen': 0, **err}
+
+            _emit(status='fetching', phase='jira_jql', message=f'Jira\'dan tamamlanmış issue\'lar çekiliyor ({resolved_project})...')
+            try:
+                items = await self.jira_client.fetch_completed_issues(
+                    {
+                        'base_url': config.base_url,
+                        'email': config.username or '',
+                        'api_token': config.secret,
+                    },
+                    project=resolved_project,
+                    board_id=board_id,
+                    since_days=since_days,
+                    max_items=max_items,
+                )
+            except Exception as exc:
+                msg = f'Jira sorgulanamadı: {exc}'
+                _emit(status='failed', error=msg)
+                return {'indexed': 0, 'skipped_no_sp': 0, 'total_seen': 0, 'error': msg}
 
         total_seen = len(items)
         indexed = 0
@@ -152,6 +189,7 @@ class RefinementHistoryIndexer:
         source: str = 'azure',
         project: str | None = None,
         team: str | None = None,
+        board_id: str | None = None,
         since_days: int | None = 365,
         max_items: int = 500,
     ) -> None:
@@ -176,6 +214,7 @@ class RefinementHistoryIndexer:
                 source=source,
                 project=project,
                 team=team,
+                board_id=board_id,
                 since_days=since_days,
                 max_items=max_items,
                 progress_cb=_cb,

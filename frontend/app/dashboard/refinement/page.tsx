@@ -736,27 +736,27 @@ export default function RefinementPage() {
 
   const runBackfill = useCallback(async () => {
     setError('');
-    if (provider !== 'azure') {
-      setBackfillJob({ status: 'failed', error: 'Şu an sadece Azure DevOps destekleniyor.' });
-      return;
-    }
-    if (!azureProject) {
-      setBackfillJob({ status: 'failed', error: 'Önce yukarıdan bir Azure proje seç.' });
-      return;
-    }
-    if (!azureTeam) {
-      setBackfillJob({ status: 'failed', error: 'Önce yukarıdan bir takım seç — yoksa sorgu projedeki tüm ekiplerin işlerini çeker ve Azure 20k limitine takılır.' });
-      return;
+    if (provider === 'azure') {
+      if (!azureProject) {
+        setBackfillJob({ status: 'failed', error: 'Önce yukarıdan bir Azure proje seç.' });
+        return;
+      }
+      if (!azureTeam) {
+        setBackfillJob({ status: 'failed', error: 'Önce yukarıdan bir takım seç — yoksa sorgu projedeki tüm ekiplerin işlerini çeker ve Azure 20k limitine takılır.' });
+        return;
+      }
+    } else if (provider === 'jira') {
+      if (!jiraProject) {
+        setBackfillJob({ status: 'failed', error: 'Önce yukarıdan bir Jira projesi seç.' });
+        return;
+      }
     }
     setBackfillJob({ status: 'queued', message: 'Arka plan işi başlatılıyor...' });
     try {
-      const body = {
-        source: 'azure',
-        project: azureProject,
-        team: azureTeam,
-        since_days: 730,
-        max_items: 5000,
-      };
+      const body: Record<string, unknown> =
+        provider === 'azure'
+          ? { source: 'azure', project: azureProject, team: azureTeam, since_days: 730, max_items: 5000 }
+          : { source: 'jira', project: jiraProject, board_id: jiraBoard || undefined, since_days: 730, max_items: 5000 };
       await apiFetch<{ status: string }>(
         '/refinement/history/backfill',
         { method: 'POST', body: JSON.stringify(body) },
@@ -764,7 +764,7 @@ export default function RefinementPage() {
     } catch (err) {
       setBackfillJob({ status: 'failed', error: err instanceof Error ? err.message : 'Backfill başlatılamadı' });
     }
-  }, [provider, azureProject, azureTeam]);
+  }, [provider, azureProject, azureTeam, jiraProject, jiraBoard]);
 
   const loadIndexPreview = useCallback(async () => {
     try {
@@ -1269,12 +1269,18 @@ export default function RefinementPage() {
                     borderColor: jobFailed ? 'rgba(239,68,68,0.3)' : jobDone ? 'rgba(34,197,94,0.3)' : 'rgba(14,165,233,0.3)',
                     color: jobFailed ? '#fca5a5' : jobDone ? '#86efac' : '#7dd3fc',
                   }}
-                  disabled={!!jobActive || provider !== 'azure' || !azureProject || !azureTeam}
+                  disabled={
+                    !!jobActive ||
+                    (provider === 'azure' && (!azureProject || !azureTeam)) ||
+                    (provider === 'jira' && !jiraProject)
+                  }
                   title={
-                    provider !== 'azure' ? 'Sadece Azure DevOps desteklenir'
-                    : !azureProject ? 'Önce yukarıdan proje seç'
-                    : !azureTeam ? 'Önce yukarıdan takım seç (projedeki tüm işler 20k limitini aşar)'
-                    : 'Seçili proje+takım için kapanmış işleri Qdrant\'a indexler; refinement SP önerisini bu geçmişe göre kurar.'
+                    provider === 'azure'
+                      ? (!azureProject ? 'Önce yukarıdan proje seç'
+                        : !azureTeam ? 'Önce yukarıdan takım seç (projedeki tüm işler 20k limitini aşar)'
+                        : 'Seçili Azure proje+takım için kapanmış işleri Qdrant\'a indexler')
+                      : (!jiraProject ? 'Önce yukarıdan Jira projesi seç'
+                        : 'Seçili Jira projesi için kapanmış issue\'ları Qdrant\'a indexler')
                   }
                 >
                   {jobActive

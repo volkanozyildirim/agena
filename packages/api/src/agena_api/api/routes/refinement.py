@@ -133,6 +133,7 @@ class RefinementBackfillRequest(BaseModel):
     source: str = 'azure'
     project: str | None = None
     team: str | None = None
+    board_id: str | None = None
     since_days: int | None = 365
     max_items: int = 500
 
@@ -160,6 +161,7 @@ async def backfill_refinement_history(
                 source=payload.source,
                 project=payload.project,
                 team=payload.team,
+                board_id=payload.board_id,
                 since_days=payload.since_days,
                 max_items=payload.max_items,
             )
@@ -227,8 +229,9 @@ async def refinement_history_preview(
             'assigned_to': r.get('assigned_to') or '',
             'url': r.get('url') or '',
             'work_item_type': r.get('work_item_type') or '',
+            'source': r.get('source') or '',
         }
-        for r in rows[:30]
+        for r in rows[:200]
     ]
 
     return {

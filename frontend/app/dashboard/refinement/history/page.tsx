@@ -315,7 +315,7 @@ export default function RefinementHistoryPage() {
               )}
             </div>
             <div style={{ fontSize: 10, color: 'var(--ink-35)', marginTop: 8 }}>
-              Not: Listede en fazla 30 örnek gösterilir (backend'den). Tam liste için Azure DevOps'a git.
+              Not: Listede en fazla 200 örnek gösterilir. Filtreyle daralt ya da tam liste için kaynak sistem'e git (Azure/Jira).
             </div>
           </div>
         </>

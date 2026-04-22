@@ -190,6 +190,97 @@ class JiraClient:
             return [item for item in items if self._normalize_status(item.state) == target]
         return items
 
+    async def fetch_completed_issues(
+        self,
+        cfg: dict[str, str] | None = None,
+        *,
+        project: str | None = None,
+        board_id: str | None = None,
+        since_days: int | None = 730,
+        max_items: int = 5000,
+    ) -> list[ExternalTask]:
+        """JQL search for terminal-state issues with story points — used
+        to backfill the refinement similarity index.
+
+        Scope prefers project key when provided; otherwise uses the board's
+        inferred scope. StoryPoints filter keeps the result set bounded.
+        """
+        base_url, email, api_token = self._resolve_config(cfg)
+        if not base_url:
+            return []
+
+        story_point_field: str | None = None
+        if board_id:
+            story_point_field = await self._fetch_story_point_field_id(
+                base_url=base_url, email=email, api_token=api_token, board_id=board_id,
+            )
+        # Fallback well-known field id — most Jira instances use customfield_10016
+        # or customfield_10026 for Story Points. Try both in JQL via name syntax.
+        sp_field = story_point_field or 'customfield_10016'
+
+        jql_parts: list[str] = ['statusCategory = Done']
+        if project:
+            # project key or name; quote if it has spaces
+            safe = str(project).replace('"', '\\"')
+            jql_parts.append(f'project = "{safe}"')
+        # 'Story Points' by field name — works on most Jira instances
+        jql_parts.append('"Story Points" is not EMPTY')
+        jql_parts.append('"Story Points" > 0')
+        if since_days and since_days > 0:
+            jql_parts.append(f'resolutiondate >= -{int(since_days)}d')
+        jql = ' AND '.join(jql_parts) + ' ORDER BY resolutiondate DESC'
+
+        url = f"{base_url.rstrip('/')}/rest/api/3/search"
+        # Always request the numeric SP custom field too so we can coerce it server-side
+        fields_list = ['summary', 'description', 'status', 'assignee', 'created', 'resolutiondate', 'issuetype', sp_field]
+        items: list[ExternalTask] = []
+        start_at = 0
+        page_size = 100
+
+        async with httpx.AsyncClient(timeout=60) as client:
+            while True:
+                params: dict[str, str | int] = {
+                    'jql': jql,
+                    'fields': ','.join(fields_list),
+                    'maxResults': page_size,
+                    'startAt': start_at,
+                }
+                try:
+                    response = await client.get(url, params=params, auth=(email, api_token))
+                    response.raise_for_status()
+                    data = response.json()
+                except httpx.HTTPStatusError as exc:
+                    body = ''
+                    try:
+                        body = exc.response.text[:500]
+                    except Exception:
+                        pass
+                    logger.error(
+                        'Jira completed JQL failed %s: body=%r jql=%r',
+                        exc.response.status_code, body, jql,
+                    )
+                    raise RuntimeError(f'Jira search {exc.response.status_code}: {body or exc}') from exc
+
+                issues = data.get('issues', []) or []
+                for issue in issues:
+                    task = self._to_external_task(issue, story_point_field=sp_field)
+                    task.web_url = self._build_issue_browse_url(base_url, task.id)
+                    # Surface issue type into work_item_type so the UI groups by it
+                    issuetype = (issue.get('fields') or {}).get('issuetype') or {}
+                    if isinstance(issuetype, dict):
+                        task.work_item_type = issuetype.get('name')
+                    items.append(task)
+
+                total = int(data.get('total') or 0)
+                fetched = len(issues)
+                start_at += max(fetched, page_size)
+                if fetched == 0 or start_at >= total or len(items) >= max_items:
+                    break
+
+        if max_items and max_items > 0 and len(items) > max_items:
+            items = items[:max_items]
+        return items
+
     async def fetch_sprint_work_items(
         self,
         cfg: dict[str, str] | None = None,
