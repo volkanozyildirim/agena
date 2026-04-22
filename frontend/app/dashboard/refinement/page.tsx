@@ -487,6 +487,17 @@ export default function RefinementPage() {
     capped?: boolean;
     error?: string;
   } | null>(null);
+  type IndexPreview = {
+    enabled: boolean;
+    total: number;
+    sp_distribution: { sp: number; count: number }[];
+    top_assignees: { name: string; count: number }[];
+    work_item_types: { type: string; count: number }[];
+    samples: { external_id: string; title: string; story_points: number; assigned_to: string; url: string; work_item_type: string }[];
+  };
+  const [indexPreview, setIndexPreview] = useState<IndexPreview | null>(null);
+  const [indexPreviewOpen, setIndexPreviewOpen] = useState(false);
+  const [loadingPreview, setLoadingPreview] = useState(false);
   const [promptExpanded, setPromptExpanded] = useState(false);
   const [useCustomPrompt, setUseCustomPrompt] = useState(false);
   const [customPromptText, setCustomPromptText] = useState('');
@@ -502,7 +513,8 @@ export default function RefinementPage() {
     [jiraSprints, jiraSprint],
   );
 
-  // Restore last backfill job state on mount so the user sees it after refresh
+  // Restore last backfill job state on mount so the user sees it after refresh,
+  // and load the current index preview so they see what's already indexed.
   useEffect(() => {
     void (async () => {
       try {
@@ -510,6 +522,12 @@ export default function RefinementPage() {
         if (data.status && data.status !== 'idle') {
           setBackfillJob(data as typeof backfillJob);
         }
+      } catch {
+        // ignore
+      }
+      try {
+        const preview = await apiFetch<IndexPreview>('/refinement/history/preview');
+        if (preview.total > 0) setIndexPreview(preview);
       } catch {
         // ignore
       }
@@ -749,6 +767,23 @@ export default function RefinementPage() {
       setBackfillJob({ status: 'failed', error: err instanceof Error ? err.message : 'Backfill başlatılamadı' });
     }
   }, [provider, azureProject, azureTeam]);
+
+  const loadIndexPreview = useCallback(async () => {
+    setLoadingPreview(true);
+    try {
+      const data = await apiFetch<IndexPreview>('/refinement/history/preview');
+      setIndexPreview(data);
+    } catch {
+      setIndexPreview(null);
+    } finally {
+      setLoadingPreview(false);
+    }
+  }, []);
+
+  // Auto-load preview when a backfill completes
+  useEffect(() => {
+    if (backfillJob?.status === 'completed') void loadIndexPreview();
+  }, [backfillJob?.status, loadIndexPreview]);
 
   // Poll backfill status while a job is active
   useEffect(() => {
@@ -1345,6 +1380,127 @@ export default function RefinementPage() {
                   style={{ border: 'none', background: 'transparent', color: 'var(--ink-45)', cursor: 'pointer', fontSize: 16, padding: '0 4px' }}
                   title='Bu mesajı kapat (iş arka planda devam eder)'
                 >×</button>
+              )}
+            </div>
+          )}
+
+          {/* Index içeriği — her zaman görünür (eğer daha önce backfill çalıştıysa) */}
+          {(indexPreview || backfillJob?.status === 'completed') && (
+            <div style={{ borderRadius: 12, border: '1px solid var(--panel-border-2)', background: 'var(--panel)' }}>
+              <button
+                onClick={() => {
+                  if (!indexPreview && !loadingPreview) void loadIndexPreview();
+                  setIndexPreviewOpen((v) => !v);
+                }}
+                style={{
+                  width: '100%', textAlign: 'left', padding: '10px 14px',
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 10, color: 'var(--ink-85)',
+                }}
+              >
+                <span style={{ fontSize: 12, fontWeight: 700, flex: 1 }}>
+                  📚 Index İçeriği{indexPreview ? ` — ${indexPreview.total.toLocaleString()} iş` : ''}
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--ink-45)' }}>
+                  {loadingPreview ? 'yükleniyor...' : indexPreviewOpen ? 'kapat' : 'göster'}
+                </span>
+              </button>
+              {indexPreviewOpen && indexPreview && (
+                <div style={{ padding: '0 14px 14px', display: 'grid', gap: 14 }}>
+                  {/* SP dağılımı */}
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-45)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>
+                      SP Dağılımı
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {indexPreview.sp_distribution.map(({ sp, count }) => {
+                        const max = Math.max(...indexPreview.sp_distribution.map((x) => x.count));
+                        const pct = max ? (count / max) * 100 : 0;
+                        return (
+                          <div key={sp} style={{
+                            minWidth: 68, padding: '8px 10px', borderRadius: 8,
+                            border: '1px solid var(--panel-border)',
+                            background: `linear-gradient(90deg, rgba(94,234,212,0.15) ${pct}%, transparent ${pct}%)`,
+                          }}>
+                            <div style={{ fontSize: 11, color: 'var(--ink-50)', fontWeight: 600 }}>{sp} SP</div>
+                            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink-90)' }}>{count}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Top assignees */}
+                  {indexPreview.top_assignees.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-45)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>
+                        En Çok İş Yapan (ilk 10)
+                      </div>
+                      <div style={{ display: 'grid', gap: 4 }}>
+                        {indexPreview.top_assignees.map((a) => {
+                          const max = indexPreview.top_assignees[0]?.count || 1;
+                          const pct = (a.count / max) * 100;
+                          return (
+                            <div key={a.name} style={{
+                              display: 'grid', gridTemplateColumns: '220px 1fr 50px', gap: 10, alignItems: 'center',
+                              fontSize: 12,
+                            }}>
+                              <div style={{ color: 'var(--ink-78)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {a.name}
+                              </div>
+                              <div style={{ height: 6, background: 'var(--panel-border)', borderRadius: 999, overflow: 'hidden' }}>
+                                <div style={{ width: `${pct}%`, height: '100%', background: 'linear-gradient(90deg, #0d9488, #5eead4)' }} />
+                              </div>
+                              <div style={{ textAlign: 'right', color: 'var(--ink-85)', fontWeight: 700 }}>
+                                {a.count}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Samples */}
+                  {indexPreview.samples.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-45)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>
+                        Örnek İşler (30)
+                      </div>
+                      <div style={{ maxHeight: 260, overflowY: 'auto', borderRadius: 8, border: '1px solid var(--panel-border)', background: 'var(--panel-alt)' }}>
+                        {indexPreview.samples.map((s, i) => (
+                          <div key={s.external_id || i} style={{
+                            padding: '6px 10px',
+                            borderBottom: i < indexPreview.samples.length - 1 ? '1px solid var(--panel-border)' : 'none',
+                            display: 'flex', alignItems: 'center', gap: 10, fontSize: 12,
+                          }}>
+                            <span style={{
+                              fontWeight: 800, color: '#5eead4', minWidth: 48, textAlign: 'center',
+                              padding: '2px 6px', borderRadius: 6, background: 'rgba(94,234,212,0.1)',
+                              fontSize: 11,
+                            }}>
+                              {s.story_points} SP
+                            </span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ color: 'var(--ink-85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {s.url ? (
+                                  <a href={s.url} target='_blank' rel='noreferrer' style={{ color: 'var(--ink-85)', textDecoration: 'none' }}>
+                                    #{s.external_id} {s.title}
+                                  </a>
+                                ) : (
+                                  <span>#{s.external_id} {s.title}</span>
+                                )}
+                              </div>
+                            </div>
+                            <span style={{ fontSize: 11, color: 'var(--ink-42)', whiteSpace: 'nowrap', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {s.assigned_to || '—'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}

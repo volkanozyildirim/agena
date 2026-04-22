@@ -179,6 +179,68 @@ async def backfill_refinement_status(
     return {'status': job.get('status', 'idle'), **{k: v for k, v in job.items() if k != 'status'}}
 
 
+@router.get('/history/preview')
+async def refinement_history_preview(
+    tenant: CurrentTenant = Depends(get_current_tenant),
+) -> dict:
+    """Summarize what's currently in the refinement index for this org:
+    total count, SP distribution, top assignees, and the most-recent samples.
+    """
+    from collections import Counter
+    from agena_agents.memory.qdrant import QdrantMemoryStore
+
+    store = QdrantMemoryStore()
+    if not store.enabled:
+        return {'enabled': False, 'total': 0, 'sp_distribution': [], 'top_assignees': [], 'samples': []}
+
+    try:
+        rows = await store.scroll_by_filters(
+            organization_id=tenant.organization_id,
+            extra_filters={'kind': 'completed_task'},
+            limit=10000,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f'Qdrant scroll failed: {exc}') from exc
+
+    total = len(rows)
+    sp_counter: Counter[int] = Counter()
+    assignee_counter: Counter[str] = Counter()
+    type_counter: Counter[str] = Counter()
+    for r in rows:
+        sp = r.get('story_points')
+        try:
+            sp_int = int(sp) if sp is not None else 0
+        except (TypeError, ValueError):
+            sp_int = 0
+        if sp_int > 0:
+            sp_counter[sp_int] += 1
+        who = str(r.get('assigned_to') or '').strip() or '(atanmadı)'
+        assignee_counter[who] += 1
+        wt = str(r.get('work_item_type') or '').strip() or '(bilinmiyor)'
+        type_counter[wt] += 1
+
+    samples = [
+        {
+            'external_id': r.get('external_id'),
+            'title': r.get('title'),
+            'story_points': r.get('story_points'),
+            'assigned_to': r.get('assigned_to') or '',
+            'url': r.get('url') or '',
+            'work_item_type': r.get('work_item_type') or '',
+        }
+        for r in rows[:30]
+    ]
+
+    return {
+        'enabled': True,
+        'total': total,
+        'sp_distribution': [{'sp': sp, 'count': c} for sp, c in sorted(sp_counter.items())],
+        'top_assignees': [{'name': n, 'count': c} for n, c in assignee_counter.most_common(10)],
+        'work_item_types': [{'type': t, 'count': c} for t, c in type_counter.most_common(10)],
+        'samples': samples,
+    }
+
+
 @router.get('/history/status')
 async def refinement_history_status(
     tenant: CurrentTenant = Depends(get_current_tenant),

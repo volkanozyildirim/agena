@@ -155,6 +155,52 @@ class QdrantMemoryStore(MemoryStore):
             rows.append(row)
         return rows
 
+    async def scroll_by_filters(
+        self,
+        *,
+        organization_id: int | None = None,
+        extra_filters: dict[str, Any] | None = None,
+        limit: int = 10000,
+    ) -> list[dict[str, Any]]:
+        """Page through every point matching org + filters. Used for the
+        refinement history preview — we need to enumerate all points, not
+        nearest-neighbor search."""
+        if not self.enabled or not self.client:
+            return []
+        await self.ensure_collection()
+        must: list[FieldCondition] = []
+        if organization_id is not None and organization_id > 0:
+            must.append(
+                FieldCondition(key='organization_id', match=MatchValue(value=int(organization_id)))
+            )
+        if extra_filters:
+            for fk, fv in extra_filters.items():
+                if fv is None:
+                    continue
+                must.append(FieldCondition(key=str(fk), match=MatchValue(value=fv)))
+        query_filter = Filter(must=must) if must else None
+
+        rows: list[dict[str, Any]] = []
+        next_page: Any = None
+        per_page = min(max(int(limit) if limit else 1000, 100), 1000)
+        while True:
+            batch, next_page = await self.client.scroll(
+                collection_name=self.settings.qdrant_collection,
+                scroll_filter=query_filter,
+                limit=per_page,
+                offset=next_page,
+                with_payload=True,
+                with_vectors=False,
+            )
+            for point in batch:
+                if point.payload:
+                    rows.append(dict(point.payload))
+            if next_page is None:
+                break
+            if limit and len(rows) >= limit:
+                break
+        return rows[: limit] if limit else rows
+
     async def get_status(self) -> dict[str, Any]:
         mode = self._embedding_mode_label()
         if not self.enabled:
