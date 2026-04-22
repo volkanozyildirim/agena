@@ -129,12 +129,22 @@ export default function DashboardTasksPage() {
         created_at: string;
       }[]>('/tasks/queue');
 
+      const statusRank = (s: string): number => (s === 'running' ? 0 : s === 'queued' ? 1 : 2);
+      const sortTasks = (items: TaskItem[]): TaskItem[] =>
+        [...items].sort((a, b) => {
+          const r = statusRank(a.status) - statusRank(b.status);
+          if (r !== 0) return r;
+          const ta = new Date((a as TaskItem & { created_at?: string }).created_at ?? 0).getTime();
+          const tb = new Date((b as TaskItem & { created_at?: string }).created_at ?? 0).getTime();
+          return tb - ta;
+        });
+
       try {
         const [data, queueData] = await Promise.all([
           apiFetch<{ items: TaskItem[]; total: number; page: number; page_size: number }>(`/tasks/search?${qs.toString()}`),
           queuePromise,
         ]);
-        setTasks(data.items);
+        setTasks(sortTasks(data.items));
         setTotal(data.total);
         setQueueItems(queueData);
       } catch {
@@ -163,7 +173,7 @@ export default function DashboardTasksPage() {
           return matchStatus && matchSource && matchSearch && matchFrom && matchTo;
         });
         const pagedLegacy = filteredLegacy.slice((page - 1) * pageSize, page * pageSize);
-        setTasks(pagedLegacy);
+        setTasks(sortTasks(pagedLegacy));
         setTotal(filteredLegacy.length);
         setQueueItems(queueData);
       }
