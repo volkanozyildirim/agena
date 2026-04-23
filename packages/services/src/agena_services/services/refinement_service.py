@@ -124,6 +124,13 @@ class RefinementService:
             )
             if len(out) >= limit:
                 break
+        logger.info(
+            'Refinement similar lookup for item %s: %d scroll hits, %d qualifying (sp>0, dedup). Top: %s',
+            item.id,
+            len(rows),
+            len(out),
+            [f'#{x.external_id}={x.story_points}SP@{x.score:.2f}' for x in out[:3]],
+        )
         return out
 
     @staticmethod
@@ -698,6 +705,30 @@ class RefinementService:
                 desc_tpl = REFINEMENT_DESCRIPTION_PROMPT
             if not expected_tpl:
                 expected_tpl = REFINEMENT_EXPECTED_OUTPUT
+
+        # Older DB-saved prompts (from Prompt Studio) may not contain the
+        # {similar_past_items} placeholder. Append a grounding block so the
+        # retrieved similar items and their prior SPs always reach the LLM,
+        # regardless of whether the admin edited the template.
+        if '{similar_past_items}' not in desc_tpl:
+            desc_tpl = desc_tpl.rstrip() + (
+                '\n\n'
+                '--- SIMILAR PAST WORK (from your team\'s Qdrant index) ---\n'
+                '{similar_past_items}\n'
+                '--- END SIMILAR ---\n\n'
+                'If similar past items are listed above, ANCHOR your SP on their distribution '
+                'and NAME the closest one(s) + who worked on them in the rationale. '
+                'If the block says none, say so explicitly in the rationale.'
+            )
+        if 'similar' not in expected_tpl.lower():
+            expected_tpl = expected_tpl.rstrip() + (
+                '\n\n'
+                'IMPORTANT: The "estimation_rationale" MUST explicitly reference the closest similar '
+                'past item(s) by ID/title and their previous assignee when any are provided above, '
+                'e.g.: "En yakın: #12345 (Ali, 3 SP) ve #67890 (Ayşe, 5 SP). Bu iş X\'e daha yakın, '
+                'o yüzden Y SP önerildi." If no similar items were provided, state that no history '
+                'was found and estimate from scratch.'
+            )
 
         agent_cfg = {
             'role': 'Sprint Refinement Analyst',
