@@ -1260,6 +1260,24 @@ class OrchestrationService:
             except NameError:
                 pass  # orchestrator not created in mcp_agent/codex_cli/claude_cli modes
 
+            # Fire-and-forget: try to distil this completed task into a
+            # reusable Skill for future grounding. Wrapped in a background
+            # task so any LLM hiccup here doesn't affect the task's
+            # completion status or PR handoff.
+            try:
+                import asyncio as _asyncio
+                from agena_services.services.skill_extractor import (
+                    SkillExtractor,
+                    run_skill_extraction_job,
+                )
+                _ = SkillExtractor  # import guard
+                _asyncio.create_task(run_skill_extraction_job(
+                    organization_id=organization_id,
+                    task_id=int(task.id),
+                ))
+            except Exception as exc:
+                logger.info('Skill extraction dispatch skipped for task %s: %s', task.id, exc)
+
             publish_fire_and_forget(organization_id, 'task_status', {
                 'task_id': task.id, 'status': 'completed', 'title': task.title,
             })
