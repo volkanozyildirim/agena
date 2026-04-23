@@ -24,7 +24,7 @@ before:
 
 builds:
   - id: agena
-    main: ./packages/cli-go/cmd/agena
+    main: ./cmd/agena
     binary: agena
     goos:
       - darwin
@@ -51,9 +51,9 @@ archives:
       - goos: windows
         format: zip
     files:
-      - LICENSE*
       - README.md
-      - packages/cli/README.md
+      - ../../LICENSE*
+      - ../cli/README.md
 
 checksum:
   name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'
