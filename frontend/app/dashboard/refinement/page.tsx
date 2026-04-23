@@ -435,7 +435,7 @@ function buildSnapshotKey(provider: Provider, sprintRef: string): string {
 }
 
 export default function RefinementPage() {
-  const { lang } = useLocale();
+  const { lang, t } = useLocale();
   const copy = lang === 'tr' ? COPY.tr : COPY.en;
 
   const [provider, setProvider] = useState<Provider>('azure');
@@ -796,16 +796,27 @@ export default function RefinementPage() {
     return () => clearInterval(iv);
   }, [backfillJob]);
 
-  const runRefinement = useCallback(async () => {
-    if (!selectedIds.length) return;
-    setRunning(true);
-    setAnalyzedCount(0);
+  const [runningItemId, setRunningItemId] = useState('');
+
+  const runRefinement = useCallback(async (overrideItemIds?: string[]) => {
+    const ids = overrideItemIds && overrideItemIds.length ? overrideItemIds : selectedIds;
+    if (!ids.length) return;
+    const isSingle = overrideItemIds?.length === 1;
+    if (isSingle) {
+      setRunningItemId(overrideItemIds![0]);
+    } else {
+      setRunning(true);
+      setAnalyzedCount(0);
+    }
     setError('');
     setRunMessage(null);
-    const totalCount = selectedIds.length;
-    const progressInterval = setInterval(() => {
-      setAnalyzedCount((prev) => prev < totalCount - 1 ? prev + 1 : prev);
-    }, Math.max(3000, 8000 / totalCount));
+    const totalCount = ids.length;
+    let progressInterval: ReturnType<typeof setInterval> | null = null;
+    if (!isSingle) {
+      progressInterval = setInterval(() => {
+        setAnalyzedCount((prev) => prev < totalCount - 1 ? prev + 1 : prev);
+      }, Math.max(3000, 8000 / totalCount));
+    }
     try {
       const customSystemPrompt = useCustomPrompt && customPromptText.trim() ? customPromptText.trim() : undefined;
       const payload = provider === 'azure'
@@ -818,8 +829,8 @@ export default function RefinementPage() {
           language,
           agent_provider: agentProvider,
           agent_model: agentModel,
-          item_ids: selectedIds,
-          max_items: maxItems,
+          item_ids: ids,
+          max_items: isSingle ? 1 : maxItems,
           ...(customSystemPrompt ? { custom_system_prompt: customSystemPrompt } : {}),
         }
         : {
@@ -830,22 +841,36 @@ export default function RefinementPage() {
           language,
           agent_provider: agentProvider,
           agent_model: agentModel,
-          item_ids: selectedIds,
-          max_items: maxItems,
+          item_ids: ids,
+          max_items: isSingle ? 1 : maxItems,
           ...(customSystemPrompt ? { custom_system_prompt: customSystemPrompt } : {}),
         };
       const response = await apiFetch<RefinementAnalyzeResponse>('/refinement/analyze', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
-      clearInterval(progressInterval);
+      if (progressInterval) clearInterval(progressInterval);
       setAnalyzedCount(totalCount);
       const normalized = normalizeAnalyzeResponse(response);
-      setResults(normalized);
-      setAutoFocusResults(true);
-      if (normalized.results.length > 0) {
-        setFocusedResultId(normalized.results[0].item_id);
-        setResultsModalOpen(true);
+      // For single-item runs, merge into existing results instead of replacing.
+      if (isSingle) {
+        setResults((prev) => {
+          const next = normalized;
+          if (!prev) return next;
+          const byId = new Map(prev.results.map((r) => [r.item_id, r]));
+          for (const r of next.results) byId.set(r.item_id, r);
+          return { ...prev, ...next, results: Array.from(byId.values()) };
+        });
+        if (normalized.results.length > 0) {
+          setExpandedItemId(normalized.results[0].item_id);
+        }
+      } else {
+        setResults(normalized);
+        setAutoFocusResults(true);
+        if (normalized.results.length > 0) {
+          setFocusedResultId(normalized.results[0].item_id);
+          setResultsModalOpen(true);
+        }
       }
       const failures = normalized.results.filter((item) => Boolean(item.error)).length;
       if (!normalized.results.length) {
@@ -858,13 +883,17 @@ export default function RefinementPage() {
         setRunMessage({ kind: 'warning', text: copy.partialRun });
       }
     } catch (err) {
-      clearInterval(progressInterval);
+      if (progressInterval) clearInterval(progressInterval);
       const message = err instanceof Error ? err.message : 'Refinement failed';
       setError(message);
       setRunMessage({ kind: 'error', text: message });
     } finally {
-      clearInterval(progressInterval);
-      setRunning(false);
+      if (progressInterval) clearInterval(progressInterval);
+      if (isSingle) {
+        setRunningItemId('');
+      } else {
+        setRunning(false);
+      }
     }
   }, [provider, azureProject, azureTeam, azureSprint, selectedAzureSprint, jiraBoard, jiraSprint, selectedJiraSprint, language, agentProvider, agentModel, selectedIds, maxItems, useCustomPrompt, customPromptText, normalizeAnalyzeResponse, copy.failedRun, copy.successRun, copy.partialRun]);
 
@@ -1510,6 +1539,28 @@ export default function RefinementPage() {
                             </div>
                           )}
                           {isWrittenBack && <span style={{ ...writtenBadge, fontSize: 9, padding: '1px 6px' }}>{copy.writtenBack}</span>}
+                          {!estimated && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); void runRefinement([item.id]); }}
+                              disabled={running || runningItemId === item.id || !!isWrittenBack}
+                              style={{
+                                marginLeft: suggestion ? 0 : 'auto',
+                                fontSize: 11, fontWeight: 700,
+                                padding: '4px 10px', borderRadius: 8,
+                                border: '1px solid rgba(94,234,212,0.35)',
+                                background: runningItemId === item.id ? 'rgba(94,234,212,0.15)' : 'rgba(94,234,212,0.08)',
+                                color: '#5eead4',
+                                cursor: (running || runningItemId === item.id) ? 'wait' : 'pointer',
+                                opacity: (running && runningItemId !== item.id) ? 0.5 : 1,
+                                whiteSpace: 'nowrap',
+                              }}
+                              title={suggestion ? copy.analyze : copy.analyze}
+                            >
+                              {runningItemId === item.id
+                                ? `⏳ ${copy.analyzing}`
+                                : suggestion ? `↻ ${copy.analyze}` : `▶ ${copy.analyze}`}
+                            </button>
+                          )}
                           {suggestion && (
                             <span style={{ fontSize: 11, color: 'var(--ink-42)', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }}>▼</span>
                           )}
