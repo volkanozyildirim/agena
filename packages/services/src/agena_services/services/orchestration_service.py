@@ -669,6 +669,34 @@ class OrchestrationService:
                         f'  system_prompt: AI_PLAN_SYSTEM_PROMPT\n'
                         f'  model: {routing.preferred_agent_model or "default"}'
                     )
+                    # Pull relevant skills from the team's catalog. These are
+                    # distilled from prior completed tasks; injecting them
+                    # into the planner + dev prompts lets future work build
+                    # on past solutions instead of rediscovering them.
+                    try:
+                        from agena_services.services.skill_service import SkillService
+                        _skill_svc = SkillService(self.db_session)
+                        _skill_hits = await _skill_svc.find_relevant(
+                            organization_id,
+                            title=task.title,
+                            description=(task_description_for_ai or '')[:3000],
+                            touched_files=plan_files if 'plan_files' in dir() else None,
+                            limit=3,
+                        )
+                        if _skill_hits:
+                            orchestrator.agents._skills_prompt_block = SkillService.format_for_prompt(
+                                _skill_hits, is_turkish=True,
+                            )
+                            await task_service.add_log(task.id, organization_id, 'agent',
+                                f'Retrieved {len(_skill_hits)} relevant skill(s) from catalog: '
+                                + ', '.join(f'#{h.id} {h.name[:50]}({h.tier})' for h in _skill_hits)
+                            )
+                        else:
+                            orchestrator.agents._skills_prompt_block = ''
+                    except Exception as _se:
+                        logger.info('Skill retrieval skipped for task %s: %s', task.id, _se)
+                        orchestrator.agents._skills_prompt_block = ''
+
                     u_before = _get_usage(flow_state)
                     s_start = datetime.utcnow()
                     s_clock = time.perf_counter()

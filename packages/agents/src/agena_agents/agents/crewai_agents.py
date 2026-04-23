@@ -61,6 +61,21 @@ class CrewAIAgentRunner:
     def __init__(self, llm_provider: LLMProvider | None = None, *, db: AsyncSession | None = None) -> None:
         self.llm = llm_provider or LLMProvider()
         self.db = db
+        # Orchestration sets this before calling run_ai_plan / run_ai_code
+        # when relevant skills were retrieved from the team's catalog. The
+        # block is prepended to the system prompt so agents can apply
+        # past solutions instead of rediscovering them.
+        self._skills_prompt_block: str = ''
+
+    def _with_skills(self, system_prompt: str) -> str:
+        if not self._skills_prompt_block:
+            return system_prompt
+        return (
+            '--- RELEVANT TEAM SKILLS (from prior completed tasks) ---\n'
+            f'{self._skills_prompt_block}\n'
+            '--- END SKILLS ---\n\n'
+            f'{system_prompt}'
+        )
 
     async def fetch_context(self, task_payload: dict[str, str], memory_context: list[dict[str, Any]]) -> tuple[str, dict[str, int], str]:
         prompt = (
@@ -122,7 +137,7 @@ class CrewAIAgentRunner:
         content, usage, model, structured = await self._run_with_crewai_or_llm(
             role='AI Planner',
             goal='Plan implementation changes for a task against the current repository state.',
-            system_prompt=await PromptService.get(self.db, 'ai_plan_system_prompt'),
+            system_prompt=self._with_skills(await PromptService.get(self.db, 'ai_plan_system_prompt')),
             user_prompt=prompt,
             expected_output='Return valid JSON with keys: plan, files, changes.',
             complexity_hint='high',
@@ -168,7 +183,7 @@ class CrewAIAgentRunner:
         content, usage, model, _ = await self._run_with_crewai_or_llm(
             role='Developer Agent',
             goal='Implement planned code changes with minimal, accurate patches.',
-            system_prompt=await PromptService.get(self.db, 'ai_code_system_prompt'),
+            system_prompt=self._with_skills(await PromptService.get(self.db, 'ai_code_system_prompt')),
             user_prompt=prompt,
             expected_output='Patch output only, using **File: path** blocks and fenced patch sections.',
             complexity_hint='high',
@@ -188,7 +203,7 @@ class CrewAIAgentRunner:
                 '- Do not output prose, apologies, or commentary.\n'
             )
             direct_content, direct_usage, direct_model, _ = await self.llm.generate(
-                system_prompt=await PromptService.get(self.db, 'ai_code_system_prompt'),
+                system_prompt=self._with_skills(await PromptService.get(self.db, 'ai_code_system_prompt')),
                 user_prompt=retry_prompt,
                 complexity_hint='high',
                 max_output_tokens=AGENT_TOKEN_LIMITS['developer'],
@@ -221,7 +236,7 @@ class CrewAIAgentRunner:
         content, usage, model, _ = await self._run_with_crewai_or_llm(
             role='Developer Agent',
             goal='Generate production-ready code from a specification.',
-            system_prompt=await PromptService.get(self.db, 'ai_code_system_prompt' if direct_mode else 'dev_system_prompt'),
+            system_prompt=self._with_skills(await PromptService.get(self.db, 'ai_code_system_prompt' if direct_mode else 'dev_system_prompt')),
             user_prompt=prompt,
             expected_output='Code output only, using **File: relative/path.ext** blocks.',
             complexity_hint='high',
