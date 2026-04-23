@@ -97,7 +97,7 @@ brews:
     caveats: |
       For the full command set while the Go port is in progress, also run:
 
-          npm install -g @agena/cli
+          npm install -g @agenaai/cli
 
       Once Go-native parity lands the npm dependency will go away.
 

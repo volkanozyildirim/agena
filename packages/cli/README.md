@@ -1,4 +1,4 @@
-# @agena/cli
+# @agenaai/cli
 
 Official command-line tool for AGENA — enroll your machine as a
 Runtime, manage the CLI bridge daemon, and inspect the backend from
@@ -7,9 +7,9 @@ the terminal.
 ## Install
 
 ```bash
-npm install -g @agena/cli
+npm install -g @agenaai/cli
 # or use it one-shot
-npx @agena/cli --help
+npx @agenaai/cli --help
 ```
 
 ## First-run setup

@@ -410,7 +410,7 @@ export default function HomePage() {
               background: 'var(--panel)', border: '1px solid var(--panel-border-2)',
               color: 'var(--ink-85)', whiteSpace: 'nowrap',
             }}>
-              npm install -g @agena/cli
+              npm install -g @agenaai/cli
             </code>
           </div>
         </section>
