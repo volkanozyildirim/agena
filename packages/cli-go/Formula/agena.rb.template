@@ -46,7 +46,7 @@ class Agena < Formula
     <<~EOS
       For the full command set while the Go port is in progress, also run:
 
-          npm install -g @agena/cli
+          npm install -g @agenaai/cli
 
       Once the Go-native rewrite lands the npm dependency will go away.
     EOS

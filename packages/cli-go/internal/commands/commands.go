@@ -80,9 +80,9 @@ func RuntimeCmd() *cobra.Command {
 func execNodeCLI(sub string, args ...string) error {
 	full := append([]string{sub}, args...)
 	candidates := []string{
-		// Same-prefix npm install: <prefix>/lib/node_modules/@agena/cli/bin/agena.js
-		"/opt/homebrew/lib/node_modules/@agena/cli/bin/agena.js",
-		"/usr/local/lib/node_modules/@agena/cli/bin/agena.js",
+		// Same-prefix npm install: <prefix>/lib/node_modules/@agenaai/cli/bin/agena.js
+		"/opt/homebrew/lib/node_modules/@agenaai/cli/bin/agena.js",
+		"/usr/local/lib/node_modules/@agenaai/cli/bin/agena.js",
 	}
 	for _, c := range candidates {
 		if _, err := os.Stat(c); err == nil {
@@ -93,6 +93,6 @@ func execNodeCLI(sub string, args ...string) error {
 			return cmd.Run()
 		}
 	}
-	return fmt.Errorf("bundled @agena/cli not found — this Go binary is a thin shim for now.\n"+
-		"Install the Node CLI: npm install -g @agena/cli\n(config dir: %s)", config.Dir())
+	return fmt.Errorf("bundled @agenaai/cli not found — this Go binary is a thin shim for now.\n"+
+		"Install the Node CLI: npm install -g @agenaai/cli\n(config dir: %s)", config.Dir())
 }

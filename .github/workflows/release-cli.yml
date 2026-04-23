@@ -70,7 +70,7 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Build + publish @agena/cli
+      - name: Build + publish @agenaai/cli
         if: env.NPM_TOKEN != ''
         working-directory: packages/cli
         run: |

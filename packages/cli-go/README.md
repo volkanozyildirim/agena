@@ -1,6 +1,6 @@
 # agena (Go)
 
-Go-based companion to `@agena/cli` (Node). This is the binary published
+Go-based companion to `@agenaai/cli` (Node). This is the binary published
 to Homebrew via `brew install aozyildirim/tap/agena`. It currently runs
 as a thin shim that delegates to the Node CLI for the actual work —
 commands will be ported to native Go one at a time.
@@ -9,7 +9,7 @@ commands will be ported to native Go one at a time.
 
 | Command       | Native in Go? | Notes |
 |---------------|:-------------:|-------|
-| `login`       | ❌ shim        | Delegates to `@agena/cli`. Port blocked on device-flow polling loop + keyring integration. |
+| `login`       | ❌ shim        | Delegates to `@agenaai/cli`. Port blocked on device-flow polling loop + keyring integration. |
 | `setup`       | ❌ shim        | Same as login. |
 | `daemon`      | ❌ shim        | Node spawns bridge-server.mjs. |
 | `runtime list/status` | ❌ shim | Straightforward to port next (just HTTP). |
@@ -32,7 +32,7 @@ go build -o agena ./cmd/agena
    - GoReleaser builds cross-platform binaries
    - Uploads to GitHub releases
    - Updates the Homebrew tap (needs `HOMEBREW_TAP_TOKEN` secret)
-   - Publishes `@agena/cli` to npm (needs `NPM_TOKEN` secret)
+   - Publishes `@agenaai/cli` to npm (needs `NPM_TOKEN` secret)
 
 ## Prereqs for the first release
 

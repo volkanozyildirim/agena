@@ -290,11 +290,11 @@ pip install -e packages/agents   # includes CrewAI + LangGraph
 
 ## CLI
 
-`@agena/cli` wraps the host bridge so you don't have to juggle env vars
+`@agenaai/cli` wraps the host bridge so you don't have to juggle env vars
 manually:
 
 ```bash
-npm install -g @agena/cli
+npm install -g @agenaai/cli
 
 agena login               # saves backend URL + tenant + JWT to ~/.agena/config.json
 agena daemon start        # launches bridge-server.mjs, auto-enrolls as a Runtime
