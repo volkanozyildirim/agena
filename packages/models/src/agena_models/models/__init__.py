@@ -19,6 +19,7 @@ from agena_models.models.prompt import Prompt
 from agena_models.models.prompt_override import PromptOverride
 from agena_models.models.refinement_record import RefinementRecord
 from agena_models.models.repo_mapping import RepoMapping
+from agena_models.models.runtime import Runtime
 from agena_models.models.skill import Skill
 from agena_models.models.run_record import RunRecord
 from agena_models.models.subscription import Subscription
@@ -44,4 +45,5 @@ __all__ = [
     'NewRelicEntityMapping',
     'SentryProjectMapping',
     'Skill',
+    'Runtime',
 ]
