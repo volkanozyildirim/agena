@@ -797,6 +797,7 @@ export default function RefinementPage() {
   }, [backfillJob]);
 
   const [runningItemId, setRunningItemId] = useState('');
+  const [runModal, setRunModal] = useState<{ itemIds: string[]; single: boolean } | null>(null);
 
   const runRefinement = useCallback(async (overrideItemIds?: string[]) => {
     const ids = overrideItemIds && overrideItemIds.length ? overrideItemIds : selectedIds;
@@ -1069,6 +1070,124 @@ export default function RefinementPage() {
         </div>,
         document.body,
       )}
+      {/* Run Refinement config modal */}
+      {runModal && typeof document !== 'undefined' && createPortal(
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 99998,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', padding: 20,
+          }}
+          onClick={() => setRunModal(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 'min(460px, 100%)',
+              borderRadius: 16,
+              background: 'var(--surface)',
+              border: '1px solid var(--panel-border)',
+              padding: 22,
+              display: 'grid',
+              gap: 14,
+              boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#5eead4', textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                {copy.analyze}
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--ink-90)', marginTop: 4 }}>
+                {runModal.single
+                  ? (t('refinement.runModal.titleSingle' as Parameters<typeof t>[0])).replace('{id}', runModal.itemIds[0] || '')
+                  : (t('refinement.runModal.titleBulk' as Parameters<typeof t>[0])).replace('{count}', String(runModal.itemIds.length))}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--ink-45)', marginTop: 4 }}>
+                {t('refinement.runModal.subtitle' as Parameters<typeof t>[0])}
+              </div>
+            </div>
+
+            <Field label={copy.agentProvider}>
+              <select
+                value={agentProvider}
+                onChange={(e) => {
+                  const next = e.target.value as AgentProvider;
+                  setAgentProvider(next);
+                  setAgentModel(modelsForProvider(next)[0]?.id || '');
+                }}
+                style={inputStyle}
+              >
+                <option value='openai'>OpenAI</option>
+                <option value='gemini'>Gemini</option>
+                <option value='claude_cli'>Claude CLI</option>
+                <option value='codex_cli'>Codex CLI</option>
+                <option value='hal'>HAL</option>
+              </select>
+            </Field>
+
+            {agentProvider !== 'hal' && (
+              <Field label={copy.agentModel}>
+                <select value={agentModel} onChange={(e) => setAgentModel(e.target.value)} style={inputStyle}>
+                  {availableModels.map((m) => (
+                    <option key={m.id} value={m.id}>{m.label}</option>
+                  ))}
+                </select>
+              </Field>
+            )}
+
+            <Field label={copy.language}>
+              <select value={language} onChange={(e) => setLanguage(e.target.value)} style={inputStyle}>
+                <option value='Turkish'>Turkish</option>
+                <option value='English'>English</option>
+                <option value='German'>German</option>
+                <option value='Spanish'>Spanish</option>
+                <option value='Chinese'>Chinese</option>
+                <option value='Italian'>Italian</option>
+                <option value='Japanese'>Japanese</option>
+              </select>
+            </Field>
+
+            <div style={{
+              display: 'flex', gap: 8, alignItems: 'center',
+              padding: '8px 10px', borderRadius: 10,
+              background: 'rgba(94,234,212,0.06)',
+              border: '1px solid rgba(94,234,212,0.25)',
+              fontSize: 11, color: 'var(--ink-65)',
+            }}>
+              💡 {t('refinement.runModal.hint' as Parameters<typeof t>[0])}
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+              <button
+                onClick={() => setRunModal(null)}
+                style={{
+                  padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 700,
+                  border: '1px solid var(--panel-border-2)', background: 'transparent',
+                  color: 'var(--ink-65)', cursor: 'pointer',
+                }}
+              >
+                {t('refinement.runModal.cancel' as Parameters<typeof t>[0])}
+              </button>
+              <button
+                onClick={() => {
+                  const ids = runModal.itemIds;
+                  setRunModal(null);
+                  void runRefinement(ids);
+                }}
+                style={{
+                  padding: '8px 18px', borderRadius: 10, fontSize: 12, fontWeight: 800,
+                  border: '1px solid rgba(13,148,136,0.6)',
+                  background: 'linear-gradient(135deg, #0d9488, #5eead4)',
+                  color: '#0a1815', cursor: 'pointer',
+                }}
+              >
+                ▶ {t('refinement.runModal.start' as Parameters<typeof t>[0])}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
       <div>
         <div className='section-label'>{copy.section}</div>
         <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink-90)', marginTop: 6, marginBottom: 2 }}>{copy.title}</h1>
@@ -1283,7 +1402,7 @@ export default function RefinementPage() {
             <button onClick={() => void refreshItems()} style={primaryButton} disabled={loadingItems}>
               {loadingItems ? copy.loadingItems : copy.loadItems}
             </button>
-            <button onClick={() => void runRefinement()} style={secondaryButton} disabled={running || !selectedIds.length}>
+            <button onClick={() => setRunModal({ itemIds: [...selectedIds], single: false })} style={secondaryButton} disabled={running || !selectedIds.length}>
               {running ? copy.analyzing : copy.analyze}
             </button>
             {(() => {
@@ -1541,7 +1660,7 @@ export default function RefinementPage() {
                           {isWrittenBack && <span style={{ ...writtenBadge, fontSize: 9, padding: '1px 6px' }}>{copy.writtenBack}</span>}
                           {!estimated && (
                             <button
-                              onClick={(e) => { e.stopPropagation(); void runRefinement([item.id]); }}
+                              onClick={(e) => { e.stopPropagation(); setRunModal({ itemIds: [item.id], single: true }); }}
                               disabled={running || runningItemId === item.id || !!isWrittenBack}
                               style={{
                                 marginLeft: suggestion ? 0 : 'auto',
