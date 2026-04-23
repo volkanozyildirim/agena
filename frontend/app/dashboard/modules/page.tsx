@@ -19,6 +19,8 @@ const MODULE_HELP: Record<string, { features: string[]; useCases: string[] }> = 
   boss_mode: { features: ['Pixel-art office visualization', 'Visual agent management', 'Drag & drop task assignment', 'Real-time agent status'], useCases: ['Managing AI agents visually', 'Quick task assignment from office view'] },
   sprints: { features: ['Sprint board (Kanban)', 'Sprint import from Azure/Jira', 'Sprint Performance tracking', 'Team management'], useCases: ['Agile teams using sprints', 'Importing work items from project tools'] },
   refinement: { features: ['AI-powered task refinement', 'Story point estimation', 'Acceptance criteria generation', 'Edge case analysis'], useCases: ['Preparing tasks before AI development', 'Improving task quality for better AI output'] },
+  skills: { features: ['Auto-extract patterns from completed tasks', 'Qdrant vector search for relevance', 'Injected into agent system prompts', 'Manual create + edit + tags'], useCases: ['Building a team knowledge base over time', 'Enforcing team coding conventions on new agent runs', 'Reducing rediscovery on similar tasks'] },
+  runtimes: { features: ['Register local + cloud compute environments', 'Token-based daemon auth', '30s heartbeat + live status', 'Available-CLI reporting'], useCases: ['Visibility into where agents can actually run', 'Multi-machine teams sharing one dashboard', 'Foundation for the upcoming agena CLI'] },
   flows: { features: ['Visual flow builder (drag & drop)', 'Flow templates', 'Multi-step automation', 'Condition nodes & branching'], useCases: ['Custom AI pipelines', 'Automated code review workflows'] },
   prompt_studio: { features: ['Edit system prompts at runtime', 'Per-agent prompt customization', 'Version history', 'No code deploy needed'], useCases: ['Fine-tuning AI behavior', 'A/B testing different prompts'] },
   dora: { features: ['Deployment Frequency', 'Lead Time for Changes', 'Change Failure Rate', 'Mean Time to Recovery (MTTR)'], useCases: ['Engineering team performance metrics', 'DevOps maturity assessment'] },
@@ -78,7 +80,7 @@ export default function ModulesPage() {
   const enabledCount = modules.filter((m) => m.enabled).length;
 
   const MODULE_GROUPS: { label: string; slugs: string[] }[] = [
-    { label: 'Core & Workspace', slugs: ['core', 'boss_mode', 'sprints', 'refinement', 'permissions'] },
+    { label: 'Core & Workspace', slugs: ['core', 'boss_mode', 'sprints', 'refinement', 'skills', 'runtimes', 'permissions'] },
     { label: 'AI & Automation', slugs: ['flows', 'prompt_studio', 'playbook'] },
     { label: 'LLM Providers', slugs: ['openai', 'gemini', 'hal', 'cli_agents'] },
     { label: 'Source Control', slugs: ['github', 'gitlab', 'bitbucket', 'azure'] },
