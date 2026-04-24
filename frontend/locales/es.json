@@ -2163,6 +2163,8 @@
   "sprintPerf.pingAlreadyBadge": "Recordado hace poco",
   "sprintPerf.pingAlreadyDetail": "Agena ya recordó hace {hours}h — cooldown de 48h.",
   "sprintPerf.pingHistoryBadge": "Agena recordó hace {hours}h",
+  "sprintPerf.pingClearBtn": "Borrar pings",
+  "sprintPerf.pingClearConfirm": "¿Borrar el historial de pings de Agena para este tenant? Los items bloqueados podrán recibir ping de nuevo.",
   "sprintPerf.pingFallbackAssignee": "equipo",
   "sprintPerf.pingGreeting": "Hola {name},",
   "sprintPerf.pingBody": "Este work item está marcado como bloqueado. Un rápido update de estado nos vendría genial para que el sprint siga avanzando.",

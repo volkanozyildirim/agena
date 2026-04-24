@@ -456,6 +456,8 @@
   "sprintPerf.pingAlreadyBadge": "Recently pinged",
   "sprintPerf.pingAlreadyDetail": "Agena already nudged this {hours}h ago — cooldown is 48h.",
   "sprintPerf.pingHistoryBadge": "Agena pinged {hours}h ago",
+  "sprintPerf.pingClearBtn": "Clear pings",
+  "sprintPerf.pingClearConfirm": "Clear Agena's ping history for this tenant? Blocked items will be pingable again.",
   "sprintPerf.pingFallbackAssignee": "team",
   "sprintPerf.pingGreeting": "Hi {name},",
   "sprintPerf.pingBody": "This work item is flagged as blocked and we'd love a quick status update so we can keep the sprint moving.",
