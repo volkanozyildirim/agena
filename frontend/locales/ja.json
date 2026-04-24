@@ -2137,6 +2137,7 @@
   "sprintPerf.pulsePrReviewEmpty": "この期間にマージされた PR なし",
   "sprintPerf.pulseVelocity": "AI タスク速度",
   "sprintPerf.pulseVelocitySub": "完了したエージェントタスク · 14 日スパークライン",
+  "sprintPerf.pingLangLabel": "コメントの言語:",
   "sprintPerf.pingAction": "リマインド",
   "sprintPerf.pingSending": "送信中…",
   "sprintPerf.pingSent": "送信済み",

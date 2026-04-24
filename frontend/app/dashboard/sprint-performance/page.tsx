@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { apiFetch, loadPrefs, type AzureMember } from '@/lib/api';
-import { useLocale } from '@/lib/i18n';
+import { useLocale, type Lang } from '@/lib/i18n';
 
 type SprintOption = {
   id: string;
@@ -204,7 +204,7 @@ function getScoreGradient(score: number): string {
 }
 
 export default function SprintPerformancePage() {
-  const { t } = useLocale();
+  const { t, lang, translate } = useLocale();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [provider, setProvider] = useState<'azure' | 'jira'>('azure');
@@ -232,6 +232,7 @@ export default function SprintPerformancePage() {
   const [doraModuleEnabled, setDoraModuleEnabled] = useState<boolean | null>(null);
   const [pingState, setPingState] = useState<Record<string, 'idle' | 'loading' | 'sent' | 'error'>>({});
   const [pingError, setPingError] = useState<Record<string, string>>({});
+  const [pingLang, setPingLang] = useState<Lang>('tr');
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -514,6 +515,12 @@ export default function SprintPerformancePage() {
     void loadData();
   }, [loadData]);
 
+  // Default the ping target language to the user's current UI locale once the
+  // locale has resolved from localStorage.
+  useEffect(() => {
+    setPingLang(lang);
+  }, [lang]);
+
   // Resolve enabled modules once — the Engineering Pulse section depends on
   // the `dora` module. On failure, hide the section rather than assume it's
   // on.
@@ -564,13 +571,13 @@ export default function SprintPerformancePage() {
     if (pingState[key] === 'loading' || pingState[key] === 'sent') return;
     setPingState((s) => ({ ...s, [key]: 'loading' }));
     setPingError((s) => ({ ...s, [key]: '' }));
-    const mention = item.assignee && item.assignee !== '—' ? item.assignee : t('sprintPerf.pingFallbackAssignee');
-    const reasonLine = item.reason ? t('sprintPerf.pingReasonLine', { reason: item.reason }) : '';
+    const mention = item.assignee && item.assignee !== '—' ? item.assignee : translate(pingLang, 'sprintPerf.pingFallbackAssignee');
+    const reasonLine = item.reason ? translate(pingLang, 'sprintPerf.pingReasonLine', { reason: item.reason }) : '';
     const comment = [
-      t('sprintPerf.pingGreeting', { name: mention }),
-      t('sprintPerf.pingBody'),
+      translate(pingLang, 'sprintPerf.pingGreeting', { name: mention }),
+      translate(pingLang, 'sprintPerf.pingBody'),
       reasonLine,
-      t('sprintPerf.pingSignature'),
+      translate(pingLang, 'sprintPerf.pingSignature'),
     ].filter(Boolean).join('\n\n');
     const path = provider === 'jira'
       ? `/tasks/jira/issues/${encodeURIComponent(item.id)}/comment`
@@ -582,7 +589,7 @@ export default function SprintPerformancePage() {
       setPingState((s) => ({ ...s, [key]: 'error' }));
       setPingError((s) => ({ ...s, [key]: err instanceof Error ? err.message : 'Failed' }));
     }
-  }, [pingState, provider, t]);
+  }, [pingState, provider, pingLang, translate]);
 
   const avgCompletion = useMemo(() => {
     if (!memberStats.length) return 0;
@@ -1244,7 +1251,7 @@ export default function SprintPerformancePage() {
             border: '1px solid var(--panel-border-2)',
             background: 'var(--surface)',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
               <div style={{
                 width: 32, height: 32, borderRadius: 10,
                 background: 'rgba(251,146,60,0.15)',
@@ -1256,6 +1263,30 @@ export default function SprintPerformancePage() {
                 </svg>
               </div>
               <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'var(--ink-90)' }}>{t('sprintPerf.blockedTitle')}</h2>
+              <span style={{ flex: 1 }} />
+              {blockedItems.length > 0 && (
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--ink-55)' }}>
+                  {t('sprintPerf.pingLangLabel')}
+                  <select
+                    value={pingLang}
+                    onChange={(e) => setPingLang(e.target.value as Lang)}
+                    style={{
+                      fontSize: 11, fontWeight: 600,
+                      padding: '3px 8px', borderRadius: 8,
+                      border: '1px solid var(--panel-border-2)',
+                      background: 'var(--panel)', color: 'var(--ink-80)',
+                    }}
+                  >
+                    <option value="tr">Türkçe</option>
+                    <option value="en">English</option>
+                    <option value="de">Deutsch</option>
+                    <option value="es">Español</option>
+                    <option value="it">Italiano</option>
+                    <option value="ja">日本語</option>
+                    <option value="zh">中文</option>
+                  </select>
+                </label>
+              )}
             </div>
 
             {blockedItems.length === 0 ? (

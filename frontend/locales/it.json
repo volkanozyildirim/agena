@@ -2128,6 +2128,7 @@
   "sprintPerf.pulsePrReviewEmpty": "Nessun PR merged nel periodo",
   "sprintPerf.pulseVelocity": "Velocità AI",
   "sprintPerf.pulseVelocitySub": "Task agente completati · sparkline 14g",
+  "sprintPerf.pingLangLabel": "Lingua del commento:",
   "sprintPerf.pingAction": "Sollecita",
   "sprintPerf.pingSending": "Invio in corso…",
   "sprintPerf.pingSent": "Inviato",

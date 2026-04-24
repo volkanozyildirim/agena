@@ -61,11 +61,24 @@ export function useLocale() {
     return str;
   }, [lang]);
 
+  // Translate a key using an explicit target language — independent of the
+  // user's active UI locale. Useful when composing text for a non-UI
+  // destination (e.g. a comment posted to a Jira ticket in the team's
+  // working language).
+  const translate = useCallback((targetLang: Lang, key: TranslationKey, vars?: Record<string, string | number>): string => {
+    const dict = dicts[targetLang] ?? dicts.tr;
+    let str = dict[key] ?? dicts.en[key] ?? dicts.tr[key] ?? key;
+    if (vars) {
+      Object.entries(vars).forEach(([k, v]) => { str = str.replace(`{${k}}`, String(v)); });
+    }
+    return str;
+  }, []);
+
   const toggle = useCallback(() => {
     const order: Lang[] = ['tr', 'en', 'es', 'zh', 'it', 'de', 'ja'];
     const idx = order.indexOf(lang);
     setLang(order[(idx + 1) % order.length]);
   }, [lang]);
 
-  return { lang, t, toggle, setLang };
+  return { lang, t, translate, toggle, setLang };
 }
