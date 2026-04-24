@@ -2137,6 +2137,7 @@
   "sprintPerf.pulsePrReviewEmpty": "Sin PRs merged en el período",
   "sprintPerf.pulseVelocity": "Velocidad IA",
   "sprintPerf.pulseVelocitySub": "Tareas de agente completadas · sparkline 14d",
+  "sprintPerf.pingLangLabel": "Idioma del comentario:",
   "sprintPerf.pingAction": "Recordar",
   "sprintPerf.pingSending": "Enviando…",
   "sprintPerf.pingSent": "Enviado",

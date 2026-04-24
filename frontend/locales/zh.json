@@ -1624,6 +1624,7 @@
   "sprintPerf.pulsePrReviewEmpty": "期间内没有合并的 PR",
   "sprintPerf.pulseVelocity": "AI 任务速度",
   "sprintPerf.pulseVelocitySub": "完成的 agent 任务 · 14 天 sparkline",
+  "sprintPerf.pingLangLabel": "评论语言:",
   "sprintPerf.pingAction": "提醒",
   "sprintPerf.pingSending": "发送中…",
   "sprintPerf.pingSent": "已发送",

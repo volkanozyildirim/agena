@@ -430,6 +430,7 @@
   "sprintPerf.pulsePrReviewEmpty": "Bu aralıkta merge edilen PR yok",
   "sprintPerf.pulseVelocity": "AI görev hızı",
   "sprintPerf.pulseVelocitySub": "Tamamlanan ajan görevleri · 14 gün sparkline",
+  "sprintPerf.pingLangLabel": "Yorum dili:",
   "sprintPerf.pingAction": "Dürt",
   "sprintPerf.pingSending": "Gönderiliyor…",
   "sprintPerf.pingSent": "Gönderildi",
