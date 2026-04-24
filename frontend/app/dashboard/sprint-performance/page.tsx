@@ -519,11 +519,18 @@ export default function SprintPerformancePage() {
     void loadData();
   }, [loadData]);
 
-  // Default the ping target language to the user's current UI locale once the
-  // locale has resolved from localStorage.
+  // Ping target language defaults to Turkish (the working language of the
+  // teams this feature was built for) and is set once from localStorage
+  // if the user previously chose one. We intentionally do NOT sync with
+  // the dashboard's UI locale — an English UI operator still pings a
+  // Turkish teammate in Turkish unless they explicitly pick otherwise.
   useEffect(() => {
-    setPingLang(lang);
-  }, [lang]);
+    if (typeof window === 'undefined') return;
+    const saved = window.localStorage.getItem('agena_ping_lang');
+    if (saved === 'tr' || saved === 'en' || saved === 'es' || saved === 'de' || saved === 'it' || saved === 'ja' || saved === 'zh') {
+      setPingLang(saved);
+    }
+  }, []);
 
   // Resolve enabled modules once — the Engineering Pulse section depends on
   // the `dora` module. On failure, hide the section rather than assume it's
@@ -1364,7 +1371,11 @@ export default function SprintPerformancePage() {
                     {t('sprintPerf.pingLangLabel')}
                     <select
                       value={pingLang}
-                      onChange={(e) => setPingLang(e.target.value as Lang)}
+                      onChange={(e) => {
+                        const next = e.target.value as Lang;
+                        setPingLang(next);
+                        if (typeof window !== 'undefined') window.localStorage.setItem('agena_ping_lang', next);
+                      }}
                       style={{
                         fontSize: 11, fontWeight: 600,
                         padding: '3px 8px', borderRadius: 8,

@@ -322,6 +322,70 @@ class AzureDevOpsClient:
             patch_resp = await client.patch(url_patch, headers=patch_headers, json=patch_ops)
             patch_resp.raise_for_status()
 
+    async def resolve_identity(
+        self, *, cfg: dict[str, str], display_name: str,
+    ) -> dict[str, str] | None:
+        """Look up an Azure DevOps identity by display name.
+
+        Returns a dict with {id, descriptor, display_name, unique_name}
+        for the best match, or None if nothing found. Used by the nudge
+        service to build real @mentions (which require a GUID) instead
+        of plain text.
+        """
+        org_url = (cfg.get('org_url') or self.settings.azure_org_url or '').strip()
+        pat = (cfg.get('pat') or self.settings.azure_pat or '').strip()
+        name = (display_name or '').strip()
+        if not org_url or not pat or not name:
+            return None
+        # ADO has both "vssps.dev.azure.com" (identity picker) and the org
+        # /_apis/identities endpoint. Try the org one first — it's the one
+        # work-item mentions use.
+        import urllib.parse
+        url = (
+            f"{org_url.rstrip('/')}/_apis/identities?"
+            f"searchFilter=DisplayName&filterValue={urllib.parse.quote(name)}"
+            f"&api-version=7.1-preview.1"
+        )
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(url, headers=self._headers(pat))
+                if resp.status_code != 200:
+                    return None
+                data = resp.json()
+        except Exception:
+            return None
+        values = data.get('value') or []
+        if not values:
+            # Fallback: try General search filter (broader but less precise)
+            fallback = (
+                f"{org_url.rstrip('/')}/_apis/identities?"
+                f"searchFilter=General&filterValue={urllib.parse.quote(name)}"
+                f"&api-version=7.1-preview.1"
+            )
+            try:
+                async with httpx.AsyncClient(timeout=10) as client:
+                    resp = await client.get(fallback, headers=self._headers(pat))
+                    if resp.status_code == 200:
+                        values = (resp.json().get('value') or [])
+            except Exception:
+                return None
+        if not values:
+            return None
+        # Pick the first exact-displayName match, else the first result.
+        pick = None
+        target = name.casefold()
+        for v in values:
+            if str(v.get('providerDisplayName', '')).casefold() == target:
+                pick = v
+                break
+        pick = pick or values[0]
+        return {
+            'id': str(pick.get('id') or ''),
+            'descriptor': str(pick.get('descriptor') or ''),
+            'display_name': str(pick.get('providerDisplayName') or name),
+            'unique_name': str((pick.get('properties') or {}).get('Mail', {}).get('$value') if isinstance((pick.get('properties') or {}).get('Mail'), dict) else pick.get('providerDisplayName') or ''),
+        }
+
     async def post_raw_html_comment(
         self, *, cfg: dict[str, str], work_item_id: str, html_body: str,
     ) -> None:

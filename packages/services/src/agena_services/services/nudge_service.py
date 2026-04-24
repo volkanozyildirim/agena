@@ -361,40 +361,42 @@ class NudgeService:
         return f'{mention}{clean}\n\n{signature}'
 
     @staticmethod
-    def _compose_azure_html(text: str) -> str:
+    def _compose_azure_html(
+        text: str,
+        assignee_name: str = '',
+        identity: dict[str, str] | None = None,
+    ) -> str:
         """Convert the composed plain-text nudge to Azure DevOps HTML.
 
-        Uses <at>@Display Name</at> wrapping for the leading mention so
-        the full display name (including spaces) is a single mention
-        token in the Azure renderer. Everything after the mention goes
-        through html.escape, so user-supplied content can't inject tags.
+        The service passes the known assignee display name explicitly so
+        we don't have to guess where the leading "@Display Name" ends —
+        multi-word names (Zaide KAYMAK, María José García) were tripping
+        up a regex-based splitter. We just peel off the exact prefix.
+
+        When an `identity` dict with an `id` GUID is supplied, the
+        mention renders as a real Azure DevOps anchor that fires a
+        notification; otherwise it falls back to plain escaped text.
         """
         import html as html_mod
-        import re
 
         raw = (text or '').strip()
+        body = raw
         mention_html = ''
-        match = re.match(r'^@([^\n]+?)\s{2}', raw + '  ')  # find leading "@Name " (up to first double-space or newline)
-        if raw.startswith('@'):
-            # Take the mention as the first "word group" up to the first
-            # newline OR two spaces: everything after is the body.
-            sep_idx = raw.find('\n')
-            # Azure mentions are a single display name; consume up to the
-            # first double-space, newline, or the first char after the
-            # name token. We use the first run of non-newline chars that
-            # terminates at either a double-space or a newline.
-            m = re.match(r'^@(\S[^\n]*?)(\s{2,}|\s+\S|\Z)', raw)
-            if m:
-                name = m.group(1).strip()
-                # Trim trailing punctuation that isn't part of a real name
-                while name and name[-1] in ',:;':
-                    name = name[:-1]
-                mention_html = f'<at>@{html_mod.escape(name)}</at> '
-                body = raw[len(m.group(0)) - len(m.group(2)):].lstrip()
+
+        name = (assignee_name or '').strip()
+        prefix = f'@{name}' if name else ''
+        if prefix and raw.startswith(prefix):
+            body = raw[len(prefix):].lstrip()
+            if identity and identity.get('id'):
+                descriptor = identity.get('id', '')
+                display = identity.get('display_name') or name
+                mention_html = (
+                    f'<a href="#" data-vss-mention="version:2.0,{html_mod.escape(descriptor)}">'
+                    f'@{html_mod.escape(display)}</a> '
+                )
             else:
-                body = raw
-        else:
-            body = raw
+                mention_html = f'@{html_mod.escape(name)} '
+
         parts: list[str] = []
         if mention_html:
             parts.append('<p>' + mention_html)
@@ -411,7 +413,6 @@ class NudgeService:
                 first_paragraph = False
             else:
                 parts.append(f'<p>{escaped}</p>')
-        # If body was empty (mention only) still close the first <p>.
         if first_paragraph and mention_html and body == '':
             parts.append('</p>')
         return ''.join(parts)
@@ -432,12 +433,25 @@ class NudgeService:
             }
         try:
             if src == 'azure':
-                # Azure's writeback_refinement() escapes everything through
-                # html.escape, so the <at>@Name</at> mention tag gets turned
-                # into literal text. Use the raw-HTML path instead — we
-                # build the HTML ourselves so the mention wraps the whole
-                # display name (spaces and all) as one token.
-                html_body = self._compose_azure_html(comment_text)
+                # For a real, notification-firing @mention Azure needs the
+                # identity GUID. Resolve the assignee (best-effort — falls
+                # back to plain text if the lookup fails) and pass it
+                # through to the HTML builder.
+                meta = getattr(self, '_pending_meta', None) or {}
+                assignee_name = str(meta.get('assignee') or '').strip()
+                identity = None
+                if assignee_name:
+                    try:
+                        identity = await self.azure_client.resolve_identity(
+                            cfg=self._build_cfg(src, config), display_name=assignee_name,
+                        )
+                    except Exception as exc:
+                        logger.info('azure identity resolve failed for %s: %s', assignee_name, exc)
+                html_body = self._compose_azure_html(
+                    comment_text,
+                    assignee_name=assignee_name,
+                    identity=identity,
+                )
                 await self.azure_client.post_raw_html_comment(
                     cfg=self._build_cfg(src, config), work_item_id=item_id,
                     html_body=html_body,
