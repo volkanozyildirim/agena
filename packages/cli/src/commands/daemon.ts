@@ -142,14 +142,15 @@ function runningPid(): number | null {
 }
 
 function defaultBridgePath(): string {
-  // Search order, most-specific to least-specific:
-  //   1. Bundled copy inside this npm package (bridge/ sibling of dist/).
-  //      Covers `npm install -g @agenaai/cli` — the common user path.
-  //   2. Monorepo dev checkout (packages/cli/dist/ → ../../docker/...).
+  // Search order, most-specific to least-specific. Compiled daemon.js
+  // lives at dist/commands/daemon.js, so `__dirname` is dist/commands/
+  // and the package root is two levels up.
+  //   1. Bundled copy inside this npm package (<pkg>/bridge/).
+  //   2. Monorepo dev checkout (packages/cli/dist/commands/ → repo/docker/).
   //   3. Explicit placement in ~/.agena/bridge-server.mjs.
   //   4. Working directory checkout (legacy local-dev fallback).
   const candidates = [
-    path.resolve(__dirname, '../bridge/bridge-server.mjs'),
+    path.resolve(__dirname, '../../bridge/bridge-server.mjs'),
     path.resolve(__dirname, '../../../../docker/bridge-server.mjs'),
     path.resolve(os.homedir(), '.agena/bridge-server.mjs'),
     path.resolve(process.cwd(), 'docker/bridge-server.mjs'),
