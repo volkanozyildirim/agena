@@ -456,6 +456,8 @@
   "sprintPerf.pingAlreadyBadge": "Yakında gönderildi",
   "sprintPerf.pingAlreadyDetail": "Agena bu iş için {hours} saat önce yorum atmış — 48 saat cooldown.",
   "sprintPerf.pingHistoryBadge": "Agena {hours} saat önce yorum attı",
+  "sprintPerf.pingClearBtn": "Pingleri temizle",
+  "sprintPerf.pingClearConfirm": "Agena'nın bu tenant için ping geçmişini temizleyelim mi? Blocked iş'lere tekrar ping atılabilecek.",
   "sprintPerf.pingFallbackAssignee": "ekip",
   "sprintPerf.pingGreeting": "Selam {name},",
   "sprintPerf.pingBody": "Bu iş engellenmiş olarak işaretli. Sprint'i ilerletebilmemiz için kısa bir durum güncellemesi paylaşabilir misin?",

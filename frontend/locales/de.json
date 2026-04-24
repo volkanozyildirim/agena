@@ -2163,6 +2163,8 @@
   "sprintPerf.pingAlreadyBadge": "Kürzlich angestupst",
   "sprintPerf.pingAlreadyDetail": "Agena hat vor {hours}h bereits angestupst — 48h Cooldown.",
   "sprintPerf.pingHistoryBadge": "Agena hat vor {hours}h angestupst",
+  "sprintPerf.pingClearBtn": "Pings löschen",
+  "sprintPerf.pingClearConfirm": "Agenas Ping-Historie für diesen Mandanten löschen? Blockierte Items sind danach wieder anstupsbar.",
   "sprintPerf.pingFallbackAssignee": "Team",
   "sprintPerf.pingGreeting": "Hallo {name},",
   "sprintPerf.pingBody": "Dieses Work Item ist als blockiert markiert. Ein kurzes Status-Update wäre hilfreich, damit der Sprint weiterlaufen kann.",

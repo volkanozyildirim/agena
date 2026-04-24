@@ -2154,6 +2154,8 @@
   "sprintPerf.pingAlreadyBadge": "Sollecitato di recente",
   "sprintPerf.pingAlreadyDetail": "Agena ha già sollecitato {hours}h fa — cooldown di 48h.",
   "sprintPerf.pingHistoryBadge": "Agena ha sollecitato {hours}h fa",
+  "sprintPerf.pingClearBtn": "Cancella ping",
+  "sprintPerf.pingClearConfirm": "Cancellare lo storico ping di Agena per questo tenant? Gli item bloccati torneranno sollecitabili.",
   "sprintPerf.pingFallbackAssignee": "team",
   "sprintPerf.pingGreeting": "Ciao {name},",
   "sprintPerf.pingBody": "Questo work item è segnato come bloccato. Un breve aggiornamento sullo stato ci aiuterebbe a far avanzare lo sprint.",

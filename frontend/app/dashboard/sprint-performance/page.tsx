@@ -1331,6 +1331,33 @@ export default function SprintPerformancePage() {
               </div>
               <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'var(--ink-90)' }}>{t('sprintPerf.blockedTitle')}</h2>
               <span style={{ flex: 1 }} />
+              {blockedItems.length > 0 && Object.keys(nudgeHistory).length > 0 && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!window.confirm(t('sprintPerf.pingClearConfirm'))) return;
+                    try {
+                      await apiFetch(`/tasks/ai-nudge/history?provider=${encodeURIComponent(provider)}`, { method: 'DELETE' });
+                      setNudgeHistory({});
+                      setPingState({});
+                      setPingDetail({});
+                      setPingError({});
+                    } catch (err) {
+                      alert(err instanceof Error ? err.message : 'Failed');
+                    }
+                  }}
+                  style={{
+                    fontSize: 11, fontWeight: 700,
+                    padding: '3px 10px', borderRadius: 999,
+                    border: '1px solid rgba(248,113,113,0.35)',
+                    background: 'rgba(248,113,113,0.08)',
+                    color: '#f87171',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {t('sprintPerf.pingClearBtn')}
+                </button>
+              )}
               {blockedItems.length > 0 && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                   <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--ink-55)' }}>

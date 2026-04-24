@@ -502,6 +502,30 @@ class NudgeHistoryResponse(BaseModel):
     items: list[NudgeHistoryItem]
 
 
+class NudgeHistoryClearResponse(BaseModel):
+    deleted: int
+
+
+@router.delete('/ai-nudge/history', response_model=NudgeHistoryClearResponse)
+async def clear_nudge_history(
+    provider: str | None = Query(default=None, description='Optional: restrict to azure or jira'),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> NudgeHistoryClearResponse:
+    """Wipe this tenant's nudge history so Ping buttons become live again.
+    Scoped to the authenticated organization — never deletes other tenants'
+    rows. Pass ?provider=azure|jira to scope to one source.
+    """
+    from sqlalchemy import delete
+    from agena_models.models.nudge_history import NudgeHistory
+    stmt = delete(NudgeHistory).where(NudgeHistory.organization_id == tenant.organization_id)
+    if provider:
+        stmt = stmt.where(NudgeHistory.provider == provider.strip().lower())
+    result = await db.execute(stmt)
+    await db.commit()
+    return NudgeHistoryClearResponse(deleted=int(result.rowcount or 0))
+
+
 @router.get('/ai-nudge/history', response_model=NudgeHistoryResponse)
 async def list_nudge_history(
     provider: str = Query(...),

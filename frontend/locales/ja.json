@@ -2163,6 +2163,8 @@
   "sprintPerf.pingAlreadyBadge": "最近送信済み",
   "sprintPerf.pingAlreadyDetail": "Agena は {hours} 時間前にすでにリマインドしました — クールダウン 48 時間。",
   "sprintPerf.pingHistoryBadge": "Agena が {hours} 時間前にリマインド",
+  "sprintPerf.pingClearBtn": "Ping をクリア",
+  "sprintPerf.pingClearConfirm": "このテナントの Agena ping 履歴をクリアしますか? ブロック済みアイテムが再び ping 可能になります。",
   "sprintPerf.pingFallbackAssignee": "チーム",
   "sprintPerf.pingGreeting": "{name} さん、",
   "sprintPerf.pingBody": "このワークアイテムはブロック状態になっています。スプリントを前に進めるため、簡単な状況を共有いただけると助かります。",
