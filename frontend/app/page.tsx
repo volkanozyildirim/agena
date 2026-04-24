@@ -743,6 +743,71 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* ── CLI ── */}
+        <section style={{ padding: '8px 0 56px' }}>
+          <div style={{ marginBottom: 20 }}>
+            <div className='section-label'>{t('landing.cliSectionLabel')}</div>
+            <h2 style={{ fontSize: 'clamp(24px, 2.5vw, 36px)', fontWeight: 800, color: 'var(--ink-90)', marginBottom: 10 }}>
+              {t('landing.cliSectionTitle')}
+            </h2>
+            <p style={{ color: 'var(--ink-50)', fontSize: 14, maxWidth: 820, lineHeight: 1.7 }}>
+              {t('landing.cliSectionSubtitle')}
+            </p>
+          </div>
+
+          <div style={{
+            display: 'grid', gap: 16,
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          }}>
+            {[
+              { n: '01', t: 'landing.cliStep1Title', d: 'landing.cliStep1Desc' },
+              { n: '02', t: 'landing.cliStep2Title', d: 'landing.cliStep2Desc' },
+              { n: '03', t: 'landing.cliStep3Title', d: 'landing.cliStep3Desc' },
+              { n: '04', t: 'landing.cliStep4Title', d: 'landing.cliStep4Desc' },
+            ].map((s, i) => (
+              <div key={s.n} style={{
+                padding: 18, borderRadius: 14,
+                border: '1px solid var(--panel-border-2)',
+                background: 'var(--panel)',
+                display: 'grid', gap: 8,
+                animation: `fadeInUp 0.4s ease ${0.1 + i * 0.08}s backwards`,
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#5eead4', letterSpacing: 1 }}>{s.n}</div>
+                <h3 style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink-90)', margin: 0 }}>
+                  {t(s.t as Parameters<typeof t>[0])}
+                </h3>
+                <p style={{ fontSize: 12, color: 'var(--ink-50)', margin: 0, lineHeight: 1.6 }}>
+                  {t(s.d as Parameters<typeof t>[0])}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div style={{
+            marginTop: 18, padding: '16px 18px', borderRadius: 14,
+            border: '1px solid var(--panel-border-2)',
+            background: 'var(--panel)',
+            display: 'grid', gap: 10,
+          }}>
+            <code style={{
+              fontSize: 13, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+              color: 'var(--ink-85)', whiteSpace: 'pre', overflowX: 'auto', display: 'block',
+              padding: '10px 12px', borderRadius: 10,
+              background: 'rgba(94,234,212,0.06)', border: '1px solid rgba(94,234,212,0.18)',
+            }}>{`$ brew install aozyildirim/tap/agena
+$ agena setup            # device-code OAuth + enrolls this machine
+$ agena task list
+$ agena skill search "nullable pointer panic"
+$ agena refinement analyze -p MyProject -t MyTeam`}</code>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 20 }}>💻</span>
+              <span style={{ fontSize: 13, color: 'var(--ink-78)', flex: 1 }}>
+                {t('landing.cliExampleQuote')}
+              </span>
+            </div>
+          </div>
+        </section>
+
         {/* ── STATS ── */}
         <section style={{ padding: '60px 0' }}>
           <div className='stats-bar'>
