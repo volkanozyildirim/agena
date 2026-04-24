@@ -10,6 +10,7 @@ const competitors = [
   { slug: 'copilot', icon: '🤖' },
   { slug: 'devin', icon: '🧑‍💻' },
   { slug: 'codex', icon: '⌨️' },
+  { slug: 'multica', icon: '🧑‍🤝‍🧑' },
 ];
 
 export default function VsIndexPage() {
