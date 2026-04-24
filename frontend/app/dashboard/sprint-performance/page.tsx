@@ -53,24 +53,6 @@ type IntegrationConfig = {
   username?: string | null;
 };
 
-type DoraMetrics = {
-  lead_time_hours: number | null;
-  deploy_frequency: number | null;
-  change_failure_rate: number | null;
-  mttr_hours: number | null;
-};
-
-type PrMetrics = {
-  pct_merged_within_goal: number;
-  merge_goal_hours: number;
-  avg_merge_hours: number;
-  merged_count: number;
-};
-
-type DoraResp = DoraMetrics & { daily?: Array<{ date: string; completed: number; failed: number; lead_time_hours: number | null; mttr_hours: number | null }> };
-type PrResp = { kpi: PrMetrics };
-type DeployResp = { deploy_freq_trend: Array<{ date: string; deploys: number }> };
-type DailyResp = { task_velocity: Array<{ date: string; completed: number; failed: number; queued: number; total: number }> };
 
 const LS_PROVIDER = 'agena_sprint_provider';
 const LS_PROJECT = 'agena_sprint_project';
@@ -224,12 +206,6 @@ export default function SprintPerformancePage() {
   const [selectedProject, setSelectedProject] = useState('');
   const [selectedTeam, setSelectedTeam] = useState('');
   const [selectedSprint, setSelectedSprint] = useState('');
-  const [doraMetrics, setDoraMetrics] = useState<DoraMetrics | null>(null);
-  const [prMetrics, setPrMetrics] = useState<PrMetrics | null>(null);
-  const [deploySparkline, setDeploySparkline] = useState<number[]>([]);
-  const [velocitySparkline, setVelocitySparkline] = useState<number[]>([]);
-  const [pulseLoading, setPulseLoading] = useState(false);
-  const [doraModuleEnabled, setDoraModuleEnabled] = useState<boolean | null>(null);
   const [pingState, setPingState] = useState<Record<string, 'idle' | 'loading' | 'sent' | 'error' | 'too_soon' | 'already_nudged'>>({});
   const [pingError, setPingError] = useState<Record<string, string>>({});
   const [pingDetail, setPingDetail] = useState<Record<string, string>>({});
@@ -531,51 +507,6 @@ export default function SprintPerformancePage() {
       setPingLang(saved);
     }
   }, []);
-
-  // Resolve enabled modules once — the Engineering Pulse section depends on
-  // the `dora` module. On failure, hide the section rather than assume it's
-  // on.
-  useEffect(() => {
-    let cancelled = false;
-    apiFetch<Array<{ slug: string; enabled: boolean }>>('/modules')
-      .then((mods) => {
-        if (cancelled) return;
-        setDoraModuleEnabled(mods.some((m) => m.slug === 'dora' && m.enabled));
-      })
-      .catch(() => { if (!cancelled) setDoraModuleEnabled(false); });
-    return () => { cancelled = true; };
-  }, []);
-
-  // Engineering Pulse — DORA / PR / deploy / velocity snapshot for a rolling
-  // 30-day window. Not sprint-scoped on the backend (those endpoints are
-  // org-wide with a days filter), but gives useful context alongside the
-  // active sprint. Only fetches when the dora module is enabled.
-  useEffect(() => {
-    if (missingConfig || !activeSprintName || !doraModuleEnabled) {
-      setDoraMetrics(null);
-      setPrMetrics(null);
-      setDeploySparkline([]);
-      setVelocitySparkline([]);
-      return;
-    }
-    let cancelled = false;
-    setPulseLoading(true);
-    const days = 30;
-    Promise.all([
-      apiFetch<DoraResp>(`/analytics/dora?days=${days}`).catch(() => null),
-      apiFetch<PrResp>(`/analytics/dora/development/prs?days=${days}`).catch(() => null),
-      apiFetch<DeployResp>(`/analytics/dora/development/deployments?days=${days}`).catch(() => null),
-      apiFetch<DailyResp>(`/analytics/daily?days=${days}`).catch(() => null),
-    ]).then(([dora, pr, dep, daily]) => {
-      if (cancelled) return;
-      setDoraMetrics(dora ? { lead_time_hours: dora.lead_time_hours, deploy_frequency: dora.deploy_frequency, change_failure_rate: dora.change_failure_rate, mttr_hours: dora.mttr_hours } : null);
-      setPrMetrics(pr ? pr.kpi : null);
-      setDeploySparkline(dep ? dep.deploy_freq_trend.slice(-14).map((x) => x.deploys) : []);
-      setVelocitySparkline(daily ? daily.task_velocity.slice(-14).map((x) => x.completed) : []);
-      setPulseLoading(false);
-    }).catch(() => { if (!cancelled) setPulseLoading(false); });
-    return () => { cancelled = true; };
-  }, [missingConfig, activeSprintName, doraModuleEnabled]);
 
   useEffect(() => {
     if (!blockedItems.length) { setNudgeHistory({}); return; }
@@ -980,81 +911,69 @@ export default function SprintPerformancePage() {
             </div>
           )}
 
-          {/* ── Engineering Pulse (DORA + PR + Velocity) ── always rendered; DORA link gated */}
-          <div style={{
-            padding: 20, borderRadius: 16,
-            border: '1px solid var(--panel-border-2)',
-            background: 'var(--surface)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* ── Sprint Pulse — computed from the sprint's own items, no DORA ── */}
+          {totalItems > 0 && (
+            <div style={{
+              padding: 20, borderRadius: 16,
+              border: '1px solid var(--panel-border-2)',
+              background: 'var(--surface)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
                 <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'var(--ink-90)' }}>{t('sprintPerf.pulseTitle')}</h2>
                 <span style={{
                   fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 999,
                   background: 'rgba(94,234,212,0.12)', color: '#5eead4', border: '1px solid rgba(94,234,212,0.25)',
                 }}>
-                  {t('sprintPerf.pulseWindow')}
+                  {activeSprintName || t('sprintPerf.activeSprint')}
                 </span>
               </div>
-              {doraModuleEnabled && (
-                <Link href="/dashboard/dora" style={{ fontSize: 11, color: 'var(--ink-58)', textDecoration: 'none' }}>
-                  {t('sprintPerf.pulseSeeAll')} →
-                </Link>
-              )}
+              {(() => {
+                const completionPct = totalItems > 0 ? Math.round((totalDone / totalItems) * 100) : 0;
+                const blockedPct = totalItems > 0 ? Math.round((totalBlocked / totalItems) * 100) : 0;
+                const remaining = Math.max(0, totalItems - totalDone);
+                const paceDelta = timelineProgress === null ? null : Math.round(completionPct - timelineProgress);
+                const perDay = (daysLeft !== null && daysLeft > 0) ? (remaining / daysLeft).toFixed(1) : null;
+                const topBlockedOwner = blockedByAssignee[0] || null;
+                const paceAccent = paceDelta === null ? '#94a3b8' : paceDelta >= 0 ? '#22c55e' : paceDelta >= -10 ? '#fbbf24' : '#f87171';
+                return (
+                  <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+                    <PulseCard
+                      label={t('sprintPerf.pulseCompletion')}
+                      value={`${completionPct}%`}
+                      sub={t('sprintPerf.pulseCompletionSub', { done: totalDone, total: totalItems })}
+                      accent={completionPct >= 75 ? '#22c55e' : completionPct >= 40 ? '#5eead4' : '#fbbf24'}
+                    />
+                    <PulseCard
+                      label={t('sprintPerf.pulseBlockedShare')}
+                      value={`${totalBlocked} (${blockedPct}%)`}
+                      sub={topBlockedOwner
+                        ? t('sprintPerf.pulseBlockedSub', { assignee: topBlockedOwner.assignee, count: topBlockedOwner.items.length })
+                        : t('sprintPerf.pulseBlockedSubNone')}
+                      accent={totalBlocked === 0 ? '#22c55e' : totalBlocked <= 2 ? '#fb923c' : '#f87171'}
+                    />
+                    <PulseCard
+                      label={t('sprintPerf.pulsePace')}
+                      value={paceDelta === null ? '—' : paceDelta > 0 ? `+${paceDelta} pts` : `${paceDelta} pts`}
+                      sub={paceDelta === null
+                        ? t('sprintPerf.pulsePaceUnknown')
+                        : paceDelta >= 0
+                          ? t('sprintPerf.pulsePaceAhead', { pct: paceDelta })
+                          : t('sprintPerf.pulsePaceBehind', { pct: Math.abs(paceDelta) })}
+                      accent={paceAccent}
+                    />
+                    <PulseCard
+                      label={t('sprintPerf.pulseRequired')}
+                      value={perDay === null ? '—' : `${perDay}/${t('sprintPerf.perDay')}`}
+                      sub={daysLeft === null
+                        ? t('sprintPerf.pulseRequiredUnknown')
+                        : t('sprintPerf.pulseRequiredSub', { remaining, days: daysLeft })}
+                      accent={perDay === null ? '#94a3b8' : Number(perDay) <= 1 ? '#22c55e' : Number(perDay) <= 3 ? '#fbbf24' : '#f87171'}
+                    />
+                  </div>
+                );
+              })()}
             </div>
-            {pulseLoading && !doraMetrics && !prMetrics ? (
-              <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--ink-45)', fontSize: 13 }}>
-                {t('sprintPerf.pulseLoading')}
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-                {/* Lead Time */}
-                <PulseCard
-                  label={t('sprintPerf.pulseLeadTime')}
-                  value={doraMetrics?.lead_time_hours != null ? `${doraMetrics.lead_time_hours.toFixed(1)}h` : '—'}
-                  sub={t('sprintPerf.pulseLeadTimeSub')}
-                  accent="#38bdf8"
-                />
-                {/* Deploy Frequency */}
-                <PulseCard
-                  label={t('sprintPerf.pulseDeployFreq')}
-                  value={doraMetrics?.deploy_frequency != null ? `${doraMetrics.deploy_frequency.toFixed(2)}/${t('sprintPerf.perDay')}` : '—'}
-                  sub={t('sprintPerf.pulseDeployFreqSub')}
-                  accent="#5eead4"
-                  sparkline={deploySparkline}
-                />
-                {/* Change Failure Rate — backend already returns a percentage (0–100) */}
-                <PulseCard
-                  label={t('sprintPerf.pulseCfr')}
-                  value={doraMetrics?.change_failure_rate != null ? `${doraMetrics.change_failure_rate.toFixed(1)}%` : '—'}
-                  sub={t('sprintPerf.pulseCfrSub')}
-                  accent={doraMetrics?.change_failure_rate != null && doraMetrics.change_failure_rate > 15 ? '#f87171' : '#fb923c'}
-                />
-                {/* MTTR */}
-                <PulseCard
-                  label={t('sprintPerf.pulseMttr')}
-                  value={doraMetrics?.mttr_hours != null ? `${doraMetrics.mttr_hours.toFixed(1)}h` : '—'}
-                  sub={t('sprintPerf.pulseMttrSub')}
-                  accent="#a78bfa"
-                />
-                {/* PR review SLA */}
-                <PulseCard
-                  label={t('sprintPerf.pulsePrReview')}
-                  value={prMetrics && prMetrics.merged_count > 0 ? `${Math.round(prMetrics.pct_merged_within_goal)}%` : '—'}
-                  sub={prMetrics && prMetrics.merged_count > 0 ? t('sprintPerf.pulsePrReviewSub', { avg: prMetrics.avg_merge_hours.toFixed(1), goal: prMetrics.merge_goal_hours.toFixed(0) }) : t('sprintPerf.pulsePrReviewEmpty')}
-                  accent={prMetrics && prMetrics.merged_count > 0 && prMetrics.pct_merged_within_goal >= 75 ? '#22c55e' : prMetrics && prMetrics.merged_count > 0 && prMetrics.pct_merged_within_goal >= 50 ? '#fb923c' : '#94a3b8'}
-                />
-                {/* AI task velocity */}
-                <PulseCard
-                  label={t('sprintPerf.pulseVelocity')}
-                  value={velocitySparkline.length ? String(velocitySparkline.reduce((s, n) => s + n, 0)) : '—'}
-                  sub={t('sprintPerf.pulseVelocitySub')}
-                  accent="#facc15"
-                  sparkline={velocitySparkline}
-                />
-              </div>
-            )}
-          </div>
+          )}
 
           {/* ── Team Member Cards ── */}
           <div style={{
