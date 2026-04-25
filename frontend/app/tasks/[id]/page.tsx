@@ -758,14 +758,13 @@ export default function TaskDetailPage() {
       );
     }
     return (
-      <div style={{ maxHeight: 300, overflow: 'auto', fontSize: 12, lineHeight: 1.45, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+      <div className='code-diff' style={{ maxHeight: 300, overflow: 'auto', fontSize: 12, lineHeight: 1.45, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
         {item.content.split('\n').map((line, idx) => {
           const isAdd = line.startsWith('+') && !line.startsWith('+++');
           const isDel = line.startsWith('-') && !line.startsWith('---');
-          const bg = isAdd ? 'rgba(34,197,94,0.18)' : isDel ? 'rgba(248,113,113,0.18)' : 'transparent';
-          const color = isAdd ? '#86efac' : isDel ? '#fca5a5' : 'var(--ink-90)';
+          const cls = isAdd ? 'diff-add' : isDel ? 'diff-del' : 'diff-ctx';
           return (
-            <div key={`${idx}-${line.slice(0, 8)}`} style={{ padding: '1px 10px', background: bg, color, whiteSpace: 'pre' }}>
+            <div key={`${idx}-${line.slice(0, 8)}`} className={cls} style={{ padding: '1px 10px', whiteSpace: 'pre' }}>
               {line || ' '}
             </div>
           );
