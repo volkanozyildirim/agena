@@ -1626,12 +1626,10 @@ export default function TaskDetailPage() {
                     <button
                       key={`${file.path}-${idx}`}
                       onClick={() => setActiveCodeTab(idx)}
+                      className={activeCodeTab === idx ? 'teal-chip teal-chip-active' : 'teal-chip'}
                       style={{
                         padding: '5px 10px',
                         borderRadius: 999,
-                        border: activeCodeTab === idx ? '1px solid rgba(94,234,212,0.55)' : '1px solid var(--panel-border-4)',
-                        background: activeCodeTab === idx ? 'rgba(94,234,212,0.12)' : 'transparent',
-                        color: activeCodeTab === idx ? '#5eead4' : 'var(--ink-65)',
                         fontSize: 11,
                         fontWeight: 700,
                         whiteSpace: 'nowrap',
