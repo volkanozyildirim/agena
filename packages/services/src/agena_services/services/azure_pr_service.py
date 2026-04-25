@@ -81,6 +81,15 @@ class AzurePRService:
 
         links = data.get('_links', {}) if isinstance(data, dict) else {}
         web = (links.get('web') or {}).get('href') if isinstance(links, dict) else None
+        if not web:
+            # Azure occasionally omits _links on POST responses. The web UI URL
+            # is deterministic — `<org>/<project>/_git/<repo>/pullrequest/<id>` —
+            # so we build it ourselves from values we already have. This keeps
+            # the stored pr_url clickable instead of an API endpoint that
+            # renders raw JSON in the browser.
+            pr_id = data.get('pullRequestId') if isinstance(data, dict) else None
+            if pr_id:
+                web = f'{org_url}/{project}/_git/{repo_name}/pullrequest/{pr_id}'
         return web or data.get('url') or ''
 
     async def list_pr_comments(self, organization_id: int, *, pr_url: str) -> list[dict[str, str]]:
@@ -187,6 +196,10 @@ class AzurePRService:
                         logger.info('Reactivated abandoned PR #%s', pr_id)
                 links = pr.get('_links', {}) if isinstance(pr, dict) else {}
                 web = (links.get('web') or {}).get('href') if isinstance(links, dict) else None
+                if not web:
+                    pr_id = pr.get('pullRequestId')
+                    if pr_id:
+                        web = f'{org_url}/{project}/_git/{repo_name}/pullrequest/{pr_id}'
                 return web or pr.get('url') or None
         return None
 
