@@ -8,7 +8,7 @@ import { apiFetch, apiUpload, loadPrefs, type BackendRepoMapping, type RepoMappi
 import { TaskItem, type RepoAssignment } from '@/components/TaskTable';
 import { useLocale, type TranslationKey } from '@/lib/i18n';
 import RemoteRepoSelector from '@/components/RemoteRepoSelector';
-import { renderMarkdown } from '@/lib/markdown';
+import RichDescription from '@/components/RichDescription';
 
 function useIsMobile(breakpoint = 768) {
   const [isMobile, setIsMobile] = useState(false);
@@ -763,10 +763,10 @@ export default function DashboardTasksPage() {
                   >
                     ✏️
                   </button>
-                  <div
+                  <RichDescription
                     className='task-md'
                     style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--ink-78)', maxHeight: 280, overflowY: 'auto', wordBreak: 'break-word' }}
-                    dangerouslySetInnerHTML={{ __html: renderMarkdown(description) }}
+                    html={description}
                   />
                 </div>
               );

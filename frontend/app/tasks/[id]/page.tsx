@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { apiDownloadBlob, apiFetch, getToken, loadPrefs, resolveApiBase } from '@/lib/api';
 import { renderMarkdown } from '@/lib/markdown';
+import RichDescription from '@/components/RichDescription';
 import StatusBadge from '@/components/StatusBadge';
 import RemoteRepoSelector, { type RemoteRepoSelection, type RepoDefault } from '@/components/RemoteRepoSelector';
 import { useLocale, type TranslationKey } from '@/lib/i18n';
@@ -932,10 +933,10 @@ export default function TaskDetailPage() {
           <h1 style={{ marginTop: 0, marginBottom: 8, fontSize: 18, lineHeight: 1.35 }}>{task?.title ?? t('taskDetail.task')}</h1>
           {task ? (
             <>
-              <div
+              <RichDescription
                 className='task-md'
                 style={{ marginTop: 0, marginBottom: 12, color: 'var(--ink-78)', fontSize: 13, lineHeight: 1.55, wordBreak: 'break-word' }}
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(task.description || '') }}
+                html={task.description || ''}
               />
               {/* Attachments */}
               <div style={{ marginBottom: 12 }}>

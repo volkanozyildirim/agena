@@ -464,6 +464,87 @@ async def import_appdynamics_errors(
     return ImportTasksResponse(imported=imported, skipped=skipped, manual_azure_urls=ad_manual_urls)
 
 
+# NOTE: this static-path route MUST be registered before `/{task_id}`
+# below — otherwise FastAPI tries to coerce "proxy-image" into an int
+# task_id and returns a 422.
+@router.get('/proxy-image')
+async def proxy_image(
+    url: str = Query(..., description='Azure / Jira attachment URL to fetch with stored PAT'),
+    tenant: CurrentTenant = Depends(require_permission('tasks:read')),
+    db: AsyncSession = Depends(get_db_session),
+) -> StreamingResponse:
+    """Fetch a remote attachment image with the org's stored credentials and
+    stream the bytes back. Used by the task detail page + Create modal so
+    Azure DevOps work-item screenshots actually render in the browser
+    (the direct URL needs Basic auth via PAT, which a plain `<img>` tag
+    can't supply). SSRF guard: the URL must point at the org's
+    integration base host."""
+    target = (url or '').strip()
+    if not target.startswith('https://'):
+        raise HTTPException(status_code=400, detail='URL must start with https://')
+
+    from urllib.parse import urlparse
+    try:
+        parsed_host = urlparse(target).netloc.lower()
+    except Exception:
+        raise HTTPException(status_code=400, detail='Bad URL')
+    if not parsed_host:
+        raise HTTPException(status_code=400, detail='Bad URL host')
+
+    cfg_service = IntegrationConfigService(db)
+    azure_cfg = await cfg_service.get_config(tenant.organization_id, 'azure')
+    jira_cfg = await cfg_service.get_config(tenant.organization_id, 'jira')
+
+    auth_header: str | None = None
+    matched = False
+    import base64 as _b64
+    if azure_cfg and azure_cfg.secret:
+        try:
+            az_host = urlparse((azure_cfg.base_url or '').rstrip('/')).netloc.lower()
+        except Exception:
+            az_host = ''
+        if (az_host and az_host in parsed_host) or 'dev.azure.com' in parsed_host:
+            token = _b64.b64encode(f':{azure_cfg.secret}'.encode()).decode()
+            auth_header = f'Basic {token}'
+            matched = True
+    if not matched and jira_cfg and jira_cfg.secret:
+        try:
+            jira_host = urlparse((jira_cfg.base_url or '').rstrip('/')).netloc.lower()
+        except Exception:
+            jira_host = ''
+        if (jira_host and jira_host in parsed_host) or 'atlassian.net' in parsed_host:
+            email = (jira_cfg.username or '').strip()
+            tok = (jira_cfg.secret or '').strip()
+            if email and tok:
+                creds = _b64.b64encode(f'{email}:{tok}'.encode()).decode()
+                auth_header = f'Basic {creds}'
+                matched = True
+    if not matched:
+        raise HTTPException(status_code=403, detail='URL does not match any configured integration')
+
+    headers = {'Authorization': auth_header} if auth_header else {}
+    try:
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+            resp = await client.get(target, headers=headers)
+            resp.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=502, detail=f'Upstream returned {exc.response.status_code}') from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f'Upstream fetch failed: {exc}') from exc
+
+    content_type = resp.headers.get('content-type', 'application/octet-stream').split(';', 1)[0].strip()
+    if not content_type.startswith('image/'):
+        raise HTTPException(status_code=415, detail=f'Upstream is not an image (got {content_type})')
+
+    body = resp.content
+    async def _stream():
+        yield body
+    return StreamingResponse(
+        _stream(),
+        media_type=content_type,
+        headers={'Cache-Control': 'private, max-age=300'},
+    )
+
 
 @router.get('/{task_id}', response_model=TaskResponse)
 async def get_task(

@@ -19,6 +19,11 @@ const nextConfig = {
       { source: '/features', destination: '/use-cases', permanent: true },
       { source: '/about', destination: '/', permanent: false },
       { source: '/documentation', destination: '/docs', permanent: true },
+      // Task detail page lives under /tasks/[id] historically but it's a
+      // dashboard view — route through /dashboard/tasks/[id] so the
+      // dashboard layout (sidebar + topbar) wraps it instead of the
+      // marketing nav.
+      { source: '/tasks/:id', destination: '/dashboard/tasks/:id', permanent: false },
     ];
   },
   async rewrites() {
