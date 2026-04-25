@@ -10,6 +10,7 @@ services:
       - .env
     environment:
       - CLI_BRIDGE_URL=http://host.docker.internal:9876
+      - ATTACHMENT_HOST_ROOT=${ATTACHMENT_HOST_ROOT:-}
     ports:
       - '8010:8010'
     volumes:
@@ -36,6 +37,7 @@ services:
       - .env
     environment:
       - CLI_BRIDGE_URL=http://host.docker.internal:9876
+      - ATTACHMENT_HOST_ROOT=${ATTACHMENT_HOST_ROOT:-}
     volumes:
       - ./packages:/app/packages
       - ./alembic:/app/alembic

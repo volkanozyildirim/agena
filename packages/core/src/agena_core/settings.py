@@ -85,6 +85,12 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = Field(default=True, alias='SMTP_USE_TLS')
     smtp_use_ssl: bool = Field(default=False, alias='SMTP_USE_SSL')
     pr_webhook_secret: str = Field(default='', alias='PR_WEBHOOK_SECRET')
+
+    # Host-side absolute path that maps to the container's /app/data dir.
+    # Needed so the orchestration layer can hand attachment file paths to
+    # the local CLI (which runs on the host and can't see container paths).
+    # Set in docker-compose to "${PWD}/data".
+    attachment_host_root: str = Field(default='', alias='ATTACHMENT_HOST_ROOT')
     sentry_dsn: str = Field(default='', alias='SENTRY_DSN')
     sentry_environment: str = Field(default='', alias='SENTRY_ENVIRONMENT')
     sentry_traces_sample_rate: float = Field(default=0.0, alias='SENTRY_TRACES_SAMPLE_RATE')

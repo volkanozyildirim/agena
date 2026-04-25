@@ -186,6 +186,20 @@ class OrchestrationService:
                 task.acceptance_criteria,
                 task.edge_cases,
             )
+
+        # Append attachment metadata + inline text content so every
+        # downstream consumer (Claude/Codex CLI, MCP agent, classic
+        # LangGraph pipeline, flow nodes) sees what the user uploaded.
+        try:
+            attachments_section = await self._build_attachments_section(task.id, organization_id)
+            if attachments_section:
+                effective_description = f'{effective_description}\n\n{attachments_section}'
+                await task_service.add_log(
+                    task.id, organization_id, 'agent',
+                    'Attachments injected into prompt (paths + inline text content)'
+                )
+        except Exception as _att_exc:
+            logger.info('Attachment injection skipped for task %s: %s', task.id, _att_exc)
         payload = {
             'id': str(task.id),
             'title': task.title,
@@ -470,7 +484,10 @@ class OrchestrationService:
 
                 mcp_result = await engine.run(
                     task_title=task.title,
-                    task_description=task.description or '',
+                    # Pass the enriched description (playbooks + skills +
+                    # attachments) so MCP agent has the same context as
+                    # CLIs and the classic pipeline.
+                    task_description=effective_description or task.description or '',
                     workspace_path=routing.local_repo_path if _is_local else None,
                     executor=_mcp_executor,
                     system_prompt=_mcp_custom_prompt,
@@ -497,9 +514,14 @@ class OrchestrationService:
             else:
                 orchestrator = await self._build_orchestrator(organization_id, routing)
                 task_description_for_ai = task.description or ''
-                task_image_inputs: list[str] = []
-                if mode == 'ai':
-                    task_image_inputs = await self._build_task_image_inputs(task_description_for_ai, organization_id)
+                # Build vision inputs (data URLs) for any mode that drives the
+                # classic agent pipeline OR flow runner. Pulls images from
+                # description URLs (Azure/Jira inline) AND from
+                # task_attachments rows on disk so vision-capable LLMs receive
+                # the actual bytes rather than just file paths.
+                task_image_inputs = await self._build_task_image_inputs(
+                    task_description_for_ai, organization_id, task_id=task.id,
+                )
                 # Build repo context into task description before flow starts
                 # Check for remote agents.md first — if it exists, skip expensive
                 # full repo context build (saves ~128K chars / ~32K tokens)
@@ -537,6 +559,14 @@ class OrchestrationService:
                     None,  # tenant_playbook
                     _repo_ctx,
                 )
+                # Same attachment injection as the non-flow path so flow
+                # nodes also see uploaded files.
+                try:
+                    _flow_atts = await self._build_attachments_section(task.id, organization_id)
+                    if _flow_atts:
+                        enriched_desc = f'{enriched_desc}\n\n{_flow_atts}'
+                except Exception:
+                    pass
                 payload_with_context = dict(payload)
                 payload_with_context['description'] = enriched_desc
                 # Run flow step-by-step with logging
@@ -2540,6 +2570,80 @@ class OrchestrationService:
                      task.source, file_path, line_number or '?', len(file_content))
         return filled
 
+    async def _build_attachments_section(self, task_id: int, organization_id: int) -> str:
+        """Render every TaskAttachment as a prompt fragment so agents,
+        local CLIs, and flow nodes all see the same thing.
+
+        - Images and other binaries: list filename + content_type + size +
+          host-resolved file path. Vision-capable LLMs and the local CLI
+          can read the file off disk; non-vision agents at least learn
+          the file exists.
+        - Text-like blobs (text/*, JSON, XML, YAML, MD): inline the
+          contents up to a per-file cap so the prompt is self-contained.
+        Returns '' when the task has no attachments.
+        """
+        if self.db_session is None:
+            return ''
+        try:
+            from agena_models.models.task_attachment import TaskAttachment
+            rows = (await self.db_session.execute(
+                select(TaskAttachment)
+                .where(
+                    TaskAttachment.task_id == task_id,
+                    TaskAttachment.organization_id == organization_id,
+                )
+                .order_by(TaskAttachment.id)
+            )).scalars().all()
+        except Exception as exc:
+            logger.warning('Could not load attachments for task %s: %s', task_id, exc)
+            return ''
+        if not rows:
+            return ''
+
+        host_root = (get_settings().attachment_host_root or '').rstrip('/')
+        max_inline = 8 * 1024  # per-file inline budget for text content
+
+        def _resolve_host_path(container_path: str) -> str:
+            # Container paths look like /app/data/uploads/tasks/<org>/<task>/<file>.
+            # Translate to the host-side path the local CLI / bridge can open.
+            if host_root and container_path.startswith('/app/data/'):
+                return host_root + container_path[len('/app/data'):]
+            return container_path
+
+        def _is_textual(ct: str) -> bool:
+            ct = (ct or '').lower()
+            if ct.startswith('text/'):
+                return True
+            return ct in {
+                'application/json', 'application/xml', 'application/yaml',
+                'application/x-yaml', 'application/javascript',
+            }
+
+        lines: list[str] = ['ATTACHMENTS:']
+        for att in rows:
+            host_path = _resolve_host_path(att.storage_path or '')
+            size_kb = (att.size_bytes or 0) / 1024
+            header = f'- {att.filename} ({att.content_type}, {size_kb:.1f} KB) — file: {host_path}'
+            if _is_textual(att.content_type) and att.size_bytes and att.size_bytes <= max_inline * 4:
+                try:
+                    raw = Path(att.storage_path).read_text(errors='replace')
+                except Exception:
+                    raw = ''
+                if raw:
+                    truncated = raw[:max_inline]
+                    suffix = '' if len(raw) <= max_inline else f'\n... (truncated, {len(raw) - max_inline} chars omitted)'
+                    lines.append(header)
+                    lines.append('  ```')
+                    for ln in (truncated + suffix).splitlines():
+                        lines.append(f'  {ln}')
+                    lines.append('  ```')
+                    continue
+            if (att.content_type or '').lower().startswith('image/'):
+                lines.append(header + '  [image — vision-capable models can open the file path above]')
+            else:
+                lines.append(header)
+        return '\n'.join(lines)
+
     def _build_effective_description(
         self,
         base_description: str | None,
@@ -2852,10 +2956,8 @@ class OrchestrationService:
         encoded = base64.b64encode(response.content).decode('ascii')
         return f'data:{content_type};base64,{encoded}'
 
-    async def _build_task_image_inputs(self, description: str | None, organization_id: int) -> list[str]:
+    async def _build_task_image_inputs(self, description: str | None, organization_id: int, task_id: int | None = None) -> list[str]:
         image_urls = self._extract_task_image_urls(description)
-        if not image_urls:
-            return []
 
         results: list[str] = []
         azure_auth_header: str | None = None
@@ -2888,6 +2990,37 @@ class OrchestrationService:
             except Exception as exc:
                 logger.warning('Failed to prepare task image input %s: %s', normalized, exc)
                 results.append(normalized)
+
+        # Pull image-type TaskAttachment rows off disk and base64-encode them
+        # so vision-capable LLMs (gpt-4o, claude sonnet, gemini) receive the
+        # bytes directly as `image_url` parts, not just a path string.
+        if task_id is not None and self.db_session is not None and len(results) < 4:
+            try:
+                from agena_models.models.task_attachment import TaskAttachment
+                rows = (await self.db_session.execute(
+                    select(TaskAttachment)
+                    .where(
+                        TaskAttachment.task_id == task_id,
+                        TaskAttachment.organization_id == organization_id,
+                    )
+                    .order_by(TaskAttachment.id)
+                )).scalars().all()
+                for att in rows:
+                    if len(results) >= 4:
+                        break
+                    ct = (att.content_type or '').lower()
+                    if not ct.startswith('image/'):
+                        continue
+                    if (att.size_bytes or 0) > 5 * 1024 * 1024:
+                        continue  # skip oversize blobs — same cap as URL downloader
+                    try:
+                        raw = Path(att.storage_path).read_bytes()
+                    except Exception:
+                        continue
+                    encoded = base64.b64encode(raw).decode('ascii')
+                    results.append(f'data:{ct};base64,{encoded}')
+            except Exception as exc:
+                logger.warning('Failed to load attachment images for task %s: %s', task_id, exc)
 
         return results[:4]
 
