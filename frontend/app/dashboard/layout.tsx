@@ -7,6 +7,7 @@ import { isLoggedIn, removeToken, apiFetch, listNotifications, markAllNotificati
 import OnboardingModal from '@/components/OnboardingModal';
 import WebPushBridge from '@/components/WebPushBridge';
 import LangToggle from '@/components/LangToggle';
+import ThemeToggle from '@/components/ThemeToggle';
 import GuidedTour from '@/components/GuidedTour';
 import SprintSwitcher from '@/components/SprintSwitcher';
 import { useLocale } from '@/lib/i18n';
@@ -475,13 +476,13 @@ function DashboardInner({ children }: { children: ReactNode }) {
 
   return (
     <RoleContext.Provider value={{ role: userRole }}>
-    <div style={{ display: 'flex', minHeight: '100vh', paddingTop: 72 }}>
+    <div style={{ display: 'flex', minHeight: '100vh', paddingTop: 56 }}>
       {/* Mobile sidebar toggle — fixed in top-left, below navbar */}
       <button
         className='dashboard-sidebar-toggle'
         onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
         style={{
-          display: 'none', position: 'fixed', top: 126, left: 6, zIndex: 60,
+          display: 'none', position: 'fixed', top: 64, left: 6, zIndex: 60,
           width: 32, height: 32, borderRadius: 8,
           border: '1px solid var(--panel-border-3)', background: 'var(--surface)',
           color: 'var(--ink-58)', cursor: 'pointer',
@@ -504,7 +505,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
         width: sidebarWidth, flexShrink: 0,
         borderRight: '1px solid var(--panel-border)',
         background: 'var(--glass)', backdropFilter: 'blur(20px)',
-        position: 'fixed', top: 72, bottom: 0, left: 0,
+        position: 'fixed', top: 56, bottom: 0, left: 0,
         display: 'flex', flexDirection: 'column',
         padding: '24px 12px', zIndex: 50,
         overflowY: 'auto', overflowX: 'hidden',
@@ -712,17 +713,49 @@ function DashboardInner({ children }: { children: ReactNode }) {
 
       </aside>
 
-      {/* Top bar */}
+      {/* Top bar — owns the entire top of the dashboard now (marketing
+          Navbar is hidden under /dashboard, see components/Navbar.tsx). */}
       <div className='dashboard-topbar' style={{
-        position: 'fixed', top: 72, left: sidebarWidth, right: 0, height: 48, zIndex: 45,
+        position: 'fixed', top: 0, left: 0, right: 0, height: 56, zIndex: 45,
         background: 'var(--glass)', backdropFilter: 'blur(20px)',
         borderBottom: '1px solid var(--panel-border)',
-        display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-        padding: '0 20px', gap: 8,
-        transition: 'left 0.2s ease',
+        display: 'flex', alignItems: 'center',
+        padding: '0 20px', gap: 12,
       }}>
+        {/* Brand — links back to dashboard home */}
+        <Link href='/dashboard' title={t('tooltip.nav.dashboard')} style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          textDecoration: 'none', flexShrink: 0,
+          paddingRight: 12, marginRight: 4, height: '100%',
+        }}>
+          <img src='/media/agena-logo.svg' alt='AGENA' style={{ height: 22, display: 'block' }} />
+        </Link>
+
+        {/* Org chip (if present) — gives quick visual context for which tenant
+            the user is acting in. Read-only here; org switching lives in /profile. */}
+        {(orgNameDisplay || orgSlug) && (
+          <span
+            title={`${t('tooltip.action.openProfile')} · ${orgNameDisplay || orgSlug}`}
+            style={{
+              fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 999,
+              border: '1px solid var(--panel-border-3)', background: 'var(--panel-alt)',
+              color: 'var(--ink-78)', maxWidth: 180,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}
+          >
+            {orgNameDisplay || orgSlug}
+          </span>
+        )}
+
+        <span style={{ flex: 1 }} />
+
         {/* Active sprint switcher — gated on sprints module */}
         {!isPlatformAdmin && enabledModules?.has('sprints') && <SprintSwitcher />}
+
+        {/* Theme + Lang — moved here from the marketing nav so the dashboard
+            isn't missing those controls now that the marketing nav is hidden. */}
+        <ThemeToggle />
+        <LangToggle />
 
         {/* Usage link */}
         <Link href='/dashboard/usage' title={navTooltip('nav.usage')} data-tour={tourAttr('nav.usage')} style={{
@@ -766,7 +799,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
         {/* Notification dropdown */}
         {notifOpen && (
           <div data-notif-dropdown style={{
-            position: 'absolute', top: 48, right: 80, width: 360,
+            position: 'absolute', top: 56, right: 80, width: 360,
             border: '1px solid var(--border)', background: 'var(--surface)',
             borderRadius: 12, padding: 10, display: 'grid', gap: 8,
             maxHeight: 400, overflow: 'auto', zIndex: 100,
@@ -863,7 +896,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
       </div>
 
       {/* Main */}
-      <main className='dashboard-main' style={{ flex: 1, marginLeft: sidebarWidth, padding: '32px 40px', paddingTop: 64, minWidth: 0, transition: 'margin-left 0.2s ease' }}>
+      <main className='dashboard-main' style={{ flex: 1, marginLeft: sidebarWidth, padding: '32px 40px', minWidth: 0, transition: 'margin-left 0.2s ease' }}>
         {children}
       </main>
 
