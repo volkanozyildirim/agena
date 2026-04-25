@@ -22,6 +22,11 @@ export default function Navbar() {
     setMenuOpen(false);
   }, [pathname]);
 
+  // The marketing nav (Use Cases / Integrations / Docs / Blog / …) is
+  // irrelevant inside the dashboard and was stacking on top of the
+  // dashboard's own topbar. /dashboard owns its own header now.
+  if (pathname?.startsWith('/dashboard')) return null;
+
   return (
     <header className='navbar-shell'>
       <div className='container navbar-inner'>
