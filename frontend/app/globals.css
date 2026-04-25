@@ -2865,6 +2865,26 @@ html.light .code-diff .diff-add { background: rgba(22,163,74,0.12); color: #1453
 html.light .code-diff .diff-del { background: rgba(220,38,38,0.10); color: #7f1d1d; }
 html.light .code-diff .diff-ctx { color: rgba(0,0,0,0.82); }
 
+/* Reusable teal chip used for tab pills (file tabs in Code Diff Preview,
+   log filter buttons, etc.). Dark mode keeps the bright `#5eead4` text;
+   light mode uses a darker teal so the active state is readable on
+   white. */
+.teal-chip {
+  border: 1px solid var(--panel-border-4);
+  background: transparent;
+  color: var(--ink-65);
+}
+.teal-chip-active {
+  border-color: rgba(94,234,212,0.55);
+  background: rgba(94,234,212,0.12);
+  color: #5eead4;
+}
+html.light .teal-chip-active {
+  border-color: rgba(13,148,136,0.55);
+  background: rgba(13,148,136,0.10);
+  color: #0d7377;
+}
+
 /* Sprint board "Import" chip — teal theme that works in both modes.
    Dark mode: bright teal text on translucent dark panel.
    Light mode: deeper teal so text stays readable on a white background. */
