@@ -2282,35 +2282,67 @@ class OrchestrationService:
         if not files:
             return 'No generated files to diff.'
 
+        import subprocess
         root = Path(repo_path).expanduser().resolve()
         lines: list[str] = [f'Diff files ({len(files)}):']
+        git_env = {
+            **__import__('os').environ,
+            'GIT_CONFIG_COUNT': '1',
+            'GIT_CONFIG_KEY_0': 'safe.directory',
+            'GIT_CONFIG_VALUE_0': str(root),
+        }
+
+        def _run_git_diff(args: list[str]) -> str:
+            try:
+                r = subprocess.run(
+                    ['git', '-C', str(root), 'diff', *args],
+                    capture_output=True, text=True, timeout=15, env=git_env,
+                )
+                if r.returncode == 0:
+                    return r.stdout
+            except Exception:
+                pass
+            return ''
 
         for file in files:
             rel = file.path.strip().replace('\\', '/')
-            before = ''
-            target = (root / rel).resolve()
-            if str(target).startswith(str(root)) and target.exists():
-                try:
-                    before = target.read_text(encoding='utf-8')
-                except Exception:
-                    before = ''
-            after = file.content or ''
-            diff = list(
-                difflib.unified_diff(
-                    before.splitlines(),
-                    after.splitlines(),
-                    fromfile=f'a/{rel}',
-                    tofile=f'b/{rel}',
-                    lineterm='',
-                    n=2,
-                )
-            )
+            # Walk the most-likely-correct sources first:
+            #   1) Working tree vs HEAD — works when the CLI just edited
+            #      files in place and we haven't committed yet.
+            #   2) HEAD~..HEAD — works after `apply_changes_and_push` has
+            #      already wrapped the edits into a single AI commit.
+            #   3) Manual unified_diff against `file.content` as a last
+            #      resort (covers parsed-from-text file blocks where the
+            #      working tree never received the changes).
+            diff_text = _run_git_diff(['--', rel]) or _run_git_diff(['HEAD~..HEAD', '--', rel])
             lines.append(f'\nFile: {rel}')
             lines.append('```diff')
-            if diff:
-                lines.extend(diff[:220])
+            if diff_text.strip():
+                for ln in diff_text.splitlines()[:220]:
+                    lines.append(ln)
             else:
-                lines.append('(no visible diff)')
+                before = ''
+                target = (root / rel).resolve()
+                if str(target).startswith(str(root)) and target.exists():
+                    try:
+                        before = target.read_text(encoding='utf-8')
+                    except Exception:
+                        before = ''
+                after = file.content or ''
+                fallback = list(
+                    difflib.unified_diff(
+                        before.splitlines(),
+                        after.splitlines(),
+                        fromfile=f'a/{rel}',
+                        tofile=f'b/{rel}',
+                        lineterm='',
+                        n=2,
+                    )
+                )
+                if fallback:
+                    lines.extend(fallback[:220])
+                else:
+                    lines.append('(no visible diff)')
             lines.append('```')
         return '\n'.join(lines)
 
