@@ -20,6 +20,7 @@ frontend/out/
 # Docker
 *.log
 data/agents_md/
+data/uploads/
 
 # OS
 .DS_Store
