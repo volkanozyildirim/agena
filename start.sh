@@ -15,6 +15,11 @@
 set -e
 cd "$(dirname "$0")"
 
+# Host-side absolute path for task attachment storage. Containers serve
+# files via /app/data, but the local CLI runs on the host and needs the
+# real macOS path so it can open uploaded images/files.
+export ATTACHMENT_HOST_ROOT="$(pwd)/data"
+
 # ── Port conflict check ──────────────────────────────────────────────
 check_port() {
   local port=$1 name=$2
