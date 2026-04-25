@@ -2930,6 +2930,15 @@ html.light .teal-chip-active {
   color: #0d7377;
 }
 
+/* Edit-task + Create-task modal grids: stack to a single column under
+   880px so the phone view doesn't clip the right column off-screen. */
+@media (max-width: 880px) {
+  .edit-task-grid,
+  .create-task-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 /* Sprint board "Import" chip — teal theme that works in both modes.
    Dark mode: bright teal text on translucent dark panel.
    Light mode: deeper teal so text stays readable on a white background. */

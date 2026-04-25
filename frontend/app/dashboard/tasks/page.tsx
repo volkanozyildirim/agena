@@ -104,6 +104,9 @@ export default function DashboardTasksPage() {
   const [editMaxTokens, setEditMaxTokens] = useState('');
   const [editMaxCost, setEditMaxCost] = useState('');
   const [editRepoMappingIds, setEditRepoMappingIds] = useState<number[]>([]);
+  const [editDepIds, setEditDepIds] = useState<number[]>([]);
+  const [editDepSearch, setEditDepSearch] = useState('');
+  const [editShowDeps, setEditShowDeps] = useState(false);
   const [editShowRawDescription, setEditShowRawDescription] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [createMappings, setCreateMappings] = useState<BackendRepoMapping[]>([]);
@@ -538,7 +541,11 @@ export default function DashboardTasksPage() {
     setEditMaxTokens('');
     setEditMaxCost('');
     setEditRepoMappingIds([]);
+    setEditDepIds([]);
+    setEditDepSearch('');
+    setEditShowDeps(false);
     setEditShowRawDescription(false);
+    void loadDepCandidates();
     // List rows don't carry the rich guardrail fields — fetch the full
     // task so the edit form can prefill story_context / acceptance /
     // edge_cases / max_tokens / max_cost_usd / repo assignments.
@@ -563,6 +570,11 @@ export default function DashboardTasksPage() {
       setEditMaxTokens(full.max_tokens != null ? String(full.max_tokens) : '');
       setEditMaxCost(full.max_cost_usd != null ? String(full.max_cost_usd) : '');
       setEditRepoMappingIds((full.repo_assignments || []).map((a) => a.repo_mapping_id));
+      // Pull current dependency set so the user can edit it.
+      try {
+        const deps = await apiFetch<{ depends_on_task_ids: number[] }>(`/tasks/${task.id}/dependencies`);
+        setEditDepIds(deps.depends_on_task_ids || []);
+      } catch { /* non-fatal */ }
     } catch {
       // Keep title + description from the row; the rest stays empty.
     } finally {
@@ -598,6 +610,15 @@ export default function DashboardTasksPage() {
         });
       } catch (assignErr) {
         setError(assignErr instanceof Error ? assignErr.message : 'Repo assignments save failed');
+      }
+      // Sync dependencies through the dedicated endpoint.
+      try {
+        await apiFetch(`/tasks/${editTask.id}/dependencies`, {
+          method: 'PUT',
+          body: JSON.stringify({ depends_on_task_ids: editDepIds }),
+        });
+      } catch (depsErr) {
+        setError(depsErr instanceof Error ? depsErr.message : 'Dependencies save failed');
       }
       setEditTask(null);
       setMsg('Task updated');
@@ -663,7 +684,7 @@ export default function DashboardTasksPage() {
         <div
           onClick={(e) => e.stopPropagation()}
           style={{
-            width: 720, maxWidth: '100%',
+            width: 1080, maxWidth: '100%',
             borderRadius: 20, border: '1px solid rgba(13,148,136,0.35)',
             background: 'var(--surface)', padding: 24,
             position: 'relative', boxShadow: '0 24px 80px rgba(0,0,0,0.5)',
@@ -797,6 +818,11 @@ export default function DashboardTasksPage() {
 
           <form onSubmit={onCreate} style={{ display: 'grid', gap: 12 }}>
             <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('tasks.titlePlaceholder')} required />
+            {/* Two-column body so the modal fits without vertical scroll on
+                most laptops. Collapses to a single column under 880px via
+                `.create-task-grid` (see globals.css). */}
+            <div className='create-task-grid' style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 0.85fr)', gap: 14, alignItems: 'start' }}>
+            <div style={{ display: 'grid', gap: 12, alignContent: 'start', minWidth: 0 }}>
             {/* Description: rendered (read-only) by default when there's
                 content, with an Edit toggle that flips to a raw textarea.
                 When the field is empty we always show the textarea so the
@@ -850,6 +876,8 @@ export default function DashboardTasksPage() {
               placeholder={t('tasks.storyContextPlaceholder')}
               rows={2}
             />
+            </div>
+            <div style={{ display: 'grid', gap: 12, alignContent: 'start', minWidth: 0 }}>
             <textarea
               value={acceptanceCriteria}
               onChange={(e) => setAcceptanceCriteria(e.target.value)}
@@ -998,6 +1026,8 @@ export default function DashboardTasksPage() {
                 onChange={(e) => setMaxCostUsd(e.target.value)}
                 placeholder={t('tasks.maxCostPlaceholder')}
               />
+            </div>
+            </div>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button type='submit' className='button button-primary' disabled={uploadingFiles}>
@@ -1619,126 +1649,180 @@ export default function DashboardTasksPage() {
       {editTask && typeof document !== 'undefined' && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', display: 'grid', placeItems: 'center', padding: 16 }}
           onClick={() => setEditTask(null)}>
-          <div style={{ width: 'min(520px, calc(100vw - 24px))', borderRadius: 20, border: '1px solid var(--panel-border-2)', background: 'var(--surface)', boxShadow: '0 24px 80px rgba(0,0,0,0.4)', overflow: 'hidden', maxHeight: '92vh' }}
+          <div style={{ width: 'min(1040px, calc(100vw - 24px))', borderRadius: 20, border: '1px solid var(--panel-border-2)', background: 'var(--surface)', boxShadow: '0 24px 80px rgba(0,0,0,0.4)', overflow: 'hidden', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}
             onClick={(e) => e.stopPropagation()}>
-            <div style={{ height: 3, background: 'linear-gradient(90deg, #38bdf8, #7c3aed)' }} />
-            <div style={{ padding: '20px 24px', display: 'grid', gap: 14, overflowY: 'auto', maxHeight: 'calc(92vh - 3px)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'var(--ink-90)' }}>Edit Task #{editTask.id}</h3>
+            <div style={{ height: 3, background: 'linear-gradient(90deg, #38bdf8, #7c3aed)', flexShrink: 0 }} />
+            {/* Header — sticky so the Save / Cancel actions are reachable
+                without scrolling on small screens. */}
+            <div style={{ padding: '18px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--panel-border-2)', flexShrink: 0 }}>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'var(--ink-90)' }}>Edit Task #{editTask.id}</h3>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {editLoading && (
+                  <span style={{ fontSize: 11, color: 'var(--ink-50)' }}>{t('tasks.picker.loading' as TranslationKey)}</span>
+                )}
+                <button onClick={() => setEditTask(null)}
+                  style={{ padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: 'var(--panel)', border: '1px solid var(--panel-border)', color: 'var(--ink-72)' }}>
+                  {t('tasks.cancel')}
+                </button>
+                <button onClick={() => void saveEditTask()}
+                  style={{ padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: 'linear-gradient(135deg, #0d9488, #22c55e)', border: 'none', color: '#fff' }}>
+                  Save
+                </button>
                 <button onClick={() => setEditTask(null)} style={{ width: 28, height: 28, borderRadius: 8, border: '1px solid var(--panel-border-3)', background: 'transparent', color: 'var(--ink-45)', cursor: 'pointer', fontSize: 14 }}>×</button>
               </div>
-              {editLoading && (
-                <div style={{ fontSize: 11, color: 'var(--ink-50)' }}>{t('tasks.picker.loading' as TranslationKey)}</div>
-              )}
-              <div>
-                <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 4, display: 'block' }}>{t('tasks.titlePlaceholder')}</label>
-                <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 13, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', color: 'var(--ink-90)', boxSizing: 'border-box' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 4, display: 'block' }}>{t('tasks.descriptionPlaceholder')}</label>
-                {(() => {
-                  const hasContent = !!editDesc.trim();
-                  const isRich = /<\/?(div|p|span|br|h[1-6]|ul|ol|li|table|img|strong|em|b|i|code|pre|blockquote)\b/i.test(editDesc);
-                  const showText = !hasContent || editShowRawDescription || !isRich;
-                  return showText ? (
-                    <div style={{ position: 'relative' }}>
-                      <textarea value={editDesc} onChange={(e) => setEditDesc(e.target.value)} rows={5}
-                        style={{ width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 13, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', color: 'var(--ink-90)', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
-                      {hasContent && isRich && (
+            </div>
+            {/* Body — two columns: left is title + description (heavy
+                content), right is guardrails + repo. Each side scrolls
+                independently if it overflows. */}
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 0.85fr)',
+              gap: 18, padding: '18px 24px', overflowY: 'auto', flex: 1, minHeight: 0,
+            }} className='edit-task-grid'>
+              <div style={{ display: 'grid', gap: 14, alignContent: 'start' }}>
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 4, display: 'block' }}>{t('tasks.titlePlaceholder')}</label>
+                  <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 13, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', color: 'var(--ink-90)', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 4, display: 'block' }}>{t('tasks.descriptionPlaceholder')}</label>
+                  {(() => {
+                    const hasContent = !!editDesc.trim();
+                    const isRich = /<\/?(div|p|span|br|h[1-6]|ul|ol|li|table|img|strong|em|b|i|code|pre|blockquote)\b/i.test(editDesc);
+                    const showText = !hasContent || editShowRawDescription || !isRich;
+                    return showText ? (
+                      <div style={{ position: 'relative' }}>
+                        <textarea value={editDesc} onChange={(e) => setEditDesc(e.target.value)} rows={14}
+                          style={{ width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 13, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', color: 'var(--ink-90)', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+                        {hasContent && isRich && (
+                          <button
+                            type='button'
+                            onClick={() => setEditShowRawDescription(false)}
+                            style={{ position: 'absolute', top: 8, right: 8, fontSize: 10, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--panel-border-3)', background: 'var(--panel-alt)', color: 'var(--ink-72)', cursor: 'pointer' }}
+                            title={t('tasks.descriptionPreview' as TranslationKey)}
+                          >👁</button>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ position: 'relative', borderRadius: 10, border: '1px solid var(--panel-border-2)', background: 'var(--panel-alt)', padding: '10px 36px 10px 12px' }}>
                         <button
                           type='button'
-                          onClick={() => setEditShowRawDescription(false)}
-                          style={{ position: 'absolute', top: 8, right: 8, fontSize: 10, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--panel-border-3)', background: 'var(--panel-alt)', color: 'var(--ink-72)', cursor: 'pointer' }}
-                          title={t('tasks.descriptionPreview' as TranslationKey)}
-                        >👁</button>
+                          onClick={() => setEditShowRawDescription(true)}
+                          style={{ position: 'absolute', top: 8, right: 8, fontSize: 10, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--panel-border-3)', background: 'var(--panel)', color: 'var(--ink-72)', cursor: 'pointer' }}
+                          title={t('tasks.descriptionEdit' as TranslationKey)}
+                        >✏️</button>
+                        <RichDescription
+                          className='task-md'
+                          style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--ink-78)', maxHeight: 360, overflowY: 'auto', wordBreak: 'break-word' }}
+                          html={editDesc}
+                        />
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+              <div style={{ display: 'grid', gap: 14, alignContent: 'start' }}>
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 4, display: 'block' }}>{t('tasks.storyContextPlaceholder')}</label>
+                  <textarea value={editStoryContext} onChange={(e) => setEditStoryContext(e.target.value)} rows={2}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 13, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', color: 'var(--ink-90)', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 4, display: 'block' }}>{t('tasks.acceptancePlaceholder')}</label>
+                  <textarea value={editAcceptance} onChange={(e) => setEditAcceptance(e.target.value)} rows={2}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 13, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', color: 'var(--ink-90)', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 4, display: 'block' }}>{t('tasks.edgeCasesPlaceholder')}</label>
+                  <textarea value={editEdgeCases} onChange={(e) => setEditEdgeCases(e.target.value)} rows={2}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 13, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', color: 'var(--ink-90)', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+                </div>
+                {/* Repo assignments + remote selector */}
+                <div style={{ borderRadius: 10, border: '1px solid var(--panel-border)', padding: '10px 12px', background: 'var(--panel)' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 6 }}>{t('tasks.multiRepo.title' as TranslationKey)}</div>
+                  {createMappingsLoaded && createMappings.length > 0 ? (
+                    <div style={{ marginBottom: 8 }}>
+                      <div style={{ maxHeight: 140, overflowY: 'auto', borderRadius: 8, border: '1px solid var(--panel-border-2)', background: 'var(--panel-alt)', padding: '4px 0' }}>
+                        {createMappings.map((m) => (
+                          <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 12, color: 'var(--ink-78)', background: editRepoMappingIds.includes(m.id) ? 'rgba(94,234,212,0.08)' : 'transparent' }}>
+                            <input
+                              type='checkbox'
+                              checked={editRepoMappingIds.includes(m.id)}
+                              onChange={() => setEditRepoMappingIds((prev) => prev.includes(m.id) ? prev.filter((x) => x !== m.id) : [...prev, m.id])}
+                              style={{ accentColor: '#0d9488', width: 14, height: 14 }}
+                            />
+                            <span style={{ fontWeight: 600 }}>{m.display_name || `${m.provider}:${m.owner}/${m.repo_name}`}</span>
+                          </label>
+                        ))}
+                      </div>
+                      {editRepoMappingIds.length > 0 && (
+                        <div style={{ fontSize: 11, color: '#5eead4', marginTop: 4 }}>
+                          {t('tasks.multiRepo.selected' as TranslationKey, { n: editRepoMappingIds.length })}
+                        </div>
                       )}
                     </div>
                   ) : (
-                    <div style={{ position: 'relative', borderRadius: 10, border: '1px solid var(--panel-border-2)', background: 'var(--panel-alt)', padding: '10px 36px 10px 12px' }}>
-                      <button
-                        type='button'
-                        onClick={() => setEditShowRawDescription(true)}
-                        style={{ position: 'absolute', top: 8, right: 8, fontSize: 10, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--panel-border-3)', background: 'var(--panel)', color: 'var(--ink-72)', cursor: 'pointer' }}
-                        title={t('tasks.descriptionEdit' as TranslationKey)}
-                      >✏️</button>
-                      <RichDescription
-                        className='task-md'
-                        style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--ink-78)', maxHeight: 280, overflowY: 'auto', wordBreak: 'break-word' }}
-                        html={editDesc}
+                    <div style={{ fontSize: 11, color: 'var(--ink-35)', marginBottom: 8 }}>—</div>
+                  )}
+                  <RemoteRepoSelector compact onChange={() => { /* read-only here; assignment list is what's saved */ }} />
+                </div>
+                {/* Dependencies — collapsible same as Create */}
+                <div style={{ borderRadius: 10, border: '1px solid var(--panel-border)', background: 'var(--panel)', overflow: 'hidden' }}>
+                  <button
+                    type='button'
+                    onClick={() => setEditShowDeps(!editShowDeps)}
+                    style={{
+                      width: '100%', padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-72)',
+                    }}
+                  >
+                    <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)' }}>
+                      {t('tasks.deps.title' as TranslationKey)} {editDepIds.length > 0 ? `(${editDepIds.length})` : ''}
+                    </span>
+                    <span style={{ fontSize: 12, color: 'var(--ink-35)', transform: editShowDeps ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
+                  </button>
+                  {editShowDeps && (
+                    <div style={{ padding: '0 12px 12px' }}>
+                      <input
+                        value={editDepSearch}
+                        onChange={(e) => setEditDepSearch(e.target.value)}
+                        placeholder={t('tasks.deps.searchPlaceholder' as TranslationKey)}
+                        style={{ width: '100%', padding: '6px 10px', fontSize: 12, marginBottom: 8, borderRadius: 8 }}
                       />
-                    </div>
-                  );
-                })()}
-              </div>
-              <div>
-                <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 4, display: 'block' }}>{t('tasks.storyContextPlaceholder')}</label>
-                <textarea value={editStoryContext} onChange={(e) => setEditStoryContext(e.target.value)} rows={2}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 13, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', color: 'var(--ink-90)', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 4, display: 'block' }}>{t('tasks.acceptancePlaceholder')}</label>
-                <textarea value={editAcceptance} onChange={(e) => setEditAcceptance(e.target.value)} rows={2}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 13, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', color: 'var(--ink-90)', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 4, display: 'block' }}>{t('tasks.edgeCasesPlaceholder')}</label>
-                <textarea value={editEdgeCases} onChange={(e) => setEditEdgeCases(e.target.value)} rows={2}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 13, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', color: 'var(--ink-90)', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }} />
-              </div>
-              {/* Repo assignments — same multi-select shape Create uses
-                  so the user can swap a wrong mapping or add a missing one
-                  without leaving the row. RemoteRepoSelector also rendered
-                  to surface the "Remote Repo:" path used at run time. */}
-              <div style={{ borderRadius: 10, border: '1px solid var(--panel-border)', padding: '10px 12px', background: 'var(--panel)' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 6 }}>{t('tasks.multiRepo.title' as TranslationKey)}</div>
-                {createMappingsLoaded && createMappings.length > 0 ? (
-                  <div style={{ marginBottom: 8 }}>
-                    <div style={{ maxHeight: 160, overflowY: 'auto', borderRadius: 8, border: '1px solid var(--panel-border-2)', background: 'var(--panel-alt)', padding: '4px 0' }}>
-                      {createMappings.map((m) => (
-                        <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 12, color: 'var(--ink-78)', background: editRepoMappingIds.includes(m.id) ? 'rgba(94,234,212,0.08)' : 'transparent' }}>
-                          <input
-                            type='checkbox'
-                            checked={editRepoMappingIds.includes(m.id)}
-                            onChange={() => setEditRepoMappingIds((prev) => prev.includes(m.id) ? prev.filter((x) => x !== m.id) : [...prev, m.id])}
-                            style={{ accentColor: '#0d9488', width: 14, height: 14 }}
-                          />
-                          <span style={{ fontWeight: 600 }}>{m.display_name || `${m.provider}:${m.owner}/${m.repo_name}`}</span>
-                        </label>
-                      ))}
-                    </div>
-                    {editRepoMappingIds.length > 0 && (
-                      <div style={{ fontSize: 11, color: '#5eead4', marginTop: 4 }}>
-                        {t('tasks.multiRepo.selected' as TranslationKey, { n: editRepoMappingIds.length })}
+                      <div style={{ maxHeight: 160, overflowY: 'auto', borderRadius: 8, border: '1px solid var(--panel-border-2)', background: 'var(--panel-alt)', padding: '4px 6px', display: 'grid', gap: 2 }}>
+                        {depCandidates
+                          .filter((c) => c.id !== editTask?.id)
+                          .filter((c) => !editDepSearch || c.title.toLowerCase().includes(editDepSearch.toLowerCase()) || String(c.id).includes(editDepSearch))
+                          .map((c) => (
+                            <label key={c.id} style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer', padding: '4px 4px', borderRadius: 6, background: editDepIds.includes(c.id) ? 'rgba(94,234,212,0.08)' : 'transparent' }}>
+                              <input
+                                type='checkbox'
+                                checked={editDepIds.includes(c.id)}
+                                onChange={(e) => setEditDepIds((prev) => e.target.checked ? [...prev, c.id] : prev.filter((x) => x !== c.id))}
+                                style={{ accentColor: '#0d9488', width: 14, height: 14, flexShrink: 0 }}
+                              />
+                              <span style={{ fontSize: 12, color: editDepIds.includes(c.id) ? 'var(--ink-90)' : 'var(--ink-65)' }}>
+                                #{c.id} {c.title}{' '}
+                                <span style={{ color: statusColor(c.status), fontSize: 11 }}>({c.status})</span>
+                              </span>
+                            </label>
+                          ))}
                       </div>
-                    )}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div>
+                    <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 4, display: 'block' }}>{t('tasks.maxTokensPlaceholder')}</label>
+                    <input type='number' min='0' step='1' value={editMaxTokens} onChange={(e) => setEditMaxTokens(e.target.value)}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 13, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', color: 'var(--ink-90)', boxSizing: 'border-box' }} />
                   </div>
-                ) : (
-                  <div style={{ fontSize: 11, color: 'var(--ink-35)', marginBottom: 8 }}>—</div>
-                )}
-                <RemoteRepoSelector compact onChange={() => { /* read-only here; assignment list is what's saved */ }} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div>
-                  <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 4, display: 'block' }}>{t('tasks.maxTokensPlaceholder')}</label>
-                  <input type='number' min='0' step='1' value={editMaxTokens} onChange={(e) => setEditMaxTokens(e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 13, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', color: 'var(--ink-90)', boxSizing: 'border-box' }} />
+                  <div>
+                    <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 4, display: 'block' }}>{t('tasks.maxCostPlaceholder')}</label>
+                    <input type='number' min='0' step='0.0001' value={editMaxCost} onChange={(e) => setEditMaxCost(e.target.value)}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 13, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', color: 'var(--ink-90)', boxSizing: 'border-box' }} />
+                  </div>
                 </div>
-                <div>
-                  <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 4, display: 'block' }}>{t('tasks.maxCostPlaceholder')}</label>
-                  <input type='number' min='0' step='0.0001' value={editMaxCost} onChange={(e) => setEditMaxCost(e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 10, fontSize: 13, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', color: 'var(--ink-90)', boxSizing: 'border-box' }} />
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={() => setEditTask(null)}
-                  style={{ flex: 1, padding: '11px', borderRadius: 12, fontSize: 13, fontWeight: 600, cursor: 'pointer', background: 'var(--panel)', border: '1px solid var(--panel-border)', color: 'var(--ink-50)' }}>
-                  Cancel
-                </button>
-                <button onClick={() => void saveEditTask()}
-                  style={{ flex: 1, padding: '11px', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer', background: 'linear-gradient(135deg, #0d9488, #22c55e)', border: 'none', color: '#fff' }}>
-                  Save
-                </button>
               </div>
             </div>
           </div>
