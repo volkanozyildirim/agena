@@ -2871,7 +2871,23 @@ class OrchestrationService:
                 'application/x-yaml', 'application/javascript',
             }
 
+        # Count images upfront so the imperative header tells the agent
+        # exactly how many screenshots are waiting on disk. Without an
+        # explicit "you must Read these" cue agents tend to skim the path
+        # list and write code blind to the user's UI mockups.
+        image_count = sum(
+            1 for att in rows
+            if (att.content_type or '').lower().startswith('image/')
+        ) + len(inline_items)
+
         lines: list[str] = ['ATTACHMENTS:']
+        if image_count:
+            lines.append(
+                f'IMPORTANT: {image_count} image attachment(s) below show the '
+                'required UI/behavior. Open each with the Read tool BEFORE '
+                'writing or planning any code — the screenshots are the '
+                'primary spec, not optional reference material.'
+            )
         for att in rows:
             host_path = _resolve_host_path(att.storage_path or '')
             size_kb = (att.size_bytes or 0) / 1024
@@ -2891,7 +2907,7 @@ class OrchestrationService:
                     lines.append('  ```')
                     continue
             if (att.content_type or '').lower().startswith('image/'):
-                lines.append(header + '  [image — vision-capable models can open the file path above]')
+                lines.append(header + '  [SCREENSHOT — Read this file before writing any code]')
             else:
                 lines.append(header)
 
@@ -2903,7 +2919,7 @@ class OrchestrationService:
             size_kb = (item['size_bytes'] or 0) / 1024
             lines.append(
                 f"- {item['filename']} ({item['content_type']}, {size_kb:.1f} KB) — file: {host_path}"
-                f"  [inline image from task description; source: {item['source_url']}]"
+                f"  [SCREENSHOT from task description — Read before coding; source: {item['source_url']}]"
             )
 
         return '\n'.join(lines)
