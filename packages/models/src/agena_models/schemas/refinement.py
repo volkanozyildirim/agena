@@ -51,6 +51,24 @@ class SimilarPastItem(BaseModel):
     commit_count: int = 0
 
 
+class TouchedFile(BaseModel):
+    """A file the LLM thinks needs editing for this task."""
+    file: str
+    action: str = 'modify'  # modify | create | delete
+    reason: str = ''
+    repo_mapping_name: str = ''
+
+
+class RecommendedAuthor(BaseModel):
+    """A team member who recently worked on the touched files. Surfaced
+    so the planner can hand the task to whoever has the most context."""
+    name: str
+    email: str = ''
+    commit_count: int = 0
+    files_touched: int = 0
+    reason: str = ''  # human-readable "5 commits in app/Foo since 2026-02"
+
+
 class RefinementSuggestion(BaseModel):
     item_id: str
     title: str
@@ -70,6 +88,12 @@ class RefinementSuggestion(BaseModel):
     provider: str | None = None
     error: str | None = None
     similar_items: list[SimilarPastItem] = Field(default_factory=list)
+    # Code-aware analysis fields (populated when refinement runs against a
+    # repo that has a local_repo_path). The LLM lists files it would
+    # touch; the service then runs `git log` per-file to surface recent
+    # authors as candidate assignees.
+    touched_files: list[TouchedFile] = Field(default_factory=list)
+    recommended_authors: list[RecommendedAuthor] = Field(default_factory=list)
 
 
 class RefinementAnalyzeResponse(BaseModel):

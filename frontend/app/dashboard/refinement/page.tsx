@@ -77,6 +77,8 @@ type RefinementSuggestion = {
   fallback_note?: string;
   error?: string | null;
   similar_items?: SimilarPastItem[];
+  touched_files?: { file: string; action?: string; reason?: string; repo_mapping_name?: string }[];
+  recommended_authors?: { name: string; email?: string; commit_count?: number; files_touched?: number; reason?: string }[];
 };
 
 type RefinementAnalyzeResponse = {
@@ -1815,6 +1817,59 @@ export default function RefinementPage() {
                                       {suggestion.comment || '-'}
                                     </div>
                                   </div>
+
+                                  {/* Touched files — what the analysis thinks needs editing */}
+                                  {suggestion.touched_files && suggestion.touched_files.length > 0 && (
+                                    <div style={expandedSection}>
+                                      <div style={expandedSectionLabel}>Etkilenen Dosyalar</div>
+                                      <div style={{ display: 'grid', gap: 4, marginTop: 6 }}>
+                                        {suggestion.touched_files.map((tf, i) => (
+                                          <div key={`${tf.file}-${i}`} style={{
+                                            padding: '6px 10px', borderRadius: 8,
+                                            border: '1px solid var(--panel-border)',
+                                            background: 'var(--panel)',
+                                            display: 'flex', flexDirection: 'column', gap: 2,
+                                          }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                              <span style={{ fontSize: 9, fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: tf.action === 'create' ? 'rgba(34,197,94,0.15)' : tf.action === 'delete' ? 'rgba(248,113,113,0.15)' : 'rgba(56,189,248,0.15)', color: tf.action === 'create' ? '#22c55e' : tf.action === 'delete' ? '#f87171' : '#38bdf8', textTransform: 'uppercase' }}>{tf.action || 'modify'}</span>
+                                              <span style={{ fontSize: 12, color: 'var(--ink-85)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{tf.file}</span>
+                                              {tf.repo_mapping_name && (
+                                                <span style={{ fontSize: 10, color: 'var(--ink-50)' }}>· {tf.repo_mapping_name}</span>
+                                              )}
+                                            </div>
+                                            {tf.reason && (
+                                              <div style={{ fontSize: 11, color: 'var(--ink-65)', lineHeight: 1.4 }}>{tf.reason}</div>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Recommended assignee from git authorship */}
+                                  {suggestion.recommended_authors && suggestion.recommended_authors.length > 0 && (
+                                    <div style={expandedSection}>
+                                      <div style={expandedSectionLabel}>Önerilen Kişi (kodu son 6 ayda yazan)</div>
+                                      <div style={{ display: 'grid', gap: 6, marginTop: 6 }}>
+                                        {suggestion.recommended_authors.map((a, i) => (
+                                          <div key={`${a.email || a.name}-${i}`} style={{
+                                            display: 'flex', alignItems: 'center', gap: 10,
+                                            padding: '8px 10px', borderRadius: 10,
+                                            border: '1px solid rgba(168,85,247,0.25)',
+                                            background: 'rgba(168,85,247,0.06)',
+                                          }}>
+                                            <span style={{ fontSize: 11, fontWeight: 800, padding: '4px 8px', borderRadius: 8, background: 'rgba(168,85,247,0.18)', color: '#c084fc', minWidth: 40, textAlign: 'center' }}>
+                                              #{i + 1}
+                                            </span>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                              <div style={{ fontSize: 13, color: 'var(--ink-85)', fontWeight: 600 }}>{a.name}{a.email ? ` <${a.email}>` : ''}</div>
+                                              <div style={{ fontSize: 11, color: 'var(--ink-58)' }}>{a.reason || `${a.commit_count || 0} commit · ${a.files_touched || 0} dosya`}</div>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
 
                                   {/* Similar past items (grounding) */}
                                   {suggestion.similar_items && suggestion.similar_items.length > 0 && (

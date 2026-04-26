@@ -24,6 +24,7 @@ from agena_services.integrations.jira_client import JiraClient
 from agena_models.models.user_preference import UserPreference
 from agena_models.models.refinement_record import RefinementRecord
 from agena_models.schemas.refinement import (
+    RecommendedAuthor,
     RefinementAnalyzeRequest,
     RefinementAnalyzeResponse,
     RefinementItemsResponse,
@@ -32,6 +33,7 @@ from agena_models.schemas.refinement import (
     RefinementWritebackResponse,
     RefinementWritebackResult,
     SimilarPastItem,
+    TouchedFile,
 )
 from agena_models.schemas.task import ExternalTask
 from agena_services.services.ai_usage_event_service import AIUsageEventService
@@ -46,6 +48,14 @@ class _SafeDict(dict[str, Any]):
         return ''
 
 
+class _RefinementFileChange(BaseModel):
+    """Loose schema for the file_changes block — we don't validate paths
+    here; resolution happens in _resolve_authorship_for_files."""
+    file: str = ''
+    action: str = 'modify'
+    description: str = ''
+
+
 class _RefinementStructuredOutput(BaseModel):
     summary: str = ''
     suggested_story_points: int | str = 0  # Accept string too (LLM may return "5 puan")
@@ -55,6 +65,9 @@ class _RefinementStructuredOutput(BaseModel):
     ambiguities: list[str] = Field(default_factory=list)
     questions: list[str] = Field(default_factory=list)
     ready_for_planning: bool = False
+    # Code-aware additions: LLM lists candidate files it would edit.
+    # Same `file_changes` shape PM_SYSTEM_PROMPT already produces.
+    file_changes: list[_RefinementFileChange] = Field(default_factory=list)
 
 
 class RefinementService:
@@ -420,6 +433,38 @@ class RefinementService:
                         payload.get('confidence'),
                         type(structured).__name__ if structured else 'dict',
                     )
+                    # Pull file_changes from the structured output and run
+                    # git authorship over them so the suggestion can name
+                    # who's worked there recently. Resolution is best-
+                    # effort: empty result just means no annotated authors.
+                    fc_paths: list[str] = []
+                    raw_changes = payload.get('file_changes') or []
+                    if isinstance(raw_changes, list):
+                        for entry in raw_changes:
+                            if isinstance(entry, dict):
+                                fc = str(entry.get('file') or '').strip()
+                            else:
+                                fc = str(entry).strip()
+                            if fc:
+                                fc_paths.append(fc)
+                    touched_files, recommended_authors = await self._resolve_authorship_for_files(
+                        organization_id, fc_paths,
+                    )
+                    # Reason text per touched-file: prefer LLM-provided
+                    # description; fall back to the action.
+                    if touched_files and isinstance(raw_changes, list):
+                        reason_by_path: dict[str, str] = {}
+                        for entry in raw_changes:
+                            if isinstance(entry, dict):
+                                key = str(entry.get('file') or '').strip()
+                                desc = str(entry.get('description') or entry.get('reason') or '').strip()
+                                action = str(entry.get('action') or 'modify').strip()
+                                if key:
+                                    reason_by_path[key] = desc
+                                    reason_by_path.setdefault(key.lstrip('/'), desc)
+                        for tf in touched_files:
+                            if not tf.reason:
+                                tf.reason = reason_by_path.get(tf.file, '') or reason_by_path.get(tf.file.lstrip('/'), '')
                     results.append(
                         self._to_suggestion(
                             item,
@@ -428,6 +473,8 @@ class RefinementService:
                             provider=agent_provider,
                             language=request.language,
                             similar_items=similar_past,
+                            touched_files=touched_files,
+                            recommended_authors=recommended_authors,
                         )
                     )
                 except Exception as exc:
@@ -834,6 +881,20 @@ class RefinementService:
                 'o yüzden Y SP önerildi." If no similar items were provided, state that no history '
                 'was found and estimate from scratch.'
             )
+        # Code-aware directive: ask for file_changes alongside the SP so the
+        # service can run git authorship and recommend an assignee. Read
+        # repo files if available, but DON'T write code — refinement is
+        # analysis-only.
+        if 'file_changes' not in expected_tpl:
+            expected_tpl = expected_tpl.rstrip() + (
+                '\n\n'
+                'ALSO INCLUDE in the JSON output a "file_changes" array. Each entry is '
+                '{"file": "relative/path.ext", "action": "modify"|"create"|"delete", '
+                '"description": "what would change in this file"}. List only files you '
+                'actually need to touch — do NOT invent paths. If the repo source is not '
+                'available, leave file_changes empty. Refinement is analysis-only: '
+                'never output code blocks; only describe the changes.'
+            )
 
         agent_cfg = {
             'role': 'Sprint Refinement Analyst',
@@ -888,6 +949,100 @@ class RefinementService:
             return int(match.group())
         return default
 
+    async def _resolve_authorship_for_files(
+        self, organization_id: int, file_paths: list[str],
+    ) -> tuple[list[TouchedFile], list[RecommendedAuthor]]:
+        """For each LLM-suggested file path, locate it in the org's local
+        repos and aggregate `git log` authorship over the last 6 months.
+        Returns (touched_files, recommended_authors) — empty if no repo
+        mapping has a local_repo_path or git is unavailable.
+        """
+        from agena_models.models.repo_mapping import RepoMapping
+
+        clean_paths = [str(p).strip() for p in file_paths if str(p or '').strip()]
+        if not clean_paths:
+            return [], []
+
+        from sqlalchemy import select as _select
+        rows = (await self.db.execute(
+            _select(RepoMapping).where(
+                RepoMapping.organization_id == organization_id,
+                RepoMapping.is_active.is_(True),
+            )
+        )).scalars().all()
+        repos = [r for r in rows if (r.local_repo_path or '').strip()]
+        if not repos:
+            # No checkout we can grep — return paths as-is so the UI still
+            # shows what the LLM thinks needs editing.
+            return [TouchedFile(file=p) for p in clean_paths], []
+
+        from pathlib import Path as _P
+        import os as _os
+        import subprocess as _sp
+
+        touched: list[TouchedFile] = []
+        # email -> {name, commits, files}
+        author_agg: dict[str, dict[str, Any]] = {}
+
+        for raw_path in clean_paths:
+            normalized = raw_path.lstrip('/')
+            located = None
+            for repo in repos:
+                root = _P(repo.local_repo_path).expanduser().resolve()
+                candidate = root / normalized
+                if candidate.exists():
+                    located = (repo, root, str(candidate.relative_to(root)))
+                    break
+            if not located:
+                touched.append(TouchedFile(file=raw_path, action='modify'))
+                continue
+            repo, root, rel = located
+            touched.append(TouchedFile(
+                file=rel, action='modify',
+                repo_mapping_name=f'{repo.provider}:{repo.owner}/{repo.repo_name}',
+            ))
+            try:
+                env = {**_os.environ, 'GIT_CONFIG_COUNT': '1',
+                       'GIT_CONFIG_KEY_0': 'safe.directory',
+                       'GIT_CONFIG_VALUE_0': str(root)}
+                result = _sp.run(
+                    ['git', '-C', str(root), 'log',
+                     '--since=6.months.ago', '--pretty=%aN\t%aE',
+                     '--', rel],
+                    capture_output=True, text=True, timeout=10, env=env,
+                )
+                for line in (result.stdout or '').splitlines():
+                    parts = line.split('\t', 1)
+                    if not parts or not parts[0].strip():
+                        continue
+                    name = parts[0].strip()
+                    email = (parts[1].strip() if len(parts) > 1 else '').lower()
+                    key = email or name
+                    bucket = author_agg.setdefault(key, {
+                        'name': name, 'email': email, 'commits': 0, 'files': set(),
+                    })
+                    bucket['commits'] = int(bucket['commits']) + 1
+                    bucket['files'].add(rel)
+            except Exception:
+                continue
+
+        ranked = sorted(
+            author_agg.values(),
+            key=lambda b: (b['commits'], len(b['files'])),
+            reverse=True,
+        )[:3]
+        authors = [
+            RecommendedAuthor(
+                name=str(b['name']),
+                email=str(b['email'] or ''),
+                commit_count=int(b['commits']),
+                files_touched=len(b['files']),
+                reason=f"{b['commits']} commits across {len(b['files'])} touched file(s) in last 6 months",
+            )
+            for b in ranked
+        ]
+        return touched, authors
+
     def _to_suggestion(
         self,
         item: ExternalTask,
@@ -897,6 +1052,8 @@ class RefinementService:
         provider: str,
         language: str,
         similar_items: list[SimilarPastItem] | None = None,
+        touched_files: list['TouchedFile'] | None = None,
+        recommended_authors: list['RecommendedAuthor'] | None = None,
     ) -> RefinementSuggestion:
         point = self._safe_int(payload.get('suggested_story_points', 0))
         confidence = max(0, min(100, self._safe_int(payload.get('confidence', 0))))
@@ -1006,6 +1163,8 @@ class RefinementService:
             model=model,
             provider=provider,
             similar_items=similar_items or [],
+            touched_files=touched_files or [],
+            recommended_authors=recommended_authors or [],
         )
 
     def _is_turkish(self, language: str) -> bool:
