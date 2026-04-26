@@ -131,6 +131,8 @@ type Copy = {
   language: string;
   agentProvider: string;
   agentModel: string;
+  repoMapping: string;
+  repoMappingNone: string;
   limit: string;
   loadItems: string;
   analyze: string;
@@ -215,6 +217,8 @@ const COPY: Record<'tr' | 'en', Copy> = {
     language: 'Cikti dili',
     agentProvider: 'Agent provider',
     agentModel: 'Agent model',
+    repoMapping: 'Repo (kod analizi icin, opsiyonel)',
+    repoMappingNone: '— Kod analizi yok —',
     limit: 'Maks item',
     loadItems: 'Itemlari Yukle',
     analyze: 'Refinement Calistir',
@@ -297,6 +301,8 @@ const COPY: Record<'tr' | 'en', Copy> = {
     language: 'Output language',
     agentProvider: 'Agent provider',
     agentModel: 'Agent model',
+    repoMapping: 'Repo (for code analysis, optional)',
+    repoMappingNone: '— No code analysis —',
     limit: 'Max items',
     loadItems: 'Load Items',
     analyze: 'Run Refinement',
@@ -460,6 +466,12 @@ export default function RefinementPage() {
   const [agentModel, setAgentModel] = useState('gpt-5.1-codex-mini');
   const [language, setLanguage] = useState('Turkish');
   const [maxItems, setMaxItems] = useState(8);
+  // Optional: when set, refinement asks the LLM for `file_changes` and
+  // resolves git authorship against this repo's checkout. Empty string
+  // = code-aware analysis off.
+  const [repoMappings, setRepoMappings] = useState<{ id: number; display_name: string; provider: string; owner: string; repo_name: string }[]>([]);
+  const [repoMappingId, setRepoMappingId] = useState<string>('');
+  const [runModalAdvanced, setRunModalAdvanced] = useState(false);
 
   const [azureProjects, setAzureProjects] = useState<Opt[]>([]);
   const [azureTeams, setAzureTeams] = useState<Opt[]>([]);
@@ -569,6 +581,12 @@ export default function RefinementPage() {
         if (preview.total > 0) setIndexPreview(preview);
       } catch {
         // ignore
+      }
+      try {
+        const rows = await apiFetch<{ id: number; display_name: string; provider: string; owner: string; repo_name: string }[]>('/repo-mappings');
+        if (Array.isArray(rows)) setRepoMappings(rows);
+      } catch {
+        // ignore — code-aware refinement just stays off
       }
     })();
   }, []);
@@ -861,6 +879,8 @@ export default function RefinementPage() {
     }
     try {
       const customSystemPrompt = useCustomPrompt && customPromptText.trim() ? customPromptText.trim() : undefined;
+      const repoMappingIdNum = repoMappingId.trim() ? Number(repoMappingId) : undefined;
+      const codeAwareExtras = repoMappingIdNum && Number.isFinite(repoMappingIdNum) ? { repo_mapping_id: repoMappingIdNum } : {};
       const payload = provider === 'azure'
         ? {
           provider,
@@ -874,6 +894,7 @@ export default function RefinementPage() {
           item_ids: ids,
           max_items: isSingle ? 1 : maxItems,
           ...(customSystemPrompt ? { custom_system_prompt: customSystemPrompt } : {}),
+          ...codeAwareExtras,
         }
         : {
           provider,
@@ -886,6 +907,7 @@ export default function RefinementPage() {
           item_ids: ids,
           max_items: isSingle ? 1 : maxItems,
           ...(customSystemPrompt ? { custom_system_prompt: customSystemPrompt } : {}),
+          ...codeAwareExtras,
         };
       const response = await apiFetch<RefinementAnalyzeResponse>('/refinement/analyze', {
         method: 'POST',
@@ -937,7 +959,7 @@ export default function RefinementPage() {
         setRunning(false);
       }
     }
-  }, [provider, azureProject, azureTeam, azureSprint, selectedAzureSprint, jiraBoard, jiraSprint, selectedJiraSprint, language, agentProvider, agentModel, selectedIds, maxItems, useCustomPrompt, customPromptText, normalizeAnalyzeResponse, copy.failedRun, copy.successRun, copy.partialRun]);
+  }, [provider, azureProject, azureTeam, azureSprint, selectedAzureSprint, jiraBoard, jiraSprint, selectedJiraSprint, language, agentProvider, agentModel, selectedIds, maxItems, useCustomPrompt, customPromptText, repoMappingId, normalizeAnalyzeResponse, copy.failedRun, copy.successRun, copy.partialRun]);
 
   useEffect(() => {
     if (!autoFocusResults || !results?.results.length) return;
@@ -1148,46 +1170,6 @@ export default function RefinementPage() {
               </div>
             </div>
 
-            <Field label={copy.agentProvider}>
-              <select
-                value={agentProvider}
-                onChange={(e) => {
-                  const next = e.target.value as AgentProvider;
-                  setAgentProvider(next);
-                  setAgentModel(modelsForProvider(next)[0]?.id || '');
-                }}
-                style={inputStyle}
-              >
-                <option value='openai'>OpenAI</option>
-                <option value='gemini'>Gemini</option>
-                <option value='claude_cli'>Claude CLI</option>
-                <option value='codex_cli'>Codex CLI</option>
-                <option value='hal'>HAL</option>
-              </select>
-            </Field>
-
-            {agentProvider !== 'hal' && (
-              <Field label={copy.agentModel}>
-                <select value={agentModel} onChange={(e) => setAgentModel(e.target.value)} style={inputStyle}>
-                  {availableModels.map((m) => (
-                    <option key={m.id} value={m.id}>{m.label}</option>
-                  ))}
-                </select>
-              </Field>
-            )}
-
-            <Field label={copy.language}>
-              <select value={language} onChange={(e) => setLanguage(e.target.value)} style={inputStyle}>
-                <option value='Turkish'>Turkish</option>
-                <option value='English'>English</option>
-                <option value='German'>German</option>
-                <option value='Spanish'>Spanish</option>
-                <option value='Chinese'>Chinese</option>
-                <option value='Italian'>Italian</option>
-                <option value='Japanese'>Japanese</option>
-              </select>
-            </Field>
-
             <div style={{
               display: 'flex', gap: 8, alignItems: 'center',
               padding: '8px 10px', borderRadius: 10,
@@ -1197,6 +1179,73 @@ export default function RefinementPage() {
             }}>
               💡 {t('refinement.runModal.hint' as Parameters<typeof t>[0])}
             </div>
+
+            <button
+              type='button'
+              onClick={() => setRunModalAdvanced((v) => !v)}
+              style={{
+                alignSelf: 'flex-start',
+                background: 'transparent', border: 'none', padding: 0,
+                fontSize: 11, color: 'var(--ink-55)',
+                cursor: 'pointer',
+                textDecoration: 'underline', textDecorationStyle: 'dotted',
+              }}
+            >
+              {runModalAdvanced ? '▾' : '▸'} {lang === 'tr' ? 'Gelişmiş' : 'Advanced'} · {agentProvider}{agentProvider !== 'hal' ? ` / ${agentModel}` : ''} · {language}{repoMappingId ? ` · ${repoMappings.find(r => String(r.id) === repoMappingId)?.display_name || ''}` : ''}
+            </button>
+
+            {runModalAdvanced && (
+              <>
+                <Field label={copy.agentProvider}>
+                  <select
+                    value={agentProvider}
+                    onChange={(e) => {
+                      const next = e.target.value as AgentProvider;
+                      setAgentProvider(next);
+                      setAgentModel(modelsForProvider(next)[0]?.id || '');
+                    }}
+                    style={inputStyle}
+                  >
+                    <option value='openai'>OpenAI</option>
+                    <option value='gemini'>Gemini</option>
+                    <option value='claude_cli'>Claude CLI</option>
+                    <option value='codex_cli'>Codex CLI</option>
+                    <option value='hal'>HAL</option>
+                  </select>
+                </Field>
+
+                {agentProvider !== 'hal' && (
+                  <Field label={copy.agentModel}>
+                    <select value={agentModel} onChange={(e) => setAgentModel(e.target.value)} style={inputStyle}>
+                      {availableModels.map((m) => (
+                        <option key={m.id} value={m.id}>{m.label}</option>
+                      ))}
+                    </select>
+                  </Field>
+                )}
+
+                <Field label={copy.repoMapping}>
+                  <select value={repoMappingId} onChange={(e) => setRepoMappingId(e.target.value)} style={inputStyle}>
+                    <option value=''>{copy.repoMappingNone}</option>
+                    {repoMappings.map((r) => (
+                      <option key={r.id} value={String(r.id)}>{r.display_name || `${r.provider}:${r.owner}/${r.repo_name}`}</option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label={copy.language}>
+                  <select value={language} onChange={(e) => setLanguage(e.target.value)} style={inputStyle}>
+                    <option value='Turkish'>Turkish</option>
+                    <option value='English'>English</option>
+                    <option value='German'>German</option>
+                    <option value='Spanish'>Spanish</option>
+                    <option value='Chinese'>Chinese</option>
+                    <option value='Italian'>Italian</option>
+                    <option value='Japanese'>Japanese</option>
+                  </select>
+                </Field>
+              </>
+            )}
 
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
               <button
@@ -1235,7 +1284,7 @@ export default function RefinementPage() {
         <p style={{ fontSize: 12, color: 'var(--ink-30)', margin: 0 }}>{copy.subtitle}</p>
       </div>
 
-      <div className="refinement-top-grid" style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
+      <div className="refinement-top-grid" style={{ display: 'grid', gap: 16 }}>
         <div style={{ borderRadius: 14, border: '1px solid var(--panel-border-2)', background: 'var(--surface)', padding: 14, display: 'grid', gap: 10 }}>
           <div className="ref-row-2" style={{ display: 'grid', gap: 8, gridTemplateColumns: '1fr 1fr' }}>
             <Field label={copy.source}>
@@ -1361,83 +1410,6 @@ export default function RefinementPage() {
             </div>
           )}
 
-          <div style={{ borderRadius: 14, border: '1px solid var(--panel-border)', background: 'var(--panel)', padding: 0, overflow: 'hidden' }}>
-            <button
-              type='button'
-              onClick={() => setPromptExpanded((p) => !p)}
-              style={{
-                width: '100%',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '12px 14px',
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                color: 'var(--ink-75)',
-              }}
-            >
-              <span style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                {copy.promptConfig}
-              </span>
-              <span style={{ fontSize: 11, color: 'var(--ink-42)', transform: promptExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
-                ▼
-              </span>
-            </button>
-            {promptExpanded && (
-              <div style={{ padding: '0 14px 14px', display: 'grid', gap: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'space-between' }}>
-                  <button
-                    onClick={() => {
-                      setUseCustomPrompt(!useCustomPrompt);
-                      if (!useCustomPrompt && !customPromptText) setCustomPromptText(defaultPromptText);
-                    }}
-                    style={{
-                      padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                      border: useCustomPrompt ? '1px solid var(--accent)' : '1px solid var(--panel-border)',
-                      background: useCustomPrompt ? 'rgba(13,148,136,0.12)' : 'transparent',
-                      color: useCustomPrompt ? '#5eead4' : 'var(--ink-50)',
-                    }}
-                  >
-                    {useCustomPrompt ? '✓ ' : ''}{copy.useCustomPrompt}
-                  </button>
-                  <a
-                    href='/dashboard/prompt-studio'
-                    style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}
-                  >
-                    {copy.editInStudio}
-                  </a>
-                </div>
-                {useCustomPrompt && (
-                  <textarea
-                    value={customPromptText}
-                    onChange={(e) => setCustomPromptText(e.target.value)}
-                    rows={6}
-                    style={{
-                      ...inputStyle,
-                      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                      fontSize: 11,
-                      lineHeight: 1.5,
-                      resize: 'vertical',
-                      minHeight: 100,
-                      borderColor: 'rgba(13,148,136,0.3)',
-                    }}
-                  />
-                )}
-                {!useCustomPrompt && defaultPromptText && (
-                  <div style={{
-                    fontSize: 11, color: 'var(--ink-35)', lineHeight: 1.5,
-                    padding: '8px 10px', borderRadius: 8,
-                    background: 'var(--panel)', border: '1px solid var(--panel-border)',
-                    maxHeight: 80, overflow: 'hidden',
-                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                  }}>
-                    {defaultPromptText.slice(0, 200)}{defaultPromptText.length > 200 ? '...' : ''}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
 
           <div className="refinement-actions" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <button onClick={() => void refreshItems()} style={primaryButton} disabled={loadingItems}>
@@ -1446,43 +1418,6 @@ export default function RefinementPage() {
             <button onClick={() => setRunModal({ itemIds: [...selectedIds], single: false })} style={secondaryButton} disabled={running || !selectedIds.length}>
               {running ? copy.analyzing : copy.analyze}
             </button>
-            {(() => {
-              const jobActive = backfillJob && (backfillJob.status === 'queued' || backfillJob.status === 'fetching' || backfillJob.status === 'indexing');
-              const jobDone = backfillJob && backfillJob.status === 'completed';
-              const jobFailed = backfillJob && backfillJob.status === 'failed';
-              return (
-                <button
-                  onClick={() => void runBackfill()}
-                  style={{
-                    ...secondaryButton,
-                    background: jobFailed ? 'rgba(239,68,68,0.1)' : jobDone ? 'rgba(34,197,94,0.1)' : 'rgba(14,165,233,0.1)',
-                    borderColor: jobFailed ? 'rgba(239,68,68,0.3)' : jobDone ? 'rgba(34,197,94,0.3)' : 'rgba(14,165,233,0.3)',
-                    color: jobFailed ? '#fca5a5' : jobDone ? '#86efac' : '#7dd3fc',
-                  }}
-                  disabled={
-                    !!jobActive ||
-                    (provider === 'azure' && (!azureProject || !azureTeam)) ||
-                    (provider === 'jira' && !jiraProject)
-                  }
-                  title={
-                    provider === 'azure'
-                      ? (!azureProject ? t('refinement.backfill.needAzureProjectShort' as Parameters<typeof t>[0])
-                        : !azureTeam ? t('refinement.backfill.needAzureTeamShort' as Parameters<typeof t>[0])
-                        : t('refinement.backfill.tooltipAzure' as Parameters<typeof t>[0]))
-                      : (!jiraProject ? t('refinement.backfill.needJiraProjectShort' as Parameters<typeof t>[0])
-                        : t('refinement.backfill.tooltipJira' as Parameters<typeof t>[0]))
-                  }
-                >
-                  {jobActive
-                    ? `${t('refinement.backfill.buttonActive' as Parameters<typeof t>[0])}${backfillJob?.total ? ` (${backfillJob.processed || 0}/${backfillJob.total})` : '...'}`
-                    : jobDone
-                      ? `${t('refinement.backfill.buttonDone' as Parameters<typeof t>[0])} (${backfillJob.indexed ?? 0})`
-                      : jobFailed
-                        ? t('refinement.backfill.buttonRetry' as Parameters<typeof t>[0])
-                        : t('refinement.backfill.buttonIdle' as Parameters<typeof t>[0])}
-                </button>
-              );
-            })()}
             {results && results.results.filter(r => !r.error).length > 0 && (
               <>
               <button
@@ -1533,9 +1468,50 @@ export default function RefinementPage() {
               </>
             )}
             <span style={{ fontSize: 12, color: 'var(--ink-35)' }}>{copy.selectionHint}</span>
+            <a
+              href='/dashboard/prompt-studio'
+              style={{ fontSize: 11, color: 'var(--ink-55)', textDecoration: 'underline', textDecorationStyle: 'dotted', marginLeft: 'auto' }}
+            >
+              {copy.editInStudio}
+            </a>
           </div>
 
-          {backfillJob && backfillJob.status !== 'idle' && (
+          {/* Backfill — small link, used rarely (Qdrant index bootstrap) */}
+          {(() => {
+            const jobActive = backfillJob && (backfillJob.status === 'queued' || backfillJob.status === 'fetching' || backfillJob.status === 'indexing');
+            const disabled = !!jobActive
+              || (provider === 'azure' && (!azureProject || !azureTeam))
+              || (provider === 'jira' && !jiraProject);
+            const label = jobActive
+              ? `${t('refinement.backfill.buttonActive' as Parameters<typeof t>[0])}${backfillJob?.total ? ` (${backfillJob.processed || 0}/${backfillJob.total})` : '...'}`
+              : t('refinement.backfill.buttonIdle' as Parameters<typeof t>[0]);
+            return (
+              <button
+                type='button'
+                onClick={() => void runBackfill()}
+                disabled={disabled}
+                style={{
+                  alignSelf: 'flex-start',
+                  background: 'transparent', border: 'none', padding: 0,
+                  fontSize: 11, color: disabled ? 'var(--ink-35)' : 'var(--ink-55)',
+                  cursor: disabled ? 'not-allowed' : 'pointer',
+                  textDecoration: 'underline', textDecorationStyle: 'dotted',
+                }}
+                title={
+                  provider === 'azure'
+                    ? (!azureProject ? t('refinement.backfill.needAzureProjectShort' as Parameters<typeof t>[0])
+                      : !azureTeam ? t('refinement.backfill.needAzureTeamShort' as Parameters<typeof t>[0])
+                      : t('refinement.backfill.tooltipAzure' as Parameters<typeof t>[0]))
+                    : (!jiraProject ? t('refinement.backfill.needJiraProjectShort' as Parameters<typeof t>[0])
+                      : t('refinement.backfill.tooltipJira' as Parameters<typeof t>[0]))
+                }
+              >
+                ↻ {label}
+              </button>
+            );
+          })()}
+
+          {backfillJob && backfillJob.status !== 'idle' && backfillJob.status !== 'completed' && (
             <div style={{
               borderRadius: 12,
               padding: '10px 14px',
@@ -1543,29 +1519,28 @@ export default function RefinementPage() {
               display: 'flex',
               alignItems: 'center',
               gap: 12,
-              border: `1px solid ${backfillJob.status === 'failed' ? 'rgba(239,68,68,0.35)' : backfillJob.status === 'completed' ? 'rgba(34,197,94,0.35)' : 'rgba(14,165,233,0.35)'}`,
-              background: backfillJob.status === 'failed' ? 'rgba(239,68,68,0.06)' : backfillJob.status === 'completed' ? 'rgba(34,197,94,0.06)' : 'rgba(14,165,233,0.06)',
+              border: `1px solid ${backfillJob.status === 'failed' ? 'rgba(239,68,68,0.35)' : 'rgba(14,165,233,0.35)'}`,
+              background: backfillJob.status === 'failed' ? 'rgba(239,68,68,0.06)' : 'rgba(14,165,233,0.06)',
               color: 'var(--ink-80)',
             }}>
               <div style={{
                 width: 8, height: 8, borderRadius: 999,
-                background: backfillJob.status === 'failed' ? '#f87171' : backfillJob.status === 'completed' ? '#22c55e' : '#38bdf8',
+                background: backfillJob.status === 'failed' ? '#f87171' : '#38bdf8',
                 flexShrink: 0,
-                animation: (backfillJob.status === 'fetching' || backfillJob.status === 'indexing' || backfillJob.status === 'queued') ? 'pulse-brand 1.4s ease-in-out infinite' : 'none',
+                animation: backfillJob.status !== 'failed' ? 'pulse-brand 1.4s ease-in-out infinite' : 'none',
               }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 700, marginBottom: 2 }}>
                   {backfillJob.status === 'queued' && t('refinement.backfill.statusQueued' as Parameters<typeof t>[0])}
                   {backfillJob.status === 'fetching' && t('refinement.backfill.statusFetching' as Parameters<typeof t>[0])}
                   {backfillJob.status === 'indexing' && `${t('refinement.backfill.statusIndexing' as Parameters<typeof t>[0])}${backfillJob.total ? ` — ${backfillJob.processed || 0}/${backfillJob.total}` : ''}`}
-                  {backfillJob.status === 'completed' && `${t('refinement.backfill.statusCompletedPrefix' as Parameters<typeof t>[0])} ${backfillJob.indexed ?? 0} ${t('refinement.backfill.statusCompletedSuffix' as Parameters<typeof t>[0])}${backfillJob.capped ? ` (${t('refinement.backfill.statusCapped' as Parameters<typeof t>[0])})` : ''}`}
                   {backfillJob.status === 'failed' && `${t('refinement.backfill.statusFailedPrefix' as Parameters<typeof t>[0])}: ${backfillJob.error || t('refinement.backfill.statusUnknownError' as Parameters<typeof t>[0])}`}
                 </div>
-                {backfillJob.message && backfillJob.status !== 'completed' && backfillJob.status !== 'failed' && (
+                {backfillJob.message && backfillJob.status !== 'failed' && (
                   <div style={{ fontSize: 11, color: 'var(--ink-45)' }}>{backfillJob.message}</div>
                 )}
               </div>
-              {backfillJob.status !== 'completed' && backfillJob.status !== 'failed' && (
+              {backfillJob.status !== 'failed' && (
                 <button
                   onClick={() => setBackfillJob(null)}
                   style={{ border: 'none', background: 'transparent', color: 'var(--ink-45)', cursor: 'pointer', fontSize: 16, padding: '0 4px' }}
@@ -1634,9 +1609,6 @@ export default function RefinementPage() {
           <Stat label={copy.total} value={String(itemsData?.items.length || 0)} />
           <Stat label={copy.unestimated} value={String(itemsData?.unestimated_count || 0)} accent='#fbbf24' />
           <Stat label={copy.pointed} value={String(itemsData?.pointed_count || 0)} accent='#34d399' />
-          <Stat label={copy.selected} value={String(selectedIds.length)} accent='#93c5fd' />
-          <Stat label='Provider' value={agentProvider} accent='#f9a8d4' />
-          <Stat label='Model' value={agentModel} accent='#cbd5e1' />
           {results && (
             <>
               <Stat label={copy.tokens} value={results.total_tokens.toLocaleString()} accent='#fca5a5' />
