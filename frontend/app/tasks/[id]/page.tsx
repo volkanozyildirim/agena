@@ -979,9 +979,17 @@ export default function TaskDetailPage() {
                         <div key={a.id} style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: 6, borderRadius: 8, border: '1px solid var(--panel-border-2)', background: 'var(--panel-alt)', fontSize: 10, color: 'var(--ink-72)', width: 96 }}>
                           {isImg && previewUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <a href={previewUrl} target='_blank' rel='noreferrer'>
+                            // <a target="_blank" rel="noreferrer" href={blob:...}> doesn't work in
+                            // Chrome — the new tab is severed from the opener and can't resolve
+                            // the blob URL. Use programmatic window.open which keeps the link.
+                            <button
+                              type='button'
+                              onClick={() => window.open(previewUrl, '_blank')}
+                              title={a.filename}
+                              style={{ background: 'none', border: 'none', padding: 0, cursor: 'zoom-in' }}
+                            >
                               <img src={previewUrl} alt={a.filename} style={{ width: 84, height: 64, objectFit: 'cover', borderRadius: 4, display: 'block' }} />
-                            </a>
+                            </button>
                           ) : (
                             <div style={{ width: 84, height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--panel)', borderRadius: 4, fontSize: 22 }}>📄</div>
                           )}
