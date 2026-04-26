@@ -152,6 +152,7 @@ async def resolve_authorship_for_files(
         repo, root, rel = located
         touched.append(TouchedFile(
             file=rel, action='modify',
+            repo_mapping_id=int(repo.id),
             repo_mapping_name=f'{repo.provider}:{repo.owner}/{repo.repo_name}',
         ))
         try:

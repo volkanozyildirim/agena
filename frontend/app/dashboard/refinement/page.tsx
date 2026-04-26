@@ -77,7 +77,7 @@ type RefinementSuggestion = {
   fallback_note?: string;
   error?: string | null;
   similar_items?: SimilarPastItem[];
-  touched_files?: { file: string; action?: string; reason?: string; repo_mapping_name?: string }[];
+  touched_files?: { file: string; action?: string; reason?: string; repo_mapping_id?: number | null; repo_mapping_name?: string }[];
   recommended_authors?: {
     name: string;
     email?: string;
@@ -481,6 +481,30 @@ export default function RefinementPage() {
   const [loadingItems, setLoadingItems] = useState(false);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState('');
+  // Inline file-history pane: keyed by `${item_id}::${file}`. Stores
+  // either the loaded commit list, an error message, or a 'loading'
+  // marker. Click toggles the pane open and lazy-loads on first open.
+  type BlameCommit = { sha: string; date: string; author_name: string; author_email: string; subject: string };
+  type BlameState = { commits?: BlameCommit[]; error?: string; loading?: boolean };
+  const [blameByKey, setBlameByKey] = useState<Record<string, BlameState>>({});
+  async function toggleBlame(key: string, repo_mapping_id: number, path: string) {
+    setBlameByKey((prev) => {
+      const cur = prev[key];
+      if (cur && (cur.commits || cur.error)) {
+        // Already loaded — close it.
+        const copy = { ...prev }; delete copy[key]; return copy;
+      }
+      return { ...prev, [key]: { loading: true } };
+    });
+    try {
+      const data = await apiFetch<{ commits: BlameCommit[] }>(
+        `/refinement/file-history?repo_mapping_id=${repo_mapping_id}&path=${encodeURIComponent(path)}&limit=8`,
+      );
+      setBlameByKey((prev) => ({ ...prev, [key]: { commits: data.commits || [] } }));
+    } catch (err) {
+      setBlameByKey((prev) => ({ ...prev, [key]: { error: err instanceof Error ? err.message : 'load failed' } }));
+    }
+  }
   const [runMessage, setRunMessage] = useState<RunMessage | null>(null);
   const [autoFocusResults, setAutoFocusResults] = useState(false);
   const [resultsModalOpen, setResultsModalOpen] = useState(false);
@@ -1833,25 +1857,61 @@ export default function RefinementPage() {
                                     <div style={expandedSection}>
                                       <div style={expandedSectionLabel}>Etkilenen Dosyalar</div>
                                       <div style={{ display: 'grid', gap: 4, marginTop: 6 }}>
-                                        {suggestion.touched_files.map((tf, i) => (
+                                        {suggestion.touched_files.map((tf, i) => {
+                                          const blameKey = `${suggestion.item_id}::${tf.file}`;
+                                          const blame = blameByKey[blameKey];
+                                          const canBlame = !!tf.repo_mapping_id;
+                                          return (
                                           <div key={`${tf.file}-${i}`} style={{
                                             padding: '6px 10px', borderRadius: 8,
                                             border: '1px solid var(--panel-border)',
                                             background: 'var(--panel)',
-                                            display: 'flex', flexDirection: 'column', gap: 2,
+                                            display: 'flex', flexDirection: 'column', gap: 4,
                                           }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                               <span style={{ fontSize: 9, fontWeight: 800, padding: '1px 5px', borderRadius: 4, background: tf.action === 'create' ? 'rgba(34,197,94,0.15)' : tf.action === 'delete' ? 'rgba(248,113,113,0.15)' : 'rgba(56,189,248,0.15)', color: tf.action === 'create' ? '#22c55e' : tf.action === 'delete' ? '#f87171' : '#38bdf8', textTransform: 'uppercase' }}>{tf.action || 'modify'}</span>
-                                              <span style={{ fontSize: 12, color: 'var(--ink-85)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{tf.file}</span>
+                                              <span style={{ flex: 1, fontSize: 12, color: 'var(--ink-85)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tf.file}</span>
                                               {tf.repo_mapping_name && (
                                                 <span style={{ fontSize: 10, color: 'var(--ink-50)' }}>· {tf.repo_mapping_name}</span>
+                                              )}
+                                              {canBlame && (
+                                                <button
+                                                  type='button'
+                                                  onClick={(e) => { e.stopPropagation(); void toggleBlame(blameKey, tf.repo_mapping_id as number, tf.file); }}
+                                                  title='Son commit geçmişi'
+                                                  style={{ padding: '2px 8px', borderRadius: 6, border: '1px solid var(--panel-border-3)', background: 'transparent', color: 'var(--ink-65)', cursor: 'pointer', fontSize: 10, fontWeight: 700 }}
+                                                >
+                                                  {blame ? '−' : 'blame'}
+                                                </button>
                                               )}
                                             </div>
                                             {tf.reason && (
                                               <div style={{ fontSize: 11, color: 'var(--ink-65)', lineHeight: 1.4 }}>{tf.reason}</div>
                                             )}
+                                            {blame && (
+                                              <div style={{ borderTop: '1px solid var(--panel-border-2)', paddingTop: 6, marginTop: 2, display: 'grid', gap: 4 }}>
+                                                {blame.loading && (
+                                                  <div style={{ fontSize: 11, color: 'var(--ink-50)' }}>Yükleniyor...</div>
+                                                )}
+                                                {blame.error && (
+                                                  <div style={{ fontSize: 11, color: '#fca5a5' }}>{blame.error}</div>
+                                                )}
+                                                {blame.commits && blame.commits.length === 0 && (
+                                                  <div style={{ fontSize: 11, color: 'var(--ink-50)' }}>Bu dosya için commit bulunamadı.</div>
+                                                )}
+                                                {blame.commits && blame.commits.map((c) => (
+                                                  <div key={c.sha} style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 11, color: 'var(--ink-72)' }}>
+                                                    <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', color: 'var(--ink-50)', minWidth: 56 }}>{c.sha}</span>
+                                                    <span style={{ minWidth: 90, color: 'var(--ink-58)' }}>{(c.date || '').slice(0, 10)}</span>
+                                                    <span style={{ minWidth: 110, fontWeight: 600, color: 'var(--ink-85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.author_email}>{c.author_name}</span>
+                                                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.subject}</span>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
                                           </div>
-                                        ))}
+                                        );
+                                        })}
                                       </div>
                                     </div>
                                   )}

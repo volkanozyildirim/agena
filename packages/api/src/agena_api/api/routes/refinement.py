@@ -120,6 +120,69 @@ async def analyze_refinement(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@router.get('/file-history')
+async def file_history(
+    repo_mapping_id: int,
+    path: str,
+    limit: int = 8,
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> dict:
+    """Recent commits that touched a path inside one of the org's local
+    checkouts. Used by the refinement card's "blame this file" affordance
+    so the user can see exactly who edited each touched file last.
+    """
+    import os, subprocess
+    from pathlib import Path
+    from agena_models.models.repo_mapping import RepoMapping
+
+    rm = await db.get(RepoMapping, repo_mapping_id)
+    if rm is None or rm.organization_id != tenant.organization_id:
+        raise HTTPException(status_code=404, detail='Repo mapping not found')
+    local = (rm.local_repo_path or '').strip()
+    if not local:
+        raise HTTPException(status_code=400, detail='Repo mapping has no local checkout')
+    root = Path(local).expanduser().resolve()
+    rel = path.lstrip('/')
+    target = (root / rel).resolve()
+    # Path-traversal guard: target must live inside the checkout root.
+    try:
+        target.relative_to(root)
+    except ValueError:
+        raise HTTPException(status_code=400, detail='Path escapes repo root')
+    if not target.exists():
+        raise HTTPException(status_code=404, detail='File not found in checkout')
+
+    env = {**os.environ, 'GIT_CONFIG_COUNT': '1',
+           'GIT_CONFIG_KEY_0': 'safe.directory',
+           'GIT_CONFIG_VALUE_0': str(root)}
+    try:
+        result = subprocess.run(
+            ['git', '-C', str(root), 'log',
+             f'-n', str(max(1, min(50, limit))),
+             '--pretty=%h%x09%aI%x09%aN%x09%aE%x09%s',
+             '--', rel],
+            capture_output=True, text=True, timeout=10, env=env,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f'git log failed: {exc}')
+    if result.returncode != 0:
+        raise HTTPException(status_code=502, detail=f'git: {result.stderr[:200]}')
+    commits: list[dict] = []
+    for line in (result.stdout or '').splitlines():
+        parts = line.split('\t', 4)
+        if len(parts) < 5:
+            continue
+        commits.append({
+            'sha': parts[0],
+            'date': parts[1],
+            'author_name': parts[2],
+            'author_email': parts[3],
+            'subject': parts[4],
+        })
+    return {'path': rel, 'repo': f'{rm.provider}:{rm.owner}/{rm.repo_name}', 'commits': commits}
+
+
 class RefinementAssignAuthorRequest(BaseModel):
     work_item_id: str  # Azure work item id or Jira issue key
     source: str  # 'azure' | 'jira'

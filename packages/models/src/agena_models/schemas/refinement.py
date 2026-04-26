@@ -56,6 +56,7 @@ class TouchedFile(BaseModel):
     file: str
     action: str = 'modify'  # modify | create | delete
     reason: str = ''
+    repo_mapping_id: int | None = None  # set when we located the file in a known checkout
     repo_mapping_name: str = ''
 
 
