@@ -1524,6 +1524,50 @@ export default function IntegrationsPage() {
                   <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
                     {t('integrations.claudeCliDesc')}
                   </p>
+                  {cliBridgeStatus?.claude && cliBridgeStatus?.claude_auth && (
+                    <div style={{ marginTop: 8 }}>
+                      <button
+                        className='button button-outline'
+                        style={{ width: '100%', padding: '9px 14px', fontSize: 12, justifyContent: 'center' }}
+                        onClick={() => {
+                          fetch('http://localhost:9876/claude/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+                            .then(async (r) => {
+                              const text = await r.text();
+                              let data: Record<string, unknown> = {};
+                              if (text) {
+                                try { data = JSON.parse(text) as Record<string, unknown>; }
+                                catch { data = { message: text }; }
+                              }
+                              const status = typeof data.status === 'string' ? data.status : (r.ok ? 'ok' : 'error');
+                              return { status, message: typeof data.message === 'string' ? data.message : '', detail: typeof data.detail === 'string' ? data.detail : '' };
+                            })
+                            .then((d) => {
+                              if (d.status === 'ok') {
+                                setMsg(t('integrations.claudeSessionCleared'));
+                                setCliBridgeStatus(s => s ? { ...s, claude_auth: false } : s);
+                              } else {
+                                setError(d.message || d.detail || t('integrations.claudeLogoutFailed'));
+                              }
+                            })
+                            .catch(() => setError(t('integrations.claudeLogoutRequestFailed')))
+                            .finally(() => {
+                              fetch('http://localhost:9876/health')
+                                .then(r => r.json())
+                                .then(h => setCliBridgeStatus({
+                                  ok: true,
+                                  codex: h.codex,
+                                  claude: h.claude,
+                                  codex_auth: h.codex_auth,
+                                  claude_auth: h.claude_auth,
+                                }))
+                                .catch(() => {});
+                            });
+                        }}
+                      >
+                        {t('integrations.clearSession')}
+                      </button>
+                    </div>
+                  )}
                   {cliBridgeStatus?.claude && !cliBridgeStatus?.claude_auth && (
                     <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
                       <button className='button button-primary' style={{ width: '100%', padding: '9px 14px', fontSize: 12, justifyContent: 'center' }} onClick={() => {
