@@ -187,18 +187,22 @@ class OrchestrationService:
                 task.edge_cases,
             )
 
-        # Append attachment metadata + inline text content so every
-        # downstream consumer (Claude/Codex CLI, MCP agent, classic
-        # LangGraph pipeline, flow nodes) sees what the user uploaded.
+        # Prepend (not append) attachment metadata so the file paths and
+        # the imperative "READ THESE FIRST" header sit at the TOP of the
+        # description. Agents tend to skim past blocks buried under a long
+        # task brief — task 92's first run did `find -name '*.png'` in the
+        # worktree and gave up when nothing matched, instead of using the
+        # explicit paths we'd already provided. Putting attachments first
+        # makes that bypass much harder.
         try:
             attachments_section = await self._build_attachments_section(
                 task.id, organization_id, description=task.description,
             )
             if attachments_section:
-                effective_description = f'{effective_description}\n\n{attachments_section}'
+                effective_description = f'{attachments_section}\n\n{effective_description}'
                 await task_service.add_log(
                     task.id, organization_id, 'agent',
-                    'Attachments injected into prompt (paths + inline text content)'
+                    'Attachments injected into prompt (top-of-description, paths + inline text)'
                 )
         except Exception as _att_exc:
             logger.info('Attachment injection skipped for task %s: %s', task.id, _att_exc)
@@ -570,7 +574,9 @@ class OrchestrationService:
                         task.id, organization_id, description=task.description,
                     )
                     if _flow_atts:
-                        enriched_desc = f'{enriched_desc}\n\n{_flow_atts}'
+                        # Top of description so flow nodes also see attachments
+                        # before the task brief, matching the non-flow path.
+                        enriched_desc = f'{_flow_atts}\n\n{enriched_desc}'
                 except Exception:
                     pass
                 payload_with_context = dict(payload)
