@@ -13,7 +13,7 @@ from typing import Awaitable, Callable
 LogCallback = Callable[[str], Awaitable[None]]
 
 
-def _read_timeout_env(default: int = 1800) -> int:
+def _read_timeout_env(default: int = 3600) -> int:
     raw = (os.getenv('AGENA_CLI_TIMEOUT_SEC') or '').strip()
     if not raw:
         return default
@@ -25,10 +25,11 @@ def _read_timeout_env(default: int = 1800) -> int:
 
 
 class ClaudeCLIService:
-    # Bumped from 1200 → 1800 (30 min) after task 92 hit the wall while
-    # still doing legitimate framework research. Override via env
-    # AGENA_CLI_TIMEOUT_SEC for one-off long jobs.
-    EXEC_TIMEOUT_SEC = _read_timeout_env(1800)
+    # 60 min default. Long CRUD-style tasks (state machine + form +
+    # menu + notifications across many files) routinely need more than
+    # 30 min — task 92 burned 20+ min in research alone before writing a
+    # line. Override via AGENA_CLI_TIMEOUT_SEC for shorter caps.
+    EXEC_TIMEOUT_SEC = _read_timeout_env(3600)
 
     # ── Worktree helpers ─────────────────────────────────────────────────
     @staticmethod
