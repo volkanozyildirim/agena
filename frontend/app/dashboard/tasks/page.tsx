@@ -2013,7 +2013,8 @@ const MCP_MODELS = [
   { label: 'Gemini 2.5 Flash', model: 'gemini-2.5-flash', provider: 'gemini' },
   { label: 'Gemini 2.5 Pro', model: 'gemini-2.5-pro', provider: 'gemini' },
   { label: 'Codex CLI', model: 'gpt-4o', provider: 'codex_cli' },
-  { label: 'Claude CLI', model: 'sonnet', provider: 'claude_cli' },
+  { label: 'Claude CLI (Sonnet)', model: 'sonnet', provider: 'claude_cli' },
+  { label: 'Claude CLI (Opus)', model: 'opus', provider: 'claude_cli' },
 ];
 
 function McpModelSelect({ taskId, agents, hasRepo, repoSel, mappingIds, createPr, onAssignAI, t }: {
@@ -2220,12 +2221,13 @@ function AssignPopup({ taskId, mode, tasks, agents, flows, defaultCreatePr: init
             {/* CLI options */}
             <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginTop: 6 }}>Local CLI</div>
             {[
-              { label: 'Claude CLI', model: 'sonnet', provider: 'claude_cli', color: '#fb923c', icon: '✎' },
+              { label: 'Claude CLI (Sonnet)', model: 'sonnet', provider: 'claude_cli', color: '#fb923c', icon: '✎' },
+              { label: 'Claude CLI (Opus)', model: 'opus', provider: 'claude_cli', color: '#a855f7', icon: '✎' },
               { label: 'Codex CLI', model: 'gpt-4o', provider: 'codex_cli', color: '#a78bfa', icon: '⌘' },
             ].map((cli) => {
-              const isSelected = selected?.type === 'cli' && selected.agent?.provider === cli.provider;
+              const isSelected = selected?.type === 'cli' && selected.agent?.provider === cli.provider && selected.agent?.model === cli.model;
               return (
-              <button key={cli.provider}
+              <button key={`${cli.provider}:${cli.model}`}
                 onClick={() => setSelected({ type: 'cli', agent: { role: 'mcp_agent', model: cli.model, provider: cli.provider } })}
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 12px', borderRadius: 10,
                   border: isSelected ? `1px solid ${cli.color}80` : `1px solid ${cli.color}40`,
