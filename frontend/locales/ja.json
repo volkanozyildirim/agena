@@ -2542,6 +2542,8 @@
   "multiRepo.desc": "単一のタスクを複数のリポジトリに同時に割り当てます。各リポジトリが独自のAI pipeline実行とpull requestを取得します。",
   "landing.feature5Title": "マルチリポジトリオーケストレーション",
   "landing.feature5Desc": "1つのタスク、複数のリポジトリ — AGENAは並列agent pipelineを実行し、各リポジトリに個別のPRを作成します。",
+  "landing.feature6Title": "共有可能なタスク",
+  "landing.feature6Desc": "ワンクリックでトークン付きリンクを生成 — 説明、コメント、スクリーンショット込み。受信者は自分の組織にインポートでき、WhatsApp / Teams / Slack ボタン付き。",
   "landing.testimonialsLabel": "お客様の声",
   "landing.testimonialsTitle": "開発者に愛されています",
   "integrations.label": "インテグレーション",

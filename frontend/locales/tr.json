@@ -2565,6 +2565,8 @@
   "multiRepo.desc": "Tek bir görevi aynı anda birden fazla repository'ye atayın. Her repo kendi AI pipeline yürütmesi ve pull request'ini alır.",
   "landing.feature5Title": "Multi-Repo Orkestrasyon",
   "landing.feature5Desc": "Tek görev, birden fazla repo — AGENA paralel agent pipeline'ları çalıştırır ve her repository için ayrı PR'lar oluşturur.",
+  "landing.feature6Title": "Paylaşılabilir Görevler",
+  "landing.feature6Desc": "Tek tıkla token bazlı bir bağlantı oluştur — açıklama, yorumlar ve görsellerle birlikte. Alıcı kendi organizasyonuna içeri alabilir; WhatsApp / Teams / Slack tek tuşla.",
   "landing.testimonialsLabel": "Referanslar",
   "landing.testimonialsTitle": "Geliştiriciler tarafından seviliyor",
   "glossary.label": "Sözlük",

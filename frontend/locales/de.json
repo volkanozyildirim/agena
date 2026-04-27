@@ -2542,6 +2542,8 @@
   "multiRepo.desc": "Weisen Sie eine einzelne Aufgabe gleichzeitig mehreren Repositories zu. Jedes Repo erhält seine eigene KI-Pipeline-Ausführung und Pull Request.",
   "landing.feature5Title": "Multi-Repo-Orchestrierung",
   "landing.feature5Desc": "Eine Aufgabe, mehrere Repos — AGENA führt parallele Agent-Pipelines aus und erstellt separate PRs für jedes Repository.",
+  "landing.feature6Title": "Teilbare Aufgaben",
+  "landing.feature6Desc": "Ein-Klick-Tokens enthalten Beschreibung, Kommentare und Screenshots. Empfänger importieren in ihre eigene Organisation — inklusive WhatsApp-, Teams- und Slack-Buttons.",
   "landing.testimonialsLabel": "Referenzen",
   "landing.testimonialsTitle": "Von Entwicklern geliebt",
   "glossary.label": "Glossar",
