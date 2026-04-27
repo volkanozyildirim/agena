@@ -109,6 +109,8 @@ export default function DashboardTasksPage() {
   const [editShowDeps, setEditShowDeps] = useState(false);
   const [editShowRawDescription, setEditShowRawDescription] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
+  const [editAttachments, setEditAttachments] = useState<Array<{ id: number; filename: string; content_type: string; size_bytes: number }>>([]);
+  const [editAttachUploading, setEditAttachUploading] = useState(false);
   const [createMappings, setCreateMappings] = useState<BackendRepoMapping[]>([]);
   const [createMappingsLoaded, setCreateMappingsLoaded] = useState(false);
   const [selectedRepoMappingIds, setSelectedRepoMappingIds] = useState<number[]>([]);
@@ -580,7 +582,11 @@ export default function DashboardTasksPage() {
     setEditDepSearch('');
     setEditShowDeps(false);
     setEditShowRawDescription(false);
+    setEditAttachments([]);
     void loadDepCandidates();
+    apiFetch<Array<{ id: number; filename: string; content_type: string; size_bytes: number }>>(`/tasks/${task.id}/attachments`)
+      .then((items) => setEditAttachments(items || []))
+      .catch(() => setEditAttachments([]));
     // List rows don't carry the rich guardrail fields — fetch the full
     // task so the edit form can prefill story_context / acceptance /
     // edge_cases / max_tokens / max_cost_usd / repo assignments.
@@ -1810,6 +1816,81 @@ export default function DashboardTasksPage() {
                     <div style={{ fontSize: 11, color: 'var(--ink-35)', marginBottom: 8 }}>—</div>
                   )}
                   <RemoteRepoSelector compact onChange={() => { /* read-only here; assignment list is what's saved */ }} />
+                </div>
+                {/* Attachments — list existing + upload new ones in place.
+                    Mirrors the create-modal section but talks to the live
+                    task: file picker triggers an immediate POST so the
+                    user does not have to re-create the task to add a
+                    forgotten screenshot. */}
+                <div style={{ borderRadius: 10, border: '1px solid var(--panel-border)', padding: '10px 12px', background: 'var(--panel)' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 6 }}>
+                    {t('tasks.attachments.title' as TranslationKey)} {editAttachments.length > 0 ? `(${editAttachments.length})` : ''}
+                  </div>
+                  <input
+                    type='file'
+                    multiple
+                    accept='image/*,.pdf,.txt,.md,.log,.json,.csv,.zip'
+                    disabled={editAttachUploading}
+                    onChange={async (e) => {
+                      if (!editTask) return;
+                      const picked = Array.from(e.target.files || []);
+                      e.target.value = '';
+                      const MAX = 20 * 1024 * 1024;
+                      const oversize = picked.filter((f) => f.size > MAX);
+                      const ok = picked.filter((f) => f.size <= MAX);
+                      if (oversize.length > 0) {
+                        setError(t('tasks.attachments.tooLarge' as TranslationKey, { names: oversize.map((f) => f.name).join(', ') }));
+                      }
+                      if (ok.length === 0) return;
+                      setEditAttachUploading(true);
+                      try {
+                        for (const f of ok) {
+                          const fd = new FormData();
+                          fd.append('file', f);
+                          await apiUpload(`/tasks/${editTask.id}/attachments`, fd);
+                        }
+                        const items = await apiFetch<Array<{ id: number; filename: string; content_type: string; size_bytes: number }>>(`/tasks/${editTask.id}/attachments`);
+                        setEditAttachments(items || []);
+                      } catch (upErr) {
+                        setError(upErr instanceof Error ? upErr.message : t('tasks.attachments.uploadFailed' as TranslationKey));
+                      } finally {
+                        setEditAttachUploading(false);
+                      }
+                    }}
+                    style={{ fontSize: 12, color: 'var(--ink-58)' }}
+                  />
+                  <div style={{ fontSize: 10, color: 'var(--ink-35)', marginTop: 4 }}>
+                    {editAttachUploading ? t('tasks.attachments.uploading' as TranslationKey) : t('tasks.attachments.hint' as TranslationKey)}
+                  </div>
+                  {editAttachments.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                      {editAttachments.map((a) => (
+                        <div
+                          key={a.id}
+                          title={`${a.filename} (${(a.size_bytes / 1024).toFixed(0)} KB)`}
+                          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderRadius: 8, border: '1px solid var(--panel-border-2)', background: 'var(--panel-alt)', fontSize: 11, color: 'var(--ink-72)', maxWidth: 180 }}
+                        >
+                          <span style={{ fontSize: 13 }}>{a.content_type.startsWith('image/') ? '🖼' : '📄'}</span>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.filename}</span>
+                          <button
+                            type='button'
+                            onClick={async () => {
+                              if (!editTask) return;
+                              try {
+                                await apiFetch(`/tasks/${editTask.id}/attachments/${a.id}`, { method: 'DELETE' });
+                                setEditAttachments((prev) => prev.filter((x) => x.id !== a.id));
+                              } catch (delErr) {
+                                setError(delErr instanceof Error ? delErr.message : 'Delete failed');
+                              }
+                            }}
+                            aria-label={t('tasks.attachments.delete' as TranslationKey)}
+                            title={t('tasks.attachments.delete' as TranslationKey)}
+                            style={{ background: 'none', border: 'none', color: 'var(--ink-35)', cursor: 'pointer', padding: 0, fontSize: 12, lineHeight: 1 }}
+                          >×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {/* Dependencies — collapsible same as Create */}
                 <div style={{ borderRadius: 10, border: '1px solid var(--panel-border)', background: 'var(--panel)', overflow: 'hidden' }}>
