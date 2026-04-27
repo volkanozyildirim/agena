@@ -76,6 +76,23 @@ async def startup_event() -> None:
     logger.info('Starting API service')
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    # Reap refinement jobs that were left in-flight by a previous process —
+    # the asyncio task running them died with the old uvicorn worker, so the
+    # row would otherwise stay 'running' forever and trap the UI in a loop.
+    async with SessionLocal() as session:
+        from datetime import datetime
+        from sqlalchemy import update
+        from agena_models.models.refinement_job import RefinementJob
+        await session.execute(
+            update(RefinementJob)
+            .where(RefinementJob.status.in_(('queued', 'running')))
+            .values(
+                status='failed',
+                error_message='Backend restarted before this refinement could finish.',
+                completed_at=datetime.utcnow(),
+            )
+        )
+        await session.commit()
 
 
 @app.get('/health')

@@ -17,6 +17,10 @@ from agena_services.services.refinement_history_indexer import (
     RefinementHistoryIndexer,
     get_backfill_job,
 )
+from agena_services.services.refinement_job_service import (
+    RefinementJobService,
+    spawn_analyze_task,
+)
 from agena_services.services.refinement_service import RefinementService
 
 router = APIRouter(prefix='/refinement', tags=['refinement'])
@@ -118,6 +122,95 @@ async def analyze_refinement(
         return await service.analyze(tenant.organization_id, tenant.user_id, payload)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class RefinementJobStartResponse(BaseModel):
+    job_id: int
+    status: str
+
+
+class RefinementJobStatusResponse(BaseModel):
+    job_id: int
+    status: str  # queued | running | completed | failed
+    provider: str | None = None
+    sprint_ref: str | None = None
+    item_count: int = 0  # how many items the job is processing (for progress UI)
+    item_ids: list[str] = []  # echoed from payload so the UI can spinner the right rows on resume
+    result: RefinementAnalyzeResponse | None = None
+    error_message: str | None = None
+    created_at: str
+    completed_at: str | None = None
+
+
+class RefinementActiveJobsResponse(BaseModel):
+    jobs: list[RefinementJobStatusResponse]
+
+
+def _serialize_job(job) -> RefinementJobStatusResponse:
+    result_payload = None
+    if job.result:
+        try:
+            result_payload = RefinementAnalyzeResponse.model_validate(job.result)
+        except Exception:
+            # Defensive: a malformed result shouldn't break the status read.
+            result_payload = None
+    raw_ids = (job.payload or {}).get('item_ids') if isinstance(job.payload, dict) else None
+    item_ids = [str(i) for i in raw_ids] if isinstance(raw_ids, list) else []
+    return RefinementJobStatusResponse(
+        job_id=job.id,
+        status=job.status,
+        provider=job.provider,
+        sprint_ref=job.sprint_ref,
+        item_count=len(item_ids),
+        item_ids=item_ids,
+        result=result_payload,
+        error_message=job.error_message,
+        created_at=job.created_at.isoformat() if job.created_at else '',
+        completed_at=job.completed_at.isoformat() if job.completed_at else None,
+    )
+
+
+@router.post('/analyze/start', response_model=RefinementJobStartResponse)
+async def start_analyze_job(
+    payload: RefinementAnalyzeRequest,
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> RefinementJobStartResponse:
+    """Persist the analyze request and run it in the background.
+
+    Returns immediately with the job id so the frontend can survive
+    page navigations and resume polling on /refinement/jobs/{id}.
+    """
+    service = RefinementJobService(db)
+    job = await service.create_job(tenant.organization_id, tenant.user_id, payload)
+    spawn_analyze_task(job.id, tenant.organization_id, tenant.user_id, payload)
+    return RefinementJobStartResponse(job_id=job.id, status=job.status)
+
+
+@router.get('/jobs/active', response_model=RefinementActiveJobsResponse)
+async def list_active_refinement_jobs(
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> RefinementActiveJobsResponse:
+    """Return queued/running jobs the current user owns. The frontend
+    calls this on mount so it can re-attach to a job that was kicked off
+    in a previous session."""
+    service = RefinementJobService(db)
+    jobs = await service.list_active(tenant.organization_id, tenant.user_id)
+    return RefinementActiveJobsResponse(jobs=[_serialize_job(j) for j in jobs])
+
+
+@router.get('/jobs/{job_id}', response_model=RefinementJobStatusResponse)
+async def get_refinement_job(
+    job_id: int,
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> RefinementJobStatusResponse:
+    service = RefinementJobService(db)
+    job = await service.get(tenant.organization_id, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail='Refinement job not found')
+    return _serialize_job(job)
 
 
 class RefinementAskQuestionRequest(BaseModel):

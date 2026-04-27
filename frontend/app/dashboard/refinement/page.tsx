@@ -457,6 +457,24 @@ function buildSnapshotKey(provider: Provider, sprintRef: string): string {
   return `agena_refinement_snapshot_${provider}_${clean}`;
 }
 
+// Survives page reloads: lets us re-attach polling to a refinement job
+// the user kicked off on a previous mount of this page.
+const ACTIVE_JOB_KEY = 'agena_refinement_active_job';
+type StoredActiveJob = { jobId: number; isSingle: boolean; savedAt: number };
+
+type RefinementJobStatus = {
+  job_id: number;
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  provider: string | null;
+  sprint_ref: string | null;
+  item_count: number;
+  item_ids: string[];
+  result: RefinementAnalyzeResponse | null;
+  error_message: string | null;
+  created_at: string;
+  completed_at: string | null;
+};
+
 export default function RefinementPage() {
   const { lang, t } = useLocale();
   const copy = lang === 'tr' ? COPY.tr : COPY.en;
@@ -530,6 +548,7 @@ export default function RefinementPage() {
   const [commentSignature, setCommentSignature] = useState('AGENA AI');
   const [focusedResultId, setFocusedResultId] = useState('');
   const [analyzedCount, setAnalyzedCount] = useState(0);
+  const [overlayTotal, setOverlayTotal] = useState(0);
   const [backfillJob, setBackfillJob] = useState<{
     status: 'idle' | 'queued' | 'fetching' | 'indexing' | 'completed' | 'failed';
     message?: string;
@@ -589,6 +608,40 @@ export default function RefinementPage() {
         // ignore — code-aware refinement just stays off
       }
     })();
+  }, []);
+
+  // Re-attach to a refinement that was started in a previous mount of
+  // this page. Source of truth = the backend's active jobs list; we use
+  // localStorage only as a hint for the single/bulk distinction so the
+  // overlay matches the original UI.
+  useEffect(() => {
+    void (async () => {
+      try {
+        const data = await apiFetch<{ jobs: RefinementJobStatus[] }>('/refinement/jobs/active');
+        if (!data.jobs?.length) {
+          if (typeof window !== 'undefined') localStorage.removeItem(ACTIVE_JOB_KEY);
+          return;
+        }
+        const job = data.jobs[0];
+        let isSingle = job.item_count === 1;
+        if (typeof window !== 'undefined') {
+          const raw = localStorage.getItem(ACTIVE_JOB_KEY);
+          if (raw) {
+            try {
+              const stored = JSON.parse(raw) as StoredActiveJob;
+              if (stored?.jobId === job.job_id) isSingle = !!stored.isSingle;
+            } catch {
+              // ignore corrupt entry
+            }
+          }
+        }
+        await attachToJob(job.job_id, isSingle, job.item_count || 0, job.item_ids || []);
+      } catch {
+        // The page must still load even if the resume probe fails.
+      }
+    })();
+    // attachToJob is stable enough — running this only on mount is intentional.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -858,93 +911,89 @@ export default function RefinementPage() {
   const [runningItemId, setRunningItemId] = useState('');
   const [runModal, setRunModal] = useState<{ itemIds: string[]; single: boolean } | null>(null);
 
-  const runRefinement = useCallback(async (overrideItemIds?: string[]) => {
-    const ids = overrideItemIds && overrideItemIds.length ? overrideItemIds : selectedIds;
-    if (!ids.length) return;
-    const isSingle = overrideItemIds?.length === 1;
+  const finalizeJobOutcome = useCallback((status: RefinementJobStatus, isSingle: boolean) => {
+    if (status.status === 'failed') {
+      const message = status.error_message || 'Refinement failed';
+      setError(message);
+      setRunMessage({ kind: 'error', text: message });
+      return;
+    }
+    if (!status.result) {
+      setRunMessage({ kind: 'error', text: copy.failedRun });
+      return;
+    }
+    const normalized = normalizeAnalyzeResponse(status.result);
     if (isSingle) {
-      setRunningItemId(overrideItemIds![0]);
+      setResults((prev) => {
+        const next = normalized;
+        if (!prev) return next;
+        const byId = new Map(prev.results.map((r) => [r.item_id, r]));
+        for (const r of next.results) byId.set(r.item_id, r);
+        return { ...prev, ...next, results: Array.from(byId.values()) };
+      });
+      if (normalized.results.length > 0) {
+        setExpandedItemId(normalized.results[0].item_id);
+      }
     } else {
-      setRunning(true);
-      setAnalyzedCount(0);
+      setResults(normalized);
+      setAutoFocusResults(true);
+      if (normalized.results.length > 0) {
+        setFocusedResultId(normalized.results[0].item_id);
+        setResultsModalOpen(true);
+      }
+    }
+    const failures = normalized.results.filter((item) => Boolean(item.error)).length;
+    if (!normalized.results.length) {
+      setRunMessage({ kind: 'error', text: copy.failedRun });
+    } else if (failures === 0) {
+      setRunMessage({ kind: 'success', text: copy.successRun });
+    } else if (failures === normalized.results.length) {
+      setRunMessage({ kind: 'error', text: copy.failedRun });
+    } else {
+      setRunMessage({ kind: 'warning', text: copy.partialRun });
+    }
+  }, [copy.failedRun, copy.successRun, copy.partialRun, normalizeAnalyzeResponse]);
+
+  // Drive the running UI from a server-side job. Polls until the job
+  // reaches a terminal status, then hands the result to finalizeJobOutcome.
+  // Decoupled from the start path so we can also re-attach to a job that
+  // was kicked off in a previous mount of the page.
+  //
+  // `resumeItemIds` is supplied when the user comes back to a job that
+  // was started in a previous mount — backend echoes the original
+  // item_ids so we can spinner the right row instead of bringing up the
+  // big overlay.
+  const attachToJob = useCallback(async (jobId: number, isSingle: boolean, totalCount: number, resumeItemIds?: string[]) => {
+    if (typeof window !== 'undefined') {
+      const stored: StoredActiveJob = { jobId, isSingle, savedAt: Date.now() };
+      localStorage.setItem(ACTIVE_JOB_KEY, JSON.stringify(stored));
     }
     setError('');
     setRunMessage(null);
-    const totalCount = ids.length;
+    if (isSingle) {
+      const resumeId = resumeItemIds && resumeItemIds.length === 1 ? resumeItemIds[0] : '';
+      setRunningItemId((prev) => prev || resumeId);
+    } else {
+      setRunning(true);
+      setAnalyzedCount(0);
+      setOverlayTotal(totalCount);
+    }
     let progressInterval: ReturnType<typeof setInterval> | null = null;
-    if (!isSingle) {
+    if (!isSingle && totalCount > 0) {
       progressInterval = setInterval(() => {
-        setAnalyzedCount((prev) => prev < totalCount - 1 ? prev + 1 : prev);
+        setAnalyzedCount((prev) => (prev < totalCount - 1 ? prev + 1 : prev));
       }, Math.max(3000, 8000 / totalCount));
     }
     try {
-      const customSystemPrompt = useCustomPrompt && customPromptText.trim() ? customPromptText.trim() : undefined;
-      const repoMappingIdNum = repoMappingId.trim() ? Number(repoMappingId) : undefined;
-      const codeAwareExtras = repoMappingIdNum && Number.isFinite(repoMappingIdNum) ? { repo_mapping_id: repoMappingIdNum } : {};
-      const payload = provider === 'azure'
-        ? {
-          provider,
-          project: azureProject,
-          team: azureTeam,
-          sprint_path: azureSprint,
-          sprint_name: selectedAzureSprint?.name || azureSprint,
-          language,
-          agent_provider: agentProvider,
-          agent_model: agentModel,
-          item_ids: ids,
-          max_items: isSingle ? 1 : maxItems,
-          ...(customSystemPrompt ? { custom_system_prompt: customSystemPrompt } : {}),
-          ...codeAwareExtras,
+      while (true) {
+        const status = await apiFetch<RefinementJobStatus>(`/refinement/jobs/${jobId}`);
+        if (status.status === 'completed' || status.status === 'failed') {
+          if (progressInterval) clearInterval(progressInterval);
+          if (totalCount > 0) setAnalyzedCount(totalCount);
+          finalizeJobOutcome(status, isSingle);
+          break;
         }
-        : {
-          provider,
-          board_id: jiraBoard,
-          sprint_id: jiraSprint,
-          sprint_name: selectedJiraSprint?.name || jiraSprint,
-          language,
-          agent_provider: agentProvider,
-          agent_model: agentModel,
-          item_ids: ids,
-          max_items: isSingle ? 1 : maxItems,
-          ...(customSystemPrompt ? { custom_system_prompt: customSystemPrompt } : {}),
-          ...codeAwareExtras,
-        };
-      const response = await apiFetch<RefinementAnalyzeResponse>('/refinement/analyze', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
-      if (progressInterval) clearInterval(progressInterval);
-      setAnalyzedCount(totalCount);
-      const normalized = normalizeAnalyzeResponse(response);
-      // For single-item runs, merge into existing results instead of replacing.
-      if (isSingle) {
-        setResults((prev) => {
-          const next = normalized;
-          if (!prev) return next;
-          const byId = new Map(prev.results.map((r) => [r.item_id, r]));
-          for (const r of next.results) byId.set(r.item_id, r);
-          return { ...prev, ...next, results: Array.from(byId.values()) };
-        });
-        if (normalized.results.length > 0) {
-          setExpandedItemId(normalized.results[0].item_id);
-        }
-      } else {
-        setResults(normalized);
-        setAutoFocusResults(true);
-        if (normalized.results.length > 0) {
-          setFocusedResultId(normalized.results[0].item_id);
-          setResultsModalOpen(true);
-        }
-      }
-      const failures = normalized.results.filter((item) => Boolean(item.error)).length;
-      if (!normalized.results.length) {
-        setRunMessage({ kind: 'error', text: copy.failedRun });
-      } else if (failures === 0) {
-        setRunMessage({ kind: 'success', text: copy.successRun });
-      } else if (failures === normalized.results.length) {
-        setRunMessage({ kind: 'error', text: copy.failedRun });
-      } else {
-        setRunMessage({ kind: 'warning', text: copy.partialRun });
+        await new Promise((r) => setTimeout(r, 3000));
       }
     } catch (err) {
       if (progressInterval) clearInterval(progressInterval);
@@ -953,13 +1002,70 @@ export default function RefinementPage() {
       setRunMessage({ kind: 'error', text: message });
     } finally {
       if (progressInterval) clearInterval(progressInterval);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(ACTIVE_JOB_KEY);
+      }
       if (isSingle) {
         setRunningItemId('');
       } else {
         setRunning(false);
       }
     }
-  }, [provider, azureProject, azureTeam, azureSprint, selectedAzureSprint, jiraBoard, jiraSprint, selectedJiraSprint, language, agentProvider, agentModel, selectedIds, maxItems, useCustomPrompt, customPromptText, repoMappingId, normalizeAnalyzeResponse, copy.failedRun, copy.successRun, copy.partialRun]);
+  }, [finalizeJobOutcome]);
+
+  const runRefinement = useCallback(async (overrideItemIds?: string[]) => {
+    const ids = overrideItemIds && overrideItemIds.length ? overrideItemIds : selectedIds;
+    if (!ids.length) return;
+    const isSingle = overrideItemIds?.length === 1;
+    if (isSingle) {
+      setRunningItemId(overrideItemIds![0]);
+    }
+    const customSystemPrompt = useCustomPrompt && customPromptText.trim() ? customPromptText.trim() : undefined;
+    const repoMappingIdNum = repoMappingId.trim() ? Number(repoMappingId) : undefined;
+    const codeAwareExtras = repoMappingIdNum && Number.isFinite(repoMappingIdNum) ? { repo_mapping_id: repoMappingIdNum } : {};
+    const payload = provider === 'azure'
+      ? {
+        provider,
+        project: azureProject,
+        team: azureTeam,
+        sprint_path: azureSprint,
+        sprint_name: selectedAzureSprint?.name || azureSprint,
+        language,
+        agent_provider: agentProvider,
+        agent_model: agentModel,
+        item_ids: ids,
+        max_items: isSingle ? 1 : maxItems,
+        ...(customSystemPrompt ? { custom_system_prompt: customSystemPrompt } : {}),
+        ...codeAwareExtras,
+      }
+      : {
+        provider,
+        board_id: jiraBoard,
+        sprint_id: jiraSprint,
+        sprint_name: selectedJiraSprint?.name || jiraSprint,
+        language,
+        agent_provider: agentProvider,
+        agent_model: agentModel,
+        item_ids: ids,
+        max_items: isSingle ? 1 : maxItems,
+        ...(customSystemPrompt ? { custom_system_prompt: customSystemPrompt } : {}),
+        ...codeAwareExtras,
+      };
+    let job: { job_id: number };
+    try {
+      job = await apiFetch<{ job_id: number; status: string }>('/refinement/analyze/start', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Refinement failed';
+      setError(message);
+      setRunMessage({ kind: 'error', text: message });
+      if (isSingle) setRunningItemId('');
+      return;
+    }
+    await attachToJob(job.job_id, !!isSingle, ids.length);
+  }, [provider, azureProject, azureTeam, azureSprint, selectedAzureSprint, jiraBoard, jiraSprint, selectedJiraSprint, language, agentProvider, agentModel, selectedIds, maxItems, useCustomPrompt, customPromptText, repoMappingId, attachToJob]);
 
   useEffect(() => {
     if (!autoFocusResults || !results?.results.length) return;
@@ -1113,7 +1219,7 @@ export default function RefinementPage() {
             <div style={{ fontSize: 18, fontWeight: 800, color: '#5eead4', marginBottom: 6 }}>
               {copy.analyzingProgress
                 .replace('{done}', String(analyzedCount))
-                .replace('{total}', String(selectedIds.length))}
+                .replace('{total}', String(overlayTotal || selectedIds.length))}
             </div>
             <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>{copy.overlayWait}</div>
           </div>
@@ -1124,8 +1230,8 @@ export default function RefinementPage() {
             <div style={{
               height: '100%', borderRadius: 2,
               background: 'linear-gradient(90deg, #0d9488, #5eead4)',
-              width: selectedIds.length > 0
-                ? `${Math.max(5, (analyzedCount / selectedIds.length) * 100)}%`
+              width: (overlayTotal || selectedIds.length) > 0
+                ? `${Math.max(5, (analyzedCount / (overlayTotal || selectedIds.length)) * 100)}%`
                 : '5%',
               transition: 'width 0.4s ease',
             }} />
@@ -1634,9 +1740,11 @@ export default function RefinementPage() {
                   const suggestion = resultByItemId.get(item.id);
                   const isWrittenBack = writtenBackIds.has(item.id);
                   const isExpanded = expandedItemId === item.id;
+                  const isRefining = runningItemId === item.id;
                   return (
                     <React.Fragment key={item.id}>
                       <div
+                        className={isRefining ? 'refinement-row-active' : undefined}
                         style={{
                           padding: '12px 14px',
                           borderBottom: '1px solid var(--panel-border)',

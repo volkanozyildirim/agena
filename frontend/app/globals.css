@@ -2197,6 +2197,28 @@ input:focus, textarea:focus {
   to { transform: rotate(360deg); }
 }
 
+/* Animated gradient sweep for the row currently being refined */
+@keyframes refinement-row-sweep {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+.refinement-row-active {
+  position: relative;
+  background: linear-gradient(
+    90deg,
+    rgba(13, 148, 136, 0.12) 0%,
+    rgba(94, 234, 212, 0.22) 25%,
+    rgba(59, 130, 246, 0.18) 50%,
+    rgba(94, 234, 212, 0.22) 75%,
+    rgba(13, 148, 136, 0.12) 100%
+  ) !important;
+  background-size: 200% 100% !important;
+  animation: refinement-row-sweep 2.4s linear infinite;
+  border-left: 3px solid #5eead4 !important;
+  box-shadow: inset 0 0 0 1px rgba(94, 234, 212, 0.35);
+}
+
 /* Hide mobile cards by default, show desktop table */
 .refinement-cards-mobile { display: none !important; }
 .refinement-table-desktop { display: block; }
