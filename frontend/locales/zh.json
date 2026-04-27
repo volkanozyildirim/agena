@@ -2542,6 +2542,8 @@
   "multiRepo.desc": "将单个任务同时分配给多个仓库。每个仓库获得自己的AI pipeline执行和pull request。",
   "landing.feature5Title": "多仓库编排",
   "landing.feature5Desc": "一个任务，多个仓库 — AGENA运行并行agent pipeline，为每个仓库创建独立的PR。",
+  "landing.feature6Title": "可分享任务",
+  "landing.feature6Desc": "一键生成令牌链接,包含描述、评论和截图。接收者可一键导入到自己的组织 — 内置 WhatsApp / Teams / Slack 分享按钮。",
   "landing.testimonialsLabel": "用户评价",
   "landing.testimonialsTitle": "深受开发者喜爱",
   "integrations.label": "集成",

@@ -92,6 +92,19 @@ AGENA is a production-ready, multi-tenant **agentic AI** orchestration platform.
 - DORA metrics dashboard (deployment frequency, lead time, change failure rate, MTTR)
 - Team health symptom analysis (knowledge silos, bus factor, stale PRs, etc.)
 
+**Shareable Task Links**
+- One-click "Share" on any task — picks a duration (1–30 days) and a
+  use cap (1–25 imports), gets back a tokenised public URL
+- Recipients without an account can read the task (description, comments
+  and inline images proxied through the *sender's* PAT so screenshots
+  still load) and click "Import to my org" to copy the task — including
+  attachments — into their own workspace
+- Built-in share buttons for WhatsApp, Microsoft Teams, Slack,
+  Telegram, Email and X next to the link, so the URL never has to
+  leave the modal manually
+- Tokens are revocable, time-limited and use-capped; expired or spent
+  links return a friendly "this link is no longer active" page
+
 **Multi-Tenant SaaS**
 - Organization isolation with subdomain routing
 - JWT auth + RBAC (owner, admin, member, viewer)

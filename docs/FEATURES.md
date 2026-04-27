@@ -30,6 +30,19 @@ This file is the single source of truth for currently implemented product capabi
   - update dependencies
   - cycle/self dependency protections
   - assignment blocking when dependencies are unresolved
+- Shareable task links:
+  - org-scoped tokens with configurable expiry (1–30 days) and use cap
+    (1–25 imports), revocable from the API
+  - public read endpoint returns description + inline-comment block +
+    attachment metadata; image proxy serves Azure / Jira screenshots
+    using the *sharing* org's PAT so recipients without their own
+    integration still see them
+  - one-click "Import to my org" copies the task into the recipient's
+    organization (description preserved, attachment files duplicated to
+    their storage tree, repo mapping intentionally left for them to
+    pick because IDs are tenant-scoped)
+  - share modal exposes deep-link buttons for WhatsApp, Microsoft
+    Teams, Slack, Telegram, Email and X next to a copy-URL field
 
 ## 3) AI Orchestration Pipeline
 

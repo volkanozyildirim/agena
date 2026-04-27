@@ -2565,6 +2565,8 @@
   "multiRepo.desc": "Assign a single task to multiple repositories simultaneously. Each repo gets its own AI pipeline execution and pull request.",
   "landing.feature5Title": "Multi-Repo Orchestration",
   "landing.feature5Desc": "One task, multiple repos — AGENA runs parallel agent pipelines and creates separate PRs for each repository.",
+  "landing.feature6Title": "Shareable Tasks",
+  "landing.feature6Desc": "One-click tokenised links carry the description, comments and screenshots. Recipients import into their own org with a single button — WhatsApp, Teams and Slack share targets included.",
   "landing.testimonialsLabel": "Testimonials",
   "landing.testimonialsTitle": "Loved by developers",
   "glossary.label": "Glossary",
