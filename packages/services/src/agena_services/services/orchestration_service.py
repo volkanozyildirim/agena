@@ -1675,12 +1675,27 @@ class OrchestrationService:
         parsed_files = self._parse_reviewed_output_to_files(reviewed_code, local_repo_path=local_repo_path)
         if not parsed_files and local_repo_path:
             # CLI agents (Claude/Codex) may edit files directly and return a summary
-            # instead of structured file blocks — fall back to git diff
-            # Use worktree path if available (Claude CLI creates worktrees per task)
+            # instead of structured file blocks — fall back to git diff.
+            # Try the worktree first (where the CLI is *supposed* to write), then
+            # the original repo path. Claude CLI sometimes resolves absolute paths
+            # straight to the original checkout instead of staying in the worktree,
+            # so the changes can land outside the sandbox we set up. Falling back
+            # to local_repo_path lets us recover those edits instead of throwing
+            # the run away.
             _wt_path = getattr(self.claude_cli_service, 'last_effective_path', None) if hasattr(self, 'claude_cli_service') else None
-            _diff_path = _wt_path or local_repo_path
-            logger.info(f'No file blocks parsed from output, falling back to git diff at {_diff_path}')
-            parsed_files = await self._collect_git_changes(_diff_path)
+            tried: list[str] = []
+            for candidate in (_wt_path, local_repo_path):
+                if not candidate or candidate in tried:
+                    continue
+                tried.append(candidate)
+                logger.info(f'No file blocks parsed from output, falling back to git diff at {candidate}')
+                parsed_files = await self._collect_git_changes(candidate)
+                if parsed_files:
+                    if candidate != _wt_path and _wt_path:
+                        logger.warning(
+                            f'CLI agent escaped its worktree ({_wt_path}) and edited the source repo at {candidate} directly — recovered changes.'
+                        )
+                    break
         if not parsed_files:
             logger.error(f'No file blocks parsed. Output length: {len(reviewed_code)} chars. First 2000 chars:\n{reviewed_code[:2000]}')
             raise RuntimeError(
