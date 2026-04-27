@@ -58,6 +58,8 @@ class CodexCLIService:
             '- Prefer editing existing files; do not invent a new framework/stack unless task explicitly requires it.\n'
             '- Implement EVERY part the task asks for: schema, controllers, views, state machines, menu entries, validations, notifications — whatever the task and Acceptance Criteria require. Partial implementation is a failure.\n'
             '- Do not invent extra unrelated work either; cover what is asked, no more.\n'
+            '- STAY OUT OF vendor/, node_modules/, dist/, build/. Use existing modules in the app code (the task usually names a reference module — use it) as the source of truth, not framework internals. Budget at most 1–2 vendor reads in the entire run.\n'
+            '- Cap exploration: if the task names a reference module, read THAT first; do not grep the whole repo for how the framework resolves things under the hood.\n'
             '- Do not output explanations, only file blocks.\n\n'
             f'Task title: {task_title}\n'
             f'Task description:\n{task_description}\n'

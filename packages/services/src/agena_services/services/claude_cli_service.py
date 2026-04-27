@@ -13,8 +13,22 @@ from typing import Awaitable, Callable
 LogCallback = Callable[[str], Awaitable[None]]
 
 
+def _read_timeout_env(default: int = 1800) -> int:
+    raw = (os.getenv('AGENA_CLI_TIMEOUT_SEC') or '').strip()
+    if not raw:
+        return default
+    try:
+        v = int(raw)
+        return v if v > 0 else default
+    except ValueError:
+        return default
+
+
 class ClaudeCLIService:
-    EXEC_TIMEOUT_SEC = 1200
+    # Bumped from 1200 → 1800 (30 min) after task 92 hit the wall while
+    # still doing legitimate framework research. Override via env
+    # AGENA_CLI_TIMEOUT_SEC for one-off long jobs.
+    EXEC_TIMEOUT_SEC = _read_timeout_env(1800)
 
     # ── Worktree helpers ─────────────────────────────────────────────────
     @staticmethod
@@ -67,20 +81,23 @@ class ClaudeCLIService:
         prompt = (
             'Implement the following task in the CURRENT repository.\n\n'
             'WORKFLOW:\n'
-            '1. Read the relevant source files to understand the existing code.\n'
-            '2. If the task description includes ATTACHMENTS / SCREENSHOTS, Read each one BEFORE planning — they are part of the spec.\n'
+            '1. If the task includes ATTACHMENTS / SCREENSHOTS, Read each one FIRST — they are the design spec.\n'
+            '2. Skim 1–3 existing files in the repo that already solve a similar problem (the task usually names a reference module). Treat THEM as the source of truth, not the framework internals.\n'
             '3. Use the Edit or Write tools to make changes directly in the repo.\n'
-            '4. Cover every Acceptance Criterion the task lists. Partial implementation is a failure, not a success.\n'
+            '4. Cover every Acceptance Criterion the task lists. Partial implementation is a failure.\n'
             '5. After all edits are done, output a short summary listing every file you changed.\n\n'
             'RULES:\n'
             '- Actually edit the files using tools — do NOT just output code blocks.\n'
-            '- Implement EVERY part the task asks for: schema, controllers, views, state machines, menu entries, validations, notifications — whatever the task and Acceptance Criteria require. If something is in scope, write it; do not punt to a follow-up task.\n'
-            '- That said, do not invent extra unrelated work. The bar is "complete the task as specified", not "as little as possible" and not "rewrite the codebase".\n'
+            '- Implement EVERY part the task asks for: schema, controllers, views, state machines, menu entries, validations, notifications — whatever the task and Acceptance Criteria require.\n'
+            '- Do not invent extra unrelated work. The bar is "complete the task as specified", not "as little as possible" and not "rewrite the codebase".\n'
+            '- STAY OUT OF vendor/, node_modules/, dist/, build/, .venv/, framework internals. Reading framework source is almost never necessary — if the task description or a similar existing module already shows the pattern, USE that pattern instead of grepping for how the framework resolves it under the hood. Budget at most 1–2 vendor reads in the entire run, and only when an existing repo example does not answer the question.\n'
+            '- Prefer the reference module called out in the task (e.g. "use travel_requests as the reference") over searching the whole repo.\n'
+            '- Cap exploration at ~10 read/grep/find calls before you start writing. If you have not started writing by then, you are over-researching.\n'
             '- If a file is large, read it first, then make targeted edits.\n'
             '- Do NOT try to compile, build, test, or run the code.\n'
             '- Do NOT search for compilers, runtimes, or tools (go, node, python, etc.).\n'
             '- Do NOT install packages or dependencies.\n'
-            '- Do NOT run any commands other than reading/editing files (or the read-only shell commands you need to find existing patterns).\n'
+            '- Do NOT run any commands other than reading/editing files (or short read-only shell commands needed to find existing patterns).\n'
             '- Stop only after every acceptance criterion is implemented and you have summarized.\n'
             '- If an IMPLEMENTATION PLAN is provided, follow it exactly — edit every file listed.\n\n'
             f'Task title: {task_title}\n'

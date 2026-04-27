@@ -349,7 +349,7 @@ async function runCodexStream(bin, data, res) {
     res.end();
     return;
   }
-  const { repo_path, prompt, model, timeout = 1200, task_id = '' } = data;
+  const { repo_path, prompt, model, timeout = 1800, task_id = '' } = data;
   if (repo_path && !existsSync(repo_path)) {
     res.writeHead(200, { 'Content-Type': 'text/event-stream' });
     res.write(`data: ${JSON.stringify({ type: 'error', message: `repo path not found: ${repo_path}` })}\n\n`);
