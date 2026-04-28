@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState, useCallback } from 'react';
 import { apiFetch, fetchDoraOverview, loadPrefs, savePrefs, syncDoraRepo } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
+import RepoSelector from '@/components/RepoSelector';
 
 const box: React.CSSProperties = {
   borderRadius: 14,
@@ -113,6 +114,10 @@ export default function DoraOverviewPage() {
   const [projects, setProjects] = useState<AzureProject[]>([]);
   const [projectRepos, setProjectRepos] = useState<Record<string, AzureRepo[]>>({});
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  // Sync controls eat ~120 lines of vertical real estate; collapsed by
+  // default so the metric cards land above the fold. Click "Sync data ▾"
+  // to expand the per-project repo sync grid.
+  const [syncPanelOpen, setSyncPanelOpen] = useState(false);
   const [syncedKeys, setSyncedKeys] = useState<Set<string>>(new Set());
   const [syncingKeys, setSyncingKeys] = useState<Set<string>>(new Set());
 
@@ -287,16 +292,34 @@ export default function DoraOverviewPage() {
             <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--ink)', margin: 0 }}>{t('dora.title')}</h1>
             <p style={{ fontSize: 14, color: 'var(--muted)', marginTop: 6 }}>{t('dora.subtitle')}</p>
           </div>
-          <button onClick={handleSyncAll} disabled={syncingAll || projects.length === 0}
-            style={{ padding: '10px 20px', borderRadius: 12, border: 'none', background: syncingAll ? 'var(--panel-alt)' : 'linear-gradient(135deg, #0d9488, #22c55e)', color: syncingAll ? 'var(--muted)' : '#fff', fontWeight: 700, fontSize: 13, cursor: syncingAll ? 'not-allowed' : 'pointer' }}>
-            {syncingAll ? `Syncing... ${syncingRepo || ''}` : `Sync All (${totalReposCount} repos)`}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <RepoSelector value={repoId} onSelect={setRepoId} />
+            <button onClick={handleSyncAll} disabled={syncingAll || projects.length === 0}
+              style={{ padding: '10px 20px', borderRadius: 12, border: 'none', background: syncingAll ? 'var(--panel-alt)' : 'linear-gradient(135deg, #0d9488, #22c55e)', color: syncingAll ? 'var(--muted)' : '#fff', fontWeight: 700, fontSize: 13, cursor: syncingAll ? 'not-allowed' : 'pointer' }}>
+              {syncingAll ? `Syncing... ${syncingRepo || ''}` : `Sync All (${totalReposCount} repos)`}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* ── Azure Project Cards ─────────────────────────────────────────── */}
+      {/* ── Azure Project Cards (sync controls — collapsed by default) ──── */}
       {projects.length > 0 && (
         <div style={{ marginBottom: 32 }}>
+          <button
+            type='button'
+            onClick={() => setSyncPanelOpen((o) => !o)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '8px 12px', marginBottom: syncPanelOpen ? 12 : 0,
+              borderRadius: 10, border: '1px solid var(--panel-border)',
+              background: 'var(--panel-alt)', cursor: 'pointer',
+              fontSize: 12, fontWeight: 600, color: 'var(--muted)',
+            }}
+          >
+            <span style={{ transition: 'transform 0.2s', transform: syncPanelOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+            <span>Sync data · {projects.length} projects, {totalReposCount} repos</span>
+          </button>
+          {syncPanelOpen && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
             {projects.map((project) => {
               const pRepos = projectRepos[project.name] || [];
@@ -402,6 +425,7 @@ export default function DoraOverviewPage() {
               );
             })}
           </div>
+          )}
         </div>
       )}
 
@@ -410,6 +434,21 @@ export default function DoraOverviewPage() {
           {error}
         </div>
       )}
+
+      {/* Scope hint above metric cards — makes "is this aggregate or per-repo?" obvious. */}
+      <div style={{
+        marginBottom: 12, padding: '8px 14px', borderRadius: 10,
+        background: repoId ? 'rgba(94,234,212,0.06)' : 'var(--panel-alt)',
+        border: repoId ? '1px solid rgba(94,234,212,0.25)' : '1px solid var(--panel-border)',
+        fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 8,
+      }}>
+        <span style={{ fontSize: 14 }}>{repoId ? '🎯' : '🌐'}</span>
+        <span>
+          {repoId
+            ? <>Showing metrics for <strong style={{ color: 'var(--ink)' }}>{repos.find((r) => r.id === repoId)?.name || `repo #${repoId}`}</strong>{' '}only.</>
+            : <>Showing aggregate metrics across <strong style={{ color: 'var(--ink)' }}>{repos.length || 'all'} repos</strong>. Pick one above to drill in.</>}
+        </span>
+      </div>
 
       {/* 4 DORA metric cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginBottom: 40 }}>
