@@ -897,18 +897,38 @@ async def sync_dora_data(
     else:
         raise HTTPException(status_code=400, detail=f'Unsupported provider: {row.provider}')
 
-    service = GitSyncService(db)
-    in_flight_key = (tenant.organization_id, row.id)
+    # Fire-and-forget: kicking off git fetches inline holds the request's
+    # DB connection (and event-loop quanta) for 5-30s per repo, which
+    # backs up unrelated GETs (menu, notifications, etc.) and ends up
+    # looking like the whole UI froze. Spawn the work on a fresh session
+    # via asyncio.Task and return 202 immediately; the in-flight registry
+    # is the source of truth for "still running".
+    import asyncio
+    import logging as _logging
     import time as _time
-    _DORA_SYNC_IN_FLIGHT[in_flight_key] = _time.time()
-    try:
-        counts = await service.sync_repo(tenant.organization_id, repo_mapping)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    finally:
-        _DORA_SYNC_IN_FLIGHT.pop(in_flight_key, None)
+    from agena_core.database import SessionLocal
 
-    return DoraSyncResponse(**counts)
+    bg_logger = _logging.getLogger(__name__)
+    org_id = tenant.organization_id
+    rm_id = row.id
+    in_flight_key = (org_id, rm_id)
+    _DORA_SYNC_IN_FLIGHT[in_flight_key] = _time.time()
+
+    async def _run() -> None:
+        try:
+            async with SessionLocal() as bg_db:
+                bg_service = GitSyncService(bg_db)
+                await bg_service.sync_repo(org_id, repo_mapping)
+        except Exception as exc:
+            bg_logger.exception('background sync failed for repo_mapping_id=%s: %s', rm_id, exc)
+        finally:
+            _DORA_SYNC_IN_FLIGHT.pop(in_flight_key, None)
+
+    asyncio.create_task(_run())
+
+    # Return zeros — real counts land in /analytics/dora/sync-status once
+    # the background task finishes and the in-flight entry clears.
+    return DoraSyncResponse(commits_synced=0, prs_synced=0, deployments_synced=0)
 
 
 @router.get('/dora/sync-status', response_model=DoraSyncStatusResponse)
