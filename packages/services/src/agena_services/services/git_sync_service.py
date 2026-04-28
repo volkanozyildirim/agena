@@ -77,6 +77,9 @@ class GitSyncService:
             prs = await self._sync_azure_prs(
                 organization_id, repo_mapping_id, base_url, project, repo_name, pat,
             )
+            deployments = await self._sync_azure_deployments(
+                organization_id, repo_mapping_id, base_url, project, repo_name, pat,
+            )
         else:
             raise ValueError(f'Unsupported provider: {provider}')
 
@@ -421,6 +424,111 @@ class GitSyncService:
 
         await self.db.commit()
         logger.info('Azure PRs synced: %d for %s/%s', count, project, repo_name)
+        return count
+
+    async def _sync_azure_deployments(
+        self,
+        org_id: int,
+        repo_mapping_id: str,
+        org_url: str,
+        project: str,
+        repo_name: str,
+        pat: str,
+        since_days: int = 365,
+    ) -> int:
+        """Pull Azure Pipelines builds for this repo as deployment events.
+
+        Azure DevOps doesn't separate "builds" from "deployments" the way
+        GitHub does — most teams use Pipelines builds (CI) AS deploys.
+        We treat each finished build as a deployment, mapping
+        ``result == 'succeeded'`` → success and ``result == 'failed'`` →
+        failure. Release Pipelines (legacy XAML/Classic) live under
+        ``/_apis/release/deployments`` and are not pulled here; if a team
+        uses those, deployment counts will look low until that's added.
+
+        Two-step: resolve the repo's GUID via ``/git/repositories/{name}``,
+        then walk ``/build/builds?repositoryId=...`` paginated by $top +
+        continuationToken header.
+        """
+        base = org_url.rstrip('/')
+        headers = self._azure_headers(pat)
+        count = 0
+
+        async with httpx.AsyncClient(timeout=30) as client:
+            # 1) Repo GUID lookup
+            repo_resp = await self._request_with_rate_limit(
+                client, 'GET',
+                f'{base}/{project}/_apis/git/repositories/{repo_name}?api-version=7.1',
+                headers=headers,
+            )
+            if repo_resp is None:
+                logger.warning('Azure deploy sync skipped (repo lookup failed) for %s/%s', project, repo_name)
+                return 0
+            repo_id = (repo_resp.json() or {}).get('id')
+            if not repo_id:
+                logger.warning('Azure deploy sync skipped (no repo id in response) for %s/%s', project, repo_name)
+                return 0
+
+            # 2) Builds for that repo
+            min_time = (datetime.utcnow() - timedelta(days=since_days)).strftime('%Y-%m-%dT%H:%M:%SZ')
+            page_size = 1000
+            continuation: str = ''
+            while True:
+                qs = (
+                    f'?repositoryId={repo_id}&repositoryType=TfsGit'
+                    f'&statusFilter=completed&minTime={min_time}'
+                    f'&$top={page_size}'
+                    '&api-version=7.1'
+                )
+                if continuation:
+                    qs += f'&continuationToken={continuation}'
+                response = await self._request_with_rate_limit(
+                    client, 'GET',
+                    f'{base}/{project}/_apis/build/builds{qs}',
+                    headers=headers,
+                )
+                if response is None:
+                    break
+                data = response.json()
+                items = data.get('value') or []
+                if not isinstance(items, list) or not items:
+                    break
+
+                for item in items:
+                    build_id = str(item.get('id') or '')
+                    if not build_id:
+                        continue
+                    finish_time = item.get('finishTime') or item.get('queueTime')
+                    if not finish_time:
+                        continue
+                    result = (item.get('result') or '').lower()
+                    if result == 'succeeded':
+                        status = 'success'
+                    elif result == 'failed':
+                        status = 'failure'
+                    elif result == 'canceled':
+                        status = 'cancelled'
+                    else:
+                        status = result or 'unknown'
+                    sha = (item.get('sourceVersion') or '')[:64]
+                    await self._upsert_deployment(
+                        org_id=org_id,
+                        repo_mapping_id=repo_mapping_id,
+                        provider='azure',
+                        external_id=build_id,
+                        environment='production',  # build def name would be richer; keep simple for now
+                        status=status,
+                        deployed_at=self._parse_datetime(finish_time),
+                        sha=sha,
+                    )
+                    count += 1
+
+                continuation = response.headers.get('x-ms-continuationtoken', '')
+                if not continuation:
+                    break
+
+        await self.db.commit()
+        logger.info('Azure deployments synced: %d for %s/%s', count, project, repo_name)
         return count
 
     # ── Credential helper ────────────────────────────────────────────────────
