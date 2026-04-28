@@ -1485,6 +1485,18 @@ async def import_shared_task(
     if src_task is None or src_task.organization_id != share.organization_id:
         raise HTTPException(status_code=404, detail='Underlying task no longer exists')
 
+    existing = (await db.execute(
+        select(TaskRecord.id).where(
+            TaskRecord.organization_id == tenant.organization_id,
+            TaskRecord.imported_from_share_id == share.id,
+        ).limit(1)
+    )).scalar_one_or_none()
+    if existing is not None:
+        raise HTTPException(
+            status_code=409,
+            detail=f'This share has already been imported into your organization (task #{existing})',
+        )
+
     service = TaskService(db)
     new_task = await service.create_task(
         organization_id=tenant.organization_id,
@@ -1494,6 +1506,9 @@ async def import_shared_task(
         source=getattr(src_task, 'source', None) or 'shared',
         external_id=None,
     )
+    new_task.imported_from_share_id = share.id
+    await db.commit()
+    await db.refresh(new_task)
 
     src_atts = (await db.execute(
         select(TaskAttachment).where(

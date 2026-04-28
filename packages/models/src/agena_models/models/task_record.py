@@ -40,6 +40,7 @@ class TaskRecord(Base):
     external_work_item_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     sprint_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     sprint_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    imported_from_share_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
