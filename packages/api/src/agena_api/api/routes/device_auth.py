@@ -56,8 +56,15 @@ _STORE: dict[str, dict[str, Any]] = {}
 
 
 def _gc_expired() -> None:
+    # _STORE holds two kinds of rows: real device-code entries (have
+    # `created_at`) and user-code aliases (only `{device_code: X}`).
+    # Skip aliases here — their lifecycle is tied to the device-code
+    # row and gets cleaned up alongside it in poll_device_token.
     now = time.time()
-    stale = [k for k, v in _STORE.items() if now - v['created_at'] > DEVICE_CODE_TTL]
+    stale = [
+        k for k, v in _STORE.items()
+        if 'created_at' in v and now - v['created_at'] > DEVICE_CODE_TTL
+    ]
     for k in stale:
         _STORE[k]['status'] = 'expired'
 
