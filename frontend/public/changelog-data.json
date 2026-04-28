@@ -1,5 +1,13 @@
 [
   {
+    "hash": "ae66947",
+    "short": "ae66947",
+    "message": "Deploy script: include full git history in changelog (1000)",
+    "date": "2026-04-28",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "19cb337",
     "short": "19cb337",
     "message": "Changelog: regenerate with full history",

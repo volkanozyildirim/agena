@@ -14,7 +14,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-COUNT=1000
+COUNT=100000
 OUTPUT_FILE="$REPO_ROOT/frontend/public/changelog-data.json"
 
 # Parse arguments
