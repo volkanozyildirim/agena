@@ -128,8 +128,38 @@ export default function DoraOverviewPage() {
       try {
         const prefs = await loadPrefs();
         mappings = (prefs.repo_mappings || []) as RepoMapping[];
-        setRepos(mappings);
       } catch { /* silent */ }
+      // Also pull the real org-wide repo_mappings table so per-repo sync
+      // sends the actual numeric DB id (the prefs store may be empty or
+      // stale, in which case the UI was inventing random ids that 404'd
+      // on the backend).
+      try {
+        type RM = { id: number; provider: string; owner: string; repo_name: string; display_name?: string };
+        const dbRows = await apiFetch<RM[]>('/repo-mappings');
+        const fromDb: RepoMapping[] = (dbRows || []).map((r) => ({
+          id: String(r.id),
+          provider: r.provider,
+          name: r.display_name || `${r.owner}/${r.repo_name}`,
+          azure_project: r.provider === 'azure' ? r.owner : undefined,
+          azure_repo_name: r.provider === 'azure' ? r.repo_name : undefined,
+          github_owner: r.provider === 'github' ? r.owner : undefined,
+          github_repo: r.provider === 'github' ? r.repo_name : undefined,
+        } as RepoMapping));
+        // De-dupe by (provider, owner/project, repo_name) — prefer the
+        // DB version because its id is the only one the sync endpoint
+        // accepts after the legacy lookup was retired.
+        const merged: RepoMapping[] = [...fromDb];
+        for (const m of mappings) {
+          const exists = fromDb.some((r) => (
+            r.provider === m.provider &&
+            (r.azure_project || r.github_owner) === (m.azure_project || m.github_owner) &&
+            (r.azure_repo_name || r.github_repo) === (m.azure_repo_name || m.github_repo)
+          ));
+          if (!exists) merged.push(m);
+        }
+        mappings = merged;
+      } catch { /* silent — fall back to whatever loadPrefs returned */ }
+      setRepos(mappings);
       try {
         const res = await apiFetch<{ repos: SyncStatusItem[] }>('/analytics/dora/sync-status');
         const map: SyncStatus = {};
@@ -196,41 +226,35 @@ export default function DoraOverviewPage() {
     } catch { /* silent */ }
   }, [syncedKeys]);
 
-  // Sync a single Azure repo (auto-add mapping if needed)
+  // Sync a single Azure repo. We DO NOT invent ephemeral ids any more —
+  // the repo must already exist in the org's `repo_mappings` table
+  // (managed at /dashboard/integrations/repo-mappings). If it doesn't,
+  // surface that, don't silently no-op.
   const syncAzureRepo = useCallback(async (projectName: string, repo: AzureRepo) => {
     const key = `${projectName}/${repo.name}`;
     setSyncingKeys((prev) => new Set(prev).add(key));
     setSyncingRepo(key);
 
-    let currentRepos = [...repos];
-    let mapping = currentRepos.find(
+    const mapping = repos.find(
       (m) => m.provider === 'azure' && m.azure_project === projectName && m.azure_repo_name === repo.name,
     );
     if (!mapping) {
-      mapping = {
-        id: String(Date.now()) + Math.random().toString(36).slice(2, 6),
-        provider: 'azure',
-        name: repo.name,
-        local_path: '',
-        azure_project: projectName,
-        azure_repo_url: repo.remote_url,
-        azure_repo_name: repo.name,
-        default_branch: 'main',
-      };
-      currentRepos.push(mapping);
-      setRepos(currentRepos);
-      // NOTE: intentionally NOT saving to preferences — DORA sync mappings
-      // are ephemeral and should not pollute the repo_mappings page
+      setError(`Repo "${projectName}/${repo.name}" is not in your repo mappings — add it first at /dashboard/integrations/repo-mappings.`);
+      setSyncingKeys((prev) => { const n = new Set(prev); n.delete(key); return n; });
+      setSyncingRepo(null);
+      return;
     }
 
     try {
       await syncDoraRepo(mapping.id);
       setSyncedKeys((prev) => new Set(prev).add(key));
-    } catch { /* silent */ }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : `Sync failed for ${key}`);
+    }
 
     setSyncingKeys((prev) => { const n = new Set(prev); n.delete(key); return n; });
     setSyncingRepo(null);
-    await refreshSyncStatus(currentRepos);
+    await refreshSyncStatus(repos);
   }, [repos, refreshSyncStatus]);
 
   // Sync entire project

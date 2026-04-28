@@ -13,6 +13,7 @@ from agena_models.models.user_preference import UserPreference
 from agena_services.services.analytics_service import AnalyticsService
 from agena_services.services.dora_service import DoraService
 from agena_services.services.git_sync_service import GitSyncService
+from agena_services.services.integration_config_service import IntegrationConfigService
 
 router = APIRouter(prefix='/analytics', tags=['analytics'])
 
@@ -773,6 +774,10 @@ async def get_dora_overview(
 
 
 class DoraSyncRequest(BaseModel):
+    # The repo_mappings.id of an org-managed repo. DORA does NOT auto-
+    # create mappings — the user manages the canonical list in
+    # /dashboard/integrations/repo-mappings, and DORA syncs whichever
+    # of those they ask it to.
     repo_mapping_id: str
 
 
@@ -825,26 +830,53 @@ async def sync_dora_data(
     tenant: CurrentTenant = Depends(require_permission('tasks:write')),
     db: AsyncSession = Depends(get_db_session),
 ) -> DoraSyncResponse:
-    """Trigger a data sync for a specific repo mapping.  Fetches commits, PRs,
-    and deployments from GitHub or Azure and stores them in the database."""
+    """Sync a repo's git activity (commits/PRs/deploys) into the local
+    git_* tables. The repo must already exist in the org's
+    `repo_mappings` table — DORA does not own the canonical list of
+    repos, it just consumes it.
+    """
+    from agena_models.models.repo_mapping import RepoMapping
 
-    # Find the repo mapping from user preferences
-    result = await db.execute(
-        select(UserPreference).where(UserPreference.user_id == tenant.user_id)
-    )
-    pref = result.scalar_one_or_none()
-    if pref is None:
-        raise HTTPException(status_code=404, detail='User preferences not found')
+    try:
+        rm_id = int(payload.repo_mapping_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail='repo_mapping_id must be a numeric repo_mappings.id')
 
-    repo_mappings = _parse_repo_mappings_json(pref.repo_mappings_json)
-    repo_mapping = None
-    for m in repo_mappings:
-        if str(m.get('id') or '') == payload.repo_mapping_id:
-            repo_mapping = m
-            break
-
-    if repo_mapping is None:
+    row = (await db.execute(
+        select(RepoMapping).where(
+            RepoMapping.id == rm_id,
+            RepoMapping.organization_id == tenant.organization_id,
+            RepoMapping.is_active.is_(True),
+        )
+    )).scalar_one_or_none()
+    if row is None:
         raise HTTPException(status_code=404, detail='Repo mapping not found')
+
+    provider = (row.provider or '').lower()
+    if provider == 'github':
+        repo_mapping = {
+            'id': str(row.id),
+            'provider': 'github',
+            'github_owner': row.owner,
+            'github_repo': row.repo_name,
+        }
+    elif provider == 'azure':
+        cfg_service = IntegrationConfigService(db)
+        azure_cfg = await cfg_service.get_config(tenant.organization_id, 'azure')
+        base = (azure_cfg.base_url if azure_cfg else '') or ''
+        azure_repo_url = (
+            f"{base.rstrip('/')}/{row.owner}/_git/{row.repo_name}"
+            if base else ''
+        )
+        repo_mapping = {
+            'id': str(row.id),
+            'provider': 'azure',
+            'azure_project': row.owner,
+            'azure_repo_url': azure_repo_url,
+            'azure_repo_name': row.repo_name,
+        }
+    else:
+        raise HTTPException(status_code=400, detail=f'Unsupported provider: {row.provider}')
 
     service = GitSyncService(db)
     try:
