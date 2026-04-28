@@ -26,12 +26,16 @@ type Props = {
  * queued, run_metrics, etc.) without losing the visual rhythm.
  */
 export default function AgentTimeline({ logs, running = false, emptyLabel }: Props) {
-  const items = useMemo(() => buildItems(logs), [logs]);
-  const endRef = useRef<HTMLDivElement | null>(null);
+  // Newest-first so a long-running task doesn't bury the latest event below
+  // the fold. Pulse stays on the topmost row while running so the eye is
+  // drawn there instead of scrolling.
+  const items = useMemo(() => buildItems(logs).reverse(), [logs]);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!running) return;
-    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    // Keep the latest entry visible at the top of the scroll viewport.
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   }, [items.length, running]);
 
   if (items.length === 0) {
@@ -43,19 +47,25 @@ export default function AgentTimeline({ logs, running = false, emptyLabel }: Pro
   }
 
   return (
-    <div style={{ position: 'relative', padding: '14px 16px 18px' }}>
+    <div
+      ref={scrollRef}
+      style={{
+        position: 'relative', padding: '14px 16px 18px',
+        maxHeight: 520, overflowY: 'auto', overflowX: 'hidden',
+      }}
+    >
       <div
         style={{
           position: 'absolute', left: 30, top: 14, bottom: 18, width: 2,
           background: 'linear-gradient(to bottom, transparent, var(--panel-border) 12%, var(--panel-border) 88%, transparent)',
+          pointerEvents: 'none',
         }}
       />
       <div style={{ display: 'grid', gap: 8, position: 'relative' }}>
         {items.map((it, idx) => (
-          <TimelineRow key={`${it.id ?? idx}-${it.kind}`} item={it} pulsing={idx === items.length - 1 && running} />
+          <TimelineRow key={`${it.id ?? idx}-${it.kind}`} item={it} pulsing={idx === 0 && running} />
         ))}
       </div>
-      <div ref={endRef} />
     </div>
   );
 }
