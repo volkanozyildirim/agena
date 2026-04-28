@@ -153,7 +153,12 @@ class GitSyncService:
                     pages_since_commit = 0
 
                 url = self._next_page_url(response)
-                params = {}  # params are already in the next URL
+                # CRITICAL: must be None, not {}. httpx's `params={}`
+                # overwrites the URL's existing query string instead of
+                # leaving it alone, so the Link-header URL's `?page=N`
+                # gets stripped and every fetch hits page 1 again. Took
+                # 50k inserts collapsing into 100 unique SHAs to find.
+                params = None
 
         await self.db.commit()
         logger.info('GitHub commits synced: %d for %s/%s', count, owner, repo)
@@ -223,7 +228,7 @@ class GitSyncService:
                 if stop_pagination:
                     break
                 url = self._next_page_url(response)
-                params = {}
+                params = None  # see commits sync — empty dict strips URL query
 
         await self.db.commit()
         logger.info('GitHub PRs synced: %d for %s/%s', count, owner, repo)
@@ -285,7 +290,7 @@ class GitSyncService:
                     count += 1
 
                 url = self._next_page_url(response)
-                params = {}
+                params = None  # see commits sync — empty dict strips URL query
 
         await self.db.commit()
         logger.info('GitHub deployments synced: %d for %s/%s', count, owner, repo)
