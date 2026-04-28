@@ -30,7 +30,18 @@ interface AnalyzeResponse {
     suggested_story_points: number;
     confidence: number;
     error?: string | null;
+    touched_files?: Array<{ file: string; action?: string; repo_mapping_id?: number | null }>;
+    recommended_authors?: Array<{ name: string; email?: string; commit_count?: number; member_unique_name?: string }>;
   }>;
+}
+
+interface RepoMapping {
+  id: number;
+  provider: string;
+  owner: string;
+  repo_name: string;
+  display_name?: string;
+  is_active?: boolean;
 }
 
 export function refinementCommand(): Command {
@@ -96,6 +107,22 @@ export function refinementCommand(): Command {
     });
 
   cmd
+    .command('repos')
+    .description('List the org\'s repo mappings (use the id with `analyze --repo`)')
+    .action(async () => {
+      const cfg = await loadConfig();
+      const gate = requireAuthed(cfg); if (!gate.ok) { console.error(`  ${gate.reason}`); process.exit(1); }
+      const rows = await api<RepoMapping[]>(cfg, '/repo-mappings');
+      if (!rows || rows.length === 0) { console.log('  No repo mappings configured.'); return; }
+      console.log(`    ${pad('ID', 4)}  ${pad('PROVIDER', 8)}  REPO`);
+      console.log(`    ${'─'.repeat(60)}`);
+      for (const r of rows) {
+        const name = r.display_name || `${r.owner}/${r.repo_name}`;
+        console.log(`    ${pad(String(r.id), 4)}  ${pad(r.provider, 8)}  ${name}`);
+      }
+    });
+
+  cmd
     .command('analyze')
     .description('Run refinement analysis on a sprint')
     .requiredOption('-p, --project <p>', 'Project')
@@ -107,6 +134,7 @@ export function refinementCommand(): Command {
     .option('-l, --language <l>', 'Output language', 'Turkish')
     .option('--agent-provider <p>', 'claude_cli, codex_cli, openai, gemini, hal', 'claude_cli')
     .option('--agent-model <m>', 'Model id', 'sonnet')
+    .option('--repo <id>', 'Repo mapping id — turns on code-aware analysis (see `agena refinement repos`)')
     .action(async (opts) => {
       const cfg = await loadConfig();
       const gate = requireAuthed(cfg); if (!gate.ok) { console.error(`  ${gate.reason}`); process.exit(1); }
@@ -125,14 +153,27 @@ export function refinementCommand(): Command {
         payload.board_id = opts.board;
         payload.sprint_id = opts.sprintId;
       }
-      console.log('  ⏳ analyzing sprint... this can take a minute per item');
+      if (opts.repo) {
+        const id = Number(opts.repo);
+        if (!Number.isFinite(id) || id <= 0) { console.error(`  --repo must be a positive integer (got "${opts.repo}"). Run \`agena refinement repos\` to list ids.`); process.exit(1); }
+        payload.repo_mapping_id = id;
+      }
+      console.log(`  ⏳ analyzing sprint${opts.repo ? ` (code-aware against repo #${opts.repo})` : ''}... this can take a minute per item`);
       const resp = await api<AnalyzeResponse>(cfg, '/refinement/analyze', { method: 'POST', body: JSON.stringify(payload) });
       console.log(`\n  Analyzed ${resp.analyzed_count}/${resp.total_items}  ($${(resp.estimated_cost_usd || 0).toFixed(3)})`);
-      console.log(`    ${pad('ITEM', 10)}  ${pad('SP', 3)}  ${pad('CONF', 5)}  TITLE`);
-      console.log(`    ${'─'.repeat(70)}`);
+      console.log(`    ${pad('ITEM', 10)}  ${pad('SP', 3)}  ${pad('CONF', 5)}  ${pad('FILES', 6)}  ${pad('AUTHOR', 22)}  TITLE`);
+      console.log(`    ${'─'.repeat(95)}`);
       for (const r of resp.results) {
-        if (r.error) { console.log(`    #${r.item_id}  err  -      ${r.error.slice(0, 50)}`); continue; }
-        console.log(`    ${pad('#' + r.item_id, 10)}  ${pad(String(r.suggested_story_points), 3)}  ${pad(`${r.confidence}%`, 5)}  ${r.title.slice(0, 55)}`);
+        if (r.error) { console.log(`    #${r.item_id}  err  -      -       -                       ${r.error.slice(0, 50)}`); continue; }
+        const fileCount = r.touched_files?.length || 0;
+        const topAuthor = r.recommended_authors?.[0];
+        const authorCell = topAuthor
+          ? `${(topAuthor.name || topAuthor.member_unique_name || '?').slice(0, 16)}${topAuthor.commit_count ? ` (${topAuthor.commit_count}c)` : ''}`
+          : '-';
+        console.log(
+          `    ${pad('#' + r.item_id, 10)}  ${pad(String(r.suggested_story_points), 3)}  ${pad(`${r.confidence}%`, 5)}  `
+          + `${pad(fileCount > 0 ? String(fileCount) : '-', 6)}  ${pad(authorCell, 22)}  ${r.title.slice(0, 55)}`,
+        );
       }
     });
 
