@@ -787,7 +787,7 @@ export default function TaskDetailPage() {
           <span style={{ color: 'var(--ink-35)', fontWeight: 600 }}>#{task?.id}</span>{' '}
           {task?.title ?? t('taskDetail.task')}
         </h1>
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <button className='button button-primary' onClick={handleRunClick} disabled={isRerunBusy} style={{ padding: '8px 18px', fontSize: 13 }}>
             {isRerunBusy ? t('taskDetail.rerunning') : t('taskDetail.rerunTask')}
           </button>
