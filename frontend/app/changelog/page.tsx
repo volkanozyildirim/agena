@@ -25,6 +25,7 @@ export default function ChangelogPage() {
   const [commits, setCommits] = useState<Commit[]>([]);
   const [filter, setFilter] = useState<string>('all');
   const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     fetch('/changelog-data.json')
@@ -42,6 +43,7 @@ export default function ChangelogPage() {
     grouped[c.date].push(c);
   }
   const dates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+  const isOpen = (date: string, idx: number) => (date in expanded ? expanded[date] : idx < 3);
 
   return (
     <div className='container changelog-container' style={{ maxWidth: 760, padding: '80px 24px' }}>
@@ -92,15 +94,40 @@ export default function ChangelogPage() {
           {/* Timeline line */}
           <div style={{ position: 'absolute', left: 7, top: 8, bottom: 8, width: 2, background: 'var(--panel-border-2)' }} />
 
-          {dates.map((date) => (
+          {dates.map((date, dateIdx) => {
+            const open = isOpen(date, dateIdx);
+            return (
             <div key={date} style={{ marginBottom: 32 }}>
-              {/* Date header */}
-              <div style={{ position: 'relative', marginBottom: 16 }}>
-                <div style={{ position: 'absolute', left: -28, top: 4, width: 12, height: 12, borderRadius: '50%', background: 'var(--accent)', border: '2px solid var(--bg)' }} />
+              {/* Date header — clickable to toggle the day's commit list */}
+              <button
+                type='button'
+                onClick={() => setExpanded((prev) => ({ ...prev, [date]: !open }))}
+                style={{
+                  position: 'relative',
+                  marginBottom: 16,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  background: 'transparent',
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  textAlign: 'left',
+                }}
+              >
+                <span style={{ position: 'absolute', left: -28, top: 4, width: 12, height: 12, borderRadius: '50%', background: 'var(--accent)', border: '2px solid var(--bg)' }} />
                 <time style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-65)' }}>{date}</time>
-              </div>
+                <span style={{ fontSize: 12, color: 'var(--ink-35)', fontWeight: 500 }}>
+                  · {grouped[date].length}
+                </span>
+                <span style={{ fontSize: 12, color: 'var(--ink-50)', transition: 'transform .15s', display: 'inline-block', transform: open ? 'rotate(90deg)' : 'rotate(0deg)' }}>
+                  ▶
+                </span>
+              </button>
 
               {/* Commits for this date */}
+              {open && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {grouped[date].map((commit) => {
                   const badge = typeBadgeStyle[commit.type] || typeBadgeStyle.other;
@@ -132,8 +159,10 @@ export default function ChangelogPage() {
                   );
                 })}
               </div>
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
