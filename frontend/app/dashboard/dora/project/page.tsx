@@ -478,6 +478,26 @@ export default function DoraProjectPage() {
 
       {!loading && data && (
         <>
+          {/* Data-source banner — makes "what is this measuring?" obvious. */}
+          <div style={{
+            marginBottom: 16, padding: '10px 14px', borderRadius: 10,
+            background: data.totals.planned === 0 ? 'rgba(239,68,68,0.06)' : 'var(--panel-alt)',
+            border: data.totals.planned === 0 ? '1px solid rgba(239,68,68,0.25)' : '1px solid var(--panel-border)',
+            fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+          }}>
+            <span style={{ fontSize: 14 }}>{data.totals.planned === 0 ? '⚠️' : '📊'}</span>
+            <span style={{ flex: 1, minWidth: 280 }}>
+              {data.totals.planned === 0
+                ? <>No Agena task records in the last <strong>{days}d</strong>{repoId ? ' for this repo' : ''}. This page measures Agena-tracked tasks (imported from Sentry/NewRelic, created via the dashboard, or AI-generated) — not raw Azure/Jira work items.</>
+                : <>Based on <strong style={{ color: 'var(--ink)' }}>{data.totals.planned}</strong> Agena task records in the last <strong>{days}d</strong>{repoId ? ' for the selected repo' : ' across all repos'}. Source: <code style={{ fontSize: 11, padding: '1px 5px', borderRadius: 4, background: 'var(--panel)' }}>task_records</code> (Agena-tracked, not raw Azure/Jira sprints).</>}
+            </span>
+            {data.totals.planned === 0 && (
+              <Link href="/dashboard/tasks" style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                Import tasks →
+              </Link>
+            )}
+          </div>
+
           {/* 4 KPI Cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 32 }}>
             <KpiCard label={t('dora.project.predictability')} value={data.kpi.predictability} color="#22c55e" />
