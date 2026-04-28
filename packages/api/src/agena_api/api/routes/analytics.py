@@ -824,6 +824,25 @@ async def get_team_symptoms(
     return TeamSymptomsResponse(**data)
 
 
+# Process-local registry of "currently syncing" repos, keyed by
+# (org_id, repo_mapping_id). Lets the UI render a "syncing" badge that
+# survives a page reload — the alternative is "user clicked sync, then
+# refreshed, then sat looking at stale numbers wondering if anything's
+# happening". Cleared in a finally block; on worker crash the next sync
+# call simply overwrites the entry.
+_DORA_SYNC_IN_FLIGHT: dict[tuple[int, int], float] = {}
+
+
+@router.get('/dora/sync-active')
+async def get_dora_sync_active(
+    tenant: CurrentTenant = Depends(get_current_tenant),
+) -> dict[str, list[int]]:
+    """List repo_mapping_ids whose sync is currently running for this org."""
+    org_id = tenant.organization_id
+    active = [rm_id for (o, rm_id) in _DORA_SYNC_IN_FLIGHT if o == org_id]
+    return {'repo_mapping_ids': active}
+
+
 @router.post('/dora/sync', response_model=DoraSyncResponse)
 async def sync_dora_data(
     payload: DoraSyncRequest,
@@ -879,10 +898,15 @@ async def sync_dora_data(
         raise HTTPException(status_code=400, detail=f'Unsupported provider: {row.provider}')
 
     service = GitSyncService(db)
+    in_flight_key = (tenant.organization_id, row.id)
+    import time as _time
+    _DORA_SYNC_IN_FLIGHT[in_flight_key] = _time.time()
     try:
         counts = await service.sync_repo(tenant.organization_id, repo_mapping)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        _DORA_SYNC_IN_FLIGHT.pop(in_flight_key, None)
 
     return DoraSyncResponse(**counts)
 

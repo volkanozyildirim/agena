@@ -236,12 +236,21 @@ export default function DoraOverviewPage() {
   const [bulkSyncing, setBulkSyncing] = useState(false);
   const [pageError, setPageError] = useState('');
 
+  // Server-side "currently syncing" registry, populated by the sync route.
+  // Survives page reloads so the user knows a click-then-reload didn't lose
+  // their in-flight sync.
+  const [serverSyncingIds, setServerSyncingIds] = useState<Set<number>>(new Set());
+
   const refreshSyncStatus = useCallback(async () => {
     try {
-      const res = await apiFetch<{ repos: SyncStatusItem[] }>('/analytics/dora/sync-status');
+      const [statusRes, activeRes] = await Promise.all([
+        apiFetch<{ repos: SyncStatusItem[] }>('/analytics/dora/sync-status'),
+        apiFetch<{ repo_mapping_ids: number[] }>('/analytics/dora/sync-active').catch(() => ({ repo_mapping_ids: [] })),
+      ]);
       const map: Record<string, SyncStatusItem> = {};
-      for (const item of res.repos) map[item.repo_mapping_id] = item;
+      for (const item of statusRes.repos) map[item.repo_mapping_id] = item;
       setSyncStatus(map);
+      setServerSyncingIds(new Set(activeRes.repo_mapping_ids || []));
     } catch { /* silent — non-fatal */ }
   }, []);
 
@@ -260,6 +269,16 @@ export default function DoraOverviewPage() {
       void refreshSyncStatus();
     })();
   }, [refreshSyncStatus]);
+
+  // Background poll. While anything is syncing (this tab OR any other
+  // session in this org), poll fast (3s) so the user sees commits / PRs
+  // tick up live. Otherwise back off to 15s — just enough to catch a
+  // sync started from another tab without burning requests.
+  useEffect(() => {
+    const fast = syncingIds.size > 0 || serverSyncingIds.size > 0;
+    const iv = setInterval(() => { void refreshSyncStatus(); }, fast ? 3000 : 15000);
+    return () => clearInterval(iv);
+  }, [syncingIds.size, serverSyncingIds.size, refreshSyncStatus]);
 
   const handleSync = useCallback(async (repoId: number) => {
     setSyncingIds((prev) => new Set(prev).add(repoId));
@@ -354,7 +373,7 @@ export default function DoraOverviewPage() {
               key={r.id}
               repo={r}
               syncStatus={syncStatus[String(r.id)]}
-              syncing={syncingIds.has(r.id)}
+              syncing={syncingIds.has(r.id) || serverSyncingIds.has(r.id)}
               onSync={() => void handleSync(r.id)}
             />
           ))}
