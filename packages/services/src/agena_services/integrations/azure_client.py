@@ -271,6 +271,32 @@ class AzureDevOpsClient:
             logger.warning('Azure period fetch skipped: org/project not configured.')
             return []
 
+        # When a team is picked, ask Azure for its actual default area path
+        # rather than naively assuming `<Project>\<TeamName>`. Team display
+        # names and area paths are independent in Azure — assuming they
+        # match trips TF51011 on most non-trivial setups.
+        team_area_path = ''
+        if team_eff:
+            try:
+                tf_url = (
+                    f"{org_url.rstrip('/')}/{project}/{quote(team_eff, safe='')}"
+                    '/_apis/work/teamsettings/teamfieldvalues?api-version=7.1-preview.1'
+                )
+                async with httpx.AsyncClient(timeout=15) as probe:
+                    tf = await probe.get(tf_url, headers=self._headers(pat))
+                if tf.status_code == 200:
+                    body = tf.json()
+                    default = body.get('defaultValue') or ''
+                    team_area_path = str(default).strip()
+                else:
+                    logger.warning(
+                        'fetch_period_work_items: could not resolve area path for team %r '
+                        '(HTTP %s). Falling back to project-wide query.',
+                        team_eff, tf.status_code,
+                    )
+            except Exception as exc:
+                logger.warning('teamfieldvalues lookup failed for team %r: %s', team_eff, exc)
+
         wiql_url = (
             f"{org_url.rstrip('/')}/{project}"
             '/_apis/wit/wiql?api-version=7.1-preview.2'
@@ -302,8 +328,12 @@ class AzureDevOpsClient:
                 if newer_offset > 0:
                     date_filter += f' AND [System.ChangedDate] < @Today-{newer_offset}'
                 parts = [date_filter]
-                if team_eff:
-                    area_root = f"{project}\\{team_eff}".replace("'", "''")
+                # Only filter by area path when we successfully resolved one
+                # via teamfieldvalues. If the lookup failed we fall through
+                # to project-wide — better to over-include than 400 the
+                # whole query on a non-existent area path.
+                if team_area_path:
+                    area_root = team_area_path.replace("'", "''")
                     parts.append(f"[System.AreaPath] UNDER '{area_root}'")
                 where_clause = ' AND '.join(parts)
                 wiql_payload = {
@@ -313,6 +343,11 @@ class AzureDevOpsClient:
                         'Order By [System.ChangedDate] Desc'
                     )
                 }
+                logger.info(
+                    'fetch_period_work_items chunk %d (%d-%dd) project=%r team_area=%r WIQL=%s',
+                    idx, newer_offset, older_offset, project, team_area_path or '(project-wide)',
+                    wiql_payload['query'],
+                )
                 try:
                     chunk_rows = await self._fetch_details_from_wiql(
                         client=client,
@@ -338,6 +373,9 @@ class AzureDevOpsClient:
                     detail = body or str(exc)
                     raise RuntimeError(f'Azure WIQL {exc.response.status_code}: {detail}') from exc
 
+                logger.info(
+                    'fetch_period_work_items chunk %d returned %d rows', idx, len(chunk_rows),
+                )
                 for row in chunk_rows:
                     try:
                         rid = int(row.get('id') or (row.get('fields') or {}).get('System.Id') or 0)
