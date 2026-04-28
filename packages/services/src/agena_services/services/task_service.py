@@ -1399,6 +1399,19 @@ class TaskService:
         self.db.add(item)
         await self.db.commit()
         await self.db.refresh(item)
+        # Stream the log to any open WebSocket subscribers so the task detail
+        # page can render the agent's tool calls in real time. Best-effort —
+        # a Redis hiccup must not break the task pipeline.
+        publish_fire_and_forget(organization_id, 'agent_log', {
+            'task_id': task_id,
+            'log_id': item.id,
+            'stage': stage,
+            # Cap the streamed body so a 16MB MEDIUMTEXT payload never floods
+            # the WS channel; the full message is still in the DB row that
+            # the client can fetch on demand if it needs the tail.
+            'message': (message or '')[:8000],
+            'created_at': item.created_at.isoformat() if item.created_at else None,
+        })
         return item
 
     async def get_logs(self, organization_id: int, task_id: int) -> list[AgentLog]:

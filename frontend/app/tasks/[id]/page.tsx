@@ -7,6 +7,7 @@ import { apiDownloadBlob, apiFetch, getToken, loadPrefs, resolveApiBase } from '
 import { renderMarkdown } from '@/lib/markdown';
 import RichDescription from '@/components/RichDescription';
 import ShareTaskModal from '@/components/ShareTaskModal';
+import AgentTimeline from '@/components/AgentTimeline';
 import StatusBadge from '@/components/StatusBadge';
 import RemoteRepoSelector, { type RemoteRepoSelection, type RepoDefault } from '@/components/RemoteRepoSelector';
 import { useLocale, type TranslationKey } from '@/lib/i18n';
@@ -279,7 +280,7 @@ export default function TaskDetailPage() {
   const [jiraBaseUrl, setJiraBaseUrl] = useState('');
   const [linkWorkItemInput, setLinkWorkItemInput] = useState('');
   const [linkBusy, setLinkBusy] = useState(false);
-  const [rightTab, setRightTab] = useState<'agent' | 'steps' | 'memory' | 'diff' | 'logs'>('agent');
+  const [rightTab, setRightTab] = useState<'activity' | 'agent' | 'steps' | 'memory' | 'diff' | 'logs'>('activity');
 
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [attachments, setAttachments] = useState<Array<{ id: number; filename: string; content_type: string; size_bytes: number; created_at: string }>>([]);
@@ -1410,6 +1411,7 @@ export default function TaskDetailPage() {
             overflowX: 'auto',
           }}>
             {([
+              { id: 'activity', label: '⚡ ' + (t('taskDetail.activityTab' as never) || 'Activity') },
               { id: 'agent', label: '🤖 ' + (t('taskDetail.liveLogs') || 'Agent') },
               { id: 'steps', label: '⚙ ' + (t('taskDetail.executionSteps') || 'Steps') },
               { id: 'memory', label: '🧠 ' + (t('taskDetail.memoryImpact') || 'Memory') },
@@ -1440,6 +1442,46 @@ export default function TaskDetailPage() {
               );
             })}
           </div>
+
+          {rightTab === 'activity' && (
+            <section style={{
+              borderRadius: 16,
+              border: task?.status === 'running'
+                ? '1px solid rgba(94,234,212,0.4)'
+                : '1px solid var(--panel-border-2)',
+              background: 'var(--surface)',
+              overflow: 'hidden', minHeight: 320,
+              display: 'grid', gridTemplateRows: 'auto 1fr',
+              boxShadow: task?.status === 'running' ? '0 0 0 4px rgba(94,234,212,0.06) inset' : 'none',
+            }}>
+              <div style={{ borderBottom: '1px solid var(--panel-border)', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--ink-90)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {t('taskDetail.activityTitle' as never) || 'Live agent activity'}
+                  {task?.status === 'running' && (
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                      padding: '2px 8px', borderRadius: 999,
+                      background: 'rgba(94,234,212,0.12)', color: '#5eead4',
+                      fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase',
+                    }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#5eead4', animation: 'pulse-brand 1.4s infinite' }} />
+                      live
+                    </span>
+                  )}
+                </h3>
+                <span style={{ fontSize: 11, color: 'var(--ink-42)' }}>
+                  {logs.length} {t('taskDetail.activityEvents' as never) || 'events'}
+                </span>
+              </div>
+              <div style={{ overflowY: 'auto' }}>
+                <AgentTimeline
+                  logs={logs}
+                  running={task?.status === 'running'}
+                  emptyLabel={t('taskDetail.activityEmpty' as never) || 'Waiting for the agent to start working…'}
+                />
+              </div>
+            </section>
+          )}
 
           {rightTab === 'agent' && (
           <section
