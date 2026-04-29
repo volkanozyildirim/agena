@@ -603,14 +603,17 @@ class RefinementService:
             }
             for item in items:
                 comment = self._with_signature(item.comment, signature)
+                assignee = (item.assignee_unique_name or '').strip()
                 try:
                     await self.azure_client.writeback_refinement(
                         cfg=cfg,
                         work_item_id=item.item_id,
                         suggested_story_points=item.suggested_story_points,
                         comment=comment,
+                        assignee_upn=assignee or None,
                     )
-                    results.append(RefinementWritebackResult(item_id=item.item_id, success=True, message='ok'))
+                    msg = 'ok' + (f' + assigned {assignee}' if assignee else '')
+                    results.append(RefinementWritebackResult(item_id=item.item_id, success=True, message=msg))
                 except Exception as exc:
                     results.append(RefinementWritebackResult(item_id=item.item_id, success=False, message=str(exc)[:220]))
                 await self._save_writeback_history(
@@ -637,6 +640,7 @@ class RefinementService:
             }
             for item in items:
                 comment = self._with_signature(item.comment, signature)
+                assignee = (item.assignee_unique_name or '').strip()
                 try:
                     await self.jira_client.writeback_refinement(
                         cfg=cfg,
@@ -644,8 +648,10 @@ class RefinementService:
                         suggested_story_points=item.suggested_story_points,
                         comment=comment,
                         board_id=request.board_id or '',
+                        assignee_email=assignee or None,
                     )
-                    results.append(RefinementWritebackResult(item_id=item.item_id, success=True, message='ok'))
+                    msg = 'ok' + (f' + assigned {assignee}' if assignee else '')
+                    results.append(RefinementWritebackResult(item_id=item.item_id, success=True, message=msg))
                 except Exception as exc:
                     results.append(RefinementWritebackResult(item_id=item.item_id, success=False, message=str(exc)[:220]))
                 await self._save_writeback_history(

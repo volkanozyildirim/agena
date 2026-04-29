@@ -128,6 +128,10 @@ class RefinementWritebackItem(BaseModel):
     item_id: str
     suggested_story_points: int = 0
     comment: str = ''
+    # Optional: when set, the writeback also assigns the work item to
+    # this user as part of the same call. UPN for Azure, email for Jira.
+    assignee_unique_name: str | None = None
+    assignee_source: str | None = None  # 'azure' | 'jira' — defaults to provider
 
 
 class RefinementWritebackRequest(BaseModel):

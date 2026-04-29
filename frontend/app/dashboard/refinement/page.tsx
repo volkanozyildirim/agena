@@ -1098,7 +1098,19 @@ export default function RefinementPage() {
       richComment += '\n\n⚠️ Belirsizlikler:\n' + row.ambiguities.map((a: string) => `• ${a}`).join('\n');
     }
 
+    // Top recommended_author with a matched team member id is the auto-
+    // assignee. If no match (or no recommendations) we just write back SP
+    // + comment without touching AssignedTo.
+    const matchedAuthor = (row.recommended_authors || []).find((a) => a.member_unique_name);
+    const assigneeUpn = matchedAuthor?.member_unique_name || undefined;
+
     try {
+      const itemPayload = {
+        item_id: row.item_id,
+        suggested_story_points: row.suggested_story_points,
+        comment: richComment,
+        ...(assigneeUpn ? { assignee_unique_name: assigneeUpn, assignee_source: provider } : {}),
+      };
       const payload = provider === 'azure'
         ? {
           provider,
@@ -1107,11 +1119,7 @@ export default function RefinementPage() {
           sprint_path: azureSprint,
           sprint_name: selectedAzureSprint?.name || azureSprint,
           comment_signature: commentSignature,
-          items: [{
-            item_id: row.item_id,
-            suggested_story_points: row.suggested_story_points,
-            comment: richComment,
-          }],
+          items: [itemPayload],
         }
         : {
           provider,
@@ -1119,11 +1127,7 @@ export default function RefinementPage() {
           sprint_id: jiraSprint,
           sprint_name: selectedJiraSprint?.name || jiraSprint,
           comment_signature: commentSignature,
-          items: [{
-            item_id: row.item_id,
-            suggested_story_points: row.suggested_story_points,
-            comment: richComment,
-          }],
+          items: [itemPayload],
         };
       const response = await apiFetch<RefinementWritebackResponse>('/refinement/writeback', {
         method: 'POST',

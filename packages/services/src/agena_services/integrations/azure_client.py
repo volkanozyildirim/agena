@@ -401,9 +401,11 @@ class AzureDevOpsClient:
         work_item_id: str,
         suggested_story_points: int,
         comment: str,
+        assignee_upn: str | None = None,
     ) -> None:
         org_url = (cfg.get('org_url') or self.settings.azure_org_url or '').strip()
         pat = (cfg.get('pat') or self.settings.azure_pat or '').strip()
+        project = (cfg.get('project') or self.settings.azure_project or '').strip()
         if not org_url or not pat:
             raise ValueError('Azure org_url or PAT is missing')
         item_id = str(work_item_id or '').strip()
@@ -425,14 +427,29 @@ class AzureDevOpsClient:
                 'path': '/fields/System.History',
                 'value': html_comment,
             })
+        if assignee_upn:
+            patch_ops.append({
+                'op': 'add',
+                'path': '/fields/System.AssignedTo',
+                'value': assignee_upn,
+            })
         if not patch_ops:
             return
 
-        url = f"{org_url.rstrip('/')}/_apis/wit/workitems/{item_id}?api-version=7.1-preview.3"
+        # Project-scoped URL works on all org configurations; the no-project
+        # form sometimes 401s on tenants where the PAT was minted with the
+        # "specific project" scope.
+        prefix = f"{org_url.rstrip('/')}/{project}" if project else org_url.rstrip('/')
+        url = f"{prefix}/_apis/wit/workitems/{item_id}?api-version=7.1-preview.3"
         headers = self._headers(pat)
         headers['Content-Type'] = 'application/json-patch+json'
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.patch(url, headers=headers, json=patch_ops)
+            if response.status_code >= 400:
+                # Bubble the Azure error message up so the UI can show
+                # exactly which field rejected (e.g. "User does not exist
+                # in this organization" or "StoryPoints field is read-only").
+                raise RuntimeError(f'Azure {response.status_code}: {response.text[:300]}')
             response.raise_for_status()
 
     async def add_tag_to_work_item(
