@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useRepoIdParam } from '@/lib/useRepoIdParam';
 import {
   fetchDoraDevelopment,
   fetchGitAnalytics,
@@ -30,7 +31,7 @@ const box: React.CSSProperties = {
 export default function DoraDevelopmentPage() {
   const { t } = useLocale();
   const [tab, setTab] = useState<Tab>('git');
-  const [repoId, setRepoId] = useState<string | null>(null);
+  const [repoId, setRepoId] = useRepoIdParam();
   const [gitData, setGitData] = useState<GitAnalyticsResponse | null>(null);
   const [devData, setDevData] = useState<DoraDevelopmentResponse | null>(null);
   const [prData, setPrData] = useState<PrAnalyticsResponse | null>(null);
