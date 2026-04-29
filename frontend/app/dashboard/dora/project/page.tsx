@@ -14,6 +14,7 @@ import { useLocale, type TranslationKey } from '@/lib/i18n';
 import BarChart from '@/components/charts/BarChart';
 import LineChart from '@/components/charts/LineChart';
 import RepoSelector from '@/components/RepoSelector';
+import { useRepoIdParam } from '@/lib/useRepoIdParam';
 
 const box: React.CSSProperties = {
   borderRadius: 14,
@@ -408,7 +409,7 @@ export default function DoraProjectPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [days, setDays] = useState(30);
-  const [repoId, setRepoId] = useState<string | null>(null);
+  const [repoId, setRepoId] = useRepoIdParam();
   const [workItemTab, setWorkItemTab] = useState<'completed' | 'incomplete' | 'removed'>('completed');
   const [velocityTab, setVelocityTab] = useState<'count' | 'effort'>('count');
   const [typeFilter, setTypeFilter] = useState<'all' | 'task' | 'bug'>('all');

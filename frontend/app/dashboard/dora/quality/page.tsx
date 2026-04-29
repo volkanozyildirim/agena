@@ -7,6 +7,7 @@ import { useLocale } from '@/lib/i18n';
 import LineChart from '@/components/charts/LineChart';
 import BarChart from '@/components/charts/BarChart';
 import RepoSelector from '@/components/RepoSelector';
+import { useRepoIdParam } from '@/lib/useRepoIdParam';
 
 const box: React.CSSProperties = {
   borderRadius: 14,
@@ -27,7 +28,7 @@ export default function DoraQualityPage() {
   const [data, setData] = useState<DoraQualityResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [repoId, setRepoId] = useState<string | null>(null);
+  const [repoId, setRepoId] = useRepoIdParam();
 
   useEffect(() => {
     let active = true;
