@@ -3082,5 +3082,6 @@
   "landing.skillsExample.futureBody": "#64044 — カテゴリ フィルターはページネーションでバリアントを失います。上位のスキル一致 (81%) は、上記のルーティング フォールバックです。そのプロンプトフラグメントが挿入されます。エージェントはインラインスラッグ解析をスキップし、リゾルバーを再利用し、チームの前例と一致する修正を出荷します。",
   "skills.importDefaults": "デフォルトをインポートする",
   "skills.importDefaultsConfirm": "厳選されたデフォルトのスキルをこの組織に追加しますか?同じ名前の既存のエントリはスキップされます。",
-  "skills.importDefaultsResult": "インポート済み: 新規 {inserted}、{skipped} すでに存在、バンドル内の合計は {total} 個です。"
+  "skills.importDefaultsResult": "インポート済み: 新規 {inserted}、{skipped} すでに存在、バンドル内の合計は {total} 個です。",
+  "skills.close": "近い"
 }

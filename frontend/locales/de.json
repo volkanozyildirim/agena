@@ -3082,5 +3082,6 @@
   "landing.skillsExample.futureBody": "#64044 – Der Kategoriefilter verliert die Variante bei der Paginierung. Top-Skill-Match (81 %) ist der Routing-Fallback oben. Sein Prompt-Fragment wird eingefügt: Der Agent überspringt die Inline-Slug-Analyse, verwendet den Resolver wieder und liefert einen Fix, der mit dem Präzedenzfall des Teams übereinstimmt.",
   "skills.importDefaults": "Standardwerte importieren",
   "skills.importDefaultsConfirm": "Die kuratierten Standardkompetenzen zu dieser Organisation hinzufügen? Vorhandene Einträge mit demselben Namen werden übersprungen.",
-  "skills.importDefaultsResult": "Importiert: {inserted} neu, {skipped} bereits vorhanden, insgesamt {total} im Bundle."
+  "skills.importDefaultsResult": "Importiert: {inserted} neu, {skipped} bereits vorhanden, insgesamt {total} im Bundle.",
+  "skills.close": "Schließen"
 }

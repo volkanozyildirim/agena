@@ -56,6 +56,12 @@ export default function SkillsPage() {
   const [page, setPage] = useState(1);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  // Import-defaults flow state. Two stages: confirm → result. We keep
+  // it modal-based instead of window.confirm + alert so the rest of
+  // the dashboard's portal-modal style stays consistent.
+  const [importStage, setImportStage] = useState<'idle' | 'confirm' | 'running' | 'result'>('idle');
+  const [importResult, setImportResult] = useState<{ inserted: number; skipped: number; total: number } | null>(null);
+  const [importError, setImportError] = useState<string>('');
   const [newSkill, setNewSkill] = useState<{ name: string; description: string; pattern_type: string; tags: string; approach_summary: string; prompt_fragment: string }>(
     { name: '', description: '', pattern_type: 'other', tags: '', approach_summary: '', prompt_fragment: '' }
   );
@@ -135,19 +141,7 @@ export default function SkillsPage() {
           </p>
         </div>
         <button
-          onClick={async () => {
-            if (!window.confirm(tr('skills.importDefaultsConfirm' as Parameters<typeof tr>[0]))) return;
-            try {
-              const r = await apiFetch<{ inserted: number; skipped: number; total: number }>('/skills/import-defaults', { method: 'POST' });
-              alert(tr('skills.importDefaultsResult' as Parameters<typeof tr>[0])
-                .replace('{inserted}', String(r.inserted))
-                .replace('{skipped}', String(r.skipped))
-                .replace('{total}', String(r.total)));
-              void load();
-            } catch (e) {
-              alert(e instanceof Error ? e.message : 'Import failed');
-            }
-          }}
+          onClick={() => { setImportError(''); setImportResult(null); setImportStage('confirm'); }}
           style={{
             fontSize: 12, fontWeight: 700, padding: '8px 14px', borderRadius: 10,
             border: '1px solid rgba(167,139,250,0.5)',
@@ -416,6 +410,122 @@ export default function SkillsPage() {
                 {saving ? tr('skills.saving') : tr('skills.save')}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import defaults modal — confirm + result in the same dialog. */}
+      {importStage !== 'idle' && (
+        <div
+          style={{
+            position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+            zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+          }}
+          onClick={() => importStage !== 'running' && setImportStage('idle')}
+        >
+          <div
+            style={{
+              width: 'min(440px, 92vw)', borderRadius: 16, padding: '20px 22px',
+              background: 'var(--surface)', border: '1px solid var(--panel-border-2)',
+              display: 'grid', gap: 14,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 22 }}>✨</div>
+            <h3 style={{ fontSize: 16, fontWeight: 800, color: 'var(--ink-90)', margin: 0 }}>
+              {tr('skills.importDefaults' as Parameters<typeof tr>[0])}
+            </h3>
+
+            {importStage === 'confirm' && (
+              <>
+                <p style={{ fontSize: 13, color: 'var(--ink-65)', lineHeight: 1.6, margin: 0 }}>
+                  {tr('skills.importDefaultsConfirm' as Parameters<typeof tr>[0])}
+                </p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type='button'
+                    onClick={() => setImportStage('idle')}
+                    style={{
+                      flex: 1, padding: '10px 16px', borderRadius: 10,
+                      border: '1px solid var(--panel-border-2)', background: 'transparent',
+                      color: 'var(--ink-50)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    }}
+                  >
+                    {tr('skills.cancel' as Parameters<typeof tr>[0])}
+                  </button>
+                  <button
+                    type='button'
+                    onClick={async () => {
+                      setImportStage('running');
+                      try {
+                        const r = await apiFetch<{ inserted: number; skipped: number; total: number }>(
+                          '/skills/import-defaults', { method: 'POST' },
+                        );
+                        setImportResult(r);
+                        setImportStage('result');
+                        void load();
+                      } catch (e) {
+                        setImportError(e instanceof Error ? e.message : 'Import failed');
+                        setImportStage('result');
+                      }
+                    }}
+                    style={{
+                      flex: 2, padding: '10px 16px', borderRadius: 10,
+                      border: '1px solid rgba(167,139,250,0.5)',
+                      background: 'rgba(167,139,250,0.15)', color: '#c4b5fd',
+                      fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    }}
+                  >
+                    ✨ {tr('skills.importDefaults' as Parameters<typeof tr>[0])}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {importStage === 'running' && (
+              <p style={{ fontSize: 13, color: 'var(--ink-65)', margin: 0 }}>
+                {tr('skills.loading')}
+              </p>
+            )}
+
+            {importStage === 'result' && (
+              <>
+                {importError ? (
+                  <div style={{
+                    padding: '10px 12px', borderRadius: 10,
+                    background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)',
+                    color: '#fca5a5', fontSize: 13,
+                  }}>
+                    {importError}
+                  </div>
+                ) : importResult ? (
+                  <div style={{
+                    padding: '12px 14px', borderRadius: 10,
+                    background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.35)',
+                    color: '#86efac', fontSize: 13, lineHeight: 1.5,
+                  }}>
+                    {tr('skills.importDefaultsResult' as Parameters<typeof tr>[0])
+                      .replace('{inserted}', String(importResult.inserted))
+                      .replace('{skipped}', String(importResult.skipped))
+                      .replace('{total}', String(importResult.total))}
+                  </div>
+                ) : null}
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    type='button'
+                    onClick={() => setImportStage('idle')}
+                    style={{
+                      padding: '8px 16px', borderRadius: 10,
+                      border: '1px solid var(--panel-border-2)', background: 'var(--panel)',
+                      color: 'var(--ink-78)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    }}
+                  >
+                    {tr('skills.close' as Parameters<typeof tr>[0])}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
