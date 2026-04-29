@@ -14,6 +14,9 @@ interface DoraSummary {
   deploy_frequency: number | null;
   change_failure_rate: number | null;
   mttr_hours: number | null;
+  commits_in_period?: number;
+  prs_in_period?: number;
+  deploys_in_period?: number;
 }
 
 type RepoMappingRow = {
@@ -185,7 +188,7 @@ function RepoCard({ repo, syncStatus, syncing, onSync, days }: RepoCardProps) {
           {syncing
             ? '⏳ Syncing…'
             : hasSynced
-              ? `↻ Refresh (${(syncStatus?.commits || 0).toLocaleString()}c · ${(syncStatus?.prs || 0).toLocaleString()}p)`
+              ? `↻ Refresh (${((metrics?.commits_in_period ?? syncStatus?.commits) || 0).toLocaleString()}c · ${((metrics?.prs_in_period ?? syncStatus?.prs) || 0).toLocaleString()}p)`
               : '↻ Sync'}
         </button>
       </div>
@@ -211,11 +214,14 @@ function RepoCard({ repo, syncStatus, syncing, onSync, days }: RepoCardProps) {
         })}
       </div>
 
-      {/* Activity strip */}
+      {/* Activity strip — same period as the KPI tiles above so the
+          numbers don't fight each other. Falls back to syncStatus's
+          all-time totals only while the per-period overview is still
+          loading or absent. */}
       <div style={{ display: 'flex', gap: 16, fontSize: 11, color: 'var(--ink-65)', flexWrap: 'wrap', borderTop: '1px solid var(--panel-border)', paddingTop: 10 }}>
-        <span><strong style={{ color: 'var(--ink)' }}>{syncStatus?.commits ?? 0}</strong> commits</span>
-        <span><strong style={{ color: 'var(--ink)' }}>{syncStatus?.prs ?? 0}</strong> PRs</span>
-        <span><strong style={{ color: 'var(--ink)' }}>{syncStatus?.deployments ?? 0}</strong> deploys</span>
+        <span><strong style={{ color: 'var(--ink)' }}>{(metrics?.commits_in_period ?? syncStatus?.commits ?? 0).toLocaleString()}</strong> commits</span>
+        <span><strong style={{ color: 'var(--ink)' }}>{(metrics?.prs_in_period ?? syncStatus?.prs ?? 0).toLocaleString()}</strong> PRs</span>
+        <span><strong style={{ color: 'var(--ink)' }}>{(metrics?.deploys_in_period ?? syncStatus?.deployments ?? 0).toLocaleString()}</strong> deploys</span>
         <Link
           href={`/dashboard/dora/development?repo=${repo.id}`}
           style={{ marginLeft: 'auto', color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}

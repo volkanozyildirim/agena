@@ -295,6 +295,9 @@ class DoraOverviewResponse(BaseModel):
     mttr_hours: float | None
     data_source: str = 'tasks'
     daily: list[DoraDailyItem]
+    commits_in_period: int = 0
+    prs_in_period: int = 0
+    deploys_in_period: int = 0
 
 
 # ── DORA Quality schemas ─────────────────────────────────────────────────────

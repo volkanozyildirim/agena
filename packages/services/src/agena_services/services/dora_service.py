@@ -227,6 +227,33 @@ class DoraService:
                 'mttr_hours': None,
             })
 
+        # Period-scoped raw counts so the hub card can show the same
+        # window the rest of the page is using (instead of an all-time
+        # synced total that drifts out of sync with the KPI tiles).
+        commit_count_q = select(func.count(GitCommit.id)).where(
+            GitCommit.organization_id == organization_id,
+            GitCommit.committed_at >= since,
+        )
+        if repo_mapping_id:
+            commit_count_q = commit_count_q.where(GitCommit.repo_mapping_id == repo_mapping_id)
+        commits_in_period = int((await self.db.execute(commit_count_q)).scalar() or 0)
+
+        pr_count_q = select(func.count(GitPullRequest.id)).where(
+            GitPullRequest.organization_id == organization_id,
+            GitPullRequest.created_at_ext >= since,
+        )
+        if repo_mapping_id:
+            pr_count_q = pr_count_q.where(GitPullRequest.repo_mapping_id == repo_mapping_id)
+        prs_in_period = int((await self.db.execute(pr_count_q)).scalar() or 0)
+
+        deploy_count_q = select(func.count(GitDeployment.id)).where(
+            GitDeployment.organization_id == organization_id,
+            GitDeployment.deployed_at >= since,
+        )
+        if repo_mapping_id:
+            deploy_count_q = deploy_count_q.where(GitDeployment.repo_mapping_id == repo_mapping_id)
+        deploys_in_period = int((await self.db.execute(deploy_count_q)).scalar() or 0)
+
         return {
             'lead_time_hours': lead_time_hours,
             'deploy_frequency': deploy_frequency,
@@ -234,6 +261,9 @@ class DoraService:
             'mttr_hours': mttr_hours,
             'data_source': 'git',
             'daily': daily,
+            'commits_in_period': commits_in_period,
+            'prs_in_period': prs_in_period,
+            'deploys_in_period': deploys_in_period,
         }
 
     # ── Task-based fallback (original implementation) ─────────────────────────
@@ -618,5 +648,8 @@ class DoraService:
             'time_trend': [],
             'throughput_trend': [],
             'daily': [],
+            'commits_in_period': 0,
+            'prs_in_period': 0,
+            'deploys_in_period': 0,
             'generated_at': _dt.utcnow().isoformat() + 'Z',
         }
