@@ -539,6 +539,11 @@ class AzureDevOpsClient:
         url = f"{prefix}/_apis/wit/workitems/{item_id}?api-version=7.1-preview.3"
         headers = self._headers(pat)
         headers['Content-Type'] = 'application/json-patch+json'
+        # Diagnostic: log which field paths we're attempting and which
+        # Azure actually persisted in the response. Lets us see when a
+        # silent drop is happening (Azure 200's but doesn't store the
+        # value because of workflow rules / custom field name / scope).
+        attempted_paths = [op.get('path', '') for op in patch_ops]
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.patch(url, headers=headers, json=patch_ops)
             if response.status_code >= 400:
@@ -547,6 +552,21 @@ class AzureDevOpsClient:
                 # in this organization" or "StoryPoints field is read-only").
                 raise RuntimeError(f'Azure {response.status_code}: {response.text[:300]}')
             response.raise_for_status()
+            try:
+                returned = response.json() or {}
+                returned_fields = (returned.get('fields') or {})
+                applied_pairs: list[str] = []
+                for p in attempted_paths:
+                    field_name = p.replace('/fields/', '')
+                    val = returned_fields.get(field_name)
+                    applied_pairs.append(f'{field_name}={val!r}')
+                logger.info(
+                    'Azure writeback work_item=%s sent_paths=%s post_state=[%s]',
+                    item_id, attempted_paths, ' | '.join(applied_pairs),
+                )
+            except Exception:
+                # Non-fatal — just diagnostic.
+                pass
 
     async def add_tag_to_work_item(
         self,
