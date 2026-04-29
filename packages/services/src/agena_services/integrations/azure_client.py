@@ -491,11 +491,30 @@ class AzureDevOpsClient:
 
         patch_ops: list[dict[str, Any]] = []
         if int(suggested_story_points or 0) > 0:
-            patch_ops.append({
-                'op': 'add',
-                'path': '/fields/Microsoft.VSTS.Scheduling.StoryPoints',
-                'value': int(suggested_story_points),
-            })
+            sp_value = int(suggested_story_points)
+            # Azure DevOps uses different field names for "story points"
+            # depending on the process template AND work item type:
+            #   • Story / PBI / Bug (Agile): Microsoft.VSTS.Scheduling.StoryPoints
+            #   • Story / PBI / Bug (Scrum): Microsoft.VSTS.Scheduling.Effort
+            #   • Story / PBI / Bug (CMMI):  Microsoft.VSTS.Scheduling.Size
+            #   • Task:                       Microsoft.VSTS.Scheduling.OriginalEstimate
+            # We don't know the process template up front, so we send all
+            # four and let Azure apply whichever the work item type knows
+            # about. Empirically Azure 200's the request and silently drops
+            # the fields that don't apply (instead of 400'ing). If the
+            # work item type accepts more than one (rare), they all get
+            # the same value, which is the right answer.
+            for field_name in (
+                'Microsoft.VSTS.Scheduling.StoryPoints',
+                'Microsoft.VSTS.Scheduling.Effort',
+                'Microsoft.VSTS.Scheduling.Size',
+                'Microsoft.VSTS.Scheduling.OriginalEstimate',
+            ):
+                patch_ops.append({
+                    'op': 'add',
+                    'path': f'/fields/{field_name}',
+                    'value': sp_value,
+                })
         if str(comment or '').strip():
             # Azure DevOps System.History accepts HTML — convert newlines to <br> and format sections
             html_comment = self._format_comment_html(str(comment).strip())
