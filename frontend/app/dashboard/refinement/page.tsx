@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { apiFetch, cachedApiFetch, loadPrefs, loadPromptCatalog } from '@/lib/api';
+import { SPRINT_CHANGED_EVENT } from '@/components/SprintSwitcher';
 import { useLocale } from '@/lib/i18n';
 
 type Provider = 'azure' | 'jira';
@@ -647,6 +648,16 @@ export default function RefinementPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Bumped whenever the global SprintSwitcher saves a new sprint, so the
+  // refinement page re-reads prefs and switches itself to the new sprint
+  // without needing a full page reload.
+  const [sprintRefreshKey, setSprintRefreshKey] = useState(0);
+  useEffect(() => {
+    const onChange = () => setSprintRefreshKey((k) => k + 1);
+    window.addEventListener(SPRINT_CHANGED_EVENT, onChange);
+    return () => window.removeEventListener(SPRINT_CHANGED_EVENT, onChange);
+  }, []);
+
   useEffect(() => {
     let active = true;
 
@@ -682,7 +693,8 @@ export default function RefinementPage() {
         const settings = ((prefs?.profile_settings || {}) as Record<string, unknown>);
         const preferredProvider = typeof settings.preferred_provider === 'string' ? settings.preferred_provider : 'openai';
         const preferredModel = typeof settings.preferred_model === 'string' ? settings.preferred_model : 'gpt-5.1-codex-mini';
-        setAgentProvider((['gemini', 'hal', 'codex_cli', 'claude_cli'] as const).includes(preferredProvider as AgentProvider) ? preferredProvider as AgentProvider : 'openai');
+        const validProviders = ['openai', 'gemini', 'hal', 'codex_cli', 'claude_cli'] as readonly string[];
+        setAgentProvider(validProviders.includes(preferredProvider) ? preferredProvider as AgentProvider : 'openai');
         setAgentModel(preferredModel || 'gpt-5.1-codex-mini');
 
         const prefAzureProject = prefs?.azure_project || '';
@@ -732,7 +744,11 @@ export default function RefinementPage() {
     return () => {
       active = false;
     };
-  }, []);
+    // sprintRefreshKey re-triggers boot so a sprint change from the
+    // global switcher pulls in fresh azure_project/team/sprint (or jira)
+    // values without a hard reload.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sprintRefreshKey]);
 
   const loadAzureTeams = useCallback(async (nextProject: string) => {
     setAzureProject(nextProject);
@@ -1591,7 +1607,7 @@ export default function RefinementPage() {
                   let ok = 0;
                   for (const r of validItems) {
                     try {
-                      const desc = r.description || r.summary || r.item_id;
+                      const desc = r.summary || r.item_id;
                       const ctxParts = [
                         `External Source: ${provider === 'jira' ? `Jira #${r.item_id}` : `Azure #${r.item_id}`}`,
                         provider === 'azure' && azureProject ? `Project: ${azureProject}` : '',
@@ -1804,7 +1820,25 @@ export default function RefinementPage() {
           <>
           {/* Unified item list — works on both mobile and desktop, grouped by work_item_type */}
           <div style={{ padding: '0' }}>
-                {groupedItems.map((group) => (
+                {groupedItems.map((group) => {
+                  const selectableInGroup = group.items.filter((it) => !hasEstimate(it));
+                  const selectedInGroup = selectableInGroup.filter((it) => selectedIds.includes(it.id));
+                  const allSelected = selectableInGroup.length > 0 && selectedInGroup.length === selectableInGroup.length;
+                  const someSelected = selectedInGroup.length > 0 && !allSelected;
+                  const toggleGroup = () => {
+                    setSelectedIds((prev) => {
+                      const inGroupIds = new Set(selectableInGroup.map((it) => it.id));
+                      if (allSelected) {
+                        // Currently fully selected → deselect all in group.
+                        return prev.filter((id) => !inGroupIds.has(id));
+                      }
+                      // Otherwise select every selectable item in the group.
+                      const next = new Set(prev);
+                      for (const it of selectableInGroup) next.add(it.id);
+                      return Array.from(next);
+                    });
+                  };
+                  return (
                   <React.Fragment key={`group-${group.type}`}>
                     <div style={{
                       padding: '8px 14px',
@@ -1814,8 +1848,22 @@ export default function RefinementPage() {
                       borderBottom: '1px solid var(--panel-border)',
                       display: 'flex', alignItems: 'center', gap: 8,
                     }}>
+                      <input
+                        type='checkbox'
+                        checked={allSelected}
+                        ref={(el) => { if (el) el.indeterminate = someSelected; }}
+                        disabled={selectableInGroup.length === 0}
+                        onChange={toggleGroup}
+                        title={selectableInGroup.length === 0 ? 'No selectable items' : 'Toggle all in group'}
+                        style={{ width: 14, height: 14, cursor: selectableInGroup.length ? 'pointer' : 'not-allowed' }}
+                      />
                       <span>{group.type}</span>
                       <span style={{ color: 'var(--ink-35)', fontWeight: 600 }}>· {group.items.length}</span>
+                      {selectedInGroup.length > 0 && (
+                        <span style={{ color: '#5eead4', fontWeight: 700, marginLeft: 4 }}>
+                          ({selectedInGroup.length} selected)
+                        </span>
+                      )}
                     </div>
                     {group.items.map((item) => {
                   const estimated = hasEstimate(item);
@@ -2305,7 +2353,8 @@ export default function RefinementPage() {
                   );
                 })}
                   </React.Fragment>
-                ))}
+                  );
+                })}
           </div>
 
           {/* Old mobile cards removed — unified list above handles both mobile and desktop */}
