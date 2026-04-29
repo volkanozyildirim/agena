@@ -484,7 +484,7 @@ export default function DoraProjectPage() {
           </div>
           <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--ink)', margin: 0 }}>{t('dora.project.pageTitle')}</h1>
           <p style={{ fontSize: 14, color: 'var(--muted)', marginTop: 6 }}>{t('dora.projectDesc')}</p>
-          <RepoSelector value={repoId} onSelect={setRepoId} />
+          <RepoSelector value={repoId} onSelect={setRepoId} hideSync />
 
           {/* Internal / External source toggle */}
           <div style={{ display: 'flex', gap: 6, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>

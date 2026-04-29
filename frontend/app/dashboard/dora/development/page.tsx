@@ -90,7 +90,7 @@ export default function DoraDevelopmentPage() {
           {t('dora.dev.subtitle')}
         </p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
-          <RepoSelector value={repoId} onSelect={setRepoId} />
+          <RepoSelector value={repoId} onSelect={setRepoId} hideSync />
           <DoraPeriodTabs value={periodDays} onChange={setPeriodDays} />
         </div>
       </div>

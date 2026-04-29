@@ -9,6 +9,10 @@ const LS_REPO_MAPPINGS = 'agena_repo_mappings';
 interface RepoSelectorProps {
   value: string | null;
   onSelect: (repoMappingId: string | null) => void;
+  /** Hide the inline Sync button. Subpages off the DORA hub already
+   *  have a dedicated sync flow on the hub, so duplicating it here is
+   *  redundant and confusing. */
+  hideSync?: boolean;
 }
 
 function ProviderIcon({ provider }: { provider?: string }) {
@@ -31,7 +35,7 @@ function ProviderIcon({ provider }: { provider?: string }) {
   );
 }
 
-export default function RepoSelector({ value, onSelect }: RepoSelectorProps) {
+export default function RepoSelector({ value, onSelect, hideSync = false }: RepoSelectorProps) {
   const { t } = useLocale();
   const [repos, setRepos] = useState<RepoMapping[]>([]);
   const [syncing, setSyncing] = useState(false);
@@ -170,7 +174,7 @@ export default function RepoSelector({ value, onSelect }: RepoSelectorProps) {
       )}
 
       {/* Sync button */}
-      {value && (
+      {value && !hideSync && (
         <button
           onClick={handleSync}
           disabled={syncing}
