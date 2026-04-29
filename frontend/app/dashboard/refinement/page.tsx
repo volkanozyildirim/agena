@@ -484,6 +484,9 @@ export default function RefinementPage() {
   const [agentModel, setAgentModel] = useState('gpt-5.1-codex-mini');
   const [language, setLanguage] = useState('Turkish');
   const [maxItems, setMaxItems] = useState(8);
+  // Filter for the sprint items list: 'all' | 'unestimated' | 'estimated'.
+  // Independent of maxItems (which only caps how many the analyze run takes).
+  const [estimateFilter, setEstimateFilter] = useState<'all' | 'unestimated' | 'estimated'>('all');
   // Optional: when set, refinement asks the LLM for `file_changes` and
   // resolves git authorship against this repo's checkout. Empty string
   // = code-aware analysis off.
@@ -810,13 +813,16 @@ export default function RefinementPage() {
         );
       }
       setItemsData(data);
-      setSelectedIds(data.items.filter((item) => !hasEstimate(item)).slice(0, maxItems).map((item) => item.id));
+      // No auto-selection on load — user picks what to refine. Auto-selecting
+      // the first N unestimated items just confused things, especially with
+      // the new type grouping.
+      setSelectedIds([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load refinement items');
     } finally {
       setLoadingItems(false);
     }
-  }, [provider, azureProject, azureTeam, azureSprint, selectedAzureSprint, jiraBoard, jiraSprint, selectedJiraSprint, maxItems]);
+  }, [provider, azureProject, azureTeam, azureSprint, selectedAzureSprint, jiraBoard, jiraSprint, selectedJiraSprint]);
 
   useEffect(() => {
     if (provider === 'azure') {
@@ -1184,6 +1190,34 @@ export default function RefinementPage() {
       return a.title.localeCompare(b.title);
     });
   }, [itemsData, resultByItemId]);
+
+  // Group sprint items by work_item_type so User Story / Task / Bug
+  // each get a clear header. Azure's "User Story" and Jira's "Story"
+  // collapse onto the same bucket. Order is intentional —
+  // stories surface first because they're typically what refinement
+  // is grading; bugs and tasks follow; anything unrecognised goes last.
+  const groupedItems = useMemo(() => {
+    const ORDER = ['Story', 'Bug', 'Task', 'Epic', 'Other'];
+    const filtered = sortedItems.filter((it) => {
+      if (estimateFilter === 'unestimated') return !hasEstimate(it);
+      if (estimateFilter === 'estimated') return hasEstimate(it);
+      return true;
+    });
+    const buckets = new Map<string, ExternalTask[]>();
+    for (const it of filtered) {
+      const raw = (it.work_item_type || 'Task').trim();
+      const norm = raw.toLowerCase() === 'user story' ? 'Story'
+        : ORDER.includes(raw) ? raw
+        : raw || 'Other';
+      const key = ORDER.includes(norm) ? norm : 'Other';
+      const existing = buckets.get(key) || [];
+      existing.push(it);
+      buckets.set(key, existing);
+    }
+    return ORDER
+      .filter((k) => (buckets.get(k) || []).length > 0)
+      .map((k) => ({ type: k, items: buckets.get(k) || [] }));
+  }, [sortedItems, estimateFilter]);
 
   useEffect(() => {
     if (!itemsData || !results) return;
@@ -1738,14 +1772,52 @@ export default function RefinementPage() {
       </div>
 
       <div className="refinement-table-wrap" style={{ borderRadius: 14, border: '1px solid var(--panel-border-2)', background: 'var(--surface)', overflow: 'hidden' }}>
-        <div style={{ ...panelHeader, padding: '10px 14px', borderBottom: '1px solid var(--panel-border)' }}>Sprint Items</div>
+        <div style={{ ...panelHeader, padding: '10px 14px', borderBottom: '1px solid var(--panel-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <span>Sprint Items</span>
+          {(itemsData?.items?.length || 0) > 0 && (
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              {([
+                { key: 'all' as const, label: lang === 'tr' ? 'Hepsi' : 'All', count: itemsData?.items.length || 0 },
+                { key: 'unestimated' as const, label: lang === 'tr' ? 'Puansız' : 'Unestimated', count: itemsData?.unestimated_count ?? (itemsData?.items.filter((i) => !hasEstimate(i)).length || 0) },
+                { key: 'estimated' as const, label: lang === 'tr' ? 'Puanlı' : 'Estimated', count: itemsData?.pointed_count ?? (itemsData?.items.filter((i) => hasEstimate(i)).length || 0) },
+              ]).map((tab) => (
+                <button
+                  key={tab.key}
+                  type='button'
+                  onClick={() => setEstimateFilter(tab.key)}
+                  style={{
+                    padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                    border: estimateFilter === tab.key ? '1px solid rgba(94,234,212,0.5)' : '1px solid var(--panel-border)',
+                    background: estimateFilter === tab.key ? 'rgba(94,234,212,0.12)' : 'transparent',
+                    color: estimateFilter === tab.key ? '#5eead4' : 'var(--ink-55)',
+                  }}
+                >
+                  {tab.label} <span style={{ opacity: 0.65, marginLeft: 2 }}>{tab.count}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         {!sortedItems.length ? (
           <div style={emptyStyle}>{loadingItems ? copy.loadingItems : copy.noItems}</div>
         ) : (
           <>
-          {/* Unified item list — works on both mobile and desktop */}
+          {/* Unified item list — works on both mobile and desktop, grouped by work_item_type */}
           <div style={{ padding: '0' }}>
-                {sortedItems.map((item) => {
+                {groupedItems.map((group) => (
+                  <React.Fragment key={`group-${group.type}`}>
+                    <div style={{
+                      padding: '8px 14px',
+                      fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8,
+                      color: 'var(--ink-50)', background: 'var(--panel-alt)',
+                      borderTop: '1px solid var(--panel-border-2)',
+                      borderBottom: '1px solid var(--panel-border)',
+                      display: 'flex', alignItems: 'center', gap: 8,
+                    }}>
+                      <span>{group.type}</span>
+                      <span style={{ color: 'var(--ink-35)', fontWeight: 600 }}>· {group.items.length}</span>
+                    </div>
+                    {group.items.map((item) => {
                   const estimated = hasEstimate(item);
                   const checked = selectedIds.includes(item.id);
                   const itemSourceUrl = resultByItemId.get(item.id)?.item_url || item.web_url || '';
@@ -2232,6 +2304,8 @@ export default function RefinementPage() {
                     </React.Fragment>
                   );
                 })}
+                  </React.Fragment>
+                ))}
           </div>
 
           {/* Old mobile cards removed — unified list above handles both mobile and desktop */}
