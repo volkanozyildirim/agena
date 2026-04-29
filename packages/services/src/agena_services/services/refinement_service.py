@@ -1362,6 +1362,11 @@ class RefinementService:
             # card — without it the row reverts to "Yaz" on every reload.
             phase = (row.phase or '').lower()
             if phase == 'writeback':
+                # Only "completed" writebacks count as still active. Rows
+                # whose status was flipped to 'deleted' by the
+                # delete-comment endpoint reflect the comment having been
+                # removed from the provider — the row stays for audit but
+                # the UI shouldn't show "Yazıldı" anymore.
                 if (row.status or '') == 'completed' and current['last_writeback_at'] is None:
                     current['last_writeback_at'] = row.created_at.isoformat() if row.created_at else None
                 continue

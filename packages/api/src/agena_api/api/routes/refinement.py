@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agena_api.api.dependencies import CurrentTenant, get_current_tenant
@@ -519,6 +519,22 @@ async def delete_refinement_comment(
                     # 404 means it was already gone (e.g., another tab) — count as success.
                     if d.status_code == 404:
                         deleted += 1
+        # 3) Tombstone the local writeback rows so list_items no longer
+        # surfaces this item as "Yazıldı" after a reload. We don't drop
+        # the row entirely — flipping status to 'deleted' keeps the audit
+        # trail visible on the runs page.
+        await db.execute(
+            update(RefinementRecord)
+            .where(
+                RefinementRecord.organization_id == tenant.organization_id,
+                RefinementRecord.provider == 'azure',
+                RefinementRecord.external_item_id == wid,
+                RefinementRecord.phase == 'writeback',
+                RefinementRecord.status == 'completed',
+            )
+            .values(status='deleted')
+        )
+        await db.commit()
         return {'deleted': deleted}
 
     if src == 'jira':
@@ -549,6 +565,19 @@ async def delete_refinement_comment(
                 d = await client.delete(del_url, headers={'Authorization': f'Basic {creds}'})
                 if d.status_code in (200, 204) or d.status_code == 404:
                     deleted += 1
+        # Same DB tombstoning for Jira-side writebacks.
+        await db.execute(
+            update(RefinementRecord)
+            .where(
+                RefinementRecord.organization_id == tenant.organization_id,
+                RefinementRecord.provider == 'jira',
+                RefinementRecord.external_item_id == wid,
+                RefinementRecord.phase == 'writeback',
+                RefinementRecord.status == 'completed',
+            )
+            .values(status='deleted')
+        )
+        await db.commit()
         return {'deleted': deleted}
 
     raise HTTPException(status_code=400, detail='provider must be azure or jira')
