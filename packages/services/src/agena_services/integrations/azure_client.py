@@ -493,22 +493,22 @@ class AzureDevOpsClient:
         if int(suggested_story_points or 0) > 0:
             sp_value = int(suggested_story_points)
             # Azure DevOps uses different field names for "story points"
-            # depending on the process template AND work item type:
-            #   • Story / PBI / Bug (Agile): Microsoft.VSTS.Scheduling.StoryPoints
-            #   • Story / PBI / Bug (Scrum): Microsoft.VSTS.Scheduling.Effort
-            #   • Story / PBI / Bug (CMMI):  Microsoft.VSTS.Scheduling.Size
-            #   • Task:                       Microsoft.VSTS.Scheduling.OriginalEstimate
-            # We don't know the process template up front, so we send all
-            # four and let Azure apply whichever the work item type knows
-            # about. Empirically Azure 200's the request and silently drops
-            # the fields that don't apply (instead of 400'ing). If the
-            # work item type accepts more than one (rare), they all get
-            # the same value, which is the right answer.
+            # depending on the process template:
+            #   • Agile  → Microsoft.VSTS.Scheduling.StoryPoints
+            #   • Scrum  → Microsoft.VSTS.Scheduling.Effort
+            #   • CMMI   → Microsoft.VSTS.Scheduling.Size
+            # All three carry the same semantic — abstract effort points —
+            # so we send all three and Azure applies whichever the work
+            # item type recognises (silently drops the rest).
+            #
+            # Deliberately NOT writing OriginalEstimate or RemainingWork:
+            # those are HOURS, not points, and stamping them with a
+            # story-point value (e.g. 5h on a "5 SP" task) actively
+            # mis-reports time tracking.
             for field_name in (
                 'Microsoft.VSTS.Scheduling.StoryPoints',
                 'Microsoft.VSTS.Scheduling.Effort',
                 'Microsoft.VSTS.Scheduling.Size',
-                'Microsoft.VSTS.Scheduling.OriginalEstimate',
             ):
                 patch_ops.append({
                     'op': 'add',
