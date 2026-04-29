@@ -244,16 +244,28 @@ class AnalyticsService:
             })
 
         # ── Totals for KPI cards ───────────────────────────────────────────
+        # Four metrics that USED to collapse to one or two values
+        # because productivity = predictability and planning_accuracy =
+        # predictability. Repurposed so each card carries information
+        # the others don't:
+        #   predictability    = % of planned work that landed (commitment)
+        #   productivity      = throughput per WEEK (count / weeks)
+        #   delivery_rate     = % of touched work that succeeded vs failed
+        #   planning_accuracy = symmetric closeness to plan (penalizes
+        #                       both under-delivery AND scope creep)
         total_planned = sum(planned_rows.values())
         total_completed = sum(completed_rows.values())
         total_failed = sum(failed_rows.values())
-        total_done = total_completed
-        total_all = total_planned
+        total_settled = total_completed + total_failed
 
-        predictability = round(total_done / total_planned * 100, 1) if total_planned > 0 else 0.0
-        productivity = predictability  # no pull-in distinction in model
-        delivery_rate = round(total_done / total_all * 100, 1) if total_all > 0 else 0.0
-        planning_accuracy = round(total_done / total_planned * 100, 1) if total_planned > 0 else 0.0
+        weeks = max(days / 7.0, 1.0)
+        predictability = round(total_completed / total_planned * 100, 1) if total_planned > 0 else 0.0
+        productivity = round(total_completed / weeks, 2)
+        delivery_rate = round(total_completed / total_settled * 100, 1) if total_settled > 0 else 0.0
+        planning_accuracy = (
+            round(max(0.0, 100.0 - abs(total_planned - total_completed) / total_planned * 100.0), 1)
+            if total_planned > 0 else 0.0
+        )
 
         # ── Cycle Time & Lead Time ─────────────────────────────────────────
         time_q = await self.db.execute(
@@ -529,10 +541,17 @@ class AnalyticsService:
         removed = sum(1 for it in items if (it.state or '').strip().lower() in removed_states)
         in_progress = total - completed - removed
 
+        # Same four-distinct-metrics treatment as the internal path so the
+        # KPI cards don't collapse to one value when toggled to Azure.
+        weeks = max(days / 7.0, 1.0)
+        settled = completed + (total - in_progress - completed)  # completed + removed
         predictability = round(completed / total * 100, 1) if total > 0 else 0.0
-        delivery_rate = predictability  # one population, no pull-in concept on raw work items
-        planning_accuracy = predictability
-        productivity = round(completed / max(days, 1), 2)  # completed-per-day proxy
+        productivity = round(completed / weeks, 2)
+        delivery_rate = round(completed / settled * 100, 1) if settled > 0 else 0.0
+        planning_accuracy = (
+            round(max(0.0, 100.0 - abs(total - completed) / total * 100.0), 1)
+            if total > 0 else 0.0
+        )
 
         # Weekly trend: created vs completed per ISO week. ExternalTask carries
         # `created_at` and `state`; we don't have a "completed_at" so we use

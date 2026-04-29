@@ -16,6 +16,7 @@ import LineChart from '@/components/charts/LineChart';
 import RepoSelector from '@/components/RepoSelector';
 import { useRepoIdParam } from '@/lib/useRepoIdParam';
 import { useDoraPeriodDays } from '@/lib/useDoraPeriodDays';
+import DoraPeriodTabs from '@/components/DoraPeriodTabs';
 
 const box: React.CSSProperties = {
   borderRadius: 14,
@@ -472,8 +473,6 @@ export default function DoraProjectPage() {
     return () => { active = false; };
   }, [days, repoId, source, azureProject, azureTeam]);
 
-  const periodOptions = [7, 14, 30, 60, 90];
-
   return (
     <div>
       {/* Header */}
@@ -535,27 +534,7 @@ export default function DoraProjectPage() {
             )}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 4 }}>
-          {periodOptions.map((d) => (
-            <button
-              key={d}
-              onClick={() => setDays(d)}
-              style={{
-                padding: '5px 12px',
-                borderRadius: 8,
-                border: '1px solid var(--panel-border)',
-                background: days === d ? 'var(--accent)' : 'var(--glass)',
-                color: days === d ? '#fff' : 'var(--ink)',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.15s',
-              }}
-            >
-              {d}d
-            </button>
-          ))}
-        </div>
+        <DoraPeriodTabs value={days} onChange={setDays} />
       </div>
 
       {/* Error */}
@@ -626,10 +605,14 @@ export default function DoraProjectPage() {
             </div>
           )}
 
-          {/* 4 KPI Cards */}
+          {/* 4 KPI Cards — each measures something distinct now:
+                - Predictability: % of planned that landed
+                - Productivity:   throughput per week (count, no %)
+                - Delivery rate:  % of touched work that succeeded
+                - Planning accuracy: symmetric closeness to plan */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 32 }}>
             <KpiCard label={t('dora.project.predictability')} value={data.kpi.predictability} color="#22c55e" />
-            <KpiCard label={t('dora.project.productivity')} value={data.kpi.productivity} color="#3b82f6" />
+            <KpiCard label={t('dora.project.productivity')} value={data.kpi.productivity} suffix="/wk" color="#3b82f6" />
             <KpiCard label={t('dora.project.deliveryRate')} value={data.kpi.delivery_rate} color="#8b5cf6" />
             <KpiCard label={t('dora.project.planningAccuracy')} value={data.kpi.planning_accuracy} color="#f59e0b" />
           </div>
