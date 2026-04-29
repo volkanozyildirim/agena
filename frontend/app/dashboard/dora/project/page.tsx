@@ -446,36 +446,6 @@ export default function DoraProjectPage() {
   const [workItemTab, setWorkItemTab] = useState<'completed' | 'incomplete' | 'removed'>('completed');
   const [velocityTab, setVelocityTab] = useState<'count' | 'effort'>('count');
   const [typeFilter, setTypeFilter] = useState<'all' | 'task' | 'bug'>('all');
-  // Source toggle: 'internal' = Agena task_records (the original behaviour),
-  // 'external' = Azure WIQL pulled live for the user's project/team. Project
-  // and team are only meaningful when source=external.
-  const [source, setSource] = useState<'internal' | 'external'>('internal');
-  const [azureProject, setAzureProject] = useState<string>('');
-  const [azureTeam, setAzureTeam] = useState<string>('');
-  const [azureProjects, setAzureProjects] = useState<{ id: string; name: string }[]>([]);
-  const [azureTeams, setAzureTeams] = useState<{ id: string; name: string }[]>([]);
-  const [projectsLoading, setProjectsLoading] = useState(false);
-  const [teamsLoading, setTeamsLoading] = useState(false);
-
-  // Lazy-load the org's Azure project list the first time external mode opens.
-  useEffect(() => {
-    if (source !== 'external' || azureProjects.length > 0 || projectsLoading) return;
-    setProjectsLoading(true);
-    apiFetch<{ id: string; name: string }[]>('/tasks/azure/projects')
-      .then((rows) => setAzureProjects(rows || []))
-      .catch(() => setAzureProjects([]))
-      .finally(() => setProjectsLoading(false));
-  }, [source, azureProjects.length, projectsLoading]);
-
-  // When the picked project changes, refresh the team list.
-  useEffect(() => {
-    if (source !== 'external' || !azureProject) { setAzureTeams([]); return; }
-    setTeamsLoading(true);
-    apiFetch<{ id: string; name: string }[]>(`/tasks/azure/teams?project=${encodeURIComponent(azureProject)}`)
-      .then((rows) => setAzureTeams(rows || []))
-      .catch(() => setAzureTeams([]))
-      .finally(() => setTeamsLoading(false));
-  }, [source, azureProject]);
 
   useEffect(() => {
     let active = true;
@@ -483,14 +453,10 @@ export default function DoraProjectPage() {
     setError('');
     (async () => {
       try {
-        const opts = source === 'external'
-          ? { source: 'external' as const, project: azureProject || undefined, team: azureTeam || undefined }
-          : { source: 'internal' as const };
-        const tasks: Promise<unknown>[] = [
-          fetchProjectAnalytics(days, repoId, opts),
-        ];
-        if (source === 'internal') tasks.push(fetchSprintDetail(days, repoId));
-        const [res, sprintRes] = await Promise.all(tasks);
+        const [res, sprintRes] = await Promise.all([
+          fetchProjectAnalytics(days, repoId, { source: 'internal' }),
+          fetchSprintDetail(days, repoId),
+        ]);
         if (active) {
           setData(res as ProjectAnalyticsResponse);
           setSprint((sprintRes as SprintDetailResponse) || null);
@@ -502,7 +468,7 @@ export default function DoraProjectPage() {
       }
     })();
     return () => { active = false; };
-  }, [days, repoId, source, azureProject, azureTeam]);
+  }, [days, repoId]);
 
   return (
     <div>
@@ -516,54 +482,6 @@ export default function DoraProjectPage() {
           <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--ink)', margin: 0 }}>{t('dora.project.pageTitle')}</h1>
           <p style={{ fontSize: 14, color: 'var(--muted)', marginTop: 6 }}>{t('dora.projectDesc')}</p>
           <RepoSelector value={repoId} onSelect={setRepoId} hideSync />
-
-          {/* Internal / External source toggle */}
-          <div style={{ display: 'flex', gap: 6, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button
-              onClick={() => setSource('internal')}
-              style={{
-                padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                border: source === 'internal' ? '1px solid rgba(94,234,212,0.5)' : '1px solid var(--panel-border)',
-                background: source === 'internal' ? 'rgba(94,234,212,0.12)' : 'var(--panel-alt)',
-                color: source === 'internal' ? '#5eead4' : 'var(--muted)',
-              }}
-            >Agena (internal)</button>
-            <button
-              onClick={() => setSource('external')}
-              style={{
-                padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                border: source === 'external' ? '1px solid rgba(94,234,212,0.5)' : '1px solid var(--panel-border)',
-                background: source === 'external' ? 'rgba(94,234,212,0.12)' : 'var(--panel-alt)',
-                color: source === 'external' ? '#5eead4' : 'var(--muted)',
-              }}
-            >Azure (live WIQL)</button>
-            {source === 'external' && (
-              <>
-                <select
-                  value={azureProject}
-                  onChange={(e) => { setAzureProject(e.target.value); setAzureTeam(''); }}
-                  disabled={projectsLoading}
-                  style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--ink)', fontSize: 12, minWidth: 180 }}
-                >
-                  <option value=''>{projectsLoading ? 'Loading projects…' : '— Pick a project —'}</option>
-                  {azureProjects.map((p) => (
-                    <option key={p.id} value={p.name}>{p.name}</option>
-                  ))}
-                </select>
-                <select
-                  value={azureTeam}
-                  onChange={(e) => setAzureTeam(e.target.value)}
-                  disabled={!azureProject || teamsLoading}
-                  style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--ink)', fontSize: 12, minWidth: 200 }}
-                >
-                  <option value=''>{!azureProject ? '(pick project first)' : teamsLoading ? 'Loading teams…' : '— All teams —'}</option>
-                  {azureTeams.map((tm) => (
-                    <option key={tm.id} value={tm.name}>{tm.name}</option>
-                  ))}
-                </select>
-              </>
-            )}
-          </div>
         </div>
         <DoraPeriodTabs value={days} onChange={setDays} />
       </div>
@@ -584,35 +502,30 @@ export default function DoraProjectPage() {
 
       {!loading && data && (
         <>
-          {/* Data-source banner — makes "what is this measuring?" obvious. */}
-          <div style={{
-            marginBottom: 16, padding: '10px 14px', borderRadius: 10,
-            background: data.error
-              ? 'rgba(239,68,68,0.08)'
-              : data.totals.planned === 0 ? 'rgba(239,68,68,0.06)' : 'var(--panel-alt)',
-            border: data.error
-              ? '1px solid rgba(239,68,68,0.4)'
-              : data.totals.planned === 0 ? '1px solid rgba(239,68,68,0.25)' : '1px solid var(--panel-border)',
-            fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-          }}>
-            <span style={{ fontSize: 14 }}>{data.error ? '⛔' : data.totals.planned === 0 ? '⚠️' : data.source === 'external' ? '🔵' : '📊'}</span>
-            <span style={{ flex: 1, minWidth: 280 }}>
-              {data.error
-                ? <>{data.error}</>
-                : data.source === 'external'
-                  ? data.totals.planned === 0
-                    ? <>Azure returned 0 work items{azureProject ? ` for "${azureProject}"` : ''} in the last <strong>{days}d</strong>. Check the project name + (optionally) team.</>
-                    : <>Live from Azure DevOps WIQL: <strong style={{ color: 'var(--ink)' }}>{data.totals.planned}</strong> work items{azureProject ? ` in "${azureProject}"` : ''}{azureTeam ? ` / ${azureTeam}` : ''} changed in the last <strong>{days}d</strong>. {data.totals.completed} done, {data.totals.in_progress ?? 0} in progress, {data.totals.removed ?? 0} removed.</>
-                  : data.totals.planned === 0
-                    ? <>No Agena task records in the last <strong>{days}d</strong>{repoId ? ' for this repo' : ''}. Switch to <strong>Azure (live WIQL)</strong> above to pull real sprint data, or import tasks first.</>
-                    : <>Based on <strong style={{ color: 'var(--ink)' }}>{data.totals.planned}</strong> Agena task records in the last <strong>{days}d</strong>{repoId ? ' for the selected repo' : ' across all repos'}. Source: <code style={{ fontSize: 11, padding: '1px 5px', borderRadius: 4, background: 'var(--panel)' }}>task_records</code>. For raw sprint data, switch to <strong>Azure (live WIQL)</strong>.</>}
-            </span>
-            {!data.error && data.source === 'internal' && data.totals.planned === 0 && (
-              <Link href="/dashboard/tasks" style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
-                Import tasks →
-              </Link>
-            )}
-          </div>
+          {/* Data-source banner — only surfaces when something is missing.
+              Live WIQL fallback was dropped; this page reads from imported
+              Agena task_records only, so an empty banner means a tasks
+              import is the next step. */}
+          {(data.error || data.totals.planned === 0) && (
+            <div style={{
+              marginBottom: 16, padding: '10px 14px', borderRadius: 10,
+              background: data.error ? 'rgba(239,68,68,0.08)' : 'rgba(239,68,68,0.06)',
+              border: data.error ? '1px solid rgba(239,68,68,0.4)' : '1px solid rgba(239,68,68,0.25)',
+              fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+            }}>
+              <span style={{ fontSize: 14 }}>{data.error ? '⛔' : '⚠️'}</span>
+              <span style={{ flex: 1, minWidth: 280 }}>
+                {data.error
+                  ? <>{data.error}</>
+                  : <>No Agena task records in the last <strong>{days}d</strong>{repoId ? ' for this repo' : ''}. Import tasks from a sprint to populate this view.</>}
+              </span>
+              {!data.error && (
+                <Link href="/dashboard/tasks" style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                  Import tasks →
+                </Link>
+              )}
+            </div>
+          )}
 
           {/* Git activity for the same period+repo — universal across both sources */}
           {data.git_activity && (
