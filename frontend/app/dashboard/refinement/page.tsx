@@ -1190,6 +1190,19 @@ export default function RefinementPage() {
   // Backend's /refinement/delete-comment fetches every comment, finds
   // ones starting with [signature] in plain text, deletes each.
   const [deletingWritebackId, setDeletingWritebackId] = useState('');
+  // Modal state for "assign suggested author" — replaces the native
+  // window.confirm with the same styled modal pattern the writeback
+  // flow already uses.
+  const [assignConfirm, setAssignConfirm] = useState<{
+    itemId: string;
+    itemTitle: string;
+    name: string;
+    upn: string;
+    source: string;
+    commitCount: number;
+    filesTouched: number;
+  } | null>(null);
+  const [assigning, setAssigning] = useState(false);
   const deleteWritebackForItem = useCallback(async (itemId: string) => {
     const sig = (commentSignature || 'AGENA AI').trim() || 'AGENA AI';
     const ok = window.confirm(
@@ -2280,23 +2293,17 @@ export default function RefinementPage() {
                                             {matched && (
                                               <button
                                                 type='button'
-                                                onClick={async (e) => {
+                                                onClick={(e) => {
                                                   e.stopPropagation();
-                                                  if (!window.confirm(`${a.member_display_name} kişisine ata?`)) return;
-                                                  try {
-                                                    await apiFetch('/refinement/assign-author', {
-                                                      method: 'POST',
-                                                      body: JSON.stringify({
-                                                        work_item_id: suggestion.item_id,
-                                                        source: a.member_source || 'azure',
-                                                        member_unique_name: a.member_unique_name,
-                                                        project: azureProject || undefined,
-                                                      }),
-                                                    });
-                                                    setError(`✓ Atandı: ${a.member_display_name}`);
-                                                  } catch (err) {
-                                                    setError(err instanceof Error ? err.message : 'Atama başarısız');
-                                                  }
+                                                  setAssignConfirm({
+                                                    itemId: suggestion.item_id,
+                                                    itemTitle: suggestion.title || '',
+                                                    name: a.member_display_name || a.name,
+                                                    upn: a.member_unique_name || a.email || '',
+                                                    source: a.member_source || 'azure',
+                                                    commitCount: a.commit_count || 0,
+                                                    filesTouched: a.files_touched || 0,
+                                                  });
                                                 }}
                                                 style={{
                                                   padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700,
@@ -2899,6 +2906,98 @@ export default function RefinementPage() {
                 }}
               >
                 {bulkWritebackRunning ? copy.writebackRunning : (copy.writeShort || 'Write')}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+
+      {assignConfirm && typeof document !== 'undefined' && createPortal(
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+          zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+        }} onClick={() => !assigning && setAssignConfirm(null)}>
+          <div style={{
+            width: 'min(420px, 92vw)', borderRadius: 16, padding: '20px 22px',
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            display: 'grid', gap: 14,
+          }} onClick={(e) => e.stopPropagation()}>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--ink-42)', fontFamily: 'monospace' }}>#{assignConfirm.itemId}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink-90)', marginTop: 2, lineHeight: 1.3 }}>
+                {assignConfirm.itemTitle}
+              </div>
+            </div>
+            <div style={{
+              padding: '12px 14px', borderRadius: 12,
+              background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)',
+              display: 'grid', gap: 4,
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#22c55e', textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                {lang === 'tr' ? 'Atama önerisi' : 'Assignee proposal'}
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>
+                {assignConfirm.name}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--ink-58)', fontFamily: 'monospace' }}>
+                {assignConfirm.upn}
+              </div>
+              {(assignConfirm.commitCount > 0 || assignConfirm.filesTouched > 0) && (
+                <div style={{ fontSize: 11, color: 'var(--ink-65)', marginTop: 4 }}>
+                  {lang === 'tr'
+                    ? `Son 6 ayda ${assignConfirm.commitCount} commit · ${assignConfirm.filesTouched} dosya`
+                    : `${assignConfirm.commitCount} commits · ${assignConfirm.filesTouched} files in last 6 months`}
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type='button'
+                disabled={assigning}
+                onClick={() => setAssignConfirm(null)}
+                style={{
+                  flex: 1, padding: '10px 16px', borderRadius: 10,
+                  border: '1px solid var(--panel-border-2)', background: 'transparent',
+                  color: 'var(--ink-50)', fontSize: 13, fontWeight: 600,
+                  cursor: assigning ? 'wait' : 'pointer',
+                }}
+              >
+                {copy.close}
+              </button>
+              <button
+                type='button'
+                disabled={assigning}
+                onClick={async () => {
+                  setAssigning(true);
+                  try {
+                    await apiFetch('/refinement/assign-author', {
+                      method: 'POST',
+                      body: JSON.stringify({
+                        work_item_id: assignConfirm.itemId,
+                        source: assignConfirm.source,
+                        member_unique_name: assignConfirm.upn,
+                        project: azureProject || undefined,
+                      }),
+                    });
+                    setRunMessage({ kind: 'success', text: `✓ ${assignConfirm.name}` });
+                    setAssignConfirm(null);
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : 'Atama başarısız');
+                  } finally {
+                    setAssigning(false);
+                  }
+                }}
+                style={{
+                  flex: 2, padding: '10px 16px', borderRadius: 10,
+                  border: '1px solid rgba(34,197,94,0.5)',
+                  background: 'rgba(34,197,94,0.15)', color: '#22c55e',
+                  fontSize: 13, fontWeight: 700,
+                  cursor: assigning ? 'wait' : 'pointer',
+                }}
+              >
+                {assigning ? '...' : (lang === 'tr' ? `${assignConfirm.name}'e ata` : `Assign to ${assignConfirm.name}`)}
               </button>
             </div>
           </div>
