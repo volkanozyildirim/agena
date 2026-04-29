@@ -7,6 +7,7 @@ from agena_models.models.ai_usage_event import AIUsageEvent
 from agena_models.models.git_commit import GitCommit
 from agena_models.models.git_deployment import GitDeployment
 from agena_models.models.git_pull_request import GitPullRequest
+from agena_models.models.git_pull_request_review import GitPullRequestReview
 from agena_models.models.flow_assets import AgentAnalyticsSnapshot, FlowTemplate, FlowVersion
 from agena_models.models.flow_run import FlowRun, FlowRunStep
 from agena_models.models.integration_config import IntegrationConfig
@@ -44,7 +45,7 @@ __all__ = [
     'AgentLog', 'AIUsageEvent', 'FlowTemplate', 'FlowVersion',
     'AgentAnalyticsSnapshot', 'FlowRun', 'FlowRunStep', 'Invite',
     'IntegrationConfig', 'NotificationRecord', 'UserPreference',
-    'GitCommit', 'GitPullRequest', 'GitDeployment',
+    'GitCommit', 'GitPullRequest', 'GitPullRequestReview', 'GitDeployment',
     'ContactSubmission', 'NewsletterSubscriber',
     'NewRelicEntityMapping',
     'SentryProjectMapping',

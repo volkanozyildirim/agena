@@ -421,7 +421,7 @@ class GitSyncService:
                     reviewers = item.get('reviewers') or []
                     review_count = len([r for r in reviewers if r.get('vote', 0) != 0])
 
-                    await self._upsert_pr(
+                    pr_row = await self._upsert_pr(
                         org_id=org_id,
                         repo_mapping_id=repo_mapping_id,
                         provider='azure',
@@ -439,6 +439,13 @@ class GitSyncService:
                         commits_count=0,
                         review_comments=review_count,
                     )
+                    if pr_row is not None:
+                        await self._upsert_pr_reviews(
+                            org_id=org_id,
+                            repo_mapping_id=repo_mapping_id,
+                            pr_row_id=pr_row,
+                            reviewers=reviewers,
+                        )
                     count += 1
 
                 if len(items) < page_size:
@@ -877,6 +884,61 @@ class GitSyncService:
             review_comments=stmt.inserted.review_comments,
         )
         await self.db.execute(stmt)
+        # Resolve the row id so the caller can attach reviewers to it.
+        # MySQL's lastrowid is unsafe under ON DUPLICATE KEY UPDATE, so a
+        # follow-up SELECT is the reliable path. Cheap because the unique
+        # key is indexed.
+        row = await self.db.execute(
+            select(GitPullRequest.id).where(
+                GitPullRequest.organization_id == org_id,
+                GitPullRequest.repo_mapping_id == repo_mapping_id,
+                GitPullRequest.provider == provider,
+                GitPullRequest.external_id == external_id,
+            )
+        )
+        pr_row_id = row.scalar_one_or_none()
+        return pr_row_id
+
+    async def _upsert_pr_reviews(
+        self,
+        *,
+        org_id: int,
+        repo_mapping_id: str,
+        pr_row_id: int,
+        reviewers: list[dict],
+    ) -> None:
+        """Upsert one row per (PR, reviewer). Azure's PR list ships
+        ``reviewers`` inline so we don't need a follow-up call. Vote=0
+        means "added to the PR but didn't engage" — we still record
+        them so the engagement ratio is honest, but the contributor
+        analytics filter ``vote != 0`` when computing Help Others %."""
+        if not reviewers:
+            return
+        from sqlalchemy.dialects.mysql import insert as mysql_insert
+        from agena_models.models.git_pull_request_review import GitPullRequestReview
+
+        for r in reviewers:
+            display = (r.get('displayName') or '').strip()
+            email = (r.get('uniqueName') or '').strip().lower()
+            if not display and not email:
+                continue
+            try:
+                vote = int(r.get('vote') or 0)
+            except (TypeError, ValueError):
+                vote = 0
+            stmt = mysql_insert(GitPullRequestReview).values(
+                organization_id=org_id,
+                repo_mapping_id=repo_mapping_id,
+                pull_request_id=pr_row_id,
+                reviewer_name=display[:255] if display else None,
+                reviewer_email=email[:255] if email else None,
+                vote=vote,
+            )
+            stmt = stmt.on_duplicate_key_update(
+                reviewer_name=stmt.inserted.reviewer_name,
+                vote=stmt.inserted.vote,
+            )
+            await self.db.execute(stmt)
 
     async def _upsert_deployment(
         self,
