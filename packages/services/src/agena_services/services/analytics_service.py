@@ -1430,8 +1430,12 @@ class AnalyticsService:
             filters.append(GitPullRequest.repo_mapping_id == repo_mapping_id)
 
         # ── 1) KPI summary ────────────────────────────────────────────────────
+        # `status == 'merged'` is GitHub-only — Azure DevOps stamps merged
+        # PRs as `completed`, so a strict status filter throws Azure data
+        # away and the dashboard reads as if no PRs were ever merged. Rely
+        # on the merged_at timestamp instead, which both providers populate
+        # the same way.
         merged_filters = filters + [
-            GitPullRequest.status == 'merged',
             GitPullRequest.merged_at.isnot(None),
         ]
 
