@@ -435,18 +435,6 @@ export default function DoraOverviewPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <DoraPeriodTabs value={periodDays} onChange={setPeriodDays} />
           <button
-            onClick={() => { setAddRepoError(''); setAddRepoOpen(true); }}
-            style={{
-              padding: '10px 16px', borderRadius: 12, border: '1px solid var(--panel-border-2)',
-              background: 'var(--surface)', color: 'var(--ink)',
-              fontWeight: 700, fontSize: 13, cursor: 'pointer',
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-            }}
-            title='Add a repo to DORA'
-          >
-            <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> Add repo
-          </button>
-          <button
             onClick={handleSyncAll}
             disabled={bulkSyncing || repos.length === 0}
             style={{
@@ -502,6 +490,53 @@ export default function DoraOverviewPage() {
               days={periodDays}
             />
           ))}
+          {/* Add-repo tile — same footprint as a RepoCard so the grid
+              flow doesn't notice and the affordance reads as a peer of
+              the existing repos rather than a header chrome button. */}
+          <button
+            type='button'
+            onClick={() => { setAddRepoError(''); setAddRepoOpen(true); }}
+            style={{
+              borderRadius: 14,
+              padding: 18,
+              border: '2px dashed var(--panel-border-2)',
+              background: 'transparent',
+              color: 'var(--muted)',
+              cursor: 'pointer',
+              minHeight: 200,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 10,
+              textAlign: 'center',
+              transition: 'border-color 0.15s, background 0.15s, color 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              const el = e.currentTarget;
+              el.style.borderColor = 'rgba(13,148,136,0.55)';
+              el.style.background = 'rgba(13,148,136,0.06)';
+              el.style.color = 'var(--ink)';
+            }}
+            onMouseLeave={(e) => {
+              const el = e.currentTarget;
+              el.style.borderColor = 'var(--panel-border-2)';
+              el.style.background = 'transparent';
+              el.style.color = 'var(--muted)';
+            }}
+            title='Add a repo to DORA'
+          >
+            <span style={{
+              width: 56, height: 56, borderRadius: '50%',
+              background: 'rgba(13,148,136,0.12)', color: '#0d9488',
+              fontSize: 36, fontWeight: 800, lineHeight: 1,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            }}>+</span>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'currentColor' }}>Add repo</div>
+            <div style={{ fontSize: 12, lineHeight: 1.5, maxWidth: 260, color: 'var(--muted)' }}>
+              Yeni bir Azure / GitHub repo&apos;sunu DORA&apos;ya ekle. Sadece provider + project / owner + repo seç — local checkout gerekmez.
+            </div>
+          </button>
         </div>
       )}
 
