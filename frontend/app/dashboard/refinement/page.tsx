@@ -1558,7 +1558,7 @@ export default function RefinementPage() {
             display: 'inline-flex', alignItems: 'center', gap: 6,
           }}
         >
-          📚 {lang === 'tr' ? 'Refinementlarım' : 'My runs'}
+          📚 {t('refinement.myRuns' as Parameters<typeof t>[0])}
         </Link>
       </div>
 
@@ -1904,9 +1904,9 @@ export default function RefinementPage() {
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                 {([
-                  { key: 'all' as const, label: lang === 'tr' ? 'Hepsi' : 'All', count: itemsData?.items.length || 0 },
-                  { key: 'unestimated' as const, label: lang === 'tr' ? 'Puansız' : 'Unestimated', count: itemsData?.unestimated_count ?? (itemsData?.items.filter((i) => !hasEstimate(i)).length || 0) },
-                  { key: 'estimated' as const, label: lang === 'tr' ? 'Puanlı' : 'Estimated', count: itemsData?.pointed_count ?? (itemsData?.items.filter((i) => hasEstimate(i)).length || 0) },
+                  { key: 'all' as const, label: t('refinement.filter.all' as Parameters<typeof t>[0]), count: itemsData?.items.length || 0 },
+                  { key: 'unestimated' as const, label: t('refinement.filter.unestimated' as Parameters<typeof t>[0]), count: itemsData?.unestimated_count ?? (itemsData?.items.filter((i) => !hasEstimate(i)).length || 0) },
+                  { key: 'estimated' as const, label: t('refinement.filter.estimated' as Parameters<typeof t>[0]), count: itemsData?.pointed_count ?? (itemsData?.items.filter((i) => hasEstimate(i)).length || 0) },
                 ]).map((tab) => (
                   <button
                     key={tab.key}
@@ -2146,7 +2146,7 @@ export default function RefinementPage() {
                                           cursor: deletingWritebackId === item.id ? 'wait' : 'pointer',
                                         }}
                                       >
-                                        {deletingWritebackId === item.id ? '...' : (lang === 'tr' ? '🗑 Sil' : '🗑 Delete')}
+                                        {deletingWritebackId === item.id ? '...' : `🗑 ${t('refinement.delete' as Parameters<typeof t>[0])}`}
                                       </button>
                                     </>
                                   ) : (
@@ -2286,17 +2286,17 @@ export default function RefinementPage() {
                                       pick a repo or to add the team member to my_team. */}
                                   {(!suggestion.recommended_authors || suggestion.recommended_authors.length === 0) && (
                                     <div style={expandedSection}>
-                                      <div style={expandedSectionLabel}>Önerilen Kişi</div>
+                                      <div style={expandedSectionLabel}>{t('refinement.recommendedAuthor.empty.title' as Parameters<typeof t>[0])}</div>
                                       <div style={{
                                         fontSize: 12, color: 'var(--ink-50)', lineHeight: 1.5,
                                         padding: '10px 12px', borderRadius: 10,
                                         background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.2)',
                                       }}>
                                         {!repoMappingId
-                                          ? <>Kod yazarına göre öneri için sağ üstte <strong style={{ color: 'var(--ink)' }}>Gelişmiş ▾ → Repo</strong>'dan bu işin geçtiği repo'yu seç ve refine'i tekrar çalıştır.</>
+                                          ? t('refinement.recommendedAuthor.empty.noRepo' as Parameters<typeof t>[0])
                                           : (suggestion.touched_files && suggestion.touched_files.length > 0)
-                                            ? <>Bu repoda etkilenen dosyalara son 6 ayda commit atan eşleşen takım üyesi bulunamadı. Doğru repo mu? Veya takımındaki kişilerin email'i Azure/Jira'da farklı olabilir.</>
-                                            : <>LLM bu iş için somut dosya listesi üretemedi (açıklama belirsiz olabilir). Açıklamayı zenginleştir, repo seçimini kontrol et, tekrar dene.</>}
+                                            ? t('refinement.recommendedAuthor.empty.noMatch' as Parameters<typeof t>[0])
+                                            : t('refinement.recommendedAuthor.empty.noFiles' as Parameters<typeof t>[0])}
                                       </div>
                                     </div>
                                   )}
@@ -2338,7 +2338,7 @@ export default function RefinementPage() {
                                                 background: 'rgba(34,197,94,0.08)',
                                                 color: '#86efac', whiteSpace: 'nowrap',
                                               }}>
-                                                ✓ {lang === 'tr' ? 'Zaten atandı' : 'Already assigned'}
+                                                ✓ {t('refinement.alreadyAssigned' as Parameters<typeof t>[0])}
                                               </span>
                                             )}
                                             {matched && !alreadyAssigned && (
@@ -2714,7 +2714,7 @@ export default function RefinementPage() {
                               cursor: deletingWritebackId === item.item_id ? 'wait' : 'pointer',
                             }}
                           >
-                            {deletingWritebackId === item.item_id ? '...' : (lang === 'tr' ? '🗑 Sil' : '🗑 Delete')}
+                            {deletingWritebackId === item.item_id ? '...' : `🗑 ${t('refinement.delete' as Parameters<typeof t>[0])}`}
                           </button>
                         </>
                       ) : (
@@ -3003,15 +3003,20 @@ export default function RefinementPage() {
               fontSize: 13, color: 'var(--ink-78)', lineHeight: 1.5,
             }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#fca5a5', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 6 }}>
-                {lang === 'tr' ? 'Yorum silme' : 'Delete comment'}
+                {t('refinement.deleteCommentTitle' as Parameters<typeof t>[0])}
               </div>
-              {lang === 'tr'
-                ? <>{providerLabel}'da bu work item'a yazılmış{' '}
-                    <strong style={{ color: 'var(--ink)' }}>[{commentSignature}]</strong>{' '}
-                    önekli tüm yorumlar silinecek. Geri alınamaz.</>
-                : <>All comments prefixed with{' '}
-                    <strong style={{ color: 'var(--ink)' }}>[{commentSignature}]</strong>{' '}
-                    will be deleted from this work item on {providerLabel}. This cannot be undone.</>}
+              {(() => {
+                const tmpl = t('refinement.deleteCommentBody' as Parameters<typeof t>[0]);
+                const filled = tmpl.replace('{signature}', `___SIG___`).replace('{provider}', providerLabel);
+                const [before, after] = filled.split('___SIG___');
+                return (
+                  <>
+                    {before}
+                    <strong style={{ color: 'var(--ink)' }}>[{commentSignature}]</strong>
+                    {after}
+                  </>
+                );
+              })()}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button
@@ -3045,7 +3050,7 @@ export default function RefinementPage() {
               >
                 {deletingWritebackId === deleteConfirm.itemId
                   ? '...'
-                  : (lang === 'tr' ? '🗑 Sil' : '🗑 Delete')}
+                  : `🗑 ${t('refinement.delete' as Parameters<typeof t>[0])}`}
               </button>
             </div>
           </div>
@@ -3076,7 +3081,7 @@ export default function RefinementPage() {
               display: 'grid', gap: 4,
             }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#22c55e', textTransform: 'uppercase', letterSpacing: 0.6 }}>
-                {lang === 'tr' ? 'Atama önerisi' : 'Assignee proposal'}
+                {t('refinement.assignProposal' as Parameters<typeof t>[0])}
               </div>
               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>
                 {assignConfirm.name}
@@ -3086,9 +3091,9 @@ export default function RefinementPage() {
               </div>
               {(assignConfirm.commitCount > 0 || assignConfirm.filesTouched > 0) && (
                 <div style={{ fontSize: 11, color: 'var(--ink-65)', marginTop: 4 }}>
-                  {lang === 'tr'
-                    ? `Son 6 ayda ${assignConfirm.commitCount} commit · ${assignConfirm.filesTouched} dosya`
-                    : `${assignConfirm.commitCount} commits · ${assignConfirm.filesTouched} files in last 6 months`}
+                  {t('refinement.assigneeStats' as Parameters<typeof t>[0])
+                    .replace('{commits}', String(assignConfirm.commitCount))
+                    .replace('{files}', String(assignConfirm.filesTouched))}
                 </div>
               )}
             </div>
@@ -3137,7 +3142,7 @@ export default function RefinementPage() {
                   cursor: assigning ? 'wait' : 'pointer',
                 }}
               >
-                {assigning ? '...' : (lang === 'tr' ? `${assignConfirm.name}'e ata` : `Assign to ${assignConfirm.name}`)}
+                {assigning ? '...' : t('refinement.assignTo' as Parameters<typeof t>[0]).replace('{name}', assignConfirm.name)}
               </button>
             </div>
           </div>
