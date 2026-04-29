@@ -15,6 +15,30 @@
 set -e
 cd "$(dirname "$0")"
 
+# ── First-run env bootstrap ──────────────────────────────────────────
+# docker-compose has `env_file: .env` and the frontend reads
+# `frontend/.env.local`. On a fresh checkout neither exists, so the
+# containers come up with empty secrets and silently fall on their
+# face the first time someone tries to log in. Seed both from the
+# committed `.example` files so `start.sh` Just Works on a clone —
+# the user can fill in API keys later when they wire up integrations.
+seed_env() {
+  local target=$1 source=$2 label=$3
+  if [ -f "$target" ]; then return 0; fi
+  if [ ! -f "$source" ]; then
+    echo "  ⚠️  $label: neither $target nor $source exists — skipping"
+    return 0
+  fi
+  cp "$source" "$target"
+  echo "  ✅  Seeded $target from $source ($label)"
+}
+echo ""
+echo "── env bootstrap ─────────────────────────────────────────────"
+seed_env ".env" ".env.example" "backend"
+seed_env "frontend/.env.local" "frontend/.env.example" "frontend"
+echo "  (edit the new .env files later to plug in API keys)"
+echo ""
+
 # Host-side absolute path for task attachment storage. Containers serve
 # files via /app/data, but the local CLI runs on the host and needs the
 # real macOS path so it can open uploaded images/files.
