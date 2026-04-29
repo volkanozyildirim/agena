@@ -1352,6 +1352,12 @@ class AnalyticsService:
             })
 
         # ── 6) Recent commits list ───────────────────────────────────────────
+        # Lift the listing cap from 100 → 500. 100 made the KPI count look
+        # "wrong" against the visible rows on a busy repo (14k commits/yr
+        # easily). 500 covers most periods without paying a real network
+        # cost — a 1-year webservice payload is ~600KB, fine for an
+        # internal dashboard. The KPI count remains the source of truth;
+        # the UI surfaces an explicit "Showing N of Total" label.
         recent_result = await self.db.execute(
             select(
                 GitCommit.sha,
@@ -1363,7 +1369,7 @@ class AnalyticsService:
                 GitCommit.files_changed,
             ).where(*filters)
             .order_by(GitCommit.committed_at.desc())
-            .limit(100)
+            .limit(500)
         )
         recent_commits = []
         for r in recent_result.all():

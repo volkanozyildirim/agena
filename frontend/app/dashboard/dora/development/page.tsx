@@ -277,9 +277,18 @@ function GitAnalyticsTab({ data, t }: { data: GitAnalyticsResponse; t: TFn }) {
 
       {/* Commit Activities Table */}
       <div style={box}>
-        <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', margin: '0 0 16px' }}>
-          {t('dora.git.commitActivities')}
-        </h2>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', margin: 0 }}>
+            {t('dora.git.commitActivities')}
+          </h2>
+          {data.recent_commits.length > 0 && (
+            <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>
+              {data.recent_commits.length < data.kpi.total_commits
+                ? `Showing latest ${data.recent_commits.length.toLocaleString()} of ${data.kpi.total_commits.toLocaleString()}`
+                : `${data.recent_commits.length.toLocaleString()} commits`}
+            </span>
+          )}
+        </div>
         {data.recent_commits.length === 0 ? (
           <div style={{ fontSize: 13, color: 'var(--muted)' }}>{t('dora.dev.noData')}</div>
         ) : (
