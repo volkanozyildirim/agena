@@ -181,6 +181,19 @@ class AnalyticsService:
         week_label = cast(func.yearweek(TaskRecord.created_at, 3), SAString)
         week_label_upd = cast(func.yearweek(TaskRecord.updated_at, 3), SAString)
 
+        # Repo scoping. Without this every project_analytics call returned
+        # org-wide totals, so the KPI cards never moved when the user
+        # switched repos. TaskRecord.repo_mapping_id is the same column
+        # the multi-repo orchestration writes to, so it's the right hook.
+        repo_filter: list = []
+        if repo_mapping_id:
+            try:
+                repo_filter.append(TaskRecord.repo_mapping_id == int(repo_mapping_id))
+            except (TypeError, ValueError):
+                # Non-numeric mapping id can't match a TaskRecord.repo_mapping_id
+                # (FK is integer); fall through unfiltered.
+                pass
+
         # Tasks created (planned) per week
         planned_q = await self.db.execute(
             select(
@@ -190,6 +203,7 @@ class AnalyticsService:
             .where(
                 TaskRecord.organization_id == organization_id,
                 TaskRecord.created_at >= since,
+                *repo_filter,
             )
             .group_by(week_label)
             .order_by(week_label)
@@ -206,6 +220,7 @@ class AnalyticsService:
                 TaskRecord.organization_id == organization_id,
                 TaskRecord.status == 'completed',
                 TaskRecord.updated_at >= since,
+                *repo_filter,
             )
             .group_by(week_label_upd)
             .order_by(week_label_upd)
@@ -222,6 +237,7 @@ class AnalyticsService:
                 TaskRecord.organization_id == organization_id,
                 TaskRecord.status == 'failed',
                 TaskRecord.updated_at >= since,
+                *repo_filter,
             )
             .group_by(week_label_upd)
             .order_by(week_label_upd)
@@ -280,6 +296,7 @@ class AnalyticsService:
                 TaskRecord.organization_id == organization_id,
                 TaskRecord.status == 'completed',
                 TaskRecord.updated_at >= since,
+                *repo_filter,
             )
             .group_by(cast(TaskRecord.updated_at, Date))
             .order_by(cast(TaskRecord.updated_at, Date))
@@ -306,6 +323,7 @@ class AnalyticsService:
                 TaskRecord.organization_id == organization_id,
                 TaskRecord.status == 'completed',
                 TaskRecord.updated_at >= since,
+                *repo_filter,
             )
         )
         avg_row = all_time_q.one()
@@ -318,6 +336,7 @@ class AnalyticsService:
             .where(
                 TaskRecord.organization_id == organization_id,
                 TaskRecord.status == 'running',
+                *repo_filter,
             )
         )
         wip_count = wip_q.scalar() or 0
