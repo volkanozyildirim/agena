@@ -3082,5 +3082,6 @@
   "landing.skillsExample.futureBody": "#64044 — Category filter loses variant on pagination. Top skill match (81%) is the routing fallback above. Its prompt fragment is injected: agent skips inline slug parse, reuses the resolver, ships a fix consistent with the team's precedent.",
   "skills.importDefaults": "Import defaults",
   "skills.importDefaultsConfirm": "Add the curated default skills to this org? Existing entries with the same name will be skipped.",
-  "skills.importDefaultsResult": "Imported: {inserted} new, {skipped} already existed, {total} total in the bundle."
+  "skills.importDefaultsResult": "Imported: {inserted} new, {skipped} already existed, {total} total in the bundle.",
+  "skills.close": "Close"
 }

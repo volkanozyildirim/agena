@@ -3082,5 +3082,6 @@
   "landing.skillsExample.futureBody": "#64044 – Il filtro di categoria perde la variante sull'impaginazione. La corrispondenza delle competenze migliori (81%) è il fallback di routing sopra indicato. Viene inserito il frammento del prompt: l'agente salta l'analisi dello slug in linea, riutilizza il risolutore, invia una correzione coerente con il precedente del team.",
   "skills.importDefaults": "Importa impostazioni predefinite",
   "skills.importDefaultsConfirm": "Aggiungere le competenze predefinite selezionate a questa organizzazione? Le voci esistenti con lo stesso nome verranno saltate.",
-  "skills.importDefaultsResult": "Importato: {inserted} nuovo, {skipped} già esistente, {total} totale nel bundle."
+  "skills.importDefaultsResult": "Importato: {inserted} nuovo, {skipped} già esistente, {total} totale nel bundle.",
+  "skills.close": "Vicino"
 }
