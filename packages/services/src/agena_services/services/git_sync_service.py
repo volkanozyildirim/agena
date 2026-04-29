@@ -458,47 +458,44 @@ class GitSyncService:
         pat: str,
         since_days: int = 365,
     ) -> int:
-        """Pull Azure Pipelines builds for this repo as deployment events.
+        """Pull Azure Pipelines builds and attribute each to the repo whose
+        commit it built — by SHA join, not by ``repositoryId``.
 
-        Azure DevOps doesn't separate "builds" from "deployments" the way
-        GitHub does — most teams use Pipelines builds (CI) AS deploys.
-        We treat each finished build as a deployment, mapping
-        ``result == 'succeeded'`` → success and ``result == 'failed'`` →
-        failure. Release Pipelines (legacy XAML/Classic) live under
-        ``/_apis/release/deployments`` and are not pulled here; if a team
-        uses those, deployment counts will look low until that's added.
+        Why SHA-join instead of ``repositoryId={repo}``: many orgs keep
+        Pipelines YAML in a centralized repo (e.g. ``yml-files``) and
+        run multi-repo builds. Azure tags those builds with the YAML
+        repo's GUID, not the deployed app's, so a strict ``repositoryId``
+        filter returns 0 for the actual product repo even when builds
+        run multiple times a day. Joining via the build's
+        ``sourceVersion`` (commit SHA) → ``git_commits.sha`` → owning
+        ``repo_mapping_id`` works regardless of how Pipelines are
+        organized, with zero per-tenant configuration.
 
-        Two-step: resolve the repo's GUID via ``/git/repositories/{name}``,
-        then walk ``/build/builds?repositoryId=...`` paginated by $top +
-        continuationToken header.
+        Returns the count of deployments attributed to *this* call's
+        ``repo_mapping_id``. Builds whose SHA matches a different repo
+        in the same org are still upserted (under that other mapping)
+        so a future per-repo sync doesn't have to re-fetch them — the
+        result is idempotent thanks to the unique
+        ``(provider, external_id)`` upsert in ``_upsert_deployment``.
         """
         base = org_url.rstrip('/')
         headers = self._azure_headers(pat)
-        count = 0
+        attributed_to_caller = 0
+        attributed_unmatched = 0
+        attributed_other_repo = 0
+
+        # Build a SHA → repo_mapping_id index for the org once, up front.
+        # Restricted to the org's commits, so a build's sourceVersion can
+        # only resolve to a repo this caller is actually allowed to touch.
+        sha_index = await self._build_sha_to_mapping_index(org_id)
 
         async with httpx.AsyncClient(timeout=30) as client:
-            # 1) Repo GUID lookup
-            repo_resp = await self._request_with_rate_limit(
-                client, 'GET',
-                f'{base}/{project}/_apis/git/repositories/{repo_name}?api-version=7.1',
-                headers=headers,
-            )
-            if repo_resp is None:
-                logger.warning('Azure deploy sync skipped (repo lookup failed) for %s/%s', project, repo_name)
-                return 0
-            repo_id = (repo_resp.json() or {}).get('id')
-            if not repo_id:
-                logger.warning('Azure deploy sync skipped (no repo id in response) for %s/%s', project, repo_name)
-                return 0
-
-            # 2) Builds for that repo
             min_time = (datetime.utcnow() - timedelta(days=since_days)).strftime('%Y-%m-%dT%H:%M:%SZ')
             page_size = 1000
             continuation: str = ''
             while True:
                 qs = (
-                    f'?repositoryId={repo_id}&repositoryType=TfsGit'
-                    f'&statusFilter=completed&minTime={min_time}'
+                    f'?statusFilter=completed&minTime={min_time}'
                     f'&$top={page_size}'
                     '&api-version=7.1'
                 )
@@ -523,6 +520,13 @@ class GitSyncService:
                     finish_time = item.get('finishTime') or item.get('queueTime')
                     if not finish_time:
                         continue
+                    sha = (item.get('sourceVersion') or '').strip()[:64]
+                    if not sha:
+                        continue
+                    matched_mapping = sha_index.get(sha)
+                    if not matched_mapping:
+                        attributed_unmatched += 1
+                        continue
                     result = (item.get('result') or '').lower()
                     if result == 'succeeded':
                         status = 'success'
@@ -532,26 +536,42 @@ class GitSyncService:
                         status = 'cancelled'
                     else:
                         status = result or 'unknown'
-                    sha = (item.get('sourceVersion') or '')[:64]
                     await self._upsert_deployment(
                         org_id=org_id,
-                        repo_mapping_id=repo_mapping_id,
+                        repo_mapping_id=matched_mapping,
                         provider='azure',
                         external_id=build_id,
-                        environment='production',  # build def name would be richer; keep simple for now
+                        environment='production',
                         status=status,
                         deployed_at=self._parse_datetime(finish_time),
                         sha=sha,
                     )
-                    count += 1
+                    if str(matched_mapping) == str(repo_mapping_id):
+                        attributed_to_caller += 1
+                    else:
+                        attributed_other_repo += 1
 
                 continuation = response.headers.get('x-ms-continuationtoken', '')
                 if not continuation:
                     break
 
         await self.db.commit()
-        logger.info('Azure deployments synced: %d for %s/%s', count, project, repo_name)
-        return count
+        logger.info(
+            'Azure deployments synced: %d for %s/%s (also wrote %d to other repos in this org via SHA join, %d builds had no matching commit)',
+            attributed_to_caller, project, repo_name, attributed_other_repo, attributed_unmatched,
+        )
+        return attributed_to_caller
+
+    async def _build_sha_to_mapping_index(self, org_id: int) -> dict[str, str]:
+        """Map every commit SHA the org has synced to its owning
+        ``repo_mapping_id``. Used to attribute Pipelines builds to the
+        right repo even when Azure tags the build with a centralized
+        YAML repo's GUID."""
+        rows = (await self.db.execute(
+            select(GitCommit.sha, GitCommit.repo_mapping_id)
+            .where(GitCommit.organization_id == org_id)
+        )).all()
+        return {row.sha: str(row.repo_mapping_id) for row in rows if row.sha}
 
     # ── Credential helper ────────────────────────────────────────────────────
 

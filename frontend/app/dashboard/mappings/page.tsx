@@ -216,8 +216,14 @@ export default function RepoMappingsPage() {
       await savePrefs({ repo_mappings: next });
       localStorage.setItem(LS_REPO_MAPPINGS, JSON.stringify(next));
       setItems(next);
-      // Sync each mapping to backend repo_mappings DB table
-      for (const m of next) {
+
+      // Mirror to the backend `repo_mappings` table so DORA / refinement
+      // / multi-repo orchestration share one source of truth. The keys
+      // differ between sides — this UI keeps rich fields (notes,
+      // analyze_prompt) in user prefs JSON, while the DB row holds the
+      // structured triple (provider, owner, repo_name) used by every
+      // server-side feature. We match across the two by that triple.
+      const triple = (m: RepoMapping) => {
         const provider = m.provider || 'azure';
         const owner = provider === 'github'
           ? (m.github_owner || m.github_repo_full_name?.split('/')[0] || '')
@@ -225,24 +231,60 @@ export default function RepoMappingsPage() {
         const repoName = provider === 'github'
           ? (m.github_repo || m.github_repo_full_name?.split('/').pop() || m.name)
           : (m.azure_repo_name || m.name);
-        if (owner && repoName) {
+        return { provider, owner, repoName };
+      };
+
+      type ServerMapping = {
+        id: number;
+        provider: string;
+        owner: string;
+        repo_name: string;
+      };
+      let existingDbRows: ServerMapping[] = [];
+      try {
+        existingDbRows = await apiFetch<ServerMapping[]>('/repo-mappings');
+      } catch {
+        // Listing failed — best-effort: fall back to POST-only and skip
+        // the orphan delete pass.
+      }
+
+      const desiredKeys = new Set<string>();
+      for (const m of next) {
+        const { provider, owner, repoName } = triple(m);
+        if (!owner || !repoName) continue;
+        desiredKeys.add(`${provider}|${owner}|${repoName}`);
+        try {
+          await apiFetch('/repo-mappings', {
+            method: 'POST',
+            body: JSON.stringify({
+              provider,
+              owner,
+              repo_name: repoName,
+              base_branch: m.default_branch || 'main',
+              local_repo_path: m.local_path || null,
+              playbook: m.repo_playbook || null,
+            }),
+          });
+        } catch {
+          // Unique-constraint duplicate — fine, row already exists.
+        }
+      }
+
+      // Drop DB rows that the user has removed from this UI, so DORA
+      // doesn't keep showing dead mappings (and so a `gocrons` orphan
+      // doesn't outlive its retirement here). Best-effort — a single
+      // failed delete shouldn't take the whole save down.
+      for (const row of existingDbRows) {
+        const key = `${row.provider}|${row.owner}|${row.repo_name}`;
+        if (!desiredKeys.has(key)) {
           try {
-            await apiFetch('/repo-mappings', {
-              method: 'POST',
-              body: JSON.stringify({
-                provider,
-                owner,
-                repo_name: repoName,
-                base_branch: m.default_branch || 'main',
-                local_repo_path: m.local_path || null,
-                playbook: m.repo_playbook || null,
-              }),
-            });
+            await apiFetch(`/repo-mappings/${row.id}`, { method: 'DELETE' });
           } catch {
-            // Ignore duplicates (unique constraint) — mapping already exists in DB
+            // ignore — the user can clean it up manually if it really matters
           }
         }
       }
+
       setMsg(t('mappings.saved'));
     } catch (e) {
       setErr(e instanceof Error ? e.message : t('mappings.saveFailed'));
