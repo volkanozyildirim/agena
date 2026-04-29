@@ -18,6 +18,30 @@ import { useRepoIdParam } from '@/lib/useRepoIdParam';
 import { useDoraPeriodDays } from '@/lib/useDoraPeriodDays';
 import DoraPeriodTabs from '@/components/DoraPeriodTabs';
 
+const compactBox: React.CSSProperties = {
+  borderRadius: 12,
+  border: '1px solid var(--panel-border-2)',
+  background: 'var(--panel)',
+  padding: 12,
+  minWidth: 0,
+};
+
+const compactH2: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 700,
+  color: 'var(--ink-78)',
+  margin: '0 0 8px',
+  textTransform: 'uppercase',
+  letterSpacing: 0.5,
+};
+
+const emptyMini: React.CSSProperties = {
+  color: 'var(--muted)',
+  fontSize: 11,
+  padding: 16,
+  textAlign: 'center',
+};
+
 const box: React.CSSProperties = {
   borderRadius: 14,
   border: '1px solid var(--panel-border-2)',
@@ -38,16 +62,23 @@ function GitStat({ label, value, accent }: { label: string; value: number | stri
 
 // ── KPI Card ────────────────────────────────────────────────────────────────
 
-function KpiCard({ label, value, suffix = '%', color }: { label: string; value: number; suffix?: string; color: string }) {
+function KpiCard({ label, value, suffix = '%', color, hint }: { label: string; value: number; suffix?: string; color: string; hint?: string }) {
   return (
-    <div style={{ ...box, display: 'flex', flexDirection: 'column', gap: 8, position: 'relative', overflow: 'hidden' }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted)' }}>{label}</div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-        <span style={{ fontSize: 36, fontWeight: 800, color, lineHeight: 1 }}>{value.toFixed(1)}</span>
-        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--muted)' }}>{suffix}</span>
+    <div style={{
+      borderRadius: 12, border: '1px solid var(--panel-border-2)', background: 'var(--panel)',
+      padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4,
+      position: 'relative', overflow: 'hidden', minWidth: 0,
+    }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.6 }}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
+        <span style={{ fontSize: 26, fontWeight: 800, color, lineHeight: 1 }}>
+          {Number.isFinite(value) ? value.toFixed(suffix === '%' ? 1 : 1) : '—'}
+        </span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>{suffix}</span>
       </div>
+      {hint && <div style={{ fontSize: 10, color: 'var(--ink-42)', marginTop: 2 }}>{hint}</div>}
       {suffix === '%' && (
-        <div style={{ height: 4, borderRadius: 2, background: 'var(--panel-border)', overflow: 'hidden', marginTop: 4 }}>
+        <div style={{ height: 3, borderRadius: 2, background: 'var(--panel-border)', overflow: 'hidden', marginTop: 4 }}>
           <div style={{ height: '100%', width: `${Math.min(value, 100)}%`, background: color, borderRadius: 2, transition: 'width 0.6s ease' }} />
         </div>
       )}
@@ -605,16 +636,39 @@ export default function DoraProjectPage() {
             </div>
           )}
 
-          {/* 4 KPI Cards — each measures something distinct now:
-                - Predictability: % of planned that landed
-                - Productivity:   throughput per week (count, no %)
-                - Delivery rate:  % of touched work that succeeded
-                - Planning accuracy: symmetric closeness to plan */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 32 }}>
-            <KpiCard label={t('dora.project.predictability')} value={data.kpi.predictability} color="#22c55e" />
-            <KpiCard label={t('dora.project.productivity')} value={data.kpi.productivity} suffix="/wk" color="#3b82f6" />
-            <KpiCard label={t('dora.project.deliveryRate')} value={data.kpi.delivery_rate} color="#8b5cf6" />
-            <KpiCard label={t('dora.project.planningAccuracy')} value={data.kpi.planning_accuracy} color="#f59e0b" />
+          {/* 4 KPI cards — picked so each tells you something the others
+              can't: completion %, throughput, average wait time, current
+              parallel load. Avoids the previous trap where three of the
+              four formulas mathematically collapsed to the same number
+              for any healthy data shape. */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginBottom: 20 }}>
+            <KpiCard
+              label={t('dora.project.predictability')}
+              value={data.kpi.predictability}
+              color="#22c55e"
+              hint={`${data.totals.completed}/${data.totals.planned} planned done`}
+            />
+            <KpiCard
+              label={t('dora.project.productivity')}
+              value={data.kpi.productivity}
+              suffix="/wk"
+              color="#3b82f6"
+              hint='completed throughput'
+            />
+            <KpiCard
+              label={t('dora.project.leadTime')}
+              value={data.avg_lead_time_hours}
+              suffix='h'
+              color="#8b5cf6"
+              hint='avg create → done'
+            />
+            <KpiCard
+              label={t('dora.project.wip')}
+              value={data.wip_count}
+              suffix=''
+              color="#f59e0b"
+              hint='currently running'
+            />
           </div>
 
           {/* Totals summary row */}
@@ -639,50 +693,54 @@ export default function DoraProjectPage() {
             </div>
           </div>
 
-          {/* Charts row 1: Velocity + WIP */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
-            <div style={box}>
-              <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', margin: '0 0 16px' }}>{t('dora.project.velocity')}</h2>
+          {/* Three small charts side-by-side. Each was its own full-row
+              section with 16px margins and ~280px chart heights — the
+              page was twice as tall as it needed to be. Trim to a
+              single row, smaller chart heights (160px), denser headers. */}
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: 10, marginBottom: 20,
+          }}>
+            <div style={compactBox}>
+              <h2 style={compactH2}>{t('dora.project.velocity')}</h2>
               {data.weekly_trend.length > 0 ? (
                 <BarChart
                   data={data.weekly_trend.slice(-8).map((w) => ({ label: w.week, value: w.completed }))}
                   barColor="#5eead4"
+                  height={160}
                 />
               ) : (
-                <div style={{ color: 'var(--muted)', fontSize: 12, padding: 20, textAlign: 'center' }}>{t('dora.project.noData')}</div>
+                <div style={emptyMini}>{t('dora.project.noData')}</div>
               )}
             </div>
-            <WipGauge count={data.wip_count} label={t('dora.project.wip')} />
-          </div>
-
-          {/* Charts row 2: Cycle & Lead Time Trend */}
-          <div style={{ ...box, marginBottom: 24 }}>
-            <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', margin: '0 0 16px' }}>{t('dora.project.cycleLeadTrend')}</h2>
-            {data.time_trend.length > 0 ? (
-              <DualLineChart
-                data={data.time_trend.map((item) => ({ label: item.date, v1: item.avg_cycle_time_hours, v2: item.avg_lead_time_hours }))}
-                color1="#38bdf8"
-                color2="#a78bfa"
-                label1={t('dora.project.cycleTime')}
-                label2={t('dora.project.leadTime')}
-              />
-            ) : (
-              <div style={{ color: 'var(--muted)', fontSize: 12, padding: 20, textAlign: 'center' }}>{t('dora.project.noData')}</div>
-            )}
-          </div>
-
-          {/* Charts row 3: Throughput */}
-          <div style={{ ...box, marginBottom: 24 }}>
-            <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', margin: '0 0 16px' }}>{t('dora.project.throughput')}</h2>
-            {data.throughput_trend.length > 0 ? (
-              <LineChart
-                data={data.throughput_trend.map((item) => ({ label: item.week, value: item.throughput }))}
-                lineColor="#22c55e"
-                fillColor="rgba(34,197,94,0.12)"
-              />
-            ) : (
-              <div style={{ color: 'var(--muted)', fontSize: 12, padding: 20, textAlign: 'center' }}>{t('dora.project.noData')}</div>
-            )}
+            <div style={compactBox}>
+              <h2 style={compactH2}>{t('dora.project.cycleLeadTrend')}</h2>
+              {data.time_trend.length > 0 ? (
+                <DualLineChart
+                  data={data.time_trend.map((item) => ({ label: item.date, v1: item.avg_cycle_time_hours, v2: item.avg_lead_time_hours }))}
+                  color1="#38bdf8"
+                  color2="#a78bfa"
+                  label1={t('dora.project.cycleTime')}
+                  label2={t('dora.project.leadTime')}
+                  height={160}
+                />
+              ) : (
+                <div style={emptyMini}>{t('dora.project.noData')}</div>
+              )}
+            </div>
+            <div style={compactBox}>
+              <h2 style={compactH2}>{t('dora.project.throughput')}</h2>
+              {data.throughput_trend.length > 0 ? (
+                <LineChart
+                  data={data.throughput_trend.map((item) => ({ label: item.week, value: item.throughput }))}
+                  lineColor="#22c55e"
+                  fillColor="rgba(34,197,94,0.12)"
+                  height={160}
+                />
+              ) : (
+                <div style={emptyMini}>{t('dora.project.noData')}</div>
+              )}
+            </div>
           </div>
 
           {/* ── Sprint Detail (Oobeya-style) ───────────────────────────── */}
