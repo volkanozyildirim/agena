@@ -1638,8 +1638,13 @@ class OrchestrationService:
         timestamp = datetime.utcnow().strftime('%Y%m%d%H%M%S')
         task_id = str(task.get('id', 'task'))
 
-        # Read branch pattern from user profile settings
-        branch_pattern = 'feature/{ext_id}-{title_slug}'  # default
+        # Read branch pattern from user profile settings.
+        # Default lives under an Agena-owned namespace so we never push
+        # onto a teammate's in-flight feature branch (e.g. their
+        # ``feature/63856`` for AB#63856) and accidentally graft an AI
+        # commit on top of a human's WIP. The trailing timestamp also
+        # prevents same-task retries from colliding with each other.
+        branch_pattern = 'agentflow/{ext_id}-{title_slug}-{timestamp}'
         try:
             user_id = task.get('created_by_user_id')
             if user_id and self.db_session:
