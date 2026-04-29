@@ -123,6 +123,7 @@ interface RepoCardProps {
 }
 
 function RepoCard({ repo, syncStatus, syncing, onSync, days }: RepoCardProps) {
+  const { t } = useLocale();
   const [metrics, setMetrics] = useState<DoraSummary | null>(null);
   const [loadingMetrics, setLoadingMetrics] = useState(true);
   const [metricsError, setMetricsError] = useState<string>('');
@@ -186,10 +187,12 @@ function RepoCard({ repo, syncStatus, syncing, onSync, days }: RepoCardProps) {
           }}
         >
           {syncing
-            ? '⏳ Syncing…'
+            ? `⏳ ${t('dora.repoCard.syncing' as Parameters<typeof t>[0])}`
             : hasSynced
-              ? `↻ Refresh (${((metrics?.commits_in_period ?? syncStatus?.commits) || 0).toLocaleString()}c · ${((metrics?.prs_in_period ?? syncStatus?.prs) || 0).toLocaleString()}p)`
-              : '↻ Sync'}
+              ? '↻ ' + t('dora.repoCard.refresh' as Parameters<typeof t>[0])
+                  .replace('{commits}', String(((metrics?.commits_in_period ?? syncStatus?.commits) || 0).toLocaleString()))
+                  .replace('{prs}', String(((metrics?.prs_in_period ?? syncStatus?.prs) || 0).toLocaleString()))
+              : `↻ ${t('dora.repoCard.sync' as Parameters<typeof t>[0])}`}
         </button>
       </div>
 
@@ -219,14 +222,14 @@ function RepoCard({ repo, syncStatus, syncing, onSync, days }: RepoCardProps) {
           all-time totals only while the per-period overview is still
           loading or absent. */}
       <div style={{ display: 'flex', gap: 16, fontSize: 11, color: 'var(--ink-65)', flexWrap: 'wrap', borderTop: '1px solid var(--panel-border)', paddingTop: 10 }}>
-        <span><strong style={{ color: 'var(--ink)' }}>{(metrics?.commits_in_period ?? syncStatus?.commits ?? 0).toLocaleString()}</strong> commits</span>
-        <span><strong style={{ color: 'var(--ink)' }}>{(metrics?.prs_in_period ?? syncStatus?.prs ?? 0).toLocaleString()}</strong> PRs</span>
-        <span><strong style={{ color: 'var(--ink)' }}>{(metrics?.deploys_in_period ?? syncStatus?.deployments ?? 0).toLocaleString()}</strong> deploys</span>
+        <span><strong style={{ color: 'var(--ink)' }}>{(metrics?.commits_in_period ?? syncStatus?.commits ?? 0).toLocaleString()}</strong> {t('dora.repoCard.commits' as Parameters<typeof t>[0])}</span>
+        <span><strong style={{ color: 'var(--ink)' }}>{(metrics?.prs_in_period ?? syncStatus?.prs ?? 0).toLocaleString()}</strong> {t('dora.repoCard.prs' as Parameters<typeof t>[0])}</span>
+        <span><strong style={{ color: 'var(--ink)' }}>{(metrics?.deploys_in_period ?? syncStatus?.deployments ?? 0).toLocaleString()}</strong> {t('dora.repoCard.deploys' as Parameters<typeof t>[0])}</span>
         <Link
           href={`/dashboard/dora/development?repo=${repo.id}`}
           style={{ marginLeft: 'auto', color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}
         >
-          Details →
+          {t('dora.repoCard.details' as Parameters<typeof t>[0])} →
         </Link>
       </div>
 
@@ -428,8 +431,7 @@ export default function DoraOverviewPage() {
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--ink)', margin: 0 }}>{t('dora.title')}</h1>
           <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 6, maxWidth: 640 }}>
-            Each card below shows DORA metrics computed from that repo&apos;s synced git data.
-            Click <strong style={{ color: 'var(--ink)' }}>Sync</strong> on a repo to pull its latest commits, PRs, and deployments.
+            {t('dora.hub.subtitle' as Parameters<typeof t>[0])}
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -444,7 +446,11 @@ export default function DoraOverviewPage() {
               fontWeight: 700, fontSize: 13, cursor: bulkSyncing ? 'not-allowed' : 'pointer',
             }}
           >
-            {bulkSyncing ? `Syncing ${syncingIds.size}/${repos.length}…` : `↻ Sync all (${repos.length})`}
+            {bulkSyncing
+              ? t('dora.hub.syncing' as Parameters<typeof t>[0])
+                  .replace('{current}', String(syncingIds.size))
+                  .replace('{total}', String(repos.length))
+              : `↻ ${t('dora.hub.syncAll' as Parameters<typeof t>[0]).replace('{count}', String(repos.length))}`}
           </button>
         </div>
       </div>
@@ -467,9 +473,10 @@ export default function DoraOverviewPage() {
           border: '1px dashed var(--panel-border-2)', background: 'var(--panel-alt)',
           color: 'var(--muted)',
         }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', marginBottom: 8 }}>No repos configured yet</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', marginBottom: 8 }}>{t('dora.hub.noReposTitle' as Parameters<typeof t>[0])}</div>
           <div style={{ fontSize: 13, marginBottom: 12 }}>
-            Add your repos at <Link href='/dashboard/integrations/repo-mappings' style={{ color: 'var(--accent)', fontWeight: 600 }}>Integrations → Repo mappings</Link>, then come back to sync DORA data.
+            {t('dora.hub.noReposBody' as Parameters<typeof t>[0])}{' '}
+            <Link href='/dashboard/integrations/repo-mappings' style={{ color: 'var(--accent)', fontWeight: 600 }}>Integrations → Repo mappings</Link>
           </div>
         </div>
       )}

@@ -71,7 +71,7 @@ function PhaseBadge({ phase, status }: { phase: RecordPhase; status: RecordStatu
 // ── Page ────────────────────────────────────────────────────────────────
 
 export default function RefinementRunsPage() {
-  const { lang } = useLocale();
+  const { lang, t } = useLocale();
   const [items, setItems] = useState<RefinementHistoryItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -115,7 +115,7 @@ export default function RefinementRunsPage() {
   const sprintGroups = useMemo(() => {
     const map = new Map<string, RefinementHistoryItem[]>();
     for (const it of items) {
-      const key = (it.sprint_name || '').trim() || (lang === 'tr' ? 'Sprint yok' : 'No sprint');
+      const key = (it.sprint_name || '').trim() || t('refinement.runs.pickSprint' as Parameters<typeof t>[0]);
       const arr = map.get(key) || [];
       arr.push(it);
       map.set(key, arr);
@@ -143,9 +143,9 @@ export default function RefinementRunsPage() {
   const deleteComment = useCallback(async (rec: RefinementHistoryItem) => {
     const sigGuess = 'AGENA AI';
     if (!window.confirm(
-      lang === 'tr'
-        ? `#${rec.external_item_id} item'ından "[${sigGuess}]" yorumlarını silinsin mi?`
-        : `Delete all "[${sigGuess}]" comments from #${rec.external_item_id}?`
+      t('refinement.runs.deleteConfirm' as Parameters<typeof t>[0])
+        .replace('{signature}', sigGuess)
+        .replace('{itemId}', rec.external_item_id)
     )) return;
     setDeleting(rec.id);
     try {
@@ -161,7 +161,7 @@ export default function RefinementRunsPage() {
           project: extractProject(rec.item_url || '') || undefined,
         }),
       });
-      setToast(`✓ ${resp.deleted} ${lang === 'tr' ? 'yorum silindi' : 'comments deleted'}`);
+      setToast('✓ ' + t('refinement.commentsDeletedToast' as Parameters<typeof t>[0]).replace('{count}', String(resp.deleted)));
       setTimeout(() => setToast(''), 3000);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Delete failed');
@@ -184,12 +184,10 @@ export default function RefinementRunsPage() {
             </Link>
           </div>
           <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--ink)', margin: 0 }}>
-            {lang === 'tr' ? 'Refinementlarım' : 'My refinement runs'}
+            {t('refinement.runs.title' as Parameters<typeof t>[0])}
           </h1>
           <p style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>
-            {lang === 'tr'
-              ? `Sprint başına analiz ve yazma kayıtları · toplam ${total}`
-              : `Analysis and writeback records grouped by sprint · ${total} total`}
+            {t('refinement.runs.subtitle' as Parameters<typeof t>[0]).replace('{total}', String(total))}
           </p>
         </div>
       </div>
@@ -236,7 +234,7 @@ export default function RefinementRunsPage() {
             <div style={{ padding: 24, color: 'var(--muted)', fontSize: 12, textAlign: 'center' }}>...</div>
           ) : sprintGroups.length === 0 ? (
             <div style={{ padding: 24, color: 'var(--muted)', fontSize: 12, textAlign: 'center' }}>
-              {lang === 'tr' ? 'Hiç çalışma yok' : 'No runs yet'}
+              {t('refinement.runs.noRuns' as Parameters<typeof t>[0])}
             </div>
           ) : (
             <div>
@@ -282,20 +280,20 @@ export default function RefinementRunsPage() {
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>
-              {activeSprint || (lang === 'tr' ? 'Sprint seç' : 'Pick a sprint')}
+              {activeSprint || t('refinement.runs.pickSprint' as Parameters<typeof t>[0])}
             </div>
             <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-              {activeRecords.length} {lang === 'tr' ? 'kayıt' : 'records'}
+              {activeRecords.length} {t('refinement.runs.records' as Parameters<typeof t>[0])}
             </div>
           </div>
 
           {!activeSprint ? (
             <div style={{ padding: 32, color: 'var(--muted)', fontSize: 13, textAlign: 'center' }}>
-              {lang === 'tr' ? 'Soldan bir sprint seç' : 'Select a sprint on the left'}
+              {t('refinement.runs.pickSprint' as Parameters<typeof t>[0])}
             </div>
           ) : activeRecords.length === 0 ? (
             <div style={{ padding: 32, color: 'var(--muted)', fontSize: 13, textAlign: 'center' }}>
-              {lang === 'tr' ? 'Bu sprint için kayıt yok' : 'No records for this sprint'}
+              {t('refinement.runs.noRecords' as Parameters<typeof t>[0])}
             </div>
           ) : (
             <div>
@@ -305,7 +303,6 @@ export default function RefinementRunsPage() {
                   record={rec}
                   onDelete={() => deleteComment(rec)}
                   deleting={deleting === rec.id}
-                  lang={lang}
                 />
               ))}
             </div>
@@ -317,13 +314,13 @@ export default function RefinementRunsPage() {
 }
 
 function RecordRow({
-  record, onDelete, deleting, lang,
+  record, onDelete, deleting,
 }: {
   record: RefinementHistoryItem;
   onDelete: () => void;
   deleting: boolean;
-  lang: string;
 }) {
+  const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const isWb = record.phase === 'writeback';
 
@@ -367,7 +364,7 @@ function RecordRow({
             onClick={(e) => e.stopPropagation()}
             style={{ fontSize: 11, color: 'var(--accent)', textDecoration: 'none' }}
           >
-            {lang === 'tr' ? 'Aç' : 'Open'} ↗
+            {t('refinement.runs.openItem' as Parameters<typeof t>[0])} ↗
           </a>
         )}
         <span style={{
@@ -388,18 +385,18 @@ function RecordRow({
               border: '1px solid rgba(239,68,68,0.3)',
               color: '#fca5a5',
             }}>
-              <strong style={{ marginRight: 6 }}>Hata:</strong>
+              <strong style={{ marginRight: 6 }}>{t('refinement.runs.error' as Parameters<typeof t>[0])}:</strong>
               {record.error_message}
             </div>
           )}
           {record.summary && (
-            <Section label={lang === 'tr' ? 'Özet' : 'Summary'} text={record.summary} />
+            <Section label={t('refinement.runs.section.summary' as Parameters<typeof t>[0])} text={record.summary} />
           )}
           {record.estimation_rationale && (
-            <Section label={lang === 'tr' ? 'Puan Gerekçesi' : 'Rationale'} text={record.estimation_rationale} />
+            <Section label={t('refinement.runs.section.rationale' as Parameters<typeof t>[0])} text={record.estimation_rationale} />
           )}
           {record.comment && (
-            <Section label={lang === 'tr' ? 'Yorum' : 'Comment'} text={record.comment} mono />
+            <Section label={t('refinement.runs.section.comment' as Parameters<typeof t>[0])} text={record.comment} mono />
           )}
           {isWb && record.status === 'completed' && (
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
@@ -413,7 +410,7 @@ function RecordRow({
                   background: 'rgba(239,68,68,0.08)', color: '#fca5a5',
                 }}
               >
-                {deleting ? '...' : lang === 'tr' ? '🗑 Yorumu sil' : '🗑 Delete comment'}
+                {deleting ? '...' : `🗑 ${t('refinement.deleteCommentTitle' as Parameters<typeof t>[0])}`}
               </button>
             </div>
           )}
