@@ -381,6 +381,7 @@ class JiraClient:
         suggested_story_points: int,
         comment: str,
         board_id: str,
+        assignee_email: str | None = None,
     ) -> None:
         base_url, email, api_token = self._resolve_config(cfg)
         key = str(issue_key or '').strip()
@@ -409,6 +410,16 @@ class JiraClient:
                 }
                 response = await client.post(comment_url, json=comment_payload, auth=(email, api_token))
                 response.raise_for_status()
+
+            assignee = (assignee_email or '').strip()
+            if assignee:
+                # Jira Cloud accepts {emailAddress}; Data Center wants {name}.
+                assignee_url = f"{base_url.rstrip('/')}/rest/api/3/issue/{key}/assignee"
+                response = await client.put(
+                    assignee_url, json={'emailAddress': assignee}, auth=(email, api_token),
+                )
+                if response.status_code >= 400:
+                    raise RuntimeError(f'Jira assignee PUT {response.status_code}: {response.text[:200]}')
 
     async def create_issue(
         self,
