@@ -40,6 +40,10 @@ class ExternalTask(BaseModel):
     last_refined_at: str | None = None
     last_refinement_comment: str | None = None
     last_suggested_story_points: float | None = None
+    # Set when a successful writeback (SP+comment to Azure/Jira) was
+    # recorded for this item. Lets the UI render "Yazıldı + Sil" instead
+    # of "Yaz" after a page reload.
+    last_writeback_at: str | None = None
 
 
 class TaskListResponse(BaseModel):

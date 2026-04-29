@@ -314,6 +314,7 @@ class RefinementService:
             item.last_refined_at = hist.get('last_refined_at')
             item.last_refinement_comment = hist.get('last_refinement_comment')
             item.last_suggested_story_points = hist.get('last_suggested_story_points')
+            item.last_writeback_at = hist.get('last_writeback_at')
         pointed = sum(1 for item in items if self._has_estimate(item))
         return RefinementItemsResponse(
             provider=provider_key,  # type: ignore[arg-type]
@@ -1352,8 +1353,18 @@ class RefinementService:
                     'last_refined_at': None,
                     'last_refinement_comment': None,
                     'last_suggested_story_points': None,
+                    'last_writeback_at': None,
                 },
             )
+            # Analysis runs feed the refined_before / count / latest-comment
+            # display. Writeback rows feed the "already pushed to provider"
+            # signal that drives the Yaz vs Sil button on the suggestion
+            # card — without it the row reverts to "Yaz" on every reload.
+            phase = (row.phase or '').lower()
+            if phase == 'writeback':
+                if (row.status or '') == 'completed' and current['last_writeback_at'] is None:
+                    current['last_writeback_at'] = row.created_at.isoformat() if row.created_at else None
+                continue
             current['refinement_count'] += 1
             if current['last_refined_at'] is None:
                 current['last_refined_at'] = row.created_at.isoformat() if row.created_at else None

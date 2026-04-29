@@ -36,6 +36,7 @@ type ExternalTask = {
   refined_before?: boolean;
   refinement_count?: number;
   last_refined_at?: string | null;
+  last_writeback_at?: string | null;
 };
 
 type RefinementItemsResponse = {
@@ -835,6 +836,20 @@ export default function RefinementPage() {
         );
       }
       setItemsData(data);
+      // Seed writtenBackIds from the server's last_writeback_at marker so
+      // a page reload still shows "Yazıldı + Sil" on previously written
+      // items. Items currently in writtenBackIds (this session) are kept;
+      // we only ADD server-known ones.
+      const writtenFromServer = (data.items || [])
+        .filter((it) => Boolean(it.last_writeback_at))
+        .map((it) => it.id);
+      if (writtenFromServer.length > 0) {
+        setWrittenBackIds((prev) => {
+          const next = new Set(prev);
+          for (const id of writtenFromServer) next.add(id);
+          return next;
+        });
+      }
       // No auto-selection on load — user picks what to refine. Auto-selecting
       // the first N unestimated items just confused things, especially with
       // the new type grouping.
@@ -2273,6 +2288,14 @@ export default function RefinementPage() {
                                       <div style={{ display: 'grid', gap: 6, marginTop: 6 }}>
                                         {suggestion.recommended_authors.map((a, i) => {
                                           const matched = !!a.member_unique_name;
+                                          // Check if the work item is already assigned to this
+                                          // person — if so, the row shows "Atandı ✓" instead of
+                                          // the Ata button. \`assigned_to\` from Azure carries
+                                          // the display name; we lower-case + trim to dodge
+                                          // case/whitespace quirks.
+                                          const currentAssignee = (item.assigned_to || '').trim().toLowerCase();
+                                          const candidateName = ((matched ? a.member_display_name : a.name) || '').trim().toLowerCase();
+                                          const alreadyAssigned = !!currentAssignee && !!candidateName && currentAssignee === candidateName;
                                           return (
                                           <div key={`${a.email || a.name}-${i}`} style={{
                                             display: 'flex', alignItems: 'center', gap: 10,
@@ -2290,7 +2313,17 @@ export default function RefinementPage() {
                                               </div>
                                               <div style={{ fontSize: 11, color: 'var(--ink-58)' }}>{a.reason || `${a.commit_count || 0} commit · ${a.files_touched || 0} dosya`}</div>
                                             </div>
-                                            {matched && (
+                                            {matched && alreadyAssigned && (
+                                              <span style={{
+                                                padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700,
+                                                border: '1px solid rgba(34,197,94,0.35)',
+                                                background: 'rgba(34,197,94,0.08)',
+                                                color: '#86efac', whiteSpace: 'nowrap',
+                                              }}>
+                                                ✓ {lang === 'tr' ? 'Zaten atandı' : 'Already assigned'}
+                                              </span>
+                                            )}
+                                            {matched && !alreadyAssigned && (
                                               <button
                                                 type='button'
                                                 onClick={(e) => {
