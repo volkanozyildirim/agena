@@ -580,5 +580,43 @@ class DoraService:
         if has_git:
             return await self._git_overview(organization_id, repo_mapping_id, days)
 
-        # Fallback to task-based calculation
+        # Per-repo views: no git data → show nulls. The task fallback below
+        # queries task_records org-wide with no repo filter, so falling back
+        # there for a specific repo would paint every never-synced card with
+        # the same org-level number (e.g. all four DORA cards showing the
+        # exact same 31m / 1.4w / 25% / 13.9h, which is what users hit
+        # before this guard was added). Force the user to actually Sync the
+        # repo before we report numbers for it.
+        if repo_mapping_id is not None:
+            return self._empty_overview(days)
+
+        # Org-wide: no git data at all → task-based proxy is acceptable
+        # because it really is an org-wide activity number.
         return await self._task_overview(organization_id, repo_mapping_id, days)
+
+    @staticmethod
+    def _empty_overview(days: int) -> dict:
+        from datetime import datetime as _dt
+        return {
+            'period_days': days,
+            'data_source': 'none',
+            'lead_time_hours': None,
+            'deploy_frequency': None,
+            'change_failure_rate': None,
+            'mttr_hours': None,
+            'avg_lead_time_hours': None,
+            'avg_cycle_time_hours': None,
+            'wip_count': 0,
+            'totals': {'planned': 0, 'completed': 0, 'failed': 0},
+            'kpi': {
+                'predictability': None,
+                'productivity': None,
+                'delivery_rate': None,
+                'planning_accuracy': None,
+            },
+            'weekly_trend': [],
+            'time_trend': [],
+            'throughput_trend': [],
+            'daily': [],
+            'generated_at': _dt.utcnow().isoformat() + 'Z',
+        }

@@ -717,8 +717,18 @@ class GitSyncService:
         deletions: int,
         commits_count: int,
         review_comments: int,
+        first_commit_at: datetime | None = None,
     ) -> None:
         from sqlalchemy.dialects.mysql import insert as mysql_insert
+
+        # DORA's lead-time-for-changes wants commit → merge, but neither
+        # Azure's PR list nor GitHub's exposes the first-commit timestamp
+        # without an extra round-trip per PR. As a free proxy we treat the
+        # PR's own creationDate as the first commit time — most teams open
+        # the PR within minutes of pushing the branch, so the error is
+        # bounded. Callers that *do* want true commit time can pass
+        # ``first_commit_at`` explicitly.
+        effective_first_commit = first_commit_at or created_at_ext
 
         stmt = mysql_insert(GitPullRequest).values(
             organization_id=org_id,
@@ -733,6 +743,7 @@ class GitSyncService:
             created_at_ext=created_at_ext,
             merged_at=merged_at,
             closed_at=closed_at,
+            first_commit_at=effective_first_commit,
             additions=additions,
             deletions=deletions,
             commits_count=commits_count,
@@ -747,6 +758,7 @@ class GitSyncService:
             created_at_ext=stmt.inserted.created_at_ext,
             merged_at=stmt.inserted.merged_at,
             closed_at=stmt.inserted.closed_at,
+            first_commit_at=stmt.inserted.first_commit_at,
             additions=stmt.inserted.additions,
             deletions=stmt.inserted.deletions,
             commits_count=stmt.inserted.commits_count,
