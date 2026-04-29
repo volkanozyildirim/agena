@@ -1324,6 +1324,33 @@ class AnalyticsService:
             .order_by(func.count(GitCommit.id).desc())
             .limit(50)
         )
+
+        # Per-reviewer engagement count for the same period+repo so we can
+        # turn "Help Others %" from a hardcoded 0 into a real number.
+        # Engagement = vote != 0 (Azure: -10 reject, -5 wait-for-author,
+        # 5/10 approved). Reviewers added but never voting are excluded
+        # — the metric is about active code review, not nominal assignment.
+        from agena_models.models.git_pull_request_review import GitPullRequestReview
+        review_filters = [
+            GitPullRequestReview.organization_id == organization_id,
+            GitPullRequestReview.created_at >= since,
+            GitPullRequestReview.vote != 0,
+        ]
+        if repo_mapping_id:
+            review_filters.append(GitPullRequestReview.repo_mapping_id == repo_mapping_id)
+        review_q = await self.db.execute(
+            select(
+                GitPullRequestReview.reviewer_email,
+                func.count(GitPullRequestReview.id).label('reviews'),
+            ).where(*review_filters)
+            .group_by(GitPullRequestReview.reviewer_email)
+        )
+        reviews_by_email = {
+            str(r.reviewer_email or '').lower(): int(r.reviews or 0)
+            for r in review_q.all()
+            if r.reviewer_email
+        }
+
         contributor_list = []
         for r in contrib_result.all():
             adds = int(r.additions)
@@ -1336,10 +1363,15 @@ class AnalyticsService:
             churn_pct = round(dels / max(total_lines, 1) * 100, 1)
             impact = round((adds - dels) / max(total_lines, 1) * 100, 1) if total_lines > 0 else 0.0
 
+            commits_for_user = int(r.commits)
+            reviews_given = reviews_by_email.get(str(r.author_email or '').lower(), 0)
+            denom = commits_for_user + reviews_given
+            help_others_pct = round(reviews_given / denom * 100, 1) if denom > 0 else 0.0
+
             contributor_list.append({
                 'author': str(r.author),
                 'email': str(r.author_email or ''),
-                'commits': int(r.commits),
+                'commits': commits_for_user,
                 'additions': adds,
                 'deletions': dels,
                 'files_changed': int(r.files_changed),
@@ -1347,7 +1379,7 @@ class AnalyticsService:
                 'impact': impact,
                 'new_pct': new_pct,
                 'refactor_pct': refactor_pct,
-                'help_others_pct': 0.0,  # would need PR review data
+                'help_others_pct': help_others_pct,
                 'churn_pct': churn_pct,
             })
 
