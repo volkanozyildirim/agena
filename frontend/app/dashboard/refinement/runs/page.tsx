@@ -74,20 +74,34 @@ export default function RefinementRunsPage() {
   const { lang } = useLocale();
   const [items, setItems] = useState<RefinementHistoryItem[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeSprint, setActiveSprint] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [toast, setToast] = useState('');
 
-  const load = useCallback(async (p: number) => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const data = await apiFetch<RefinementHistoryResponse>(`/refinement/history?page=${p}&page_size=200`);
-      setItems(data.items || []);
-      setTotal(data.total || 0);
+      // Backend caps page_size at 50. Walk pages until we've fetched
+      // them all (or hit a 1000-row safety net — keeps the UI from
+      // hanging on a runaway dataset).
+      const pageSize = 50;
+      const pageCap = 20;
+      let acc: RefinementHistoryItem[] = [];
+      let totalSeen = 0;
+      for (let p = 1; p <= pageCap; p += 1) {
+        const data = await apiFetch<RefinementHistoryResponse>(
+          `/refinement/history?page=${p}&page_size=${pageSize}`,
+        );
+        const batch = data.items || [];
+        acc = acc.concat(batch);
+        totalSeen = data.total || acc.length;
+        if (batch.length < pageSize || acc.length >= totalSeen) break;
+      }
+      setItems(acc);
+      setTotal(totalSeen);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load history');
     } finally {
@@ -95,7 +109,7 @@ export default function RefinementRunsPage() {
     }
   }, []);
 
-  useEffect(() => { void load(page); }, [load, page]);
+  useEffect(() => { void load(); }, [load]);
 
   // Group by sprint_name. Records without a sprint go into "Bilinmiyor".
   const sprintGroups = useMemo(() => {
