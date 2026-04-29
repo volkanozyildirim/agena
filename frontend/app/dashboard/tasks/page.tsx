@@ -2122,11 +2122,25 @@ function AssignPopup({ taskId, mode, tasks, agents, flows, defaultCreatePr: init
       .then((data) => {
         setBackendMappings(data);
         setMappingsLoaded(true);
-        // Auto-select the task's existing repo mapping
-        const taskObj = task as unknown as { repo_mapping_id?: number } | undefined;
-        const existingId = taskObj?.repo_mapping_id;
-        if (existingId && data.some((m) => m.id === existingId)) {
-          setSelectedMappingIds([existingId]);
+        // Auto-select the task's existing repo mappings.
+        //
+        // Multi-repo imports write to ``task_repo_assignments`` and may
+        // leave the legacy single ``repo_mapping_id`` column null, so we
+        // prefer the ``repo_assignments`` array first and only fall back
+        // to the legacy field for older / single-repo tasks. Without
+        // this the Run modal popped open empty even though the user had
+        // explicitly picked a repo at import time.
+        const taskObj = task as unknown as {
+          repo_mapping_id?: number;
+          repo_assignments?: Array<{ repo_mapping_id?: number }>;
+        } | undefined;
+        const fromAssignments = (taskObj?.repo_assignments || [])
+          .map((a) => a?.repo_mapping_id)
+          .filter((id): id is number => typeof id === 'number' && data.some((m) => m.id === id));
+        if (fromAssignments.length > 0) {
+          setSelectedMappingIds(fromAssignments);
+        } else if (taskObj?.repo_mapping_id && data.some((m) => m.id === taskObj.repo_mapping_id)) {
+          setSelectedMappingIds([taskObj.repo_mapping_id as number]);
         }
       })
       .catch(() => setMappingsLoaded(true));
