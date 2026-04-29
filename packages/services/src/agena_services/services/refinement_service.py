@@ -398,6 +398,31 @@ class RefinementService:
                         similar_past_block=similar_past_prompt,
                     )
 
+                    # Pull image attachments from the work item description so
+                    # screenshots / mockups land in the LLM context. Both
+                    # API providers (data URLs) and CLI providers (file path
+                    # @-references) work — the model just needs the bytes.
+                    item_images_data_urls: list[str] = []
+                    item_image_paths: list[str] = []
+                    if request.provider == 'azure' and (item.description or '').strip():
+                        try:
+                            azure_cfg_for_img = await self.integration_service.get_config(organization_id, 'azure')
+                            if azure_cfg_for_img and azure_cfg_for_img.secret:
+                                fetched = await self.azure_client.fetch_description_images(
+                                    item.description or '',
+                                    cfg={
+                                        'org_url': azure_cfg_for_img.base_url or '',
+                                        'pat': azure_cfg_for_img.secret,
+                                    },
+                                    max_images=4,
+                                )
+                                if fetched:
+                                    item_images_data_urls, item_image_paths = self._materialize_images_for_llm(
+                                        fetched, item.id,
+                                    )
+                        except Exception as exc:
+                            logger.info('Image fetch skipped for item %s: %s', item.id, exc)
+
                     if use_cli:
                         # Run via CLI bridge instead of LLM API
                         full_prompt = (
@@ -405,6 +430,13 @@ class RefinementService:
                             + self._format_template(desc_tpl, prompt_vars) + '\n\n'
                             + 'Expected output format:\n' + self._format_template(expected_tpl, prompt_vars)
                         )
+                        if item_image_paths:
+                            attach_block = '\n'.join(f'  - {p}' for p in item_image_paths)
+                            full_prompt += (
+                                '\n\nATTACHED SCREENSHOTS — read each one with the Read tool '
+                                'before answering. They were attached to the work item and may '
+                                'contain context the description does not.\n' + attach_block
+                            )
                         content = await self._run_cli_refinement(
                             agent_provider, agent_model, full_prompt,
                             organization_id=organization_id,
@@ -426,6 +458,7 @@ class RefinementService:
                             structured_output=_RefinementStructuredOutput,
                             reasoning=False,
                             skip_cache=True,
+                            image_inputs=item_images_data_urls or None,
                         )
 
                     total_usage = self._merge_usage(total_usage, usage)
@@ -1157,6 +1190,54 @@ class RefinementService:
     def _is_turkish(self, language: str) -> bool:
         value = str(language or '').strip().lower()
         return value.startswith('tr') or 'turk' in value
+
+    def _materialize_images_for_llm(
+        self,
+        fetched: list[tuple[str, bytes, str]],
+        item_id: str,
+    ) -> tuple[list[str], list[str]]:
+        """Take the (filename, bytes, mime) list produced by
+        AzureDevOpsClient.fetch_description_images and return two views:
+
+          • data URLs — for API providers that take base64 inputs
+            (\`data:image/png;base64,...\`)
+          • on-disk paths — written under /tmp/agena-attachments/<item>/
+            so the CLI bridge can hand them to claude/codex via @-refs
+
+        Both are returned regardless of which transport the caller picks
+        — the call site uses one of them depending on use_cli.
+        """
+        import base64 as _b64
+        import os as _os
+        import re as _re
+
+        data_urls: list[str] = []
+        paths: list[str] = []
+        if not fetched:
+            return data_urls, paths
+        safe_id = _re.sub(r'[^A-Za-z0-9_-]', '_', str(item_id) or 'item')
+        out_dir = f'/tmp/agena-attachments/{safe_id}'
+        try:
+            _os.makedirs(out_dir, exist_ok=True)
+        except Exception as exc:
+            logger.info('Could not create attachment dir %s: %s', out_dir, exc)
+            out_dir = ''
+        for idx, (name, blob, mime) in enumerate(fetched):
+            try:
+                b64 = _b64.b64encode(blob).decode('ascii')
+                data_urls.append(f'data:{mime or "image/png"};base64,{b64}')
+            except Exception as exc:
+                logger.info('Failed to b64-encode image %s for item %s: %s', name, item_id, exc)
+            if out_dir:
+                safe_name = _re.sub(r'[^A-Za-z0-9._-]', '_', name) or f'attachment-{idx + 1}'
+                fpath = f'{out_dir}/{safe_name}'
+                try:
+                    with open(fpath, 'wb') as fh:
+                        fh.write(blob)
+                    paths.append(fpath)
+                except Exception as exc:
+                    logger.info('Failed to write image %s: %s', fpath, exc)
+        return data_urls, paths
 
     def _normalize_description(self, value: str | None) -> str:
         raw = str(value or '').strip()

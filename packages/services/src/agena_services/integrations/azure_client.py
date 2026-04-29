@@ -245,6 +245,83 @@ class AzureDevOpsClient:
             details_payload = details_payload[:max_items]
         return [self._to_external_task(item, org_url=org_url, project=project) for item in details_payload]
 
+    async def fetch_description_images(
+        self,
+        description_html: str,
+        cfg: dict[str, str] | None = None,
+        *,
+        max_images: int = 4,
+    ) -> list[tuple[str, bytes, str]]:
+        """Pull image attachments referenced from a work item's description
+        HTML. Returns up to `max_images` tuples of
+        (filename, raw_bytes, mime_type) so callers can decide whether to
+        send them as base64 data URLs (API providers) or write to disk
+        and reference by path (CLI bridge).
+
+        Only Azure-hosted attachments are fetched — links to other hosts
+        are skipped because we can't authenticate against them. Non-image
+        attachments are also skipped via Content-Type check.
+        """
+        import re as _re
+        if not description_html:
+            return []
+        cfg = cfg or {}
+        org_url = (cfg.get('org_url') or self.settings.azure_org_url or '').strip()
+        pat = (cfg.get('pat') or self.settings.azure_pat or '').strip()
+        if not pat:
+            return []
+
+        # Pull every src attribute from <img> tags. The same regex catches
+        # `<img src="..."/>` and `<img alt="..." src="..." />`.
+        img_urls: list[str] = []
+        for match in _re.finditer(r'<img[^>]+src=["\']([^"\']+)["\']', description_html, flags=_re.IGNORECASE):
+            url = match.group(1).strip()
+            if not url or url.startswith('data:'):
+                continue
+            # Only fetch URLs that look like Azure attachments — auth scope
+            # we have only works there. Public CDN images would 401 with
+            # our PAT and pollute the logs.
+            host_ok = ('/_apis/wit/attachments/' in url) or (org_url and url.startswith(org_url.rstrip('/')))
+            if not host_ok:
+                continue
+            img_urls.append(url)
+            if len(img_urls) >= max_images:
+                break
+        if not img_urls:
+            return []
+
+        results: list[tuple[str, bytes, str]] = []
+        headers = self._headers(pat)
+        async with httpx.AsyncClient(timeout=20) as client:
+            for idx, url in enumerate(img_urls):
+                try:
+                    resp = await client.get(url, headers=headers)
+                    if resp.status_code != 200:
+                        logger.info('Skip image %s — HTTP %s', url, resp.status_code)
+                        continue
+                    mime = (resp.headers.get('content-type') or '').split(';')[0].strip().lower()
+                    if not mime.startswith('image/'):
+                        continue
+                    # Try to coax a stable filename from the URL or
+                    # Content-Disposition; otherwise fall back to seq#.
+                    name = ''
+                    cd = resp.headers.get('content-disposition') or ''
+                    fn_match = _re.search(r'filename="?([^";]+)"?', cd)
+                    if fn_match:
+                        name = fn_match.group(1).strip()
+                    if not name:
+                        qs_match = _re.search(r'fileName=([^&]+)', url)
+                        if qs_match:
+                            name = qs_match.group(1).strip()
+                    if not name:
+                        ext = mime.split('/')[-1].split('+')[0]
+                        name = f'attachment-{idx + 1}.{ext or "bin"}'
+                    results.append((name, resp.content, mime))
+                except Exception as exc:
+                    logger.info('Failed to fetch description image %s: %s', url, exc)
+                    continue
+        return results
+
     async def fetch_period_work_items(
         self,
         cfg: dict[str, str] | None = None,
