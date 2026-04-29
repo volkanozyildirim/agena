@@ -1212,8 +1212,26 @@ export default function RefinementPage() {
   // collapse onto the same bucket. Order is intentional —
   // stories surface first because they're typically what refinement
   // is grading; bugs and tasks follow; anything unrecognised goes last.
+  // Type-bucket every item once, regardless of the estimate filter, so
+  // the per-type count chips on the filter row stay stable as users
+  // toggle Hepsi/Puansız/Puanlı.
+  const typeCounts = useMemo(() => {
+    const counts: Record<string, number> = { Story: 0, Bug: 0, Task: 0, Epic: 0, Other: 0 };
+    for (const it of itemsData?.items || []) {
+      const raw = (it.work_item_type || 'Task').trim();
+      const key = raw.toLowerCase() === 'user story' ? 'Story'
+        : (raw in counts) ? raw
+        : 'Other';
+      counts[key] = (counts[key] || 0) + 1;
+    }
+    return counts;
+  }, [itemsData]);
+
   const groupedItems = useMemo(() => {
-    const ORDER = ['Story', 'Bug', 'Task', 'Epic', 'Other'];
+    // Bug + Task surface first because they're typically the unestimated
+    // / fast-to-refine items; Story lands at the bottom because the user
+    // wants long-form stories to come last in the visual list.
+    const ORDER = ['Bug', 'Task', 'Epic', 'Other', 'Story'];
     const filtered = sortedItems.filter((it) => {
       if (estimateFilter === 'unestimated') return !hasEstimate(it);
       if (estimateFilter === 'estimated') return hasEstimate(it);
@@ -1791,26 +1809,42 @@ export default function RefinementPage() {
         <div style={{ ...panelHeader, padding: '10px 14px', borderBottom: '1px solid var(--panel-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <span>Sprint Items</span>
           {(itemsData?.items?.length || 0) > 0 && (
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              {([
-                { key: 'all' as const, label: lang === 'tr' ? 'Hepsi' : 'All', count: itemsData?.items.length || 0 },
-                { key: 'unestimated' as const, label: lang === 'tr' ? 'Puansız' : 'Unestimated', count: itemsData?.unestimated_count ?? (itemsData?.items.filter((i) => !hasEstimate(i)).length || 0) },
-                { key: 'estimated' as const, label: lang === 'tr' ? 'Puanlı' : 'Estimated', count: itemsData?.pointed_count ?? (itemsData?.items.filter((i) => hasEstimate(i)).length || 0) },
-              ]).map((tab) => (
-                <button
-                  key={tab.key}
-                  type='button'
-                  onClick={() => setEstimateFilter(tab.key)}
-                  style={{
-                    padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                    border: estimateFilter === tab.key ? '1px solid rgba(94,234,212,0.5)' : '1px solid var(--panel-border)',
-                    background: estimateFilter === tab.key ? 'rgba(94,234,212,0.12)' : 'transparent',
-                    color: estimateFilter === tab.key ? '#5eead4' : 'var(--ink-55)',
-                  }}
-                >
-                  {tab.label} <span style={{ opacity: 0.65, marginLeft: 2 }}>{tab.count}</span>
-                </button>
-              ))}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                {([
+                  { key: 'all' as const, label: lang === 'tr' ? 'Hepsi' : 'All', count: itemsData?.items.length || 0 },
+                  { key: 'unestimated' as const, label: lang === 'tr' ? 'Puansız' : 'Unestimated', count: itemsData?.unestimated_count ?? (itemsData?.items.filter((i) => !hasEstimate(i)).length || 0) },
+                  { key: 'estimated' as const, label: lang === 'tr' ? 'Puanlı' : 'Estimated', count: itemsData?.pointed_count ?? (itemsData?.items.filter((i) => hasEstimate(i)).length || 0) },
+                ]).map((tab) => (
+                  <button
+                    key={tab.key}
+                    type='button'
+                    onClick={() => setEstimateFilter(tab.key)}
+                    style={{
+                      padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                      border: estimateFilter === tab.key ? '1px solid rgba(94,234,212,0.5)' : '1px solid var(--panel-border)',
+                      background: estimateFilter === tab.key ? 'rgba(94,234,212,0.12)' : 'transparent',
+                      color: estimateFilter === tab.key ? '#5eead4' : 'var(--ink-55)',
+                    }}
+                  >
+                    {tab.label} <span style={{ opacity: 0.65, marginLeft: 2 }}>{tab.count}</span>
+                  </button>
+                ))}
+              </div>
+              {/* Per-type breakdown chips. Read-only summary; they're not
+                  filterable by themselves — the group headers below are the
+                  per-type interaction surface. */}
+              {(['Bug', 'Task', 'Epic', 'Story'] as const)
+                .filter((t) => (typeCounts[t] || 0) > 0)
+                .map((t) => (
+                  <span key={t} style={{
+                    padding: '3px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700,
+                    background: 'var(--panel)', border: '1px solid var(--panel-border-2)',
+                    color: 'var(--ink-65)', textTransform: 'uppercase', letterSpacing: 0.5,
+                  }}>
+                    {t} <span style={{ opacity: 0.65, marginLeft: 2 }}>{typeCounts[t]}</span>
+                  </span>
+                ))}
             </div>
           )}
         </div>
