@@ -456,6 +456,117 @@ async def writeback_refinement(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+class RefinementDeleteCommentRequest(BaseModel):
+    provider: str  # 'azure' | 'jira'
+    work_item_id: str
+    signature: str = 'AGENA AI'
+    project: str | None = None  # required for Azure
+
+
+@router.post('/delete-comment')
+async def delete_refinement_comment(
+    payload: RefinementDeleteCommentRequest,
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> dict[str, int]:
+    """Remove every [signature]-prefixed comment from a work item. Used
+    when the user re-refines and wants the older AI comment gone before
+    writing the new one. Returns the count actually deleted so the UI
+    can confirm."""
+    src = (payload.provider or '').strip().lower()
+    wid = (payload.work_item_id or '').strip()
+    sig = (payload.signature or 'AGENA AI').strip()
+    if not wid:
+        raise HTTPException(status_code=400, detail='work_item_id is required')
+    prefix = f'[{sig}]'
+
+    from agena_services.services.integration_config_service import IntegrationConfigService
+    cfg_service = IntegrationConfigService(db)
+
+    if src == 'azure':
+        cfg = await cfg_service.get_config(tenant.organization_id, 'azure')
+        if cfg is None or not cfg.secret:
+            raise HTTPException(status_code=400, detail='Azure integration not configured')
+        project = (payload.project or cfg.project or '').strip()
+        if not project:
+            raise HTTPException(status_code=400, detail='project is required for Azure')
+        import base64, httpx
+        token = base64.b64encode(f':{cfg.secret}'.encode()).decode()
+        headers = {'Authorization': f'Basic {token}'}
+        org_url = (cfg.base_url or '').rstrip('/')
+        # 1) List comments for the work item.
+        list_url = f'{org_url}/{project}/_apis/wit/workitems/{wid}/comments?api-version=7.1-preview.4'
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(list_url, headers=headers)
+            if resp.status_code >= 400:
+                raise HTTPException(status_code=502, detail=f'Azure list comments {resp.status_code}: {resp.text[:200]}')
+            comments = (resp.json() or {}).get('comments', []) or []
+            # 2) Delete each one whose plain-text body starts with [SIG].
+            deleted = 0
+            import re as _re
+            for c in comments:
+                cid = str(c.get('id') or '')
+                body = str(c.get('text') or '')
+                # Strip HTML tags before matching since Azure stores comments as HTML.
+                body_text = _re.sub(r'(?is)<[^>]+>', '', body).strip()
+                if not cid or not body_text.startswith(prefix):
+                    continue
+                del_url = f'{org_url}/{project}/_apis/wit/workitems/{wid}/comments/{cid}?api-version=7.1-preview.4'
+                d = await client.delete(del_url, headers=headers)
+                if d.status_code in (200, 204):
+                    deleted += 1
+                else:
+                    # 404 means it was already gone (e.g., another tab) — count as success.
+                    if d.status_code == 404:
+                        deleted += 1
+        return {'deleted': deleted}
+
+    if src == 'jira':
+        cfg = await cfg_service.get_config(tenant.organization_id, 'jira')
+        if cfg is None or not cfg.secret:
+            raise HTTPException(status_code=400, detail='Jira integration not configured')
+        import base64, httpx
+        email = (cfg.username or '').strip()
+        if not email:
+            raise HTTPException(status_code=400, detail='Jira email missing in integration config')
+        creds = base64.b64encode(f'{email}:{cfg.secret}'.encode()).decode()
+        base = (cfg.base_url or '').rstrip('/')
+        list_url = f'{base}/rest/api/3/issue/{wid}/comment'
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(list_url, headers={'Authorization': f'Basic {creds}'})
+            if resp.status_code >= 400:
+                raise HTTPException(status_code=502, detail=f'Jira list comments {resp.status_code}: {resp.text[:200]}')
+            comments = (resp.json() or {}).get('comments', []) or []
+            deleted = 0
+            for c in comments:
+                cid = str(c.get('id') or '')
+                # Jira ADF body — extract plain text by walking content tree.
+                body = c.get('body') or {}
+                plain = _adf_plain_text(body) if isinstance(body, dict) else str(body)
+                if not cid or not plain.strip().startswith(prefix):
+                    continue
+                del_url = f'{base}/rest/api/3/issue/{wid}/comment/{cid}'
+                d = await client.delete(del_url, headers={'Authorization': f'Basic {creds}'})
+                if d.status_code in (200, 204) or d.status_code == 404:
+                    deleted += 1
+        return {'deleted': deleted}
+
+    raise HTTPException(status_code=400, detail='provider must be azure or jira')
+
+
+def _adf_plain_text(node: dict) -> str:
+    """Recursively concat \`text\` fields out of an Atlassian Document
+    Format tree. Good enough to match a [SIG] prefix; not lossless."""
+    if not isinstance(node, dict):
+        return ''
+    if node.get('type') == 'text' and isinstance(node.get('text'), str):
+        return node['text']
+    out: list[str] = []
+    for child in (node.get('content') or []):
+        out.append(_adf_plain_text(child))
+    return ''.join(out)
+
+
 class RefinementBackfillRequest(BaseModel):
     source: str = 'azure'
     project: str | None = None
