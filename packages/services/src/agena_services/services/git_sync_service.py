@@ -232,8 +232,119 @@ class GitSyncService:
                 params = None  # see commits sync — empty dict strips URL query
 
         await self.db.commit()
+        # Backfill PR reviews. GitHub's PR list doesn't inline reviews,
+        # so we walk recently-merged PRs that have no review rows yet
+        # and pull `/pulls/{n}/reviews` for each. Capped at 200 per sync
+        # so the first call doesn't punish the user; subsequent syncs
+        # whittle the backlog.
+        await self._backfill_github_pr_reviews(
+            org_id, repo_mapping_id, owner, repo, headers,
+        )
         logger.info('GitHub PRs synced: %d for %s/%s', count, owner, repo)
         return count
+
+    async def _backfill_github_pr_reviews(
+        self,
+        org_id: int,
+        repo_mapping_id: str,
+        owner: str,
+        repo: str,
+        headers: dict[str, str],
+    ) -> None:
+        from agena_models.models.git_pull_request import GitPullRequest as PR
+        from agena_models.models.git_pull_request_review import GitPullRequestReview
+
+        # PRs in this repo that don't have any review rows yet, newest
+        # first. Outer-join + IS NULL is the cheap "missing review"
+        # filter (also covers PRs that genuinely had zero reviewers).
+        pr_rows = (await self.db.execute(
+            select(PR.id, PR.external_id)
+            .outerjoin(
+                GitPullRequestReview,
+                (GitPullRequestReview.pull_request_id == PR.id)
+                & (GitPullRequestReview.organization_id == PR.organization_id),
+            )
+            .where(
+                PR.organization_id == org_id,
+                PR.repo_mapping_id == repo_mapping_id,
+                PR.provider == 'github',
+                PR.merged_at.isnot(None),
+                GitPullRequestReview.id.is_(None),
+            )
+            .order_by(PR.merged_at.desc())
+            .limit(200)
+        )).all()
+        if not pr_rows:
+            return
+
+        # GitHub state → vote, mirroring Azure's scale so the analytics
+        # query can stay provider-agnostic.
+        state_to_vote = {
+            'APPROVED': 10,
+            'COMMENTED': 5,
+            'CHANGES_REQUESTED': -10,
+            'DISMISSED': 0,
+            'PENDING': 0,
+        }
+
+        sem = asyncio.Semaphore(10)
+        async with httpx.AsyncClient(timeout=20) as client:
+            async def _one(pr_id: int, pr_number: str) -> tuple[int, list[dict]] | None:
+                async with sem:
+                    url = f'https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}/reviews?per_page=100'
+                    resp = await self._request_with_rate_limit(client, 'GET', url, headers=headers)
+                    if resp is None:
+                        return None
+                    try:
+                        items = resp.json() or []
+                    except Exception:
+                        return None
+                    if not isinstance(items, list):
+                        return None
+                    parsed: list[dict] = []
+                    seen: set[str] = set()
+                    for it in items:
+                        user = it.get('user') or {}
+                        login = (user.get('login') or '').strip().lower()
+                        if not login or login in seen:
+                            # Keep one row per (PR, reviewer); the latest
+                            # review state wins via on_duplicate_key_update.
+                            pass
+                        else:
+                            seen.add(login)
+                        state = (it.get('state') or '').upper()
+                        parsed.append({
+                            'displayName': user.get('login') or '',
+                            'uniqueName': login,
+                            'vote': state_to_vote.get(state, 0),
+                        })
+                    return pr_id, parsed
+
+            results = await asyncio.gather(
+                *[_one(r.id, r.external_id) for r in pr_rows],
+                return_exceptions=True,
+            )
+
+        applied = 0
+        for r in results:
+            if isinstance(r, Exception) or r is None:
+                continue
+            pr_id, reviewers = r
+            if not reviewers:
+                continue
+            await self._upsert_pr_reviews(
+                org_id=org_id,
+                repo_mapping_id=repo_mapping_id,
+                pr_row_id=pr_id,
+                reviewers=reviewers,
+            )
+            applied += 1
+        if applied:
+            await self.db.commit()
+            logger.info(
+                'GitHub PR reviews backfill: %d/%d for %s/%s',
+                applied, len(pr_rows), owner, repo,
+            )
 
     async def _sync_github_deployments(
         self,
