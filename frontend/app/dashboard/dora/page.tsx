@@ -249,6 +249,56 @@ export default function DoraOverviewPage() {
   const [syncingIds, setSyncingIds] = useState<Set<number>>(new Set());
   const [bulkSyncing, setBulkSyncing] = useState(false);
   const [pageError, setPageError] = useState('');
+  const [addRepoOpen, setAddRepoOpen] = useState(false);
+  const [addRepoBusy, setAddRepoBusy] = useState(false);
+  const [addRepoError, setAddRepoError] = useState('');
+  const [addRepoForm, setAddRepoForm] = useState({
+    provider: 'azure' as 'azure' | 'github',
+    owner: '',
+    repo_name: '',
+    base_branch: 'main',
+  });
+
+  const reloadRepos = useCallback(async () => {
+    try {
+      const rows = await apiFetch<RepoMappingRow[]>('/repo-mappings');
+      setRepos((rows || []).filter((r) => r.is_active !== false));
+    } catch (e) {
+      setReposError(e instanceof Error ? e.message : 'Failed to load repos');
+    }
+  }, []);
+
+  const submitAddRepo = useCallback(async () => {
+    setAddRepoBusy(true);
+    setAddRepoError('');
+    try {
+      const owner = addRepoForm.owner.trim();
+      const repoName = addRepoForm.repo_name.trim();
+      if (!owner || !repoName) {
+        setAddRepoError('Owner / project ve repo adı zorunlu');
+        setAddRepoBusy(false);
+        return;
+      }
+      await apiFetch('/repo-mappings', {
+        method: 'POST',
+        body: JSON.stringify({
+          provider: addRepoForm.provider,
+          owner,
+          repo_name: repoName,
+          base_branch: addRepoForm.base_branch.trim() || 'main',
+          local_repo_path: null,
+          playbook: null,
+        }),
+      });
+      await reloadRepos();
+      setAddRepoOpen(false);
+      setAddRepoForm({ provider: 'azure', owner: '', repo_name: '', base_branch: 'main' });
+    } catch (e) {
+      setAddRepoError(e instanceof Error ? e.message : 'Failed to add repo');
+    } finally {
+      setAddRepoBusy(false);
+    }
+  }, [addRepoForm, reloadRepos]);
 
   // Server-side "currently syncing" registry, populated by the sync route.
   // Survives page reloads so the user knows a click-then-reload didn't lose
@@ -340,6 +390,18 @@ export default function DoraOverviewPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <DoraPeriodTabs value={periodDays} onChange={setPeriodDays} />
           <button
+            onClick={() => { setAddRepoError(''); setAddRepoOpen(true); }}
+            style={{
+              padding: '10px 16px', borderRadius: 12, border: '1px solid var(--panel-border-2)',
+              background: 'var(--surface)', color: 'var(--ink)',
+              fontWeight: 700, fontSize: 13, cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}
+            title='Add a repo to DORA'
+          >
+            <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> Add repo
+          </button>
+          <button
             onClick={handleSyncAll}
             disabled={bulkSyncing || repos.length === 0}
             style={{
@@ -424,6 +486,122 @@ export default function DoraOverviewPage() {
           ))}
         </div>
       </div>
+
+      {addRepoOpen && (
+        <div
+          onClick={() => !addRepoBusy && setAddRepoOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex',
+            alignItems: 'center', justifyContent: 'center', padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 'min(460px, 100%)', background: 'var(--surface)',
+              border: '1px solid var(--panel-border-2)', borderRadius: 14,
+              padding: 20, boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+            }}
+          >
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--ink)' }}>Add repo to DORA</h2>
+            <p style={{ marginTop: 6, marginBottom: 14, fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>
+              DORA için lokal checkout gerekmez. Sadece provider + sahibi + repo adı yeterli — sync'te commits, PRs, deploys ve reviews API'den gelir.
+            </p>
+
+            <div style={{ display: 'grid', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Provider</div>
+                <div style={{ display: 'inline-flex', padding: 3, borderRadius: 999, border: '1px solid var(--panel-border-2)', background: 'var(--panel-alt)' }}>
+                  {(['azure', 'github'] as const).map((p) => {
+                    const active = addRepoForm.provider === p;
+                    return (
+                      <button
+                        key={p}
+                        onClick={() => setAddRepoForm((f) => ({ ...f, provider: p }))}
+                        style={{
+                          padding: '5px 14px', borderRadius: 999, border: 'none',
+                          background: active ? 'var(--surface)' : 'transparent',
+                          color: active ? 'var(--ink)' : 'var(--ink-50)',
+                          fontSize: 12, fontWeight: active ? 700 : 600, cursor: 'pointer',
+                          textTransform: 'capitalize',
+                        }}
+                      >
+                        {p}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <label style={{ display: 'grid', gap: 4 }}>
+                <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>
+                  {addRepoForm.provider === 'azure' ? 'Azure project' : 'GitHub owner'}
+                </span>
+                <input
+                  type='text'
+                  value={addRepoForm.owner}
+                  onChange={(e) => setAddRepoForm((f) => ({ ...f, owner: e.target.value }))}
+                  placeholder={addRepoForm.provider === 'azure' ? 'EcomBackend' : 'octocat'}
+                  style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--ink)', fontSize: 13 }}
+                />
+              </label>
+
+              <label style={{ display: 'grid', gap: 4 }}>
+                <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>Repo adı</span>
+                <input
+                  type='text'
+                  value={addRepoForm.repo_name}
+                  onChange={(e) => setAddRepoForm((f) => ({ ...f, repo_name: e.target.value }))}
+                  placeholder='webservice'
+                  style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--ink)', fontSize: 13 }}
+                />
+              </label>
+
+              <label style={{ display: 'grid', gap: 4 }}>
+                <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>Base branch</span>
+                <input
+                  type='text'
+                  value={addRepoForm.base_branch}
+                  onChange={(e) => setAddRepoForm((f) => ({ ...f, base_branch: e.target.value }))}
+                  placeholder='main'
+                  style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--ink)', fontSize: 13 }}
+                />
+              </label>
+            </div>
+
+            {addRepoError && (
+              <div style={{ marginTop: 10, fontSize: 12, color: '#fca5a5' }}>{addRepoError}</div>
+            )}
+
+            <p style={{ marginTop: 14, marginBottom: 0, fontSize: 11, color: 'var(--muted)', lineHeight: 1.5 }}>
+              Daha sonra Mappings sayfasından local path / playbook / analyze prompt ekleyip refinement &amp; AI agent için zenginleştirebilirsin.
+            </p>
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+              <button
+                onClick={() => setAddRepoOpen(false)}
+                disabled={addRepoBusy}
+                style={{ padding: '8px 16px', borderRadius: 10, border: '1px solid var(--panel-border-2)', background: 'transparent', color: 'var(--ink)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+              >
+                Vazgeç
+              </button>
+              <button
+                onClick={() => void submitAddRepo()}
+                disabled={addRepoBusy}
+                style={{
+                  padding: '8px 16px', borderRadius: 10, border: 'none',
+                  background: addRepoBusy ? 'var(--panel-alt)' : 'linear-gradient(135deg, #0d9488, #22c55e)',
+                  color: addRepoBusy ? 'var(--muted)' : '#fff',
+                  fontSize: 13, fontWeight: 700, cursor: addRepoBusy ? 'wait' : 'pointer',
+                }}
+              >
+                {addRepoBusy ? 'Ekleniyor…' : '+ Ekle'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
