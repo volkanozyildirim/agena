@@ -1,5 +1,13 @@
 [
   {
+    "hash": "729a28e",
+    "short": "729a28e",
+    "message": "Agents: drop card grid min-col to 165px so mobile fits 2 columns",
+    "date": "2026-04-30",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "8576267",
     "short": "8576267",
     "message": "Agents: portal-mount the new/edit agent modal so it actually centers",
