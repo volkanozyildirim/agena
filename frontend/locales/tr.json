@@ -707,6 +707,8 @@
   "profile.preferredModelPlaceholder": "gpt-5",
   "profile.branchPattern": "Branch Deseni",
   "profile.branchPatternPlaceholder": "feature/{ext_id}-{title_slug}",
+  "profile.prTitleFormat": "PR Başlık Formatı",
+  "profile.prTitleFormatPlaceholder": "[AI] {title}",
   "profile.preview": "Önizleme",
   "profile.queueWarningThreshold": "Kuyruk uyarı eşiği",
   "profile.queueWarningThresholdPlaceholder": "5",

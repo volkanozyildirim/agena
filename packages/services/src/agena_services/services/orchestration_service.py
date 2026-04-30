@@ -213,6 +213,12 @@ class OrchestrationService:
             'source': routing.effective_source,
             'organization_id': organization_id,
             'created_by_user_id': task.created_by_user_id,
+            # external_id: source platform's identifier (Azure work item id,
+            # Jira issue key, etc.) populated on sprint-board import.
+            # external_work_item_id: only set when Agena mirrors a manual
+            # task back into Azure/Jira. Branch naming wants the former so
+            # PRs link to the work item the user is actually tracking.
+            'external_id': getattr(task, 'external_id', None),
             'external_work_item_id': getattr(task, 'external_work_item_id', None),
         }
 
@@ -1164,7 +1170,7 @@ class OrchestrationService:
                                 target_branch=pr_payload.base_branch,
                                 title=pr_payload.title,
                                 description=pr_payload.body,
-                                work_item_id=getattr(task, 'external_work_item_id', None),
+                                work_item_id=self._resolve_azure_work_item_id(task),
                             )
                         except Exception as pr_exc:
                             await notification_service.notify_event(
@@ -1215,7 +1221,7 @@ class OrchestrationService:
                         description=pr_payload.body,
                         files=[{'path': f.path, 'content': f.content} for f in pr_payload.files],
                         commit_message=pr_payload.commit_message,
-                        work_item_id=getattr(task, 'external_work_item_id', None),
+                        work_item_id=self._resolve_azure_work_item_id(task),
                     )
                     branch_name = pr_payload.branch_name
                     await task_service.add_log(task.id, organization_id, 'pr', f'Azure PR created: {pr_url}')
@@ -1617,15 +1623,48 @@ class OrchestrationService:
                 await task_service.add_log(task.id, organization_id, 'notify', 'Failure email sent')
             raise
 
+    @staticmethod
+    def _resolve_azure_work_item_id(task: Any) -> str | None:
+        """Pick the Azure work item id to attach to a PR.
+
+        Prefer the explicitly mirrored id (manual task → Agena-created
+        Azure item); otherwise, when the task came in via sprint import,
+        ``external_id`` already holds the source work item id. Without
+        this fallback Azure can't auto-link the PR to the work item, so
+        the PR title and ``workItemRefs`` payload both end up empty.
+        """
+        linked = (getattr(task, 'external_work_item_id', None) or '').strip()
+        if linked:
+            return linked
+        source = (getattr(task, 'source', None) or '').strip().lower()
+        if source == 'azure':
+            ext = (getattr(task, 'external_id', None) or '').strip()
+            if ext.isdigit():
+                return ext
+        return None
+
     async def _build_pr_payload(self, task: dict[str, Any], reviewed_code: str, local_repo_path: str | None = None) -> CreatePRRequest:
         # Build branch name from pattern (user configurable via profile settings)
         title = str(task.get('title', '') or '')
         desc = str(task.get('description', '') or '')
 
-        # Prefer explicitly-linked Azure work item ID (mirror created on import)
+        # Resolve {ext_id} in priority order:
+        # 1. external_work_item_id — set when Agena mirrors a manual task
+        #    back into Azure/Jira (the new work item it created).
+        # 2. external_id — set on sprint-board import. This is the actual
+        #    Azure work item id ("63856") or Jira issue key ("PROJ-123")
+        #    the user is tracking on their board, so the PR links back to
+        #    the right item. Only trust it for known external sources;
+        #    'internal' / 'manual' tasks have a synthesised value here.
+        # 3. Regex over title/description for "Azure #1234" style mentions.
+        # 4. Internal task id as last-resort fallback.
         linked_wi = str(task.get('external_work_item_id') or '').strip()
+        source_ext_id = str(task.get('external_id') or '').strip()
+        task_source = str(task.get('source') or '').strip().lower()
         if linked_wi:
             ext_id = linked_wi
+        elif source_ext_id and task_source in {'azure', 'jira', 'github', 'sentry', 'newrelic'}:
+            ext_id = source_ext_id
         else:
             # Extract external ID number only (e.g. "Azure #61717" → "61717")
             ext_match = re.search(r'(?:Azure|Jira|GitHub)\s*#(\d+)', f'{title} {desc}')
@@ -1645,6 +1684,10 @@ class OrchestrationService:
         # commit on top of a human's WIP. The trailing timestamp also
         # prevents same-task retries from colliding with each other.
         branch_pattern = 'agentflow/{ext_id}-{title_slug}-{timestamp}'
+        # User-overridable PR title template. Default keeps the
+        # historical "[AI] <title>" so existing repos see no behavior
+        # change until someone configures a different format.
+        pr_title_format = '[AI] {title}'
         try:
             user_id = task.get('created_by_user_id')
             if user_id and self.db_session:
@@ -1658,6 +1701,9 @@ class OrchestrationService:
                     custom_pattern = str(ps.get('branch_prefix', '') or '').strip()
                     if custom_pattern:
                         branch_pattern = custom_pattern
+                    custom_title_format = str(ps.get('pr_title_format', '') or '').strip()
+                    if custom_title_format:
+                        pr_title_format = custom_title_format
         except Exception:
             pass
 
@@ -1708,9 +1754,29 @@ class OrchestrationService:
                 'Task cannot be applied safely to repository files.'
             )
 
+        # Apply user PR title template. {title} is the raw task title
+        # (may include the imported "[Azure #61717] " prefix), while
+        # {title_clean} drops that prefix so users can choose either.
+        raw_title = str(task.get('title') or 'Generated Task')
+        pr_title = (
+            pr_title_format
+            .replace('{ext_id}', ext_id)
+            .replace('{title_clean}', clean_title or raw_title)
+            .replace('{title_slug}', title_slug)
+            .replace('{title}', raw_title)
+            .replace('{id}', task_id)
+        ).strip()
+        # Collapse internal whitespace runs created when a placeholder
+        # resolved to '' (e.g. {ext_id} for an internal-only task).
+        pr_title = re.sub(r'\s+', ' ', pr_title) or f'[AI] {raw_title}'
+        # Azure rejects titles longer than 400 chars; trim defensively
+        # so we never ship an unsavable PR.
+        if len(pr_title) > 400:
+            pr_title = pr_title[:397].rstrip() + '...'
+
         return CreatePRRequest(
             branch_name=branch_name,
-            title=f"[AI] {task.get('title', 'Generated Task')}",
+            title=pr_title,
             body=(
                 'Automated PR generated by AI orchestration pipeline.\n\n'
                 f"Source: {task.get('source', 'unknown')}\n"
