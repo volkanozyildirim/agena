@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, loadPrefs } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
+
+const FALLBACK_AGENT_ROLES = ['manager', 'pm', 'analyzer', 'planner', 'developer', 'lead_developer', 'reviewer', 'qa'];
 
 type Provider = 'jira' | 'azure';
 
@@ -69,6 +71,7 @@ export default function IntegrationRulesPage() {
   const [azureUsers, setAzureUsers] = useState<AzureUser[]>([]);
   const [azureWITypes, setAzureWITypes] = useState<AzureWorkItemType[]>([]);
   const [azureProject, setAzureProject] = useState<string>('');
+  const [agentRoles, setAgentRoles] = useState<{ role: string; label: string }[]>([]);
 
   const [editingRule, setEditingRule] = useState<IntegrationRule | null>(null);
   const [showAdd, setShowAdd] = useState(false);
@@ -76,6 +79,21 @@ export default function IntegrationRulesPage() {
   useEffect(() => {
     void loadRules();
     void loadRepos();
+    // Pull the user's configured agents so the rule editor can offer a
+    // proper dropdown rather than a free-text box.
+    loadPrefs()
+      .then((prefs) => {
+        const agents = (prefs.agents || []) as Array<{ role?: string; label?: string; enabled?: boolean }>;
+        const roles = agents
+          .filter((a) => a.role && a.enabled !== false)
+          .map((a) => ({ role: String(a.role), label: String(a.label || a.role) }));
+        if (roles.length > 0) {
+          setAgentRoles(roles);
+        } else {
+          setAgentRoles(FALLBACK_AGENT_ROLES.map((r) => ({ role: r, label: r })));
+        }
+      })
+      .catch(() => setAgentRoles(FALLBACK_AGENT_ROLES.map((r) => ({ role: r, label: r }))));
   }, []);
 
   useEffect(() => {
@@ -321,6 +339,7 @@ export default function IntegrationRulesPage() {
           jiraIssueTypes={jiraIssueTypes}
           azureUsers={azureUsers}
           azureWITypes={azureWITypes}
+          agentRoles={agentRoles}
           onClose={() => { setShowAdd(false); setEditingRule(null); }}
           onSaved={() => {
             setShowAdd(false);
@@ -336,7 +355,7 @@ export default function IntegrationRulesPage() {
   );
 }
 
-function RuleEditor({ provider, existing, repos, jiraReporters, jiraIssueTypes, azureUsers, azureWITypes, onClose, onSaved, setError }: {
+function RuleEditor({ provider, existing, repos, jiraReporters, jiraIssueTypes, azureUsers, azureWITypes, agentRoles, onClose, onSaved, setError }: {
   provider: Provider;
   existing: IntegrationRule | null;
   repos: RepoMapping[];
@@ -344,6 +363,7 @@ function RuleEditor({ provider, existing, repos, jiraReporters, jiraIssueTypes, 
   jiraIssueTypes: JiraIssueType[];
   azureUsers: AzureUser[];
   azureWITypes: AzureWorkItemType[];
+  agentRoles: { role: string; label: string }[];
   onClose: () => void;
   onSaved: () => void;
   setError: (s: string) => void;
@@ -492,7 +512,10 @@ function RuleEditor({ provider, existing, repos, jiraReporters, jiraIssueTypes, 
               </div>
               <div>
                 <label style={labelStyle}>{t('integrationRules.agentRole') || 'Agent role'}</label>
-                <input value={agentRole} onChange={(e) => setAgentRole(e.target.value)} style={inputStyle} placeholder='reviewer / qa / lead_developer' />
+                <select value={agentRole} onChange={(e) => setAgentRole(e.target.value)} style={inputStyle}>
+                  <option value=''>{t('integrationRules.noChange') || '— no change —'}</option>
+                  {agentRoles.map((a) => <option key={a.role} value={a.role}>{a.label} ({a.role})</option>)}
+                </select>
               </div>
             </div>
           </div>

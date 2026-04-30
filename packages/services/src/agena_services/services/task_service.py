@@ -144,6 +144,15 @@ class TaskService:
         if action.repo_mapping_id and not task.repo_mapping_id:
             task.repo_mapping_id = action.repo_mapping_id
             changed = True
+        # Stamp the agent role into description metadata so that
+        # assign_task_to_ai picks it up at run time and routes the task to
+        # the right AI persona (e.g. reviewer for security-tagged tasks).
+        if action.agent_role and 'Preferred Agent Role:' not in (task.description or ''):
+            task.description = self._upsert_description_metadata(
+                task.description,
+                {'Preferred Agent Role': action.agent_role},
+            )
+            changed = True
         if changed:
             await self.db.commit()
             try:
@@ -1326,6 +1335,13 @@ class TaskService:
         explicit_model = (agent_model or '').strip() or None
         explicit_provider = (agent_provider or '').strip() or None
         stored_model, stored_provider = self._extract_preferred_agent_selection(task.description)
+        # An IntegrationRule may have stamped a "Preferred Agent Role:" line
+        # into the description on import — honour it when no explicit role
+        # was passed in by the caller.
+        if not agent_role:
+            stored_role = self._extract_description_metadata(task.description, 'Preferred Agent Role')
+            if stored_role:
+                agent_role = stored_role
 
         if explicit_model or explicit_provider:
             task.description = self._upsert_description_metadata(
