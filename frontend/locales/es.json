@@ -3115,5 +3115,11 @@
   "integrations.sentry.statMapped": "Proyectos mapeados",
   "integrations.sentry.statWithRepo": "Vinculados a repo",
   "integrations.sentry.statAuto": "Auto-import activo",
-  "integrations.sentry.findProjectsLabel": "Buscar proyecto para mapear"
+  "integrations.sentry.findProjectsLabel": "Buscar proyecto para mapear",
+  "integrations.sentry.lastImport": "Última importación",
+  "integrations.sentry.justNow": "ahora mismo",
+  "integrations.sentry.everyN": "cada {n}min",
+  "integrations.sentry.noRepoLinked": "sin repo vinculado",
+  "integrations.sentry.noMappingsTitle": "Sin mapeos de proyecto",
+  "integrations.common.unmap": "Desvincular"
 }

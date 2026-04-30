@@ -3115,5 +3115,11 @@
   "integrations.sentry.statMapped": "Verknüpfte Projekte",
   "integrations.sentry.statWithRepo": "Mit Repo verbunden",
   "integrations.sentry.statAuto": "Auto-Import an",
-  "integrations.sentry.findProjectsLabel": "Projekt zum Verknüpfen finden"
+  "integrations.sentry.findProjectsLabel": "Projekt zum Verknüpfen finden",
+  "integrations.sentry.lastImport": "Letzter Import",
+  "integrations.sentry.justNow": "gerade eben",
+  "integrations.sentry.everyN": "alle {n}min",
+  "integrations.sentry.noRepoLinked": "kein Repo verknüpft",
+  "integrations.sentry.noMappingsTitle": "Noch keine Projektzuordnung",
+  "integrations.common.unmap": "Zuordnung entfernen"
 }

@@ -495,6 +495,12 @@ export default function SentryPage() {
 
   return (
     <div className='integrations-page' style={{ display: 'grid', gap: 16, maxWidth: 980, margin: '0 auto' }}>
+      <style>{`
+        @media (max-width: 640px) {
+          .sentry-issue-card { flex-direction: column; align-items: stretch !important; }
+          .sentry-issue-right { flex-direction: row !important; align-items: center !important; justify-content: space-between !important; flex-wrap: wrap; gap: 8px !important; padding-top: 6px; border-top: 1px dashed var(--panel-border); }
+        }
+      `}</style>
       {/* Hero header */}
       <div style={{
         position: 'relative', overflow: 'hidden',
@@ -572,32 +578,69 @@ export default function SentryPage() {
 
       {projects.length > 0 && (
         <div style={cardStyle}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: 'var(--ink-58)' }}>{t('integrations.sentry.projectsCount').replace('{n}', String(projects.length))}</h3>
-          <div style={{ display: 'grid', gap: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <h3 style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', margin: 0 }}>
+              {t('integrations.sentry.projectsCount').replace('{n}', String(projects.length))}
+            </h3>
+          </div>
+          <div style={{ display: 'grid', gap: 6 }}>
             {projects.map((p) => {
               const mapping = mappings.find((m) => m.project_slug === p.slug);
+              const isSelected = selectedProject === p.slug;
               return (
-                <div key={p.slug} className='int-row' style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 8, background: selectedProject === p.slug ? 'var(--glass)' : 'transparent', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, flex: 1, minWidth: 150, color: 'var(--ink)' }}>{p.name}</span>
-                  <span style={{ fontSize: 10, color: 'var(--ink-35)', fontWeight: 500 }}>{p.slug}</span>
-                  <button onClick={() => void fetchIssues(p.slug)} style={btnSmall}>{t('integrations.sentry.issuesBtn')}</button>
-                  {!mapping && <button onClick={() => void addMapping(p)} style={btnSmall}>{t('integrations.common.map')}</button>}
-                  {mapping && (
-                    <>
-                      <select
-                        value={mapping.repo_mapping_id ?? ''}
-                        onChange={(ev) => void updateMapping(mapping.id, { repo_mapping_id: ev.target.value ? parseInt(ev.target.value) : null })}
-                        style={{ ...inputStyle, width: 160, fontSize: 11, padding: '4px 8px' }}
-                      >
-                        <option value="">{t('integrations.common.selectRepo')}</option>
-                        {repos.map((r) => (
-                          <option key={r.id} value={r.id}>{r.owner}/{r.repo_name}</option>
-                        ))}
-                      </select>
-                      <button onClick={() => void importIssues(mapping.project_slug)} style={btnSmall}>{t('integrations.common.import')}</button>
-                      <button onClick={() => void deleteMapping(mapping.id)} style={{ ...btnSmall, color: '#f87171', borderColor: 'rgba(248,113,113,0.2)', fontSize: 10 }}>x</button>
-                    </>
-                  )}
+                <div key={p.slug} className='int-row' style={{
+                  display: 'grid', gridTemplateColumns: 'auto 1fr auto', alignItems: 'center', gap: 10,
+                  padding: '10px 12px', borderRadius: 10,
+                  background: isSelected ? 'rgba(75,46,131,0.10)' : 'var(--glass)',
+                  border: `1px solid ${isSelected ? 'rgba(75,46,131,0.4)' : 'var(--panel-border)'}`,
+                  transition: 'background 0.15s, border 0.15s',
+                }}>
+                  <div style={{
+                    width: 30, height: 30, borderRadius: 8,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: mapping ? 'rgba(28,231,131,0.12)' : 'rgba(148,163,184,0.10)',
+                    border: `1px solid ${mapping ? 'rgba(28,231,131,0.30)' : 'var(--panel-border)'}`,
+                    fontSize: 14, color: mapping ? '#1CE783' : 'var(--ink-35)',
+                  }}>
+                    {mapping ? '✓' : '○'}
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {p.name}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 2 }}>
+                      <span style={{ fontSize: 10, color: 'var(--ink-35)', fontFamily: 'monospace' }}>{p.slug}</span>
+                      {mapping && mapping.repo_display_name && (
+                        <span style={{ fontSize: 10, color: '#60a5fa', fontWeight: 600 }}>→ {mapping.repo_display_name}</span>
+                      )}
+                      {mapping && mapping.auto_import && (
+                        <Pill color='#1CE783'>AUTO</Pill>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <button onClick={() => void fetchIssues(p.slug)} style={btnSmall}>{t('integrations.sentry.issuesBtn')}</button>
+                    {!mapping ? (
+                      <button onClick={() => void addMapping(p)} style={{ ...btnSmall, color: '#1CE783', borderColor: 'rgba(28,231,131,0.4)' }}>
+                        + {t('integrations.common.map')}
+                      </button>
+                    ) : (
+                      <>
+                        <select
+                          value={mapping.repo_mapping_id ?? ''}
+                          onChange={(ev) => void updateMapping(mapping.id, { repo_mapping_id: ev.target.value ? parseInt(ev.target.value) : null })}
+                          style={{ ...inputStyle, width: 140, fontSize: 11, padding: '4px 8px', height: 28 }}
+                        >
+                          <option value="">{t('integrations.common.selectRepo')}</option>
+                          {repos.map((r) => (
+                            <option key={r.id} value={r.id}>{r.owner}/{r.repo_name}</option>
+                          ))}
+                        </select>
+                        <button onClick={() => void importIssues(mapping.project_slug)} style={btnSmall}>{t('integrations.common.import')}</button>
+                        <button onClick={() => void deleteMapping(mapping.id)} title={t('integrations.common.unmap') || 'Unmap'} style={{ ...btnSmall, color: '#f87171', borderColor: 'rgba(248,113,113,0.2)', padding: '4px 8px' }}>×</button>
+                      </>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -682,7 +725,7 @@ export default function SentryPage() {
                     background: selectedIssueId === i.id ? 'var(--panel)' : 'var(--glass)',
                     border: '1px solid var(--panel-border)',
                   }}>
-                    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                    <div className='sentry-issue-card' style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
                           <Pill color={levelColor}>{i.level.toUpperCase()}</Pill>
@@ -719,7 +762,7 @@ export default function SentryPage() {
                           {i.last_seen && <span>{(t('integrations.common.lastSeen') || 'Last seen')}: {new Date(i.last_seen).toLocaleString()}</span>}
                         </div>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
+                      <div className='sentry-issue-right' style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
                         {i.stats_24h && i.stats_24h.length > 1 && (
                           <Sparkline values={i.stats_24h} color={levelColor} />
                         )}
@@ -842,41 +885,105 @@ export default function SentryPage() {
       )}
 
       <div style={cardStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-58)' }}>{t('integrations.sentry.projectMappings')}</h3>
-          <button onClick={() => void importIssues()} style={btnPrimary}>{t('integrations.common.importAll')}</button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+          <h3 style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', margin: 0 }}>
+            {t('integrations.sentry.projectMappings')}
+          </h3>
+          {mappings.length > 0 && (
+            <button onClick={() => void importIssues()} style={btnPrimary}>{t('integrations.common.importAll')}</button>
+          )}
         </div>
         {mappings.length === 0 ? (
-          <div style={{ fontSize: 12, color: 'var(--ink-35)', padding: 12 }}>{t('integrations.common.noProjectMappingsHint')}</div>
+          <div style={{
+            padding: '28px 18px', textAlign: 'center', borderRadius: 12,
+            background: 'var(--glass)', border: '1px dashed var(--panel-border)',
+          }}>
+            <div style={{ fontSize: 28, marginBottom: 6 }}>🪤</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>
+              {t('integrations.sentry.noMappingsTitle') || 'No project mappings yet'}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--ink-50)', marginTop: 4, lineHeight: 1.5, maxWidth: 380, margin: '4px auto 0' }}>
+              {t('integrations.common.noProjectMappingsHint')}
+            </div>
+          </div>
         ) : (
-          <div style={{ display: 'grid', gap: 6 }}>
-            {mappings.map((m) => (
-              <div key={m.id} className='int-row' style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, background: 'var(--glass)', flexWrap: 'wrap' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{m.project_name}</div>
-                  <div style={{ fontSize: 10, color: 'var(--ink-35)' }}>{m.project_slug} • {m.repo_display_name || t('integrations.common.noRepo')}</div>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {mappings.map((m) => {
+              const lastImport = m.last_import_at ? new Date(m.last_import_at) : null;
+              const lastImportRel = lastImport ? (() => {
+                const diffMs = Date.now() - lastImport.getTime();
+                const mins = Math.floor(diffMs / 60000);
+                if (mins < 1) return t('integrations.sentry.justNow') || 'just now';
+                if (mins < 60) return `${mins}m ago`;
+                const hrs = Math.floor(mins / 60);
+                if (hrs < 24) return `${hrs}h ago`;
+                const days = Math.floor(hrs / 24);
+                return `${days}d ago`;
+              })() : null;
+              return (
+                <div key={m.id} className='int-row' style={{
+                  display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 12,
+                  alignItems: 'center',
+                  padding: '12px 14px', borderRadius: 12,
+                  background: 'var(--glass)',
+                  border: '1px solid var(--panel-border)',
+                }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 10,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: m.auto_import ? 'rgba(28,231,131,0.10)' : 'rgba(96,165,250,0.10)',
+                    border: `1px solid ${m.auto_import ? 'rgba(28,231,131,0.35)' : 'rgba(96,165,250,0.35)'}`,
+                    fontSize: 16,
+                  }}>
+                    {m.auto_import ? '⚡' : '🔗'}
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{m.project_name}</span>
+                      {m.repo_display_name ? (
+                        <span style={{ fontSize: 11, color: '#60a5fa', fontWeight: 600 }}>→ {m.repo_display_name}</span>
+                      ) : (
+                        <Pill color='#f59e0b'>{(t('integrations.sentry.noRepoLinked') || 'no repo linked').toUpperCase()}</Pill>
+                      )}
+                      {m.auto_import && <Pill color='#1CE783'>AUTO</Pill>}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--ink-35)', marginTop: 3, fontFamily: 'monospace' }}>
+                      {m.project_slug}
+                      {lastImportRel && <span style={{ color: 'var(--ink-50)', fontFamily: 'inherit', marginLeft: 8 }}>· {(t('integrations.sentry.lastImport') || 'Last import')}: {lastImportRel}</span>}
+                      {!lastImportRel && m.import_interval_minutes && m.auto_import && <span style={{ color: 'var(--ink-50)', fontFamily: 'inherit', marginLeft: 8 }}>· {(t('integrations.sentry.everyN') || 'every {n}min').replace('{n}', String(m.import_interval_minutes))}</span>}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <select
+                      value={m.repo_mapping_id ?? ''}
+                      onChange={(e) => void updateMapping(m.id, { repo_mapping_id: e.target.value ? parseInt(e.target.value) : null })}
+                      style={{ ...inputStyle, width: 150, fontSize: 11, height: 30 }}
+                    >
+                      <option value="">{t('integrations.common.noRepo') || 'No repo'}</option>
+                      {repos.map((r) => (
+                        <option key={r.id} value={r.id}>{r.owner}/{r.repo_name}</option>
+                      ))}
+                    </select>
+                    <label style={{
+                      display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
+                      fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
+                      color: m.auto_import ? '#1CE783' : 'var(--ink-50)',
+                      padding: '6px 10px', borderRadius: 6,
+                      background: m.auto_import ? 'rgba(28,231,131,0.10)' : 'transparent',
+                      border: `1px solid ${m.auto_import ? 'rgba(28,231,131,0.4)' : 'var(--panel-border)'}`,
+                    }}>
+                      <input type='checkbox' checked={m.auto_import} onChange={(e) => void updateMapping(m.id, { auto_import: e.target.checked })} style={{ margin: 0 }} />
+                      {t('integrations.common.auto').toUpperCase()}
+                    </label>
+                    <button onClick={() => void importIssues(m.project_slug)} style={btnSmall}>{t('integrations.common.import')}</button>
+                    <button onClick={() => void openRequestModal(m)} style={btnSmall}>
+                      {t('integrations.newrelic.request') || 'Request'}
+                    </button>
+                    <button onClick={() => void deleteMapping(m.id)} style={{ ...btnSmall, color: '#f87171', borderColor: 'rgba(248,113,113,0.2)', padding: '4px 8px' }}>×</button>
+                  </div>
                 </div>
-                <select
-                  value={m.repo_mapping_id ?? ''}
-                  onChange={(e) => void updateMapping(m.id, { repo_mapping_id: e.target.value ? parseInt(e.target.value) : null })}
-                  style={{ ...inputStyle, width: 160, fontSize: 11 }}
-                >
-                  <option value="">No repo</option>
-                  {repos.map((r) => (
-                    <option key={r.id} value={r.id}>{r.owner}/{r.repo_name}</option>
-                  ))}
-                </select>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 10, color: 'var(--ink-50)' }}>
-                  <input type='checkbox' checked={m.auto_import} onChange={(e) => void updateMapping(m.id, { auto_import: e.target.checked })} />
-                  {t('integrations.common.auto')}
-                </label>
-                <button onClick={() => void importIssues(m.project_slug)} style={btnSmall}>{t('integrations.common.import')}</button>
-                <button onClick={() => void openRequestModal(m)} style={btnSmall}>
-                  {t('integrations.newrelic.request') || 'Request'}
-                </button>
-                <button onClick={() => void deleteMapping(m.id)} style={{ ...btnSmall, color: '#f87171', borderColor: 'rgba(248,113,113,0.2)' }}>x</button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

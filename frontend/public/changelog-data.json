@@ -1,5 +1,13 @@
 [
   {
+    "hash": "03b1566",
+    "short": "03b1566",
+    "message": "Sentry: premium landing UX — hero header with status, stat tiles, auto-load projects",
+    "date": "2026-04-30",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "5ec8758",
     "short": "5ec8758",
     "message": "Sentry: cap statsPeriod to 24h/14d for issues list (Sentry API rejects 30d/7d)",

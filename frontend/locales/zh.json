@@ -3115,5 +3115,11 @@
   "integrations.sentry.statMapped": "已映射项目",
   "integrations.sentry.statWithRepo": "已关联仓库",
   "integrations.sentry.statAuto": "自动导入开启",
-  "integrations.sentry.findProjectsLabel": "查找要映射的项目"
+  "integrations.sentry.findProjectsLabel": "查找要映射的项目",
+  "integrations.sentry.lastImport": "上次导入",
+  "integrations.sentry.justNow": "刚刚",
+  "integrations.sentry.everyN": "每 {n} 分钟",
+  "integrations.sentry.noRepoLinked": "未关联仓库",
+  "integrations.sentry.noMappingsTitle": "尚无项目映射",
+  "integrations.common.unmap": "取消映射"
 }

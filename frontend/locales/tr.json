@@ -3115,5 +3115,11 @@
   "integrations.sentry.statMapped": "Eşlenen proje",
   "integrations.sentry.statWithRepo": "Repo bağlı",
   "integrations.sentry.statAuto": "Auto-import açık",
-  "integrations.sentry.findProjectsLabel": "Eşlenecek proje bul"
+  "integrations.sentry.findProjectsLabel": "Eşlenecek proje bul",
+  "integrations.sentry.lastImport": "Son içe aktarım",
+  "integrations.sentry.justNow": "az önce",
+  "integrations.sentry.everyN": "{n}dk'da bir",
+  "integrations.sentry.noRepoLinked": "repo bağlı değil",
+  "integrations.sentry.noMappingsTitle": "Henüz proje eşlemesi yok",
+  "integrations.common.unmap": "Eşlemeyi kaldır"
 }

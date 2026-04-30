@@ -3115,5 +3115,11 @@
   "integrations.sentry.statMapped": "マッピング済みプロジェクト",
   "integrations.sentry.statWithRepo": "リポジトリ紐付け",
   "integrations.sentry.statAuto": "オート取り込み ON",
-  "integrations.sentry.findProjectsLabel": "マッピングするプロジェクトを検索"
+  "integrations.sentry.findProjectsLabel": "マッピングするプロジェクトを検索",
+  "integrations.sentry.lastImport": "最終取り込み",
+  "integrations.sentry.justNow": "たった今",
+  "integrations.sentry.everyN": "{n}分ごと",
+  "integrations.sentry.noRepoLinked": "リポジトリ未連携",
+  "integrations.sentry.noMappingsTitle": "まだプロジェクトマッピングがありません",
+  "integrations.common.unmap": "マッピング解除"
 }
