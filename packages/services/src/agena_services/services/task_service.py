@@ -948,6 +948,13 @@ class TaskService:
                     description=item.description,
                     priority=item.priority,
                 )
+                rm_id = extra.get('repo_mapping_id')
+                if rm_id:
+                    try:
+                        task.repo_mapping_id = int(rm_id)
+                        await self.db.commit()
+                    except (TypeError, ValueError):
+                        pass
                 fallback_url = await self._maybe_create_azure_mirror_work_item(
                     organization_id=organization_id,
                     user_id=user_id,
@@ -1033,6 +1040,13 @@ class TaskService:
                     description=item.description,
                     priority=item.priority,
                 )
+                rm_id = extra.get('repo_mapping_id')
+                if rm_id:
+                    try:
+                        task.repo_mapping_id = int(rm_id)
+                        await self.db.commit()
+                    except (TypeError, ValueError):
+                        pass
                 fallback_url = await self._maybe_create_azure_mirror_work_item(
                     organization_id=organization_id,
                     user_id=user_id,
@@ -1795,6 +1809,55 @@ class TaskService:
 
         return model, provider
 
+    def _chosen_dict_from_repo_mapping(self, rm, prefs_mappings: list[dict]) -> dict:
+        """Build a description-builder dict from a RepoMapping row, enriched with
+        any matching user-prefs entry (which carries azure_repo_url, name, etc.)."""
+        provider = (rm.provider or '').strip().lower()
+        owner = (rm.owner or '').strip()
+        repo_name = (rm.repo_name or '').strip()
+
+        match: dict | None = None
+        for item in prefs_mappings:
+            if provider == 'azure':
+                if (str(item.get('azure_project') or '').strip() == owner
+                        and str(item.get('azure_repo_name') or item.get('name') or '').strip() == repo_name):
+                    match = item
+                    break
+            elif provider == 'github':
+                full = str(item.get('github_repo_full_name') or '').strip()
+                if full and full == f'{owner}/{repo_name}':
+                    match = item
+                    break
+                if (str(item.get('github_owner') or '').strip() == owner
+                        and str(item.get('github_repo') or '').strip() == repo_name):
+                    match = item
+                    break
+
+        if match is not None:
+            enriched = dict(match)
+            if rm.local_repo_path and not enriched.get('local_path'):
+                enriched['local_path'] = rm.local_repo_path
+            if rm.playbook and not enriched.get('repo_playbook'):
+                enriched['repo_playbook'] = rm.playbook
+            return enriched
+
+        # No prefs entry; build a minimal dict from the RepoMapping row itself.
+        synthesized: dict = {
+            'name': f'{owner}/{repo_name}',
+            'provider': provider,
+            'local_path': rm.local_repo_path or '',
+            'repo_playbook': rm.playbook or '',
+        }
+        if provider == 'azure':
+            synthesized['azure_project'] = owner
+            synthesized['azure_repo_name'] = repo_name
+        elif provider == 'github':
+            synthesized['github_owner'] = owner
+            synthesized['github_repo'] = repo_name
+            synthesized['github_repo_full_name'] = f'{owner}/{repo_name}'
+            synthesized['remote_repo'] = f'github:{owner}/{repo_name}'
+        return synthesized
+
     async def _attach_default_repo_mapping(self, organization_id: int, task: TaskRecord) -> bool:
         if self.db is None:
             return False
@@ -1803,55 +1866,57 @@ class TaskService:
             select(UserPreference).where(UserPreference.user_id == task.created_by_user_id)
         )
         pref = pref_result.scalar_one_or_none()
-        if pref is None or not pref.repo_mappings_json:
-            return False
-
-        try:
-            mappings = json.loads(pref.repo_mappings_json)
-        except Exception:
-            return False
-        if not isinstance(mappings, list):
-            return False
-
-        valid: list[dict] = []
-        for item in mappings:
-            if not isinstance(item, dict):
-                continue
-            local_path = str(item.get('local_path') or '').strip()
-            if not local_path:
-                continue
-            valid.append(item)
-        if not valid:
-            return False
+        prefs_mappings: list[dict] = []
+        if pref and pref.repo_mappings_json:
+            try:
+                parsed = json.loads(pref.repo_mappings_json)
+                if isinstance(parsed, list):
+                    prefs_mappings = [m for m in parsed if isinstance(m, dict)]
+            except Exception:
+                prefs_mappings = []
 
         source = (task.source or '').strip().lower()
+        chosen: dict | None = None
 
-        def score(item: dict) -> tuple[int, int]:
-            provider = str(item.get('provider') or '').strip().lower()
-            has_azure_meta = int(bool((item.get('azure_repo_url') or '') and (item.get('azure_project') or '')))
-            has_github_meta = int(bool(item.get('github_repo_full_name') or item.get('github_repo')))
-            score_source = 0
-            if source == 'azure':
-                if provider == 'azure':
-                    score_source += 3
-                score_source += has_azure_meta * 2
-            elif source == 'jira':
-                # Jira taskleri genelde Azure repo'ya merge edilir; Azure metadata öncelikli.
-                score_source += has_azure_meta * 3
-                if provider == 'azure':
-                    score_source += 2
-                if provider == 'github':
-                    score_source += 1
-            elif source == 'github':
-                if provider == 'github':
-                    score_source += 3
-                score_source += has_github_meta * 2
-            else:
-                if provider:
-                    score_source += 1
-            return score_source, has_azure_meta + has_github_meta
+        # Prefer the RepoMapping linked to the task (e.g. set by Sentry/NewRelic auto-import).
+        # This ensures the mapping configured in the integration UI actually drives task routing.
+        if getattr(task, 'repo_mapping_id', None):
+            from agena_models.models.repo_mapping import RepoMapping as _RepoMapping
+            rm = await self.db.get(_RepoMapping, int(task.repo_mapping_id))
+            if rm and rm.organization_id == organization_id and rm.is_active:
+                chosen = self._chosen_dict_from_repo_mapping(rm, prefs_mappings)
 
-        chosen = sorted(valid, key=score, reverse=True)[0]
+        if chosen is None:
+            valid: list[dict] = [m for m in prefs_mappings if str(m.get('local_path') or '').strip()]
+            if not valid:
+                return False
+
+            def score(item: dict) -> tuple[int, int]:
+                provider = str(item.get('provider') or '').strip().lower()
+                has_azure_meta = int(bool((item.get('azure_repo_url') or '') and (item.get('azure_project') or '')))
+                has_github_meta = int(bool(item.get('github_repo_full_name') or item.get('github_repo')))
+                score_source = 0
+                if source == 'azure':
+                    if provider == 'azure':
+                        score_source += 3
+                    score_source += has_azure_meta * 2
+                elif source == 'jira':
+                    # Jira taskleri genelde Azure repo'ya merge edilir; Azure metadata öncelikli.
+                    score_source += has_azure_meta * 3
+                    if provider == 'azure':
+                        score_source += 2
+                    if provider == 'github':
+                        score_source += 1
+                elif source == 'github':
+                    if provider == 'github':
+                        score_source += 3
+                    score_source += has_github_meta * 2
+                else:
+                    if provider:
+                        score_source += 1
+                return score_source, has_azure_meta + has_github_meta
+
+            chosen = sorted(valid, key=score, reverse=True)[0]
 
         desc = (task.description or '').strip()
         existing = {line.split(':', 1)[0].strip().lower() for line in desc.splitlines() if ':' in line}

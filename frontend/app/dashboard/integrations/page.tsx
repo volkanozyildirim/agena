@@ -106,11 +106,14 @@ export default function IntegrationsPage() {
   const [datadogApiKey, setDatadogApiKey] = useState('');
   const [datadogApiKeyPreview, setDatadogApiKeyPreview] = useState('');
   const [datadogAppKey, setDatadogAppKey] = useState('');
+  const [datadogRepoMappingId, setDatadogRepoMappingId] = useState<string>('');
   const [appdBaseUrl, setAppdBaseUrl] = useState('');
   const [appdUsername, setAppdUsername] = useState('');
   const [appdToken, setAppdToken] = useState('');
   const [appdTokenPreview, setAppdTokenPreview] = useState('');
   const [appdAppId, setAppdAppId] = useState('');
+  const [appdRepoMappingId, setAppdRepoMappingId] = useState<string>('');
+  const [repoMappings, setRepoMappings] = useState<Array<{ id: number; provider: string; owner: string; repo_name: string; display_name?: string }>>([]);
   const [notifyTesting, setNotifyTesting] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
@@ -300,6 +303,16 @@ export default function IntegrationsPage() {
       setSentryBaseUrl(sentry.base_url || 'https://sentry.io/api/0');
       setSentryOrgSlug(sentry.extra_config?.organization_slug ?? '');
     }
+    const datadog = data.find((c) => c.provider === 'datadog');
+    if (datadog) {
+      const rmId = datadog.extra_config?.repo_mapping_id;
+      setDatadogRepoMappingId(rmId == null || rmId === '' ? '' : String(rmId));
+    }
+    const appdynamics = data.find((c) => c.provider === 'appdynamics');
+    if (appdynamics) {
+      const rmId = appdynamics.extra_config?.repo_mapping_id;
+      setAppdRepoMappingId(rmId == null || rmId === '' ? '' : String(rmId));
+    }
   }
 
   useEffect(() => {
@@ -318,6 +331,8 @@ export default function IntegrationsPage() {
     apiFetch<Array<{ slug: string; enabled: boolean }>>('/modules').then((mods) => {
       setEnabledModules(new Set(mods.filter((m) => m.enabled).map((m) => m.slug)));
     }).catch(() => {});
+    apiFetch<Array<{ id: number; provider: string; owner: string; repo_name: string; display_name?: string }>>('/repo-mappings')
+      .then(setRepoMappings).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -450,7 +465,14 @@ export default function IntegrationsPage() {
     Promise.all([
       apiFetch('/integrations/datadog', {
         method: 'PUT',
-        body: JSON.stringify({ base_url: datadogBaseUrl, secret: datadogApiKey || undefined, extra_config: { app_key: datadogAppKey || undefined } }),
+        body: JSON.stringify({
+          base_url: datadogBaseUrl,
+          secret: datadogApiKey || undefined,
+          extra_config: {
+            app_key: datadogAppKey || undefined,
+            repo_mapping_id: datadogRepoMappingId ? parseInt(datadogRepoMappingId) : null,
+          },
+        }),
       }),
       loadIntegrationState(),
     ]).then(async () => {
@@ -468,7 +490,15 @@ export default function IntegrationsPage() {
     Promise.all([
       apiFetch('/integrations/appdynamics', {
         method: 'PUT',
-        body: JSON.stringify({ base_url: appdBaseUrl || undefined, username: appdUsername || undefined, secret: appdToken || undefined, extra_config: { app_id: appdAppId || undefined } }),
+        body: JSON.stringify({
+          base_url: appdBaseUrl || undefined,
+          username: appdUsername || undefined,
+          secret: appdToken || undefined,
+          extra_config: {
+            app_id: appdAppId || undefined,
+            repo_mapping_id: appdRepoMappingId ? parseInt(appdRepoMappingId) : null,
+          },
+        }),
       }),
       loadIntegrationState(),
     ]).then(async () => {
@@ -1111,6 +1141,17 @@ export default function IntegrationsPage() {
           <FieldGroup label="Application ID">
             <input value={appdAppId} onChange={(e) => setAppdAppId(e.target.value)} placeholder="Application ID from AppDynamics" />
           </FieldGroup>
+          <FieldGroup label="Default Repo Mapping">
+            <select value={appdRepoMappingId} onChange={(e) => setAppdRepoMappingId(e.target.value)}
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, fontSize: 12, border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--ink)' }}>
+              <option value=''>— None (use default routing) —</option>
+              {repoMappings.map((rm) => (
+                <option key={rm.id} value={String(rm.id)}>
+                  {rm.display_name || `${rm.provider}:${rm.owner}/${rm.repo_name}`}
+                </option>
+              ))}
+            </select>
+          </FieldGroup>
           <button className='button button-primary' onClick={() => void saveAppDynamics()} style={{ width: '100%', justifyContent: 'center', marginTop: 2 }}>
             Save AppDynamics Config
           </button>
@@ -1139,6 +1180,17 @@ export default function IntegrationsPage() {
           <FieldGroup label="Application Key">
             <input type='password' value={datadogAppKey} onChange={(e) => setDatadogAppKey(e.target.value)}
               placeholder="Your Datadog Application key" />
+          </FieldGroup>
+          <FieldGroup label="Default Repo Mapping">
+            <select value={datadogRepoMappingId} onChange={(e) => setDatadogRepoMappingId(e.target.value)}
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 8, fontSize: 12, border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--ink)' }}>
+              <option value=''>— None (use default routing) —</option>
+              {repoMappings.map((rm) => (
+                <option key={rm.id} value={String(rm.id)}>
+                  {rm.display_name || `${rm.provider}:${rm.owner}/${rm.repo_name}`}
+                </option>
+              ))}
+            </select>
           </FieldGroup>
           <button className='button button-primary' onClick={() => void saveDatadog()} style={{ width: '100%', justifyContent: 'center', marginTop: 2 }}>
             Save Datadog Config

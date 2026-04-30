@@ -1681,16 +1681,20 @@ function NodeEditPanel({ node, onChange, onClose, flow }: {
               <label style={pLbl}>Agent</label>
               <select
                 value={(() => {
-                  const match = agentConfigs.find((a) =>
-                    (node.provider && a.provider === node.provider && (a.custom_model || a.model) === node.model) ||
-                    (!node.provider && !node.model && a.role === node.role)
-                  );
-                  return match?.role || '';
+                  const byRole = agentConfigs.find((a) => a.role === node.role);
+                  if (byRole) return byRole.role;
+                  if (node.provider && node.model) {
+                    const byModel = agentConfigs.find((a) =>
+                      a.provider === node.provider && (a.custom_model || a.model) === node.model
+                    );
+                    if (byModel) return byModel.role;
+                  }
+                  return '';
                 })()}
                 onChange={(e) => {
                   const agent = agentConfigs.find((a) => a.role === e.target.value);
                   if (agent) {
-                    onChange({ model: agent.custom_model || agent.model, provider: agent.provider });
+                    onChange({ role: agent.role, model: agent.custom_model || agent.model, provider: agent.provider });
                   } else {
                     onChange({ model: '', provider: '' });
                   }
