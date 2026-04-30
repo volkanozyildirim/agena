@@ -707,6 +707,8 @@
   "profile.preferredModelPlaceholder": "gpt-5",
   "profile.branchPattern": "Branch-Muster",
   "profile.branchPatternPlaceholder": "feature/{ext_id}-{title_slug}",
+  "profile.prTitleFormat": "PR-Titelformat",
+  "profile.prTitleFormatPlaceholder": "[AI] {title}",
   "profile.preview": "Vorschau",
   "profile.queueWarningThreshold": "Queue-Warnschwelle",
   "profile.queueWarningThresholdPlaceholder": "5",

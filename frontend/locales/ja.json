@@ -707,6 +707,8 @@
   "profile.preferredModelPlaceholder": "gpt-5",
   "profile.branchPattern": "ブランチパターン",
   "profile.branchPatternPlaceholder": "feature/{ext_id}-{title_slug}",
+  "profile.prTitleFormat": "PRタイトル形式",
+  "profile.prTitleFormatPlaceholder": "[AI] {title}",
   "profile.preview": "プレビュー",
   "profile.queueWarningThreshold": "キュー警告しきい値",
   "profile.queueWarningThresholdPlaceholder": "5",

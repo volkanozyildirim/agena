@@ -15,6 +15,7 @@ type ProfileSettings = {
   preferred_provider: string;
   preferred_model: string;
   branch_prefix: string;
+  pr_title_format: string;
   queue_warn_threshold: number;
   notification_preferences: Record<string, { in_app: boolean; email: boolean; web_push: boolean }>;
 };
@@ -45,6 +46,7 @@ export default function ProfilePage() {
     preferred_provider: 'openai',
     preferred_model: 'gpt-5',
     branch_prefix: 'ai/task',
+    pr_title_format: '[AI] {title}',
     queue_warn_threshold: 5,
     notification_preferences: EVENT_PREF_DEFAULTS,
   });
@@ -69,6 +71,7 @@ export default function ProfilePage() {
         preferred_provider: typeof rawSettings.preferred_provider === 'string' ? rawSettings.preferred_provider : prev.preferred_provider,
         preferred_model: typeof rawSettings.preferred_model === 'string' ? rawSettings.preferred_model : prev.preferred_model,
         branch_prefix: typeof rawSettings.branch_prefix === 'string' ? rawSettings.branch_prefix : prev.branch_prefix,
+        pr_title_format: typeof rawSettings.pr_title_format === 'string' ? rawSettings.pr_title_format : prev.pr_title_format,
         queue_warn_threshold: typeof rawSettings.queue_warn_threshold === 'number' ? Math.max(1, Math.floor(rawSettings.queue_warn_threshold)) : prev.queue_warn_threshold,
         notification_preferences: (typeof rawSettings.notification_preferences === 'object' && rawSettings.notification_preferences)
           ? {
@@ -205,6 +208,43 @@ export default function ProfilePage() {
                 .replace('{title_slug}', 'merchant-status')
                 .replace('{id}', '47')
                 .replace('{timestamp}', '20260327')}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-50)', marginBottom: 6 }}>{t('profile.prTitleFormat')}</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+              {[
+                { label: '[AI] {title}', desc: '[AI] Update merchant status' },
+                { label: '[AI] AB#{ext_id} {title}', desc: '[AI] AB#61717 Update merchant status' },
+                { label: 'AB#{ext_id} — {title_clean}', desc: 'AB#61717 — Update merchant status' },
+                { label: '{title_clean} (AB#{ext_id})', desc: 'Update merchant status (AB#61717)' },
+                { label: '[AI] {ext_id}: {title_clean}', desc: '[AI] 61717: Update merchant status' },
+              ].map((p) => (
+                <button key={p.label} onClick={() => { setProfileSettings((prev) => ({ ...prev, pr_title_format: p.label })); setSaved(false); }}
+                  style={{
+                    padding: '6px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer',
+                    border: profileSettings.pr_title_format === p.label ? '1px solid rgba(94,234,212,0.5)' : '1px solid var(--panel-border-3)',
+                    background: profileSettings.pr_title_format === p.label ? 'rgba(94,234,212,0.12)' : 'var(--panel)',
+                    color: profileSettings.pr_title_format === p.label ? '#5eead4' : 'var(--ink-50)',
+                    fontFamily: 'monospace', fontWeight: 600,
+                  }}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <input
+              value={profileSettings.pr_title_format}
+              onChange={(e) => { setProfileSettings((p) => ({ ...p, pr_title_format: e.target.value })); setSaved(false); }}
+              placeholder={t('profile.prTitleFormatPlaceholder')}
+              style={{ width: '100%', padding: '9px 11px', borderRadius: 10, border: '1px solid var(--panel-border-3)', background: 'var(--glass)', color: 'var(--ink-90)', fontSize: 12, fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' }}
+            />
+            <div style={{ fontSize: 10, color: 'var(--ink-25)', marginTop: 6, fontFamily: 'monospace' }}>
+              {t('profile.preview')}: {(profileSettings.pr_title_format || '[AI] {title}')
+                .replace('{ext_id}', '61717')
+                .replace('{title_clean}', 'Update merchant status')
+                .replace('{title_slug}', 'merchant-status')
+                .replace('{title}', '[Azure #61717] Update merchant status')
+                .replace('{id}', '47')}
             </div>
           </div>
           <ProfileInput
