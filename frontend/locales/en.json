@@ -3217,5 +3217,6 @@
   "reviews.inputSnapshot": "Input snapshot",
   "reviews.output": "Reviewer output",
   "agents.toggleReviewer": "Use as code reviewer",
-  "agents.toggleReviewerDesc": "When on, this agent shows up in the 🔎 Review dropdowns on tasks and on the Reviews tab. Reviews never modify code or open PRs."
+  "agents.toggleReviewerDesc": "When on, this agent shows up in the 🔎 Review dropdowns on tasks and on the Reviews tab. Reviews never modify code or open PRs.",
+  "reviews.pickReviewer": "Pick reviewer"
 }

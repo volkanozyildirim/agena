@@ -3217,5 +3217,6 @@
   "reviews.inputSnapshot": "Input-Snapshot",
   "reviews.output": "Reviewer-Output",
   "agents.toggleReviewer": "Als Code-Reviewer einsetzen",
-  "agents.toggleReviewerDesc": "Wenn aktiv, taucht dieser Agent in den 🔎 Review-Dropdowns auf Tasks und im Reviews-Tab auf. Reviews ändern niemals Code und öffnen keine PRs."
+  "agents.toggleReviewerDesc": "Wenn aktiv, taucht dieser Agent in den 🔎 Review-Dropdowns auf Tasks und im Reviews-Tab auf. Reviews ändern niemals Code und öffnen keine PRs.",
+  "reviews.pickReviewer": "Reviewer wählen"
 }

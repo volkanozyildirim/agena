@@ -3217,5 +3217,6 @@
   "reviews.inputSnapshot": "Input snapshot",
   "reviews.output": "Reviewer output",
   "agents.toggleReviewer": "Kod reviewer olarak kullan",
-  "agents.toggleReviewerDesc": "Açıkken bu agent task'larda ve Reviews sekmesindeki 🔎 Review dropdown'unda görünür. Review hiçbir zaman kodu değiştirmez ya da PR açmaz."
+  "agents.toggleReviewerDesc": "Açıkken bu agent task'larda ve Reviews sekmesindeki 🔎 Review dropdown'unda görünür. Review hiçbir zaman kodu değiştirmez ya da PR açmaz.",
+  "reviews.pickReviewer": "Reviewer seç"
 }
