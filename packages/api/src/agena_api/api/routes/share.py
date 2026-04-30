@@ -73,7 +73,7 @@ async def read_shared_task(
         from agena_models.models.repo_mapping import RepoMapping
         rm = await db.get(RepoMapping, task.repo_mapping_id)
         if rm is not None:
-            repo_mapping_name = rm.name or f'{rm.azure_project or ""}/{rm.azure_repo_name or rm.name or ""}'.strip('/')
+            repo_mapping_name = f'{rm.owner}/{rm.repo_name}'
 
     atts = (await db.execute(
         select(TaskAttachment)

@@ -1,5 +1,13 @@
 [
   {
+    "hash": "f4fe7aa",
+    "short": "f4fe7aa",
+    "message": "Tasks: surface Sentry Resolve / Share / priority / resolved marker on mobile too",
+    "date": "2026-04-30",
+    "author": "root",
+    "type": "fix"
+  },
+  {
     "hash": "f87a03b",
     "short": "f87a03b",
     "message": "Header: 🚨 Sentry + 📡 NewRelic quick-link icons next to Usage on mobile + desktop",
