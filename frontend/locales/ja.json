@@ -3180,5 +3180,19 @@
   "agents.role.securityDeveloper.prompt": "あなたはシニアセキュリティエンジニアです。すべての入力は悪意あるものとして扱います。問題を再現し、最小限の影響範囲でパッチを適用し、リグレッションテストを追加し、脅威モデルを記述し、残余リスクを列挙してください。",
   "agents.errLabelRequired": "名前(label)は必須です。",
   "agents.errRoleRequired": "ロールを導出できませんでした — 名前を入力してください。",
-  "agents.errRoleDuplicate": "ロール \"{role}\" のエージェントは既に存在します。"
+  "agents.errRoleDuplicate": "ロール \"{role}\" のエージェントは既に存在します。",
+  "reviews.title": "コードレビュー",
+  "reviews.heroSubtitle": "AI による敵対的コードレビュー。コードを変更せずに、発見事項・重大度・エージェント別の判定履歴を追跡。",
+  "reviews.runReview": "レビュー実行",
+  "reviews.statTotal": "レビュー",
+  "reviews.statAgents": "レビュアーエージェント",
+  "reviews.statAvgScore": "平均スコア",
+  "reviews.statCritical": "重大",
+  "reviews.filtersLabel": "レビューを絞り込む",
+  "reviews.allRoles": "すべてのレビュアー",
+  "reviews.allSeverities": "すべての重大度",
+  "reviews.count": "{n} 件のレビュー",
+  "reviews.emptyTitle": "まだレビューはありません",
+  "reviews.emptyHint": "任意のタスクで 🔎 Review ボタンを押してレビュアーエージェントを実行してください。",
+  "nav.reviews": "コードレビュー"
 }

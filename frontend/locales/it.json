@@ -3180,5 +3180,19 @@
   "agents.role.securityDeveloper.prompt": "Sei un Senior Security Engineer. Ogni input è malevolo. Riproduci il problema, applica patch con il minor blast radius, aggiungi test di regressione, documenta il threat model, elenca i rischi residui.",
   "agents.errLabelRequired": "Il nome (label) è obbligatorio.",
   "agents.errRoleRequired": "Impossibile derivare il ruolo — compila il nome.",
-  "agents.errRoleDuplicate": "Esiste già un agente con il ruolo \"{role}\"."
+  "agents.errRoleDuplicate": "Esiste già un agente con il ruolo \"{role}\".",
+  "reviews.title": "Code Review",
+  "reviews.heroSubtitle": "Code review avversariali con IA. Storico finding, severità e verdetto per agente senza modificare il codice.",
+  "reviews.runReview": "Esegui review",
+  "reviews.statTotal": "Review",
+  "reviews.statAgents": "Agenti reviewer",
+  "reviews.statAvgScore": "Score medio",
+  "reviews.statCritical": "Critiche",
+  "reviews.filtersLabel": "Filtra review",
+  "reviews.allRoles": "Tutti i reviewer",
+  "reviews.allSeverities": "Tutte le severità",
+  "reviews.count": "{n} review",
+  "reviews.emptyTitle": "Nessuna review ancora",
+  "reviews.emptyHint": "Clicca 🔎 Review su un task per eseguire un agente reviewer.",
+  "nav.reviews": "Code Review"
 }

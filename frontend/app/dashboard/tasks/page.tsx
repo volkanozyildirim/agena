@@ -495,6 +495,21 @@ export default function DashboardTasksPage() {
     setMcpPopupTaskId(id);
   }
 
+  async function triggerReview(taskId: number, role: string) {
+    setError('');
+    try {
+      const res = await apiFetch<{ id: number; status: string; severity: string | null; findings_count: number | null; score: number | null }>('/reviews', {
+        method: 'POST',
+        body: JSON.stringify({ task_id: taskId, reviewer_agent_role: role }),
+      });
+      const sevText = res.severity ? ` · ${res.severity}` : '';
+      const findText = res.findings_count != null ? ` · ${res.findings_count} findings` : '';
+      setMsg(`Review #${res.id}: ${res.status}${sevText}${findText}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Review failed');
+    }
+  }
+
   async function toggleSentryResolve(taskId: number) {
     // Optimistic toggle: flip the "Status: resolved" line in the description
     // locally so the row turns purple instantly. On failure we revert.
@@ -1490,10 +1505,17 @@ export default function DashboardTasksPage() {
                     {statusLabel(task.status, t)}
                   </span>
                 ) : (
-                  <button onClick={() => void onAssignMCP(task.id)}
-                    style={{ padding: '6px 12px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #0d9488, #7c3aed)', color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                    Run
-                  </button>
+                  <>
+                    <button onClick={() => void triggerReview(task.id, (task.tags || []).includes('security_review') ? 'security_developer' : 'reviewer')}
+                      title={t('reviews.runReview' as TranslationKey) || 'Run review'}
+                      style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: '1px solid rgba(168,85,247,0.4)', background: 'rgba(168,85,247,0.10)', color: '#c084fc', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                      🔎 Review
+                    </button>
+                    <button onClick={() => void onAssignMCP(task.id)}
+                      style={{ padding: '6px 12px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #0d9488, #7c3aed)', color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                      Run
+                    </button>
+                  </>
                 )}
                 <Link href={`/tasks/${task.id}`} className='button button-outline' style={{ padding: '6px 8px', fontSize: 11, whiteSpace: 'nowrap', minHeight: 30 }}>
                   {t('tasks.details')}
@@ -1605,6 +1627,10 @@ export default function DashboardTasksPage() {
                         <span style={{ fontSize: 11, fontWeight: 700, color: statusColor(task.status) }}>{statusLabel(task.status, t)}</span>
                       ) : (
                         <>
+                          <button onClick={() => void triggerReview(task.id, (task.tags || []).includes('security_review') ? 'security_developer' : 'reviewer')}
+                            style={{ padding: '7px 12px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: '1px solid rgba(168,85,247,0.4)', background: 'rgba(168,85,247,0.10)', color: '#c084fc', cursor: 'pointer' }}>
+                            🔎 Review
+                          </button>
                           <button onClick={() => void onAssignMCP(task.id)}
                             style={{ padding: '7px 14px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #0d9488, #7c3aed)', color: '#fff', cursor: 'pointer' }}>
                             Run

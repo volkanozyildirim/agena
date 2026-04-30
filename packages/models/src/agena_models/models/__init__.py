@@ -36,6 +36,7 @@ from agena_models.models.user import User
 from agena_models.models.newrelic_entity_mapping import NewRelicEntityMapping
 from agena_models.models.sentry_project_mapping import SentryProjectMapping
 from agena_models.models.integration_rule import IntegrationRule
+from agena_models.models.task_review import TaskReview
 from agena_models.models.module import Module, OrganizationModule
 from agena_models.models.user_preference import UserPreference
 
@@ -51,6 +52,7 @@ __all__ = [
     'NewRelicEntityMapping',
     'SentryProjectMapping',
     'IntegrationRule',
+    'TaskReview',
     'Skill',
     'Runtime',
     'NudgeHistory',

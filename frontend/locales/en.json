@@ -3180,5 +3180,19 @@
   "agents.role.securityDeveloper.prompt": "You are a Senior Security Engineer. Treat every input as malicious. Reproduce the issue, patch with the smallest blast radius, add a regression test, document the threat model, list residual risks.",
   "agents.errLabelRequired": "Name (label) is required.",
   "agents.errRoleRequired": "Role could not be derived — fill the name.",
-  "agents.errRoleDuplicate": "An agent with role \"{role}\" already exists."
+  "agents.errRoleDuplicate": "An agent with role \"{role}\" already exists.",
+  "reviews.title": "Code Reviews",
+  "reviews.heroSubtitle": "AI-driven adversarial code reviews. Track findings, severities, and per-agent verdict history without touching the code.",
+  "reviews.runReview": "Run review",
+  "reviews.statTotal": "Reviews",
+  "reviews.statAgents": "Reviewer agents",
+  "reviews.statAvgScore": "Avg score",
+  "reviews.statCritical": "Critical",
+  "reviews.filtersLabel": "Filter reviews",
+  "reviews.allRoles": "All reviewers",
+  "reviews.allSeverities": "All severities",
+  "reviews.count": "{n} reviews",
+  "reviews.emptyTitle": "No reviews yet",
+  "reviews.emptyHint": "Hit the 🔎 Review button on any task to run a reviewer agent against it.",
+  "nav.reviews": "Code Reviews"
 }

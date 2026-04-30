@@ -280,8 +280,13 @@ export default function TaskDetailPage() {
   const [jiraBaseUrl, setJiraBaseUrl] = useState('');
   const [linkWorkItemInput, setLinkWorkItemInput] = useState('');
   const [linkBusy, setLinkBusy] = useState(false);
-  const [rightTab, setRightTab] = useState<'activity' | 'agent' | 'steps' | 'memory' | 'diff' | 'logs'>('activity');
+  const [rightTab, setRightTab] = useState<'activity' | 'agent' | 'steps' | 'memory' | 'diff' | 'logs' | 'reviews'>('activity');
 
+  type ReviewRow = { id: number; reviewer_agent_role: string; reviewer_model: string | null; output: string | null; score: number | null; findings_count: number | null; severity: string | null; status: string; created_at: string };
+  const [reviews, setReviews] = useState<ReviewRow[]>([]);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewRunning, setReviewRunning] = useState(false);
+  const [reviewerRole, setReviewerRole] = useState('reviewer');
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [attachments, setAttachments] = useState<Array<{ id: number; filename: string; content_type: string; size_bytes: number; created_at: string }>>([]);
   const [attachmentPreviews, setAttachmentPreviews] = useState<Record<number, string>>({});
@@ -445,6 +450,16 @@ export default function TaskDetailPage() {
     const maxId = logs.reduce((acc, item) => Math.max(acc, item.id || 0), 0);
     if (maxId > lastLogIdRef.current) lastLogIdRef.current = maxId;
   }, [logs]);
+
+  // Lazy-load reviews when the user opens the Reviews tab.
+  useEffect(() => {
+    if (rightTab !== 'reviews' || !taskId) return;
+    setReviewLoading(true);
+    apiFetch<ReviewRow[]>(`/reviews/by-task/${taskId}`)
+      .then(setReviews)
+      .catch(() => setReviews([]))
+      .finally(() => setReviewLoading(false));
+  }, [rightTab, taskId]);
 
   useEffect(() => {
     if (!taskId) return;
@@ -1414,6 +1429,7 @@ export default function TaskDetailPage() {
               { id: 'activity', label: '⚡ ' + (t('taskDetail.activityTab' as never) || 'Activity') },
               { id: 'agent', label: '🤖 ' + (t('taskDetail.liveLogs') || 'Agent') },
               { id: 'steps', label: '⚙ ' + (t('taskDetail.executionSteps') || 'Steps') },
+              { id: 'reviews', label: '🔎 ' + (t('reviews.title') || 'Reviews') },
               { id: 'memory', label: '🧠 ' + (t('taskDetail.memoryImpact') || 'Memory') },
               { id: 'diff', label: '📝 ' + (t('taskDetail.codeDiffPreview') || 'Diff') },
               { id: 'logs', label: '📜 Logs' },
@@ -1597,6 +1613,65 @@ export default function TaskDetailPage() {
                 </div>
               )}
             </div>
+          </section>
+          )}
+
+          {rightTab === 'reviews' && (
+          <section style={{ borderRadius: 16, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', padding: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 8, flexWrap: 'wrap' }}>
+              <h3 style={{ margin: 0, color: 'var(--ink-90)', fontSize: 15 }}>🔎 {t('reviews.title') || 'Code Reviews'}</h3>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <select value={reviewerRole} onChange={(e) => setReviewerRole(e.target.value)}
+                  style={{ padding: '6px 10px', borderRadius: 6, fontSize: 11, border: '1px solid var(--panel-border)', background: 'var(--panel-alt)', color: 'var(--ink)' }}>
+                  <option value='reviewer'>reviewer</option>
+                  <option value='security_developer'>security_developer</option>
+                  <option value='qa'>qa</option>
+                  <option value='lead_developer'>lead_developer</option>
+                </select>
+                <button onClick={async () => {
+                  setReviewRunning(true);
+                  try {
+                    await apiFetch('/reviews', { method: 'POST', body: JSON.stringify({ task_id: task?.id, reviewer_agent_role: reviewerRole }) });
+                    const fresh = await apiFetch<typeof reviews>(`/reviews/by-task/${task?.id}`);
+                    setReviews(fresh);
+                  } catch { /* surfaced via toast elsewhere */ }
+                  finally { setReviewRunning(false); }
+                }} disabled={reviewRunning || !task}
+                  style={{ padding: '6px 14px', borderRadius: 6, fontSize: 11, fontWeight: 700, border: 'none', background: 'linear-gradient(135deg, #a855f7, #6366f1)', color: '#fff', cursor: 'pointer', opacity: reviewRunning ? 0.6 : 1 }}>
+                  {reviewRunning ? '…' : (t('reviews.runReview') || 'Run review')}
+                </button>
+              </div>
+            </div>
+            {reviewLoading ? (
+              <div style={{ padding: 20, textAlign: 'center', color: 'var(--ink-35)', fontSize: 12 }}>Loading…</div>
+            ) : reviews.length === 0 ? (
+              <div style={{ padding: '24px 16px', textAlign: 'center', borderRadius: 12, background: 'var(--glass)', border: '1px dashed var(--panel-border)' }}>
+                <div style={{ fontSize: 28, marginBottom: 6 }}>🔎</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{t('reviews.emptyTitle') || 'No reviews yet'}</div>
+                <div style={{ fontSize: 11, color: 'var(--ink-50)', marginTop: 4 }}>{t('reviews.emptyHint') || 'Run a review to get started.'}</div>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: 8 }}>
+                {reviews.map((r) => {
+                  const sevColors: Record<string, string> = { critical: '#ef4444', high: '#f97316', medium: '#eab308', low: '#60a5fa', clean: '#22c55e' };
+                  const sevColor = r.severity ? (sevColors[r.severity] || 'var(--ink-35)') : 'var(--ink-35)';
+                  return (
+                    <details key={r.id} style={{ padding: '10px 12px', borderRadius: 10, background: 'var(--glass)', border: '1px solid var(--panel-border)' }}>
+                      <summary style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: 'rgba(168,85,247,0.15)', color: '#c084fc' }}>{r.reviewer_agent_role}</span>
+                        {r.severity && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: `${sevColor}1f`, color: sevColor, textTransform: 'uppercase' }}>{r.severity}</span>}
+                        {r.findings_count != null && <span style={{ fontSize: 11, color: 'var(--ink-50)' }}>{r.findings_count} findings</span>}
+                        {r.score != null && <span style={{ fontSize: 11, color: 'var(--ink-50)' }}>score: {r.score}</span>}
+                        <span style={{ fontSize: 11, color: 'var(--ink-35)', marginLeft: 'auto' }}>#{r.id} · {new Date(r.created_at).toLocaleString()}</span>
+                      </summary>
+                      {r.output && (
+                        <pre style={{ margin: '10px 0 0 0', fontSize: 12, fontFamily: 'inherit', color: 'var(--ink-78)', background: 'var(--panel)', padding: '12px 14px', borderRadius: 8, whiteSpace: 'pre-wrap', maxHeight: 480, overflowY: 'auto', lineHeight: 1.55 }}>{r.output}</pre>
+                      )}
+                    </details>
+                  );
+                })}
+              </div>
+            )}
           </section>
           )}
 

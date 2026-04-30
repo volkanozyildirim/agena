@@ -3180,5 +3180,19 @@
   "agents.role.securityDeveloper.prompt": "Kıdemli bir Güvenlik Mühendisisin. Her input zararlı kabul edilir. Önce zafiyeti reproduce et, sonra en dar kapsamla patch geç, regression test ekle, threat model yaz, kapanmamış riskleri listele.",
   "agents.errLabelRequired": "İsim (label) zorunlu.",
   "agents.errRoleRequired": "Role üretilemedi — ismi doldur.",
-  "agents.errRoleDuplicate": "\"{role}\" rolüne sahip bir agent zaten var."
+  "agents.errRoleDuplicate": "\"{role}\" rolüne sahip bir agent zaten var.",
+  "reviews.title": "Kod İncelemeleri",
+  "reviews.heroSubtitle": "AI destekli adversarial kod inceleme. Bulgu, severity ve agent başına karar geçmişini koda dokunmadan takip et.",
+  "reviews.runReview": "İnceleme çalıştır",
+  "reviews.statTotal": "İnceleme",
+  "reviews.statAgents": "Reviewer agent",
+  "reviews.statAvgScore": "Ort. skor",
+  "reviews.statCritical": "Kritik",
+  "reviews.filtersLabel": "İncelemeleri filtrele",
+  "reviews.allRoles": "Tüm reviewer'lar",
+  "reviews.allSeverities": "Tüm severity'ler",
+  "reviews.count": "{n} inceleme",
+  "reviews.emptyTitle": "Henüz inceleme yok",
+  "reviews.emptyHint": "Herhangi bir task'ta 🔎 Review butonuna basarak reviewer agent çalıştır.",
+  "nav.reviews": "Kod İncelemeleri"
 }

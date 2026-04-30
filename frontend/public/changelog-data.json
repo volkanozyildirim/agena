@@ -1,5 +1,13 @@
 [
   {
+    "hash": "5d98200",
+    "short": "5d98200",
+    "message": "Agents: validate before closing the modal — show inline error instead of silent close",
+    "date": "2026-04-30",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "32160a0",
     "short": "32160a0",
     "message": "Prompts: register SECURITY_DEV_SYSTEM_PROMPT in PROMPT_DEFAULTS",

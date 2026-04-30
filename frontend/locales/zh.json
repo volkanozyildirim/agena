@@ -3180,5 +3180,19 @@
   "agents.role.securityDeveloper.prompt": "你是高级安全工程师。每个输入都是恶意的。先重现漏洞,以最小爆炸半径打补丁,添加回归测试,记录威胁模型,列出残余风险。",
   "agents.errLabelRequired": "名称(label)为必填项。",
   "agents.errRoleRequired": "无法推导角色 — 请填写名称。",
-  "agents.errRoleDuplicate": "已存在角色为 \"{role}\" 的 agent。"
+  "agents.errRoleDuplicate": "已存在角色为 \"{role}\" 的 agent。",
+  "reviews.title": "代码审查",
+  "reviews.heroSubtitle": "AI 驱动的对抗性代码审查。在不改动代码的情况下追踪发现、严重性和按 agent 的判断历史。",
+  "reviews.runReview": "运行审查",
+  "reviews.statTotal": "审查",
+  "reviews.statAgents": "审查员",
+  "reviews.statAvgScore": "平均分",
+  "reviews.statCritical": "严重",
+  "reviews.filtersLabel": "筛选审查",
+  "reviews.allRoles": "所有审查员",
+  "reviews.allSeverities": "所有级别",
+  "reviews.count": "{n} 条审查",
+  "reviews.emptyTitle": "暂无审查",
+  "reviews.emptyHint": "在任何任务上点击 🔎 Review 按钮即可运行审查 agent。",
+  "nav.reviews": "代码审查"
 }
