@@ -294,7 +294,16 @@ async function runCLIStream(bin, name, data, res) {
           if (resultText && !fullText.includes(resultText.slice(0, 100))) {
             fullText += resultText;
           }
-          res.write(`data: ${JSON.stringify({ type: 'result', text: resultText.slice(0, 500) })}\n\n`);
+          // Forward provider-reported usage / cost so the backend can
+          // log real token counts instead of a char-length estimate.
+          // Claude Code stream-json emits usage in the result event:
+          //   usage: { input_tokens, output_tokens,
+          //            cache_creation_input_tokens, cache_read_input_tokens }
+          //   total_cost_usd: <number>
+          const payload = { type: 'result', text: resultText.slice(0, 500) };
+          if (event.usage && typeof event.usage === 'object') payload.usage = event.usage;
+          if (typeof event.total_cost_usd === 'number') payload.total_cost_usd = event.total_cost_usd;
+          res.write(`data: ${JSON.stringify(payload)}\n\n`);
         } else {
           // Forward other events (system, tool_result, etc.) as-is for visibility
           res.write(`data: ${JSON.stringify({ type: 'event', event_type: eventType })}\n\n`);
@@ -437,6 +446,21 @@ async function runCodexStream(bin, data, res) {
           res.write(`data: ${JSON.stringify({ type: 'tool', tool: name, summary })}\n\n`);
         } else if (eventType === 'function_call_output' || eventType === 'tool_result') {
           res.write(`data: ${JSON.stringify({ type: 'event', event_type: 'tool_result' })}\n\n`);
+        } else if (
+          eventType === 'token_count' ||
+          eventType === 'token_usage' ||
+          (event.msg && event.msg.type === 'token_count') ||
+          event.token_count ||
+          event.usage ||
+          (event.info && event.info.total_token_usage)
+        ) {
+          // Codex CLI emits token usage in its own event type.
+          // Field names vary across versions; collect them all.
+          const usage = event.usage || event.token_count || event.info?.total_token_usage
+            || event.msg?.info?.total_token_usage || event.msg?.token_count || null;
+          if (usage) {
+            res.write(`data: ${JSON.stringify({ type: 'usage', usage })}\n\n`);
+          }
         } else if (eventType === 'error' || eventType === 'turn.failed') {
           const errMsg = event.message || event.error?.message || event.error || 'unknown error';
           res.write(`data: ${JSON.stringify({ type: 'error', message: String(errMsg).slice(0, 500) })}\n\n`);

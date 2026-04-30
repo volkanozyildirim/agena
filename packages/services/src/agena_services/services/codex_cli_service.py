@@ -12,6 +12,12 @@ class CodexCLIService:
     EXEC_TIMEOUT_SEC = 1200
     TRANSIENT_RETRIES = 3
 
+    # Last bridge-reported provider usage. Populated by _generate_via_bridge
+    # when Codex's --json stream emits a token_count/usage event. Read by
+    # OrchestrationService to log real numbers instead of len/4 estimates.
+    last_usage: dict[str, int] | None = None
+    last_cost_usd: float | None = None
+
     async def generate_file_markdown(
         self,
         *,
@@ -24,6 +30,8 @@ class CodexCLIService:
         log_callback=None,
         task_id: str = '',
     ) -> str:
+        self.last_usage = None
+        self.last_cost_usd = None
         # Always let Codex CLI pick its own default model —
         # ChatGPT accounts don't support explicit model selection
         model = None
@@ -376,6 +384,42 @@ class CodexCLIService:
                                 preview = event.get('output_preview', '')
                                 code = event.get('exit_code', '')
                                 await log_callback(f'exit={code} {preview[:300]}' if preview else f'exit={code}')
+                        elif evt_type == 'usage':
+                            usage_obj = event.get('usage') or {}
+                            if isinstance(usage_obj, dict):
+                                # Codex emits a few different shapes across
+                                # versions: {input_tokens, output_tokens,
+                                # cached_input_tokens, total_tokens} or
+                                # {input, output, cached, total}.
+                                input_tokens = int(
+                                    usage_obj.get('input_tokens')
+                                    or usage_obj.get('input')
+                                    or usage_obj.get('prompt_tokens')
+                                    or 0
+                                )
+                                output_tokens = int(
+                                    usage_obj.get('output_tokens')
+                                    or usage_obj.get('output')
+                                    or usage_obj.get('completion_tokens')
+                                    or 0
+                                )
+                                cached_tokens = int(
+                                    usage_obj.get('cached_input_tokens')
+                                    or usage_obj.get('cached')
+                                    or usage_obj.get('cache_read_input_tokens')
+                                    or 0
+                                )
+                                total_tokens = int(
+                                    usage_obj.get('total_tokens')
+                                    or usage_obj.get('total')
+                                    or (input_tokens + output_tokens)
+                                )
+                                self.last_usage = {
+                                    'prompt_tokens': input_tokens,
+                                    'completion_tokens': output_tokens,
+                                    'total_tokens': total_tokens,
+                                    'cached_input_tokens': cached_tokens,
+                                }
                         elif evt_type == 'stderr':
                             stderr_text = event.get('text', '')
                             if stderr_text:

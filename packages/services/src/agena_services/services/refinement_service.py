@@ -361,7 +361,7 @@ class RefinementService:
                 explicit_model=request.agent_model,
             )
 
-        total_usage = {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0}
+        total_usage = {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0, 'cached_input_tokens': 0}
         results: list[RefinementSuggestion] = []
 
         if selected:
@@ -560,6 +560,7 @@ class RefinementService:
             prompt_tokens=total_usage['prompt_tokens'],
             completion_tokens=total_usage['completion_tokens'],
             model=agent_model,
+            cached_input_tokens=int(total_usage.get('cached_input_tokens', 0) or 0),
         ) if total_usage['total_tokens'] > 0 else 0.0
 
         ended_at = datetime.utcnow()
@@ -1294,6 +1295,7 @@ class RefinementService:
             'prompt_tokens': int(current.get('prompt_tokens', 0)) + int(nxt.get('prompt_tokens', 0)),
             'completion_tokens': int(current.get('completion_tokens', 0)) + int(nxt.get('completion_tokens', 0)),
             'total_tokens': int(current.get('total_tokens', 0)) + int(nxt.get('total_tokens', 0)),
+            'cached_input_tokens': int(current.get('cached_input_tokens', 0) or 0) + int(nxt.get('cached_input_tokens', 0) or 0),
         }
 
     def _extract_json_dict(self, text: str) -> dict[str, Any] | None:

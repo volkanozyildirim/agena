@@ -69,6 +69,12 @@ class ClaudeCLIService:
         except Exception:
             pass
 
+    # Last bridge-reported provider usage/cost. Populated by _run_bridge
+    # when Claude Code's stream-json result event carries them. Read by
+    # OrchestrationService to log real numbers instead of len/4 estimates.
+    last_usage: dict[str, int] | None = None
+    last_cost_usd: float | None = None
+
     async def generate_file_markdown(
         self,
         *,
@@ -79,6 +85,8 @@ class ClaudeCLIService:
         log_callback: LogCallback | None = None,
         task_id: str = '',
     ) -> str:
+        self.last_usage = None
+        self.last_cost_usd = None
         prompt = (
             'Implement the following task in the CURRENT repository.\n\n'
             'WORKFLOW:\n'
@@ -264,6 +272,25 @@ class ClaudeCLIService:
                                 if not collected_text or sum(len(t) for t in collected_text) < len(text):
                                     collected_text.clear()
                                     collected_text.append(text)
+                            usage_obj = event.get('usage')
+                            if isinstance(usage_obj, dict):
+                                input_tokens = int(usage_obj.get('input_tokens', 0) or 0)
+                                output_tokens = int(usage_obj.get('output_tokens', 0) or 0)
+                                cache_read = int(usage_obj.get('cache_read_input_tokens', 0) or 0)
+                                cache_create = int(usage_obj.get('cache_creation_input_tokens', 0) or 0)
+                                # Anthropic's "input_tokens" excludes cached reads/creates.
+                                # Treat the prompt tokens we bill against as the sum.
+                                prompt_total = input_tokens + cache_read + cache_create
+                                self.last_usage = {
+                                    'prompt_tokens': prompt_total,
+                                    'completion_tokens': output_tokens,
+                                    'total_tokens': prompt_total + output_tokens,
+                                    'cached_input_tokens': cache_read,
+                                    'cache_creation_input_tokens': cache_create,
+                                }
+                            cost_val = event.get('total_cost_usd')
+                            if isinstance(cost_val, (int, float)):
+                                self.last_cost_usd = float(cost_val)
                             if log_callback and text:
                                 await log_callback(f'CLI result: {text[:200]}')
                         elif etype == 'event':
