@@ -1,5 +1,13 @@
 [
   {
+    "hash": "1d1259b",
+    "short": "1d1259b",
+    "message": "NewRelic + Datadog + AppDynamics: full Sentry-style premium UX + share login fallback",
+    "date": "2026-04-30",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "89bca91",
     "short": "89bca91",
     "message": "Share: fix 500 — RepoMapping has no .name attribute, derive display name from owner/repo_name",

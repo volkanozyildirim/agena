@@ -495,6 +495,34 @@ export default function DashboardTasksPage() {
     setMcpPopupTaskId(id);
   }
 
+  async function toggleSentryResolve(taskId: number) {
+    // Optimistic toggle: flip the "Status: resolved" line in the description
+    // locally so the row turns purple instantly. On failure we revert.
+    let prev: TaskItem | undefined;
+    setTasks((cur) => cur.map((task) => {
+      if (task.id !== taskId) return task;
+      prev = task;
+      const desc = task.description || '';
+      const isResolved = desc.includes('Status: resolved');
+      const nextDesc = isResolved
+        ? desc.replace(/^Status: resolved\s*$/m, 'Status: unresolved').replace(/\nStatus: resolved\s*/g, '\nStatus: unresolved')
+        : (/^Status:/m.test(desc)
+            ? desc.replace(/^Status:.*$/m, 'Status: resolved')
+            : (desc ? `${desc}\nStatus: resolved` : 'Status: resolved'));
+      return { ...task, description: nextDesc };
+    }));
+    try {
+      const data = await apiFetch<{ status: string }>(`/tasks/${taskId}/sentry-resolve`, { method: 'POST' });
+      setMsg(`Sentry: ${data.status}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Sentry resolve failed');
+      if (prev) {
+        const original = prev;
+        setTasks((cur) => cur.map((task) => task.id === taskId ? original : task));
+      }
+    }
+  }
+
   async function _assignWithConflictRetry(id: number, body: Record<string, unknown>) {
     try {
       await apiFetch('/tasks/' + id + '/assign', { method: 'POST', body: JSON.stringify(body) });
@@ -1446,13 +1474,7 @@ export default function DashboardTasksPage() {
               </div>
               <div style={{ display: 'flex', gap: 5, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                 {task.source === 'sentry' && (
-                  <button onClick={async () => {
-                    try {
-                      const data = await apiFetch<{ status: string }>(`/tasks/${task.id}/sentry-resolve`, { method: 'POST' });
-                      setMsg(`Sentry: ${data.status}`);
-                      setTimeout(() => window.location.reload(), 800);
-                    } catch { setError('Sentry resolve failed'); }
-                  }}
+                  <button onClick={() => void toggleSentryResolve(task.id)}
                     style={{ padding: '5px 10px', fontSize: 10, fontWeight: 700, borderRadius: 8, border: '1px solid rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)', color: '#a855f7', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                     {task.description?.includes('Status: resolved') ? 'Unresolve' : 'Resolve'}
                   </button>
@@ -1579,13 +1601,7 @@ export default function DashboardTasksPage() {
                         </>
                       )}
                       {task.source === 'sentry' && (
-                        <button onClick={async () => {
-                          try {
-                            const data = await apiFetch<{ status: string }>(`/tasks/${task.id}/sentry-resolve`, { method: 'POST' });
-                            setMsg(`Sentry: ${data.status}`);
-                            setTimeout(() => window.location.reload(), 800);
-                          } catch { setError('Sentry resolve failed'); }
-                        }}
+                        <button onClick={() => void toggleSentryResolve(task.id)}
                           style={{ padding: '7px 10px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: '1px solid rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)', color: '#a855f7', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                           {task.description?.includes('Status: resolved') ? 'Unresolve' : 'Resolve'}
                         </button>
