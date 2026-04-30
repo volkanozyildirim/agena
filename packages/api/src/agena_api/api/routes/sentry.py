@@ -11,18 +11,25 @@ from agena_models.models.repo_mapping import RepoMapping
 from agena_models.models.sentry_project_mapping import SentryProjectMapping
 from agena_models.models.task_record import TaskRecord
 from agena_models.schemas.sentry import (
+    SentryAIFixPreviewRequest,
+    SentryAIFixPreviewResponse,
+    SentryEnvironmentItem,
     SentryIssueEventItem,
     SentryIssueEventListResponse,
     SentryIssueItem,
     SentryIssueListResponse,
+    SentryIssuePreview,
     SentryProjectItem,
     SentryProjectListResponse,
     SentryProjectMappingCreate,
     SentryProjectMappingResponse,
     SentryProjectMappingUpdate,
+    SentryReleaseItem,
+    SentryStackFrame,
 )
 from agena_services.integrations.sentry_client import SentryClient
 from agena_services.services.integration_config_service import IntegrationConfigService
+from agena_services.services.llm.provider import LLMProvider
 
 router = APIRouter(prefix='/sentry', tags=['sentry'])
 
@@ -114,6 +121,8 @@ async def list_sentry_project_issues(
     query: str = Query('is:unresolved'),
     limit: int = Query(50, ge=1, le=100),
     stats_period: str | None = Query(None),
+    environment: str | None = Query(None),
+    release: str | None = Query(None),
     tenant: CurrentTenant = Depends(get_current_tenant),
     db: AsyncSession = Depends(get_db_session),
 ) -> SentryIssueListResponse:
@@ -127,6 +136,8 @@ async def list_sentry_project_issues(
             query=query,
             limit=limit,
             stats_period=stats_period,
+            environment=environment,
+            release=release,
         )
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code in (401, 403):
@@ -155,6 +166,29 @@ async def list_sentry_project_issues(
     for i in issues:
         issue_id = str(i.get('id') or '')
         task_id, wi_id = imported_map.get(f'{project_key}:{issue_id}', (None, None))
+
+        fixability_score: float | None = None
+        raw_score = i.get('seerFixabilityScore')
+        if raw_score is not None:
+            try:
+                fixability_score = round(float(raw_score), 2)
+            except (ValueError, TypeError):
+                fixability_score = None
+
+        stats_24h: list[int] = []
+        stats_obj = i.get('stats') or {}
+        if isinstance(stats_obj, dict):
+            for bucket_key in ('24h', '14d', '30d'):
+                series = stats_obj.get(bucket_key)
+                if isinstance(series, list) and series:
+                    for entry in series:
+                        if isinstance(entry, list) and len(entry) >= 2:
+                            try:
+                                stats_24h.append(int(entry[1]))
+                            except (ValueError, TypeError):
+                                stats_24h.append(0)
+                    break
+
         parsed.append(
             SentryIssueItem(
                 id=issue_id,
@@ -166,7 +200,13 @@ async def list_sentry_project_issues(
                 count=int(i.get('count') or 0),
                 user_count=int(i.get('userCount') or 0),
                 last_seen=str(i.get('lastSeen') or '') or None,
+                first_seen=str(i.get('firstSeen') or '') or None,
                 permalink=str(i.get('permalink') or '') or None,
+                is_unhandled=bool(i.get('isUnhandled')),
+                substatus=str(i.get('substatus') or '') or None,
+                fixability_score=fixability_score,
+                platform=str(i.get('platform') or '') or None,
+                stats_24h=stats_24h,
                 imported_task_id=task_id,
                 imported_work_item_url=wi_resolver(wi_id) if wi_id else None,
             )
@@ -177,6 +217,263 @@ async def list_sentry_project_issues(
         project_slug=project_slug.strip(),
         issues=parsed,
     )
+
+
+@router.get('/projects/{project_slug}/environments', response_model=list[SentryEnvironmentItem])
+async def list_sentry_environments(
+    project_slug: str,
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[SentryEnvironmentItem]:
+    cfg = await _sentry_cfg(db, tenant.organization_id)
+    client = SentryClient()
+    try:
+        envs = await client.list_environments(cfg, organization_slug=cfg['organization_slug'], project_slug=project_slug.strip())
+    except httpx.HTTPError:
+        return []
+    out: list[SentryEnvironmentItem] = []
+    for e in envs:
+        name = str(e.get('name') or '').strip()
+        if not name:
+            continue
+        out.append(SentryEnvironmentItem(name=name, is_hidden=bool(e.get('isHidden'))))
+    return out
+
+
+@router.get('/projects/{project_slug}/releases', response_model=list[SentryReleaseItem])
+async def list_sentry_releases(
+    project_slug: str,
+    limit: int = Query(30, ge=1, le=100),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[SentryReleaseItem]:
+    cfg = await _sentry_cfg(db, tenant.organization_id)
+    client = SentryClient()
+    try:
+        rels = await client.list_releases(cfg, organization_slug=cfg['organization_slug'], project_slug=project_slug.strip(), limit=limit)
+    except httpx.HTTPError:
+        return []
+    out: list[SentryReleaseItem] = []
+    for r in rels:
+        version = str(r.get('version') or '').strip()
+        if not version:
+            continue
+        out.append(SentryReleaseItem(
+            version=version,
+            short_version=str(r.get('shortVersion') or '') or None,
+            date_released=str(r.get('dateReleased') or '') or None,
+            last_event=str(r.get('lastEvent') or '') or None,
+        ))
+    return out
+
+
+@router.get('/issues/{issue_id}/preview', response_model=SentryIssuePreview)
+async def get_sentry_issue_preview(
+    issue_id: str,
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> SentryIssuePreview:
+    cfg = await _sentry_cfg(db, tenant.organization_id)
+    client = SentryClient()
+    try:
+        event = await client.get_latest_event(cfg, organization_slug=cfg['organization_slug'], issue_id=issue_id.strip())
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f'Sentry request failed: {exc}') from exc
+
+    if not event:
+        return SentryIssuePreview(issue_id=issue_id)
+
+    # Extract exception + frames
+    exc_type: str | None = None
+    exc_value: str | None = None
+    frames: list[SentryStackFrame] = []
+    entries = event.get('entries') or []
+    if isinstance(entries, list):
+        for entry in entries:
+            if not isinstance(entry, dict) or str(entry.get('type') or '') != 'exception':
+                continue
+            values = ((entry.get('data') or {}).get('values') or [])
+            if not isinstance(values, list) or not values:
+                continue
+            first = values[0] or {}
+            exc_type = str(first.get('type') or '').strip() or None
+            exc_value = str(first.get('value') or '').strip() or None
+            raw_frames = ((first.get('stacktrace') or {}).get('frames') or [])
+            if isinstance(raw_frames, list):
+                # Sentry orders frames oldest-first; we want newest first, prefer in_app.
+                ordered = list(reversed(raw_frames))
+                in_app = [f for f in ordered if isinstance(f, dict) and f.get('inApp')]
+                preferred = in_app if in_app else ordered
+                for fr in preferred[:6]:
+                    if not isinstance(fr, dict):
+                        continue
+                    frames.append(SentryStackFrame(
+                        filename=str(fr.get('filename') or '') or None,
+                        function=str(fr.get('function') or '') or None,
+                        lineno=int(fr.get('lineNo') or fr.get('lineno') or 0) or None,
+                        abs_path=str(fr.get('absPath') or '') or None,
+                        in_app=bool(fr.get('inApp')),
+                        context_line=str(fr.get('context_line') or fr.get('contextLine') or '') or None,
+                        pre_context=[str(x) for x in (fr.get('pre_context') or fr.get('preContext') or []) if x is not None][-5:],
+                        post_context=[str(x) for x in (fr.get('post_context') or fr.get('postContext') or []) if x is not None][:5],
+                    ))
+            break
+
+    # Tags → environment / release
+    environment_tag: str | None = None
+    release_tag: str | None = None
+    tags_raw = event.get('tags') or []
+    if isinstance(tags_raw, list):
+        for tag in tags_raw:
+            if isinstance(tag, dict):
+                k = str(tag.get('key') or '').strip().lower()
+                v = str(tag.get('value') or '').strip()
+                if k == 'environment' and v:
+                    environment_tag = v
+                elif k == 'release' and v:
+                    release_tag = v
+
+    # Breadcrumbs (latest 8)
+    breadcrumbs_out: list[dict] = []
+    breadcrumb_entry = next((e for e in entries if isinstance(e, dict) and str(e.get('type') or '') == 'breadcrumbs'), None)
+    if isinstance(breadcrumb_entry, dict):
+        bvals = (breadcrumb_entry.get('data') or {}).get('values') or []
+        if isinstance(bvals, list):
+            for b in bvals[-8:]:
+                if not isinstance(b, dict):
+                    continue
+                breadcrumbs_out.append({
+                    'timestamp': str(b.get('timestamp') or '')[:19],
+                    'category': str(b.get('category') or ''),
+                    'level': str(b.get('level') or ''),
+                    'message': str(b.get('message') or '')[:200],
+                    'type': str(b.get('type') or ''),
+                })
+
+    request = event.get('request') or {}
+    request_method = None
+    request_url = None
+    if isinstance(request, dict):
+        request_method = str(request.get('method') or '') or None
+        request_url = str(request.get('url') or '') or None
+
+    event_id = str(event.get('eventID') or event.get('id') or '') or None
+
+    return SentryIssuePreview(
+        issue_id=issue_id,
+        event_id=event_id,
+        title=str(event.get('title') or '') or None,
+        exception_type=exc_type,
+        exception_value=exc_value,
+        platform=str(event.get('platform') or '') or None,
+        environment=environment_tag,
+        release=release_tag,
+        transaction=str(event.get('transaction') or '') or None,
+        request_method=request_method,
+        request_url=request_url,
+        frames=frames,
+        breadcrumbs=breadcrumbs_out,
+        permalink=None,
+    )
+
+
+_AI_PREVIEW_CACHE: dict[str, SentryAIFixPreviewResponse] = {}
+
+
+@router.post('/issues/{issue_id}/ai-preview', response_model=SentryAIFixPreviewResponse)
+async def get_sentry_ai_fix_preview(
+    issue_id: str,
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> SentryAIFixPreviewResponse:
+    cache_key = f'{tenant.organization_id}:{issue_id.strip()}'
+    if cache_key in _AI_PREVIEW_CACHE:
+        cached = _AI_PREVIEW_CACHE[cache_key]
+        return SentryAIFixPreviewResponse(
+            summary=cached.summary,
+            suggested_fix=cached.suggested_fix,
+            files_to_change=cached.files_to_change,
+            confidence=cached.confidence,
+            cached=True,
+        )
+
+    cfg = await _sentry_cfg(db, tenant.organization_id)
+    client = SentryClient()
+    try:
+        event = await client.get_latest_event(cfg, organization_slug=cfg['organization_slug'], issue_id=issue_id.strip())
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f'Sentry request failed: {exc}') from exc
+    if not event:
+        raise HTTPException(status_code=404, detail='No event data found for this issue')
+
+    summary, stack_lines = client._extract_exception_summary(event)
+    title = str(event.get('title') or '').strip()
+    transaction = str(event.get('transaction') or '').strip()
+    platform = str(event.get('platform') or '').strip()
+
+    snippet = '\n'.join(stack_lines[:8]) if stack_lines else '(no stack trace available)'
+    user_prompt = (
+        f"Sentry issue title: {title or summary or '(unknown)'}\n"
+        f"Exception: {summary or '(unknown)'}\n"
+        f"Platform: {platform or 'unknown'}\n"
+        f"Transaction: {transaction or 'n/a'}\n"
+        f"Top stack frames (most recent first):\n{snippet}\n\n"
+        "Return STRICT JSON with keys: summary (1-2 sentences explaining the bug), "
+        "suggested_fix (3-6 sentences describing what to change), "
+        "files_to_change (array of likely file paths from the stack), "
+        "confidence (0-100 integer estimating how fixable this is from the available info). "
+        "No markdown fences. Pure JSON only."
+    )
+    system_prompt = (
+        "You are a senior engineer reviewing a production exception captured by Sentry. "
+        "Read the stack trace and produce a concise root-cause hypothesis and a concrete fix plan. "
+        "Respond with strict JSON; no prose, no code fences."
+    )
+
+    provider = LLMProvider()
+    try:
+        output, _usage, _model, _cached = await provider.generate(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            complexity_hint='normal',
+            max_output_tokens=600,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f'LLM call failed: {exc}') from exc
+
+    import json as _json
+    cleaned = (output or '').strip()
+    if cleaned.startswith('```'):
+        cleaned = cleaned.strip('`')
+        if cleaned.lower().startswith('json'):
+            cleaned = cleaned[4:].lstrip()
+    try:
+        parsed = _json.loads(cleaned)
+    except Exception:
+        parsed = {
+            'summary': (cleaned[:280] or 'Could not parse AI output.'),
+            'suggested_fix': '',
+            'files_to_change': [],
+            'confidence': 0,
+        }
+
+    files_raw = parsed.get('files_to_change') or []
+    if not isinstance(files_raw, list):
+        files_raw = []
+
+    response = SentryAIFixPreviewResponse(
+        summary=str(parsed.get('summary') or '')[:600],
+        suggested_fix=str(parsed.get('suggested_fix') or '')[:1200],
+        files_to_change=[str(f) for f in files_raw if str(f).strip()][:8],
+        confidence=int(parsed.get('confidence') or 0),
+        cached=False,
+    )
+    _AI_PREVIEW_CACHE[cache_key] = response
+    if len(_AI_PREVIEW_CACHE) > 256:
+        # Drop oldest entries; cheap eviction
+        for k in list(_AI_PREVIEW_CACHE.keys())[:64]:
+            _AI_PREVIEW_CACHE.pop(k, None)
+    return response
 
 
 @router.get('/issues/{issue_id}/events', response_model=SentryIssueEventListResponse)

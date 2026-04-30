@@ -3083,5 +3083,20 @@
   "skills.importDefaults": "Importa impostazioni predefinite",
   "skills.importDefaultsConfirm": "Aggiungere le competenze predefinite selezionate a questa organizzazione? Le voci esistenti con lo stesso nome verranno saltate.",
   "skills.importDefaultsResult": "Importato: {inserted} nuovo, {skipped} già esistente, {total} totale nel bundle.",
-  "skills.close": "Vicino"
+  "skills.close": "Vicino",
+  "integrations.sentry.allEnvironments": "Tutti gli ambienti",
+  "integrations.sentry.allReleases": "Tutte le release",
+  "integrations.sentry.preview": "Anteprima",
+  "integrations.sentry.aiFix": "Fix IA",
+  "integrations.sentry.usersAffected": "utenti",
+  "integrations.sentry.noStackFrames": "Nessun frame disponibile.",
+  "integrations.sentry.breadcrumbsCount": "{n} breadcrumb",
+  "integrations.sentry.aiFixTitle": "Anteprima Fix IA",
+  "integrations.sentry.aiFixThinking": "Analisi dello stack trace…",
+  "integrations.sentry.aiFixSummary": "Causa principale",
+  "integrations.sentry.aiFixPlan": "Fix suggerito",
+  "integrations.sentry.aiFixFiles": "File probabili",
+  "integrations.sentry.aiFixConfidence": "Affidabilità",
+  "integrations.sentry.aiFixImport": "Importa come task → IA lo risolve",
+  "integrations.sentry.aiFixOpenTask": "Apri task #{id}"
 }

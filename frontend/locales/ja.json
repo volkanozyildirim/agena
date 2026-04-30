@@ -3083,5 +3083,20 @@
   "skills.importDefaults": "デフォルトをインポートする",
   "skills.importDefaultsConfirm": "厳選されたデフォルトのスキルをこの組織に追加しますか?同じ名前の既存のエントリはスキップされます。",
   "skills.importDefaultsResult": "インポート済み: 新規 {inserted}、{skipped} すでに存在、バンドル内の合計は {total} 個です。",
-  "skills.close": "近い"
+  "skills.close": "近い",
+  "integrations.sentry.allEnvironments": "すべての環境",
+  "integrations.sentry.allReleases": "すべてのリリース",
+  "integrations.sentry.preview": "プレビュー",
+  "integrations.sentry.aiFix": "AI 修正",
+  "integrations.sentry.usersAffected": "ユーザー",
+  "integrations.sentry.noStackFrames": "スタックフレームがありません。",
+  "integrations.sentry.breadcrumbsCount": "{n} 件のブレッドクラム",
+  "integrations.sentry.aiFixTitle": "AI 修正プレビュー",
+  "integrations.sentry.aiFixThinking": "スタックトレースを分析中…",
+  "integrations.sentry.aiFixSummary": "根本原因",
+  "integrations.sentry.aiFixPlan": "提案された修正",
+  "integrations.sentry.aiFixFiles": "該当する可能性が高いファイル",
+  "integrations.sentry.aiFixConfidence": "信頼度",
+  "integrations.sentry.aiFixImport": "タスクとして取り込む → AI に修正させる",
+  "integrations.sentry.aiFixOpenTask": "タスク #{id} を開く"
 }

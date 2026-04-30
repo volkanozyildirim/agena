@@ -1,5 +1,565 @@
 [
   {
+    "hash": "1d76e8b",
+    "short": "1d76e8b",
+    "message": "Fix flow agent dropdown + propagate Sentry/NewRelic/Datadog/AppDynamics repo mapping to imported tasks",
+    "date": "2026-04-30",
+    "author": "root",
+    "type": "fix"
+  },
+  {
+    "hash": "7ff38ff",
+    "short": "7ff38ff",
+    "message": "Skills: replace alert/confirm with portal modal for Import defaults",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "6d9e18e",
+    "short": "6d9e18e",
+    "message": "Skills: curated default seed bundle + Import defaults button",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "adeb4e1",
+    "short": "adeb4e1",
+    "message": "Skills: README rewrite + concrete walk-through panel on landing",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "docs"
+  },
+  {
+    "hash": "18a0fb9",
+    "short": "18a0fb9",
+    "message": "Refinement TR locale: fix Google's 'LLM' → 'Yüksek Lisans' mistranslation + cleanup",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "fix"
+  },
+  {
+    "hash": "b80ad74",
+    "short": "b80ad74",
+    "message": "i18n: route runs page + DORA hub strings through locale keys",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "32a2c24",
+    "short": "32a2c24",
+    "message": "i18n: route refinement page strings through locale keys, translate to all 7 langs",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "3c5f20d",
+    "short": "3c5f20d",
+    "message": "Refinement: harder prompt for big/new tasks + empty-state for recommended-assignee",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "feat"
+  },
+  {
+    "hash": "2e99638",
+    "short": "2e99638",
+    "message": "Refinement Azure writeback: stop stamping OriginalEstimate with the SP value",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "647e2fd",
+    "short": "647e2fd",
+    "message": "Refinement Azure writeback: log post-PATCH field state for SP-write debugging",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "fix"
+  },
+  {
+    "hash": "6387dba",
+    "short": "6387dba",
+    "message": "Refinement delete-comment: tombstone the local writeback row too",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "c56c1b6",
+    "short": "c56c1b6",
+    "message": "Refinement: replace native delete confirm with the same modal pattern",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "c47eaae",
+    "short": "c47eaae",
+    "message": "Refinement: persist Yaz/Sil + Ata state across reloads from refinement_records",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "39004dd",
+    "short": "39004dd",
+    "message": "Refinement: render Sil button on the second written-back render path too",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "cea776f",
+    "short": "cea776f",
+    "message": "Refinement: fix silently-dropped SP write + replace native confirm with a styled modal",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "fix"
+  },
+  {
+    "hash": "f3aab63",
+    "short": "f3aab63",
+    "message": "Refinement runs page: auto-paginate over the 50-cap so all history loads",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "8c153ef",
+    "short": "8c153ef",
+    "message": "Refinement: per-row Sil button + new Refinementlarım runs page",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "feat"
+  },
+  {
+    "hash": "9eba8f5",
+    "short": "9eba8f5",
+    "message": "Refinement: DELETE comment endpoint for [SIG]-prefixed Azure/Jira comments",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "1a92a44",
+    "short": "1a92a44",
+    "message": "Refinement: feed Azure description screenshots to the LLM",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "732b052",
+    "short": "732b052",
+    "message": "Refinement: respect saved sprint pick, make type chips into actual filters",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "6b9a904",
+    "short": "6b9a904",
+    "message": "Refinement: type breakdown chips + Story bucket lands at the bottom",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "5543dea",
+    "short": "5543dea",
+    "message": "Refinement: group bulk-select, react to global sprint switcher, fix lingering TS errors",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "fix"
+  },
+  {
+    "hash": "53e1e34",
+    "short": "53e1e34",
+    "message": "Refinement: group items by work_item_type + estimate filter, drop auto-select",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "877e049",
+    "short": "877e049",
+    "message": "Refinement writeback: optionally assign the matched author in the same call",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "937dd6b",
+    "short": "937dd6b",
+    "message": "Sprints import: don't silently drop the picked repo when prefs are stale",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "165b392",
+    "short": "165b392",
+    "message": "Run modal: pre-check repo from task_repo_assignments, not just the legacy column",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "2301bb6",
+    "short": "2301bb6",
+    "message": "start.sh: seed .env + frontend/.env.local from the .example files on first run",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "277b476",
+    "short": "277b476",
+    "message": "Branch naming: scope AI branches under agentflow/ + timestamp by default",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "622c9f8",
+    "short": "622c9f8",
+    "message": "Tasks: persist source-platform assignee + use it in sprint detail",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "0c390e1",
+    "short": "0c390e1",
+    "message": "Git activity strip: filter PRs by created_at_ext, not our row insert time",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "d5944c2",
+    "short": "d5944c2",
+    "message": "DORA project: drop the Azure live WIQL toggle",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "9abdba2",
+    "short": "9abdba2",
+    "message": "DORA project: scope task_records queries by repo_mapping_id",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "c3082b2",
+    "short": "c3082b2",
+    "message": "DORA project: 4 truly distinct KPIs + tighter, denser layout",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "33e2466",
+    "short": "33e2466",
+    "message": "RepoSelector: hide the inline Sync button on DORA subpages",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "6044101",
+    "short": "6044101",
+    "message": "DORA project: stop collapsing the 4 KPI cards into one number",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "c20b0d8",
+    "short": "c20b0d8",
+    "message": "DORA hub: promote + Add repo from a header button to a card-sized tile",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "feat"
+  },
+  {
+    "hash": "d7c81c6",
+    "short": "d7c81c6",
+    "message": "DORA Add-repo modal: dropdowns instead of free-text owner/repo fields",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "c1c2706",
+    "short": "c1c2706",
+    "message": "DORA hub: + Add repo button with a quick mapping modal",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "feat"
+  },
+  {
+    "hash": "e77dd44",
+    "short": "e77dd44",
+    "message": "GitHub PR reviews: backfill via /pulls/{n}/reviews so Help Others % works there too",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "703cf1d",
+    "short": "703cf1d",
+    "message": "Help Others %: persist Azure PR reviewers and compute the contributor metric",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "484ef90",
+    "short": "484ef90",
+    "message": "DORA: backfill Azure PR line stats + always reconcile repo list with the API",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "ce3eadb",
+    "short": "ce3eadb",
+    "message": "DORA hub card: counts respect the period selector instead of all-time totals",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "af02903",
+    "short": "af02903",
+    "message": "Git Analytics: Active Days subtitle reads the actual period (was hardcoded /30)",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "6e95635",
+    "short": "6e95635",
+    "message": "Git Analytics: lift commit list cap to 500 + show \"N of Total\" label",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "4b9e1dc",
+    "short": "4b9e1dc",
+    "message": "PR analytics: drop the GitHub-only ``status == 'merged'`` filter",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "e756d19",
+    "short": "e756d19",
+    "message": "DORA pages: shared period selector across hub + every subpage",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "3c12d52",
+    "short": "3c12d52",
+    "message": "DORA subpages: read ?repo=N from the URL so the hub's deep links land on a single-repo view",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "fd7f4c0",
+    "short": "fd7f4c0",
+    "message": "DORA hub: per-card period selector, default 3 months",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "fb12750",
+    "short": "fb12750",
+    "message": "DORA per-repo overview: stop painting unsynced cards with org-wide task numbers",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "4bffb0d",
+    "short": "4bffb0d",
+    "message": "DORA sync: attribute Azure builds by SHA, not by repositoryId",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "9c3e0e2",
+    "short": "9c3e0e2",
+    "message": "DORA sync: stop httpx from stripping pagination query strings",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "8a5d94d",
+    "short": "8a5d94d",
+    "message": "DORA sync: incremental commits during long backfills so progress shows up",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "eff58f5",
+    "short": "eff58f5",
+    "message": "DORA sync: pull Azure Pipelines builds as deployment events",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "76c9c97",
+    "short": "76c9c97",
+    "message": "DORA sync: paginate Azure properly + keep background tasks reachable from GC",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "5079bfd",
+    "short": "5079bfd",
+    "message": "DORA sync: fire and forget so a long sync stops blocking other requests",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "b2c150a",
+    "short": "b2c150a",
+    "message": "DORA sync: server-side in-flight registry + adaptive polling so reloads survive",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "ce7ab54",
+    "short": "ce7ab54",
+    "message": "DORA hub: rewrite as a per-repo card grid, drop Azure-discovery scaffolding",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "50c01b1",
+    "short": "50c01b1",
+    "message": "DORA sync: drop ephemeral mapping invention; only sync repos already in repo_mappings",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "8fa34ed",
+    "short": "8fa34ed",
+    "message": "DORA azure WIQL: lookup team's real area path + log query for 0-result diagnosis",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "e186b43",
+    "short": "e186b43",
+    "message": "DORA project external: pick Azure project + team from dropdowns, drop stale config fallback",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "4b5f51c",
+    "short": "4b5f51c",
+    "message": "DORA project: live Azure (WIQL) source + universal git activity row",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "ee8798a",
+    "short": "ee8798a",
+    "message": "DORA project: surface the data source so \"where do these numbers come from\" stops being a guess",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "07ea198",
+    "short": "07ea198",
+    "message": "DORA hub: per-repo filter + scope hint, collapse the sync grid",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "eabf28d",
+    "short": "eabf28d",
+    "message": "device-auth: stop crashing _gc_expired on user-code alias rows",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "f5c2c1d",
+    "short": "f5c2c1d",
+    "message": "CLI v1.3.1: Go binary passes unknown subcommands through to Node CLI",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "39ff0b1",
+    "short": "39ff0b1",
+    "message": "CLI v1.3.0: refinement code-aware analysis + repos subcommand",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "7535ad3",
+    "short": "7535ad3",
+    "message": "Make Sentry auto-import + task_attachments migration safe to re-run",
+    "date": "2026-04-29",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "80271f4",
+    "short": "80271f4",
+    "message": "Activity timeline: newest-first with internal scroll",
+    "date": "2026-04-28",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "ff4a38b",
+    "short": "ff4a38b",
+    "message": "Tasks: live agent timeline tab with real-time tool-call cards",
+    "date": "2026-04-28",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
+    "hash": "78b57fc",
+    "short": "78b57fc",
+    "message": "Changelog: bump cap to 100000 to keep the entire history",
+    "date": "2026-04-28",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "ae66947",
     "short": "ae66947",
     "message": "Deploy script: include full git history in changelog (1000)",

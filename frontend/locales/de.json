@@ -3083,5 +3083,20 @@
   "skills.importDefaults": "Standardwerte importieren",
   "skills.importDefaultsConfirm": "Die kuratierten Standardkompetenzen zu dieser Organisation hinzufügen? Vorhandene Einträge mit demselben Namen werden übersprungen.",
   "skills.importDefaultsResult": "Importiert: {inserted} neu, {skipped} bereits vorhanden, insgesamt {total} im Bundle.",
-  "skills.close": "Schließen"
+  "skills.close": "Schließen",
+  "integrations.sentry.allEnvironments": "Alle Umgebungen",
+  "integrations.sentry.allReleases": "Alle Releases",
+  "integrations.sentry.preview": "Vorschau",
+  "integrations.sentry.aiFix": "KI-Fix",
+  "integrations.sentry.usersAffected": "Nutzer",
+  "integrations.sentry.noStackFrames": "Keine Stack-Frames verfügbar.",
+  "integrations.sentry.breadcrumbsCount": "{n} Breadcrumbs",
+  "integrations.sentry.aiFixTitle": "KI-Fix-Vorschau",
+  "integrations.sentry.aiFixThinking": "Analysiere Stack-Trace…",
+  "integrations.sentry.aiFixSummary": "Ursache",
+  "integrations.sentry.aiFixPlan": "Vorgeschlagener Fix",
+  "integrations.sentry.aiFixFiles": "Wahrscheinliche Dateien",
+  "integrations.sentry.aiFixConfidence": "Zuversicht",
+  "integrations.sentry.aiFixImport": "Als Task importieren → KI behebt es",
+  "integrations.sentry.aiFixOpenTask": "Task #{id} öffnen"
 }

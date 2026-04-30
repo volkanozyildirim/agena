@@ -85,6 +85,8 @@ class SentryClient:
         query: str = 'is:unresolved',
         limit: int = 50,
         stats_period: str | None = None,
+        environment: str | None = None,
+        release: str | None = None,
     ) -> list[dict[str, Any]]:
         base_url, token = self._resolve(cfg)
         if not token:
@@ -101,20 +103,83 @@ class SentryClient:
             age_token = f'age:-{stats_period}'
             if age_token not in effective_query:
                 effective_query = f'{effective_query} {age_token}'.strip()
+        if release:
+            release_token = f'release:{release.strip()}'
+            if release_token not in effective_query:
+                effective_query = f'{effective_query} {release_token}'.strip()
 
         params: dict[str, str] = {
             'query': effective_query,
             'limit': str(max(1, min(limit, 100))),
             'sort': 'freq',
         }
-        if stats_period in ('24h', '14d'):
-            params['statsPeriod'] = stats_period
+        # Always request 24h sparkline buckets so the UI can render trend.
+        params['statsPeriod'] = stats_period if stats_period in ('24h', '14d', '30d') else '24h'
+        if environment:
+            params['environment'] = environment.strip()
 
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.get(url, headers=headers, params=params)
             resp.raise_for_status()
             data = resp.json()
         return data if isinstance(data, list) else []
+
+    async def list_environments(
+        self,
+        cfg: dict[str, str],
+        *,
+        organization_slug: str,
+        project_slug: str,
+    ) -> list[dict[str, Any]]:
+        base_url, token = self._resolve(cfg)
+        if not token:
+            return []
+        url = f'{base_url}/projects/{organization_slug}/{project_slug}/environments/'
+        headers = {'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
+        async with httpx.AsyncClient(timeout=20) as client:
+            resp = await client.get(url, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
+        return data if isinstance(data, list) else []
+
+    async def list_releases(
+        self,
+        cfg: dict[str, str],
+        *,
+        organization_slug: str,
+        project_slug: str,
+        limit: int = 30,
+    ) -> list[dict[str, Any]]:
+        base_url, token = self._resolve(cfg)
+        if not token:
+            return []
+        url = f'{base_url}/projects/{organization_slug}/{project_slug}/releases/'
+        headers = {'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
+        params = {'per_page': str(max(1, min(limit, 100)))}
+        async with httpx.AsyncClient(timeout=20) as client:
+            resp = await client.get(url, headers=headers, params=params)
+            resp.raise_for_status()
+            data = resp.json()
+        return data if isinstance(data, list) else []
+
+    async def get_latest_event(
+        self,
+        cfg: dict[str, str],
+        *,
+        organization_slug: str,
+        issue_id: str,
+    ) -> dict[str, Any]:
+        """Fetch the most recent event for an issue, including stack frames with code context."""
+        base_url, token = self._resolve(cfg)
+        if not token:
+            return {}
+        url = f'{base_url}/organizations/{organization_slug}/issues/{issue_id}/events/latest/'
+        headers = {'Authorization': f'Bearer {token}', 'Accept': 'application/json'}
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(url, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
+        return data if isinstance(data, dict) else {}
 
     async def update_issue_status(
         self,

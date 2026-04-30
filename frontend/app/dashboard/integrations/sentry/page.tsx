@@ -20,9 +20,53 @@ interface SentryIssue {
   count: number;
   user_count: number;
   last_seen: string | null;
+  first_seen: string | null;
   permalink: string | null;
+  is_unhandled: boolean;
+  substatus: string | null;
+  fixability_score: number | null;
+  platform: string | null;
+  stats_24h: number[];
   imported_task_id?: number | null;
   imported_work_item_url?: string | null;
+}
+
+interface SentryEnvironment { name: string; is_hidden: boolean }
+interface SentryRelease { version: string; short_version: string | null; date_released: string | null; last_event: string | null }
+
+interface SentryStackFrame {
+  filename: string | null;
+  function: string | null;
+  lineno: number | null;
+  abs_path: string | null;
+  in_app: boolean;
+  context_line: string | null;
+  pre_context: string[];
+  post_context: string[];
+}
+
+interface SentryPreview {
+  issue_id: string;
+  event_id: string | null;
+  title: string | null;
+  exception_type: string | null;
+  exception_value: string | null;
+  platform: string | null;
+  environment: string | null;
+  release: string | null;
+  transaction: string | null;
+  request_method: string | null;
+  request_url: string | null;
+  frames: SentryStackFrame[];
+  breadcrumbs: Array<{ timestamp: string; category: string; level: string; message: string; type: string }>;
+}
+
+interface SentryAIFixPreview {
+  summary: string;
+  suggested_fix: string;
+  files_to_change: string[];
+  confidence: number;
+  cached: boolean;
 }
 
 interface SentryIssueEvent {
@@ -55,6 +99,51 @@ interface RepoMapping {
   repo_name: string;
 }
 
+function Sparkline({ values, width = 80, height = 22, color = '#f87171' }: { values: number[]; width?: number; height?: number; color?: string }) {
+  if (!values || values.length === 0) return null;
+  const max = Math.max(1, ...values);
+  const step = values.length > 1 ? width / (values.length - 1) : width;
+  const points = values.map((v, i) => {
+    const x = i * step;
+    const y = height - (v / max) * (height - 2) - 1;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return (
+    <svg width={width} height={height} style={{ display: 'block' }} aria-hidden>
+      <polyline points={`0,${height} ${points} ${width},${height}`} fill={color} fillOpacity={0.15} stroke='none' />
+      <polyline points={points} fill='none' stroke={color} strokeWidth={1.5} />
+    </svg>
+  );
+}
+
+function Pill({ children, color = '#94a3b8', bg }: { children: React.ReactNode; color?: string; bg?: string }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      fontSize: 10, fontWeight: 700, letterSpacing: 0.3,
+      padding: '2px 7px', borderRadius: 4,
+      color, background: bg ?? `${color}1f`,
+      whiteSpace: 'nowrap',
+    }}>{children}</span>
+  );
+}
+
+function FixabilityBadge({ score }: { score: number | null }) {
+  if (score == null) return null;
+  const pct = Math.round(score * 100);
+  const color = pct >= 70 ? '#22c55e' : pct >= 40 ? '#eab308' : '#94a3b8';
+  return <Pill color={color}>AI {pct}%</Pill>;
+}
+
+function RegressionBadge({ substatus }: { substatus: string | null }) {
+  if (!substatus) return null;
+  const s = substatus.toLowerCase();
+  if (s === 'regressed') return <Pill color='#ef4444'>REGRESSION</Pill>;
+  if (s === 'new') return <Pill color='#3b82f6'>NEW</Pill>;
+  if (s === 'escalating') return <Pill color='#f97316'>ESCALATING</Pill>;
+  return null;
+}
+
 export default function SentryPage() {
   const { t } = useLocale();
   const [query, setQuery] = useState('');
@@ -85,6 +174,21 @@ export default function SentryPage() {
   const [modalSprintPath, setModalSprintPath] = useState<string>('');
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [sprintOptions, setSprintOptions] = useState<Array<{ path: string; name: string; is_current?: boolean }>>([]);
+
+  const [environments, setEnvironments] = useState<SentryEnvironment[]>([]);
+  const [releases, setReleases] = useState<SentryRelease[]>([]);
+  const [filterEnvironment, setFilterEnvironment] = useState('');
+  const [filterRelease, setFilterRelease] = useState('');
+  const [filterPeriod, setFilterPeriod] = useState('24h');
+
+  const [expandedIssueId, setExpandedIssueId] = useState<string | null>(null);
+  const [previewById, setPreviewById] = useState<Record<string, SentryPreview>>({});
+  const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null);
+
+  const [aiFixIssue, setAiFixIssue] = useState<SentryIssue | null>(null);
+  const [aiFixData, setAiFixData] = useState<SentryAIFixPreview | null>(null);
+  const [aiFixLoading, setAiFixLoading] = useState(false);
+  const [aiFixError, setAiFixError] = useState('');
 
   useEffect(() => {
     void loadMappings();
@@ -136,14 +240,64 @@ export default function SentryPage() {
     setIssuesLoading(true);
     setSelectedIssueId('');
     setEvents([]);
+    setExpandedIssueId(null);
     try {
-      const data = await apiFetch<{ issues: SentryIssue[] }>(`/sentry/projects/${encodeURIComponent(projectSlug)}/issues?query=is:unresolved&limit=50`);
+      const params = new URLSearchParams({ query: 'is:unresolved', limit: '50' });
+      if (filterPeriod) params.set('stats_period', filterPeriod);
+      if (filterEnvironment) params.set('environment', filterEnvironment);
+      if (filterRelease) params.set('release', filterRelease);
+      const data = await apiFetch<{ issues: SentryIssue[] }>(`/sentry/projects/${encodeURIComponent(projectSlug)}/issues?${params}`);
       setIssues(data.issues || []);
+      // Fire and forget: load env + release lists for filter dropdowns.
+      void apiFetch<SentryEnvironment[]>(`/sentry/projects/${encodeURIComponent(projectSlug)}/environments`)
+        .then((envs) => setEnvironments(envs.filter((e) => !e.is_hidden)))
+        .catch(() => setEnvironments([]));
+      void apiFetch<SentryRelease[]>(`/sentry/projects/${encodeURIComponent(projectSlug)}/releases?limit=30`)
+        .then(setReleases).catch(() => setReleases([]));
     } catch {
       setIssues([]);
     } finally {
       setIssuesLoading(false);
     }
+  }
+
+  async function togglePreview(issueId: string) {
+    if (expandedIssueId === issueId) {
+      setExpandedIssueId(null);
+      return;
+    }
+    setExpandedIssueId(issueId);
+    if (previewById[issueId]) return;
+    setPreviewLoadingId(issueId);
+    try {
+      const data = await apiFetch<SentryPreview>(`/sentry/issues/${encodeURIComponent(issueId)}/preview`);
+      setPreviewById((prev) => ({ ...prev, [issueId]: data }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Preview failed');
+    } finally {
+      setPreviewLoadingId(null);
+    }
+  }
+
+  async function openAiFixPreview(issue: SentryIssue) {
+    setAiFixIssue(issue);
+    setAiFixData(null);
+    setAiFixError('');
+    setAiFixLoading(true);
+    try {
+      const data = await apiFetch<SentryAIFixPreview>(`/sentry/issues/${encodeURIComponent(issue.id)}/ai-preview`, { method: 'POST', body: JSON.stringify({ issue_id: issue.id }) });
+      setAiFixData(data);
+    } catch (e) {
+      setAiFixError(e instanceof Error ? e.message : 'AI preview failed');
+    } finally {
+      setAiFixLoading(false);
+    }
+  }
+
+  function closeAiFixPreview() {
+    setAiFixIssue(null);
+    setAiFixData(null);
+    setAiFixError('');
   }
 
   async function fetchIssueEvents(issueId: string) {
@@ -371,29 +525,162 @@ export default function SentryPage() {
 
       {selectedProject && (
         <div style={cardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
             <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-58)' }}>{t('integrations.sentry.issuesFor').replace('{name}', selectedProject)}</h3>
             <button onClick={() => void importIssues(selectedProject)} style={btnPrimary}>{t('integrations.common.importAsTasks')}</button>
           </div>
+
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+            <select value={filterPeriod} onChange={(e) => { setFilterPeriod(e.target.value); void fetchIssues(selectedProject); }}
+              style={{ ...inputStyle, width: 'auto', padding: '6px 10px', fontSize: 11 }}>
+              <option value='1h'>{t('integrations.newrelic.range1h') || 'Last 1 hour'}</option>
+              <option value='24h'>{t('integrations.newrelic.range24h') || 'Last 24 hours'}</option>
+              <option value='7d'>{t('integrations.newrelic.range7d') || 'Last 7 days'}</option>
+              <option value='14d'>{t('integrations.sentry.range14d') || 'Last 14 days'}</option>
+              <option value='30d'>{t('integrations.sentry.range30d') || 'Last 30 days'}</option>
+            </select>
+            <select value={filterEnvironment} onChange={(e) => { setFilterEnvironment(e.target.value); void fetchIssues(selectedProject); }}
+              style={{ ...inputStyle, width: 'auto', padding: '6px 10px', fontSize: 11 }}>
+              <option value=''>{t('integrations.sentry.allEnvironments') || 'All environments'}</option>
+              {environments.map((e) => <option key={e.name} value={e.name}>{e.name}</option>)}
+            </select>
+            <select value={filterRelease} onChange={(e) => { setFilterRelease(e.target.value); void fetchIssues(selectedProject); }}
+              style={{ ...inputStyle, width: 'auto', padding: '6px 10px', fontSize: 11, maxWidth: 240 }}>
+              <option value=''>{t('integrations.sentry.allReleases') || 'All releases'}</option>
+              {releases.map((r) => <option key={r.version} value={r.version}>{r.short_version || r.version}</option>)}
+            </select>
+          </div>
+
           {issuesLoading ? (
             <div style={{ fontSize: 12, color: 'var(--ink-35)', padding: 12 }}>{t('integrations.common.loading')}</div>
           ) : issues.length === 0 ? (
             <div style={{ fontSize: 12, color: 'var(--ink-35)', padding: 12 }}>{t('integrations.common.noIssues')}</div>
           ) : (
-            <div style={{ display: 'grid', gap: 4 }}>
-              {issues.map((i) => (
-                <div key={i.id} style={{ display: 'flex', gap: 8, padding: '6px 8px', borderRadius: 8, background: selectedIssueId === i.id ? 'var(--panel)' : 'var(--glass)', fontSize: 12 }}>
-                  <span style={{ fontWeight: 600, color: '#f87171', minWidth: 64, textAlign: 'right' }}>{i.count}x</span>
-                  <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{i.title}</span>
-                  <span style={{ color: 'var(--ink-50)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{i.culprit || i.short_id || i.id}</span>
-                  <button onClick={() => void fetchIssueEvents(i.id)} style={btnSmall}>{t('integrations.sentry.tracesBtn')}</button>
-                  {i.permalink && (
-                    <a href={i.permalink} target='_blank' rel='noreferrer' style={{ fontSize: 11, color: '#f97316', textDecoration: 'none', alignSelf: 'center' }}>
-                      {t('integrations.sentry.openExternal')}
-                    </a>
-                  )}
-                </div>
-              ))}
+            <div style={{ display: 'grid', gap: 6 }}>
+              {issues.map((i) => {
+                const expanded = expandedIssueId === i.id;
+                const preview = previewById[i.id];
+                const levelColor = i.level === 'fatal' || i.level === 'error' ? '#f87171' : i.level === 'warning' ? '#f59e0b' : '#94a3b8';
+                return (
+                  <div key={i.id} style={{
+                    padding: '10px 12px', borderRadius: 10,
+                    background: selectedIssueId === i.id ? 'var(--panel)' : 'var(--glass)',
+                    border: '1px solid var(--panel-border)',
+                  }}>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
+                          <Pill color={levelColor}>{i.level.toUpperCase()}</Pill>
+                          <RegressionBadge substatus={i.substatus} />
+                          {i.is_unhandled && <Pill color='#ef4444'>UNHANDLED</Pill>}
+                          <FixabilityBadge score={i.fixability_score} />
+                          {i.platform && <Pill color='#64748b'>{i.platform}</Pill>}
+                          {i.imported_task_id && (
+                            <a href={`/tasks/${i.imported_task_id}`} style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: 'rgba(96,165,250,0.18)', color: '#60a5fa', textDecoration: 'none' }}>
+                              TASK #{i.imported_task_id}
+                            </a>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {i.title}
+                        </div>
+                        {(i.culprit || i.short_id) && (
+                          <div style={{ fontSize: 11, color: 'var(--ink-50)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {i.culprit || i.short_id}
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 6, fontSize: 10, color: 'var(--ink-45)', flexWrap: 'wrap' }}>
+                          <span><strong style={{ color: '#f87171' }}>{i.count.toLocaleString()}</strong> events</span>
+                          {i.user_count > 0 && <span><strong style={{ color: '#fbbf24' }}>{i.user_count.toLocaleString()}</strong> {(t('integrations.sentry.usersAffected') || 'users')}</span>}
+                          {i.last_seen && <span>{(t('integrations.common.lastSeen') || 'Last seen')}: {new Date(i.last_seen).toLocaleString()}</span>}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
+                        {i.stats_24h && i.stats_24h.length > 1 && (
+                          <Sparkline values={i.stats_24h} color={levelColor} />
+                        )}
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button onClick={() => void togglePreview(i.id)} style={btnSmall}>
+                            {expanded ? '▾' : '▸'} {t('integrations.sentry.preview') || 'Preview'}
+                          </button>
+                          <button onClick={() => void openAiFixPreview(i)} style={{ ...btnSmall, color: '#1CE783', borderColor: 'rgba(28,231,131,0.4)' }}>
+                            ✦ {t('integrations.sentry.aiFix') || 'AI Fix'}
+                          </button>
+                          {i.permalink && (
+                            <a href={i.permalink} target='_blank' rel='noreferrer' style={{ ...btnSmall, color: '#f97316', textDecoration: 'none', borderColor: 'rgba(249,115,22,0.4)' }}>
+                              ↗
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    {expanded && (
+                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--panel-border)' }}>
+                        {previewLoadingId === i.id || !preview ? (
+                          <div style={{ fontSize: 11, color: 'var(--ink-45)' }}>{t('integrations.common.loading') || 'Loading...'}</div>
+                        ) : (
+                          <div style={{ display: 'grid', gap: 8 }}>
+                            {(preview.exception_type || preview.exception_value) && (
+                              <div style={{ fontSize: 12, fontFamily: 'monospace', background: 'rgba(248,113,113,0.08)', padding: '6px 10px', borderRadius: 6, color: '#fca5a5' }}>
+                                {preview.exception_type && <strong>{preview.exception_type}: </strong>}
+                                {preview.exception_value}
+                              </div>
+                            )}
+                            <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'var(--ink-45)', flexWrap: 'wrap' }}>
+                              {preview.environment && <span>env: <strong>{preview.environment}</strong></span>}
+                              {preview.release && <span>release: <strong>{preview.release}</strong></span>}
+                              {preview.transaction && <span>txn: <strong>{preview.transaction}</strong></span>}
+                              {preview.request_method && preview.request_url && <span>{preview.request_method} {preview.request_url}</span>}
+                            </div>
+                            {preview.frames.length === 0 ? (
+                              <div style={{ fontSize: 11, color: 'var(--ink-35)' }}>{t('integrations.sentry.noStackFrames') || 'No stack frames available.'}</div>
+                            ) : (
+                              <div style={{ display: 'grid', gap: 6 }}>
+                                {preview.frames.slice(0, 3).map((fr, idx) => (
+                                  <div key={idx} style={{ background: 'var(--panel)', borderRadius: 6, padding: '6px 10px', fontFamily: 'monospace', fontSize: 11, border: fr.in_app ? '1px solid rgba(28,231,131,0.3)' : '1px solid var(--panel-border)' }}>
+                                    <div style={{ color: 'var(--ink-58)', marginBottom: 4 }}>
+                                      <span style={{ color: fr.in_app ? '#1CE783' : 'var(--ink-35)' }}>{fr.in_app ? '★ ' : ''}</span>
+                                      <span style={{ color: 'var(--ink)' }}>{fr.filename || fr.abs_path || '<unknown>'}</span>
+                                      {fr.lineno != null && <span style={{ color: '#f59e0b' }}>:{fr.lineno}</span>}
+                                      {fr.function && <span style={{ color: 'var(--ink-50)' }}> in {fr.function}</span>}
+                                    </div>
+                                    {fr.context_line && (
+                                      <pre style={{ margin: 0, fontSize: 10, lineHeight: 1.6, color: 'var(--ink-78)', whiteSpace: 'pre', overflowX: 'auto' }}>
+                                        {fr.pre_context.map((l) => `  ${l}\n`).join('')}
+                                        {`▶ ${fr.context_line}\n`}
+                                        {fr.post_context.map((l) => `  ${l}\n`).join('')}
+                                      </pre>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {preview.breadcrumbs.length > 0 && (
+                              <details>
+                                <summary style={{ fontSize: 11, color: 'var(--ink-45)', cursor: 'pointer' }}>
+                                  {(t('integrations.sentry.breadcrumbsCount') || '{n} breadcrumbs').replace('{n}', String(preview.breadcrumbs.length))}
+                                </summary>
+                                <div style={{ marginTop: 6, display: 'grid', gap: 3 }}>
+                                  {preview.breadcrumbs.map((b, idx) => (
+                                    <div key={idx} style={{ fontSize: 10, color: 'var(--ink-50)', fontFamily: 'monospace' }}>
+                                      <span style={{ color: '#94a3b8' }}>{b.timestamp}</span>{' '}
+                                      <span style={{ color: '#f59e0b' }}>{b.category}</span>{' '}
+                                      <span>{b.message || b.type}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </details>
+                            )}
+                            <div>
+                              <button onClick={() => void fetchIssueEvents(i.id)} style={btnSmall}>{t('integrations.sentry.tracesBtn')}</button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -464,6 +751,103 @@ export default function SentryPage() {
           </div>
         )}
       </div>
+
+      {aiFixIssue && typeof document !== 'undefined' && createPortal(
+        <div onClick={closeAiFixPreview} style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)' }}>
+          <div onClick={(ev) => ev.stopPropagation()} style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            background: 'var(--surface)', border: '1px solid var(--panel-border)', borderRadius: 14,
+            width: 'min(680px, calc(100vw - 32px))', maxHeight: '85vh',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            boxShadow: '0 24px 60px rgba(0,0,0,0.45)',
+          }}>
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--panel-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 18 }}>✦</span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)' }}>{t('integrations.sentry.aiFixTitle') || 'AI Fix Preview'}</span>
+                  {aiFixData?.cached && <Pill color='#94a3b8'>cached</Pill>}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--ink-45)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {aiFixIssue.title}
+                </div>
+              </div>
+              <button onClick={closeAiFixPreview} style={{ ...btnSmall, fontSize: 16 }}>×</button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: 18 }}>
+              {aiFixLoading && (
+                <div style={{ fontSize: 12, color: 'var(--ink-45)', textAlign: 'center', padding: 24 }}>
+                  {t('integrations.sentry.aiFixThinking') || 'Analyzing the stack trace...'}
+                </div>
+              )}
+              {aiFixError && (
+                <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(248,113,113,0.12)', color: '#f87171', fontSize: 12, fontWeight: 600 }}>
+                  {aiFixError}
+                </div>
+              )}
+              {aiFixData && (
+                <div style={{ display: 'grid', gap: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, color: 'var(--ink-35)', textTransform: 'uppercase', marginBottom: 6 }}>
+                      {t('integrations.sentry.aiFixSummary') || 'Root cause'}
+                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--ink)', lineHeight: 1.55 }}>
+                      {aiFixData.summary}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, color: 'var(--ink-35)', textTransform: 'uppercase', marginBottom: 6 }}>
+                      {t('integrations.sentry.aiFixPlan') || 'Suggested fix'}
+                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--ink-78)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
+                      {aiFixData.suggested_fix || '—'}
+                    </div>
+                  </div>
+                  {aiFixData.files_to_change.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, color: 'var(--ink-35)', textTransform: 'uppercase', marginBottom: 6 }}>
+                        {t('integrations.sentry.aiFixFiles') || 'Likely files'}
+                      </div>
+                      <div style={{ display: 'grid', gap: 3 }}>
+                        {aiFixData.files_to_change.map((f, idx) => (
+                          <div key={idx} style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--ink-78)', background: 'var(--panel)', padding: '4px 8px', borderRadius: 6 }}>
+                            {f}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, color: 'var(--ink-35)', textTransform: 'uppercase' }}>
+                      {t('integrations.sentry.aiFixConfidence') || 'Confidence'}
+                    </div>
+                    <div style={{ flex: 1, height: 6, background: 'var(--panel-border)', borderRadius: 999, overflow: 'hidden' }}>
+                      <div style={{ width: `${aiFixData.confidence}%`, height: '100%', background: aiFixData.confidence >= 70 ? '#22c55e' : aiFixData.confidence >= 40 ? '#eab308' : '#94a3b8' }} />
+                    </div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink)', minWidth: 30, textAlign: 'right' }}>
+                      {aiFixData.confidence}%
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div style={{ padding: '12px 18px', borderTop: '1px solid var(--panel-border)', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={closeAiFixPreview} style={btnSmall}>{t('integrations.common.cancel') || 'Close'}</button>
+              {aiFixData && !aiFixIssue.imported_task_id && (
+                <button onClick={() => { void importIssues(selectedProject); closeAiFixPreview(); }} style={btnPrimary}>
+                  {t('integrations.sentry.aiFixImport') || 'Import as task → Let AI fix it'}
+                </button>
+              )}
+              {aiFixData && aiFixIssue.imported_task_id && (
+                <a href={`/tasks/${aiFixIssue.imported_task_id}`} style={{ ...btnPrimary, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
+                  {(t('integrations.sentry.aiFixOpenTask') || 'Open task #{id}').replace('{id}', String(aiFixIssue.imported_task_id))}
+                </a>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {modalMapping && typeof document !== 'undefined' && createPortal(
         <div

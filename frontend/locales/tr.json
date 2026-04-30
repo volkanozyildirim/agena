@@ -3083,5 +3083,20 @@
   "skills.importDefaults": "Varsayılanları içe aktar",
   "skills.importDefaultsConfirm": "Seçilen varsayılan beceriler bu kuruluşa eklensin mi? Aynı ada sahip mevcut girişler atlanacaktır.",
   "skills.importDefaultsResult": "İçe aktarıldı: {inserted} yeni, {skipped} zaten mevcut, pakette toplam {total}.",
-  "skills.close": "Kapalı"
+  "skills.close": "Kapalı",
+  "integrations.sentry.allEnvironments": "Tüm ortamlar",
+  "integrations.sentry.allReleases": "Tüm sürümler",
+  "integrations.sentry.preview": "Önizle",
+  "integrations.sentry.aiFix": "AI Düzelt",
+  "integrations.sentry.usersAffected": "kullanıcı",
+  "integrations.sentry.noStackFrames": "Stack frame bulunamadı.",
+  "integrations.sentry.breadcrumbsCount": "{n} breadcrumb",
+  "integrations.sentry.aiFixTitle": "AI Düzeltme Önizlemesi",
+  "integrations.sentry.aiFixThinking": "Stack trace analiz ediliyor…",
+  "integrations.sentry.aiFixSummary": "Kök neden",
+  "integrations.sentry.aiFixPlan": "Önerilen düzeltme",
+  "integrations.sentry.aiFixFiles": "Olası dosyalar",
+  "integrations.sentry.aiFixConfidence": "Güven",
+  "integrations.sentry.aiFixImport": "Görev olarak al → AI düzeltsin",
+  "integrations.sentry.aiFixOpenTask": "Görev #{id}'i aç"
 }

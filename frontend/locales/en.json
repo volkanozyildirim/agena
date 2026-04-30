@@ -3083,5 +3083,20 @@
   "skills.importDefaults": "Import defaults",
   "skills.importDefaultsConfirm": "Add the curated default skills to this org? Existing entries with the same name will be skipped.",
   "skills.importDefaultsResult": "Imported: {inserted} new, {skipped} already existed, {total} total in the bundle.",
-  "skills.close": "Close"
+  "skills.close": "Close",
+  "integrations.sentry.allEnvironments": "All environments",
+  "integrations.sentry.allReleases": "All releases",
+  "integrations.sentry.preview": "Preview",
+  "integrations.sentry.aiFix": "AI Fix",
+  "integrations.sentry.usersAffected": "users",
+  "integrations.sentry.noStackFrames": "No stack frames available.",
+  "integrations.sentry.breadcrumbsCount": "{n} breadcrumbs",
+  "integrations.sentry.aiFixTitle": "AI Fix Preview",
+  "integrations.sentry.aiFixThinking": "Analyzing the stack trace…",
+  "integrations.sentry.aiFixSummary": "Root cause",
+  "integrations.sentry.aiFixPlan": "Suggested fix",
+  "integrations.sentry.aiFixFiles": "Likely files",
+  "integrations.sentry.aiFixConfidence": "Confidence",
+  "integrations.sentry.aiFixImport": "Import as task → Let AI fix it",
+  "integrations.sentry.aiFixOpenTask": "Open task #{id}"
 }

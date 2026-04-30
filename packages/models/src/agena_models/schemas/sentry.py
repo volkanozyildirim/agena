@@ -13,7 +13,13 @@ class SentryIssueItem(BaseModel):
     count: int = 0
     user_count: int = 0
     last_seen: str | None = None
+    first_seen: str | None = None
     permalink: str | None = None
+    is_unhandled: bool = False
+    substatus: str | None = None
+    fixability_score: float | None = None
+    platform: str | None = None
+    stats_24h: list[int] = []
     imported_task_id: int | None = None
     imported_work_item_url: str | None = None
 
@@ -22,6 +28,58 @@ class SentryIssueListResponse(BaseModel):
     organization_slug: str
     project_slug: str
     issues: list[SentryIssueItem] = []
+
+
+class SentryStackFrame(BaseModel):
+    filename: str | None = None
+    function: str | None = None
+    lineno: int | None = None
+    abs_path: str | None = None
+    in_app: bool = False
+    context_line: str | None = None
+    pre_context: list[str] = []
+    post_context: list[str] = []
+
+
+class SentryIssuePreview(BaseModel):
+    issue_id: str
+    event_id: str | None = None
+    title: str | None = None
+    exception_type: str | None = None
+    exception_value: str | None = None
+    platform: str | None = None
+    environment: str | None = None
+    release: str | None = None
+    transaction: str | None = None
+    request_method: str | None = None
+    request_url: str | None = None
+    frames: list[SentryStackFrame] = []
+    breadcrumbs: list[dict] = []
+    permalink: str | None = None
+
+
+class SentryAIFixPreviewRequest(BaseModel):
+    issue_id: str
+
+
+class SentryAIFixPreviewResponse(BaseModel):
+    summary: str
+    suggested_fix: str
+    files_to_change: list[str] = []
+    confidence: int = 0  # 0-100
+    cached: bool = False
+
+
+class SentryEnvironmentItem(BaseModel):
+    name: str
+    is_hidden: bool = False
+
+
+class SentryReleaseItem(BaseModel):
+    version: str
+    short_version: str | None = None
+    date_released: str | None = None
+    last_event: str | None = None
 
 
 class SentryProjectItem(BaseModel):

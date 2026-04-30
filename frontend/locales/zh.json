@@ -3083,5 +3083,20 @@
   "skills.importDefaults": "导入默认值",
   "skills.importDefaultsConfirm": "向该组织添加精选的默认技能？将跳过具有相同名称的现有条目。",
   "skills.importDefaultsResult": "已导入：{已插入} 个新的，{已跳过} 已存在，捆绑包中总计为 {total}。",
-  "skills.close": "关闭"
+  "skills.close": "关闭",
+  "integrations.sentry.allEnvironments": "所有环境",
+  "integrations.sentry.allReleases": "所有发布",
+  "integrations.sentry.preview": "预览",
+  "integrations.sentry.aiFix": "AI 修复",
+  "integrations.sentry.usersAffected": "用户",
+  "integrations.sentry.noStackFrames": "无堆栈帧。",
+  "integrations.sentry.breadcrumbsCount": "{n} 个面包屑",
+  "integrations.sentry.aiFixTitle": "AI 修复预览",
+  "integrations.sentry.aiFixThinking": "正在分析堆栈跟踪…",
+  "integrations.sentry.aiFixSummary": "根本原因",
+  "integrations.sentry.aiFixPlan": "建议修复",
+  "integrations.sentry.aiFixFiles": "可能的文件",
+  "integrations.sentry.aiFixConfidence": "置信度",
+  "integrations.sentry.aiFixImport": "导入任务 → AI 修复",
+  "integrations.sentry.aiFixOpenTask": "打开任务 #{id}"
 }
