@@ -1,5 +1,13 @@
 [
   {
+    "hash": "f87a03b",
+    "short": "f87a03b",
+    "message": "Header: 🚨 Sentry + 📡 NewRelic quick-link icons next to Usage on mobile + desktop",
+    "date": "2026-04-30",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "bddc9c9",
     "short": "bddc9c9",
     "message": "Sentry: floating bottom toast with live spinner so import feedback is impossible to miss",

@@ -1513,8 +1513,8 @@ export default function DashboardTasksPage() {
                 return (
                   <div key={task.id} style={{
                     padding: '12px 14px', borderBottom: '1px solid var(--panel-border)',
-                    borderLeft: task.status === 'running' ? '3px solid #38bdf8' : '3px solid transparent',
-                    background: task.status === 'running' ? 'rgba(56,189,248,0.04)' : undefined,
+                    borderLeft: task.description?.includes('Status: resolved') ? '3px solid #a855f7' : task.status === 'running' ? '3px solid #38bdf8' : '3px solid transparent',
+                    background: task.description?.includes('Status: resolved') ? 'rgba(168,85,247,0.04)' : task.status === 'running' ? 'rgba(56,189,248,0.04)' : undefined,
                   }}>
                     {/* Row 1: title + status */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
@@ -1539,6 +1539,16 @@ export default function DashboardTasksPage() {
                     </div>
                     {/* Row 3: badges */}
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 2 }}>
+                      {task.priority && (() => {
+                        const pc: Record<string, string> = { critical: '#ef4444', high: '#f97316', medium: '#eab308', low: '#22c55e' };
+                        const c = pc[task.priority] || 'var(--ink-35)';
+                        return <span style={{ display: 'inline-flex', alignItems: 'center', padding: '1px 6px', borderRadius: 999, fontSize: 9, fontWeight: 700, background: `${c}15`, color: c, textTransform: 'capitalize' }}>{task.priority}</span>;
+                      })()}
+                      {task.description?.includes('Status: resolved') && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 6px', borderRadius: 999, fontSize: 9, fontWeight: 700, background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.35)', color: '#a855f7' }}>
+                          ✓ Resolved
+                        </span>
+                      )}
                       {(task.dependency_blockers && task.dependency_blockers.length > 0) && (
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '1px 6px', borderRadius: 999, fontSize: 9, fontWeight: 700, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b' }}>
                           {t('tasks.deps.depCount' as TranslationKey, { n: task.dependency_blockers.length })}
@@ -1557,7 +1567,7 @@ export default function DashboardTasksPage() {
                       {(task.retry_count !== null && task.retry_count !== undefined && task.retry_count > 0) && <span>retry: {task.retry_count}</span>}
                     </div>
                     {/* Row 5: actions */}
-                    <div style={{ display: 'flex', gap: 6 }}>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {busy ? (
                         <span style={{ fontSize: 11, fontWeight: 700, color: statusColor(task.status) }}>{statusLabel(task.status, t)}</span>
                       ) : (
@@ -1568,16 +1578,38 @@ export default function DashboardTasksPage() {
                           </button>
                         </>
                       )}
+                      {task.source === 'sentry' && (
+                        <button onClick={async () => {
+                          try {
+                            const data = await apiFetch<{ status: string }>(`/tasks/${task.id}/sentry-resolve`, { method: 'POST' });
+                            setMsg(`Sentry: ${data.status}`);
+                            setTimeout(() => window.location.reload(), 800);
+                          } catch { setError('Sentry resolve failed'); }
+                        }}
+                          style={{ padding: '7px 10px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: '1px solid rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)', color: '#a855f7', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                          {task.description?.includes('Status: resolved') ? 'Unresolve' : 'Resolve'}
+                        </button>
+                      )}
                       <Link href={`/tasks/${task.id}`} style={{ padding: '7px 10px', fontSize: 11, fontWeight: 600, borderRadius: 8, border: '1px solid var(--panel-border-2)', background: 'transparent', color: 'var(--ink-50)', textAlign: 'center', textDecoration: 'none' }}>
                         {t('tasks.details')}
                       </Link>
-                      <button onClick={() => openEditTask(task)}
-                        style={{ padding: '7px 6px', fontSize: 11, borderRadius: 8, border: '1px solid rgba(56,189,248,0.2)', background: 'transparent', color: '#38bdf8', cursor: 'pointer', lineHeight: 1 }}>
+                      <button onClick={() => openEditTask(task)} title={t('tasks.actions.edit' as TranslationKey)}
+                        style={{ padding: '7px 8px', fontSize: 11, borderRadius: 8, border: '1px solid rgba(56,189,248,0.2)', background: 'transparent', color: '#38bdf8', cursor: 'pointer', lineHeight: 1 }}>
                         ✏️
+                      </button>
+                      <button onClick={() => setShareTask(task)} title={t('taskDetail.share.button' as TranslationKey)}
+                        style={{ padding: '7px 8px', fontSize: 11, borderRadius: 8, border: '1px solid rgba(94,234,212,0.25)', background: 'transparent', color: '#5eead4', cursor: 'pointer', lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
+                          <circle cx='18' cy='5' r='3' />
+                          <circle cx='6' cy='12' r='3' />
+                          <circle cx='18' cy='19' r='3' />
+                          <line x1='8.59' y1='13.51' x2='15.42' y2='17.49' />
+                          <line x1='15.41' y1='6.51' x2='8.59' y2='10.49' />
+                        </svg>
                       </button>
                       {task.status !== 'running' && (
                         <button onClick={() => setDeleteConfirmTask(task)}
-                          style={{ padding: '7px 6px', fontSize: 11, borderRadius: 8, border: '1px solid rgba(239,68,68,0.2)', background: 'transparent', color: '#ef4444', cursor: 'pointer', lineHeight: 1 }}>
+                          style={{ padding: '7px 8px', fontSize: 11, borderRadius: 8, border: '1px solid rgba(239,68,68,0.2)', background: 'transparent', color: '#ef4444', cursor: 'pointer', lineHeight: 1 }}>
                           🗑
                         </button>
                       )}
