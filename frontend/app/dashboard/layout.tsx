@@ -785,6 +785,30 @@ function DashboardInner({ children }: { children: ReactNode }) {
           <LangToggle />
         </span>
 
+        {/* Quick integration shortcuts — visible on mobile + desktop */}
+        {enabledModules?.has('sentry') && (
+          <Link href='/dashboard/integrations/sentry' title={t('nav.sentry')} style={{
+            width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: pathname.startsWith('/dashboard/integrations/sentry') ? 'var(--nav-active-bg)' : 'transparent',
+            border: pathname.startsWith('/dashboard/integrations/sentry') ? '1px solid var(--nav-active-border)' : '1px solid transparent',
+            color: pathname.startsWith('/dashboard/integrations/sentry') ? 'var(--nav-active)' : 'var(--muted)',
+            textDecoration: 'none', fontSize: 16, cursor: 'pointer', transition: 'all 0.2s',
+          }}>
+            🚨
+          </Link>
+        )}
+        {enabledModules?.has('newrelic') && (
+          <Link href='/dashboard/integrations/newrelic' title={t('nav.newrelic')} style={{
+            width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: pathname.startsWith('/dashboard/integrations/newrelic') ? 'var(--nav-active-bg)' : 'transparent',
+            border: pathname.startsWith('/dashboard/integrations/newrelic') ? '1px solid var(--nav-active-border)' : '1px solid transparent',
+            color: pathname.startsWith('/dashboard/integrations/newrelic') ? 'var(--nav-active)' : 'var(--muted)',
+            textDecoration: 'none', fontSize: 16, cursor: 'pointer', transition: 'all 0.2s',
+          }}>
+            📡
+          </Link>
+        )}
+
         {/* Usage link */}
         <Link href='/dashboard/usage' title={navTooltip('nav.usage')} data-tour={tourAttr('nav.usage')} style={{
           width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',

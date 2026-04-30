@@ -1,5 +1,13 @@
 [
   {
+    "hash": "bddc9c9",
+    "short": "bddc9c9",
+    "message": "Sentry: floating bottom toast with live spinner so import feedback is impossible to miss",
+    "date": "2026-04-30",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "5aca0f0",
     "short": "5aca0f0",
     "message": "Sentry: drop int-row class on new flex rows so globals.css mobile rule stops nuking layout",
