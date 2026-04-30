@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { loadPrefs, savePrefs, getAgentAnalytics, loadPromptCatalog, type PromptCatalog } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
 
@@ -597,8 +598,9 @@ function AgentModal({ agent: initial, isNew, onClose, onSave, onDelete, t, promp
   const models = a.provider === 'openai' ? OPENAI_MODELS : a.provider === 'gemini' ? GEMINI_MODELS : [];
   const color = a.color || '#38bdf8';
 
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
+  if (typeof document === 'undefined') return null;
+  return createPortal(
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={onClose}>
       <div style={{ width: 'min(560px, 100%)', maxHeight: '85vh', overflowY: 'auto', borderRadius: 24, border: `1px solid ${color}30`, background: 'var(--surface)', padding: 0, boxShadow: `0 32px 100px rgba(0,0,0,0.5), 0 0 0 1px ${color}10` }} onClick={(e) => e.stopPropagation()}>
 
         {/* Header */}
@@ -762,7 +764,8 @@ function AgentModal({ agent: initial, isNew, onClose, onSave, onDelete, t, promp
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

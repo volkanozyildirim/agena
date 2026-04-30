@@ -1,5 +1,13 @@
 [
   {
+    "hash": "a38c920",
+    "short": "a38c920",
+    "message": "Agents: add Security Developer role end-to-end (DB prompt + UI + i18n)",
+    "date": "2026-04-30",
+    "author": "root",
+    "type": "feat"
+  },
+  {
     "hash": "5aebe08",
     "short": "5aebe08",
     "message": "Integration Rules: wire agent_role end-to-end + replace text input with dropdown",
