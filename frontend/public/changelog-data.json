@@ -1,5 +1,13 @@
 [
   {
+    "hash": "899c071",
+    "short": "899c071",
+    "message": "Tasks: optimistic Sentry resolve toggle — no full-page reload",
+    "date": "2026-04-30",
+    "author": "root",
+    "type": "fix"
+  },
+  {
     "hash": "1d1259b",
     "short": "1d1259b",
     "message": "NewRelic + Datadog + AppDynamics: full Sentry-style premium UX + share login fallback",

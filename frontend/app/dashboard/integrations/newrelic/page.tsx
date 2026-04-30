@@ -350,7 +350,8 @@ export default function NewRelicPage() {
         position: 'relative', overflow: 'hidden',
         borderRadius: 16,
         border: '1px solid var(--panel-border)',
-        background: 'linear-gradient(135deg, rgba(28,231,131,0.18), rgba(0,180,200,0.10) 60%, rgba(56,189,248,0.08))',
+        background: 'var(--panel)',
+        backgroundImage: 'linear-gradient(135deg, rgba(28,231,131,0.28), rgba(0,180,200,0.16) 60%, rgba(56,189,248,0.12))',
         padding: '20px 22px',
       }}>
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #1CE783, #00b4c8, #38bdf8)' }} />
