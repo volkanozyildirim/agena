@@ -1,5 +1,13 @@
 [
   {
+    "hash": "5aca0f0",
+    "short": "5aca0f0",
+    "message": "Sentry: drop int-row class on new flex rows so globals.css mobile rule stops nuking layout",
+    "date": "2026-04-30",
+    "author": "root",
+    "type": "feat"
+  },
+  {
     "hash": "2172cea",
     "short": "2172cea",
     "message": "Sentry: inline import feedback so the run-now button doesn't feel silent",

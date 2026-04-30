@@ -3129,5 +3129,6 @@
   "integrations.sentry.allAlreadyImported": "{n} 个已导入",
   "integrations.sentry.importedSomeSkipped": "+{i} 导入, {s} 跳过",
   "integrations.sentry.importedN": "+{n} 导入",
-  "integrations.sentry.noNewIssues": "没有新问题"
+  "integrations.sentry.noNewIssues": "没有新问题",
+  "integrations.sentry.toastImporting": "正在从 {p} 导入…"
 }

@@ -3129,5 +3129,6 @@
   "integrations.sentry.allAlreadyImported": "Tutti i {n} già importati",
   "integrations.sentry.importedSomeSkipped": "+{i} importati, {s} saltati",
   "integrations.sentry.importedN": "+{n} importati",
-  "integrations.sentry.noNewIssues": "Nessun nuovo errore"
+  "integrations.sentry.noNewIssues": "Nessun nuovo errore",
+  "integrations.sentry.toastImporting": "Importazione da {p}…"
 }

@@ -3129,5 +3129,6 @@
   "integrations.sentry.allAlreadyImported": "{n} 件すでに取込済み",
   "integrations.sentry.importedSomeSkipped": "+{i} 取込, {s} スキップ",
   "integrations.sentry.importedN": "+{n} 取込",
-  "integrations.sentry.noNewIssues": "新しい問題なし"
+  "integrations.sentry.noNewIssues": "新しい問題なし",
+  "integrations.sentry.toastImporting": "{p} から取込中…"
 }

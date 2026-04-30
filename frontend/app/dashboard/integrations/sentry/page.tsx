@@ -589,8 +589,46 @@ export default function SentryPage() {
         )}
       </div>
 
-      {msg && <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(34,197,94,0.1)', color: '#22c55e', fontSize: 12, fontWeight: 600 }}>{msg}</div>}
-      {error && <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(248,113,113,0.1)', color: '#f87171', fontSize: 12, fontWeight: 600 }}>{error}</div>}
+      {/* Floating toast: visible regardless of scroll position so mobile users can see the import outcome. */}
+      {(runningSlug || msg || error) && typeof document !== 'undefined' && createPortal(
+        <div style={{
+          position: 'fixed', left: '50%', bottom: 28, transform: 'translateX(-50%)',
+          zIndex: 9999, maxWidth: 'min(94vw, 460px)',
+          padding: '12px 18px', borderRadius: 12,
+          display: 'flex', alignItems: 'center', gap: 10,
+          fontSize: 13, fontWeight: 700,
+          color: error ? '#fecaca' : runningSlug ? '#fde68a' : '#bbf7d0',
+          background: error ? 'rgba(127,29,29,0.95)' : runningSlug ? 'rgba(120,53,15,0.95)' : 'rgba(20,83,45,0.95)',
+          border: `1px solid ${error ? 'rgba(248,113,113,0.4)' : runningSlug ? 'rgba(251,191,36,0.4)' : 'rgba(34,197,94,0.4)'}`,
+          boxShadow: '0 12px 32px rgba(0,0,0,0.45)',
+          backdropFilter: 'blur(8px)',
+        }}>
+          {runningSlug ? (
+            <>
+              <span style={{
+                display: 'inline-block', width: 14, height: 14,
+                border: '2px solid rgba(251,191,36,0.4)', borderTopColor: '#fbbf24',
+                borderRadius: '50%', animation: 'sentry-spin 0.7s linear infinite',
+              }} />
+              <span>{(t('integrations.sentry.toastImporting') || 'Importing from {p}…').replace('{p}', runningSlug === '__all__' ? 'all projects' : runningSlug)}</span>
+            </>
+          ) : error ? (
+            <>
+              <span>✗</span>
+              <span style={{ flex: 1 }}>{error}</span>
+              <button onClick={() => setError('')} style={{ background: 'transparent', border: 'none', color: '#fca5a5', cursor: 'pointer', fontSize: 16, padding: 0 }}>×</button>
+            </>
+          ) : (
+            <>
+              <span>✓</span>
+              <span style={{ flex: 1 }}>{msg}</span>
+              <button onClick={() => setMsg('')} style={{ background: 'transparent', border: 'none', color: '#86efac', cursor: 'pointer', fontSize: 16, padding: 0 }}>×</button>
+            </>
+          )}
+          <style>{`@keyframes sentry-spin { to { transform: rotate(360deg); } }`}</style>
+        </div>,
+        document.body
+      )}
 
       <div style={cardStyle}>
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', marginBottom: 8 }}>

@@ -3129,5 +3129,6 @@
   "integrations.sentry.allAlreadyImported": "{n} zaten alınmış",
   "integrations.sentry.importedSomeSkipped": "+{i} alındı, {s} atlandı",
   "integrations.sentry.importedN": "+{n} alındı",
-  "integrations.sentry.noNewIssues": "Yeni hata yok"
+  "integrations.sentry.noNewIssues": "Yeni hata yok",
+  "integrations.sentry.toastImporting": "{p} içe aktarılıyor…"
 }
