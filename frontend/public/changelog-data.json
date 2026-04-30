@@ -1,5 +1,13 @@
 [
   {
+    "hash": "ae9458f",
+    "short": "ae9458f",
+    "message": "Agents: review history surface inside the agent edit modal too",
+    "date": "2026-04-30",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "e5ea640",
     "short": "e5ea640",
     "message": "Reviews: route reviewer dynamically from task metadata, drop hardcoded tag heuristic",
