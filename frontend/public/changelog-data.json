@@ -1,5 +1,13 @@
 [
   {
+    "hash": "0d8c5d8",
+    "short": "0d8c5d8",
+    "message": "Reviews page: pro-grade filters, sort, severity bar, time-grouped list, mobile",
+    "date": "2026-04-30",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "ae9458f",
     "short": "ae9458f",
     "message": "Agents: review history surface inside the agent edit modal too",

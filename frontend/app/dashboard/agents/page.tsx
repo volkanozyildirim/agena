@@ -21,6 +21,10 @@ interface AgentConfig {
   enabled: boolean;
   palette?: number;
   create_pr?: boolean;
+  // When true, this agent shows up in code-review dropdowns (🔎 Review on
+  // tasks, Reviews tab, IntegrationRule action picker). Defaults to true for
+  // built-in reviewer-class roles, false for general developers.
+  is_reviewer?: boolean;
 }
 
 const BUILTIN_ROLE_KEYS = {
@@ -200,6 +204,7 @@ function defaultAgents(t: ReturnType<typeof useLocale>['t']): AgentConfig[] {
       system_prompt: t('agents.role.qa.prompt'),
       enabled: true,
       palette: 4,
+      is_reviewer: true,
     },
     {
       role: 'security_developer',
@@ -213,6 +218,7 @@ function defaultAgents(t: ReturnType<typeof useLocale>['t']): AgentConfig[] {
       system_prompt: t('agents.role.securityDeveloper.prompt'),
       enabled: true,
       palette: 5,
+      is_reviewer: true,
     },
     {
       role: 'sentry_developer',
@@ -806,6 +812,26 @@ function AgentModal({ agent: initial, isNew, onClose, onSave, onDelete, t, promp
                 <div style={{ position: 'absolute', top: 3, left: a.enabled ? 21 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
               </div>
               <div style={{ fontSize: 12, color: 'var(--ink-50)' }}>{t('agents.toggleEnabled')}</div>
+            </div>
+          </div>
+
+          {/* Reviewer toggle — when on, this agent appears in 🔎 Review dropdowns */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '10px 12px', borderRadius: 10,
+            background: a.is_reviewer ? 'rgba(168,85,247,0.10)' : 'var(--panel)',
+            border: `1px solid ${a.is_reviewer ? 'rgba(168,85,247,0.35)' : 'var(--panel-border)'}`,
+          }}>
+            <span style={{ fontSize: 18 }}>🔎</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{t('agents.toggleReviewer') || 'Use as code reviewer'}</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-50)', marginTop: 2, lineHeight: 1.5 }}>
+                {t('agents.toggleReviewerDesc') || 'When on, this agent shows up in the 🔎 Review dropdowns on tasks and on the Reviews tab. Reviews never modify code or open PRs.'}
+              </div>
+            </div>
+            <div onClick={() => setA((v) => ({ ...v, is_reviewer: !v.is_reviewer }))}
+              style={{ width: 40, height: 22, borderRadius: 999, background: a.is_reviewer ? '#a855f7' : 'var(--panel-border-3)', position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 }}>
+              <div style={{ position: 'absolute', top: 3, left: a.is_reviewer ? 21 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
             </div>
           </div>
 

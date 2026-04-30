@@ -3215,5 +3215,7 @@
   "reviews.noFilterHint": "Limpia filtros o cambia la combinación.",
   "reviews.rerun": "Ejecutar de nuevo",
   "reviews.inputSnapshot": "Snapshot de entrada",
-  "reviews.output": "Salida del revisor"
+  "reviews.output": "Salida del revisor",
+  "agents.toggleReviewer": "Usar como revisor de código",
+  "agents.toggleReviewerDesc": "Cuando está activo, este agente aparece en los desplegables 🔎 Review de las tareas y en la pestaña Reviews. Las revisiones nunca modifican código ni abren PRs."
 }

@@ -3215,5 +3215,7 @@
   "reviews.noFilterHint": "フィルタをクリアするか別の組み合わせを試してください。",
   "reviews.rerun": "再実行",
   "reviews.inputSnapshot": "入力スナップショット",
-  "reviews.output": "レビュアー出力"
+  "reviews.output": "レビュアー出力",
+  "agents.toggleReviewer": "コードレビュアーとして使う",
+  "agents.toggleReviewerDesc": "オンの場合、このエージェントはタスクの 🔎 Review ドロップダウンと Reviews タブに表示されます。レビューはコードを変更せず PR も作成しません。"
 }

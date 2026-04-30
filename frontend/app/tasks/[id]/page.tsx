@@ -287,6 +287,12 @@ export default function TaskDetailPage() {
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewRunning, setReviewRunning] = useState(false);
   const [reviewerRole, setReviewerRole] = useState('reviewer');
+  const [reviewerOptions, setReviewerOptions] = useState<{ role: string; label: string }[]>([
+    { role: 'reviewer', label: 'reviewer' },
+    { role: 'security_developer', label: 'security_developer' },
+    { role: 'qa', label: 'qa' },
+    { role: 'lead_developer', label: 'lead_developer' },
+  ]);
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [attachments, setAttachments] = useState<Array<{ id: number; filename: string; content_type: string; size_bytes: number; created_at: string }>>([]);
   const [attachmentPreviews, setAttachmentPreviews] = useState<Record<number, string>>({});
@@ -459,6 +465,20 @@ export default function TaskDetailPage() {
       .then(setReviews)
       .catch(() => setReviews([]))
       .finally(() => setReviewLoading(false));
+    // Pull the user's reviewer agents so the dropdown is dynamic — only
+    // shows agents the user has marked is_reviewer=true (or the built-in
+    // fallback set when no user agents exist).
+    import('@/lib/api').then(({ loadPrefs }) =>
+      loadPrefs()
+        .then((prefs) => {
+          const agents = (prefs.agents || []) as Array<{ role?: string; label?: string; is_reviewer?: boolean; enabled?: boolean }>;
+          const opts = agents
+            .filter((a) => a.role && a.is_reviewer && a.enabled !== false)
+            .map((a) => ({ role: String(a.role), label: String(a.label || a.role) }));
+          if (opts.length > 0) setReviewerOptions(opts);
+        })
+        .catch(() => { /* keep fallback */ })
+    );
   }, [rightTab, taskId]);
 
   useEffect(() => {
@@ -1623,10 +1643,9 @@ export default function TaskDetailPage() {
               <div style={{ display: 'flex', gap: 6 }}>
                 <select value={reviewerRole} onChange={(e) => setReviewerRole(e.target.value)}
                   style={{ padding: '6px 10px', borderRadius: 6, fontSize: 11, border: '1px solid var(--panel-border)', background: 'var(--panel-alt)', color: 'var(--ink)' }}>
-                  <option value='reviewer'>reviewer</option>
-                  <option value='security_developer'>security_developer</option>
-                  <option value='qa'>qa</option>
-                  <option value='lead_developer'>lead_developer</option>
+                  {reviewerOptions.map((o) => (
+                    <option key={o.role} value={o.role}>{o.label} ({o.role})</option>
+                  ))}
                 </select>
                 <button onClick={async () => {
                   setReviewRunning(true);

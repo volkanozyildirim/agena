@@ -28,14 +28,64 @@ _ROLE_TO_SLUG = {
 }
 
 
+_KNOWN_SLUGS = {
+    'reviewer_system_prompt', 'security_dev_system_prompt',
+    'pm_system_prompt', 'dev_system_prompt', 'ai_code_system_prompt',
+    'finalize_system_prompt', 'fetch_context_system_prompt',
+    'sentry_fix_prompt', 'newrelic_fix_prompt',
+}
+
+
 async def _resolve_reviewer_prompt(db: AsyncSession, role: str, user_id: int) -> str:
-    """Pick the right prompt slug for the reviewer role and load it from DB
-    (with the user's prompt-override applied if any)."""
-    slug = _ROLE_TO_SLUG.get(role.strip().lower(), 'reviewer_system_prompt')
+    """Pick the right prompt for the reviewer role.
+
+    Resolution order:
+      1. User-defined agent in their saved prefs with matching role → use
+         that agent's `system_prompt`. If the value is a known slug, fetch
+         it from the prompts DB; otherwise treat it as inline custom text
+         and return it directly. This is what makes user-created reviewer
+         agents work without a code change.
+      2. Built-in role → slug map (_ROLE_TO_SLUG).
+      3. Fallback: the generic reviewer_system_prompt.
+    """
+    role_norm = (role or '').strip().lower()
+
+    # 1) Look up the user's agent for this role.
+    from sqlalchemy import select
+    from agena_models.models.user_preference import UserPreference
+    pref = (await db.execute(
+        select(UserPreference).where(UserPreference.user_id == user_id)
+    )).scalar_one_or_none()
+    if pref and pref.agents_json:
+        try:
+            agents = json.loads(pref.agents_json)
+        except (ValueError, TypeError):
+            agents = []
+        if isinstance(agents, list):
+            for a in agents:
+                if not isinstance(a, dict):
+                    continue
+                if str(a.get('role') or '').strip().lower() != role_norm:
+                    continue
+                sp = str(a.get('system_prompt') or '').strip()
+                if not sp:
+                    break
+                # If the saved value matches a known slug, load via PromptService
+                # (so a user editing the prompt in Prompt Studio is reflected).
+                if sp.lower() in _KNOWN_SLUGS or sp in _KNOWN_SLUGS:
+                    try:
+                        return await PromptService.get(db, sp.lower())
+                    except ValueError:
+                        pass
+                # Otherwise treat as inline custom prompt text.
+                return sp
+
+    # 2) Built-in mapping.
+    slug = _ROLE_TO_SLUG.get(role_norm, 'reviewer_system_prompt')
     try:
         return await PromptService.get(db, slug)
     except ValueError:
-        # Fallback: generic reviewer
+        # 3) Final fallback.
         return await PromptService.get(db, 'reviewer_system_prompt')
 
 

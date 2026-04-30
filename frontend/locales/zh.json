@@ -3215,5 +3215,7 @@
   "reviews.noFilterHint": "清除筛选或换一个组合。",
   "reviews.rerun": "重新运行",
   "reviews.inputSnapshot": "输入快照",
-  "reviews.output": "审查员输出"
+  "reviews.output": "审查员输出",
+  "agents.toggleReviewer": "作为代码审查员",
+  "agents.toggleReviewerDesc": "开启后,此 agent 出现在任务的 🔎 Review 下拉框和 Reviews 标签页中。审查不会修改代码或打开 PR。"
 }

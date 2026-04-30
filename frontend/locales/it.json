@@ -3215,5 +3215,7 @@
   "reviews.noFilterHint": "Pulisci filtri o cambia combo.",
   "reviews.rerun": "Riesegui",
   "reviews.inputSnapshot": "Snapshot input",
-  "reviews.output": "Output reviewer"
+  "reviews.output": "Output reviewer",
+  "agents.toggleReviewer": "Usa come reviewer di codice",
+  "agents.toggleReviewerDesc": "Quando attivo, questo agent appare nei dropdown 🔎 Review nei task e nella tab Reviews. Le review non modificano mai il codice né aprono PR."
 }
