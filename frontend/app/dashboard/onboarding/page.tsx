@@ -128,6 +128,27 @@ function StepIntegration({ onNext, onSkip }: { onNext: (provider: 'azure' | 'jir
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Pre-fill Azure / Jira fields from already-saved integration configs so
+  // onboarding doesn't ask the user to re-enter values they've already given.
+  useEffect(() => {
+    apiFetch<Array<{ provider: string; base_url?: string; project?: string | null; username?: string | null; has_secret?: boolean }>>('/integrations')
+      .then((items) => {
+        const azure = items.find((c) => c.provider === 'azure');
+        if (azure) {
+          if (azure.base_url) setAzureOrg(azure.base_url);
+          if (azure.project) setAzureProject(azure.project);
+          if (azure.has_secret) setProvider('azure');
+        }
+        const jira = items.find((c) => c.provider === 'jira');
+        if (jira) {
+          if (jira.base_url) setJiraUrl(jira.base_url);
+          if (jira.username) setJiraEmail(jira.username);
+          if (jira.has_secret && !azure?.has_secret) setProvider('jira');
+        }
+      })
+      .catch(() => { /* silent — onboarding still works empty */ });
+  }, []);
+
   async function handleSave() {
     setSaving(true);
     setError('');

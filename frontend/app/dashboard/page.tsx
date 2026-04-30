@@ -141,7 +141,7 @@ export default function DashboardOverview() {
         { key: 'integration', titleKey: 'command.integration', done: integrations.some((c) => c.provider !== 'playbook' && c.has_secret === true), href: '/dashboard/integrations' },
         { key: 'aiProvider', titleKey: 'command.aiProvider', done: hasSecret(['openai', 'gemini']), href: '/dashboard/integrations' },
         { key: 'sprint', titleKey: 'command.sprint', done: !!(prefs.azure_sprint_path?.trim() || jiraSprint), href: '/dashboard/sprints' },
-        { key: 'repo', titleKey: 'command.repo', done: !!defaultRepo, href: '/dashboard/onboarding' },
+        { key: 'repo', titleKey: 'command.repo', done: !!defaultRepo, href: '/dashboard/mappings' },
         { key: 'agent', titleKey: 'command.agent', done: hasConfiguredAgent(prefs.agents), href: '/dashboard/agents' },
         { key: 'team', titleKey: 'command.team', done: (prefs.my_team?.length ?? 0) > 0, href: '/dashboard/team' },
         { key: 'repoMapping', titleKey: 'command.repoMapping', done: (prefs.repo_mappings?.length ?? 0) > 0, href: '/dashboard/mappings' },

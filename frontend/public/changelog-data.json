@@ -1,5 +1,13 @@
 [
   {
+    "hash": "7fadcdc",
+    "short": "7fadcdc",
+    "message": "Sidebar: remove Webhooks nav entry",
+    "date": "2026-04-30",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "5787895",
     "short": "5787895",
     "message": "NewRelic: bump hero gradient opacity + solid panel fallback so the card is readable",
