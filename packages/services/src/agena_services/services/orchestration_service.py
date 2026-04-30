@@ -302,27 +302,42 @@ class OrchestrationService:
                         f'Codex CLI failed before code generation: {str(codex_exc)[:280]}',
                     )
                     raise
-                prompt_estimate = self._estimate_tokens(
-                    '\n'.join(
-                        [
-                            f'Task title: {task.title}',
-                            f'Task description: {task.description or ""}',
-                            f'External Source: {routing.external_source or ""}',
-                            f'Local Repo Path: {routing.local_repo_path or ""}',
-                        ]
+                # Prefer the bridge-reported usage over the char-length
+                # heuristic — Codex agentic loops re-inject every tool
+                # result into the prompt, so len(title+desc)/4 is off by
+                # several orders of magnitude.
+                cli_usage = getattr(self.codex_cli_service, 'last_usage', None)
+                if cli_usage and int(cli_usage.get('total_tokens', 0)) > 0:
+                    usage_payload = {
+                        'prompt_tokens': int(cli_usage.get('prompt_tokens', 0)),
+                        'completion_tokens': int(cli_usage.get('completion_tokens', 0)),
+                        'total_tokens': int(cli_usage.get('total_tokens', 0)),
+                        'cached_input_tokens': int(cli_usage.get('cached_input_tokens', 0) or 0),
+                    }
+                else:
+                    prompt_estimate = self._estimate_tokens(
+                        '\n'.join(
+                            [
+                                f'Task title: {task.title}',
+                                f'Task description: {task.description or ""}',
+                                f'External Source: {routing.external_source or ""}',
+                                f'Local Repo Path: {routing.local_repo_path or ""}',
+                            ]
+                        )
                     )
-                )
-                completion_estimate = self._estimate_tokens(final_code)
+                    completion_estimate = self._estimate_tokens(final_code)
+                    usage_payload = {
+                        'prompt_tokens': prompt_estimate,
+                        'completion_tokens': completion_estimate,
+                        'total_tokens': prompt_estimate + completion_estimate,
+                        'cached_input_tokens': 0,
+                    }
                 state = {
                     'spec': {'goal': 'codex_cli execution', 'requirements': [], 'acceptance_criteria': []},
                     'generated_code': final_code,
                     'reviewed_code': final_code,
                     'final_code': final_code,
-                    'usage': {
-                        'prompt_tokens': prompt_estimate,
-                        'completion_tokens': completion_estimate,
-                        'total_tokens': prompt_estimate + completion_estimate,
-                    },
+                    'usage': usage_payload,
                     'model_usage': [f"codex-cli:{routing.preferred_agent_model or 'default'}"],
                 }
                 await task_service.add_log(task.id, organization_id, 'agent', 'Using codex_cli preferred agent')
@@ -367,20 +382,39 @@ class OrchestrationService:
                         f'Claude CLI failed: {str(claude_exc)[:280]}',
                     )
                     raise
-                prompt_estimate = self._estimate_tokens(f'{task.title}\n{task.description or ""}')
-                completion_estimate = self._estimate_tokens(final_code)
+                # Prefer the bridge-reported usage over the char-length
+                # heuristic — Claude Code's agentic loop re-injects every
+                # tool result into the prompt, so len(title+desc)/4 is
+                # off by several orders of magnitude.
+                cli_usage = getattr(self.claude_cli_service, 'last_usage', None)
+                cli_cost = getattr(self.claude_cli_service, 'last_cost_usd', None)
+                if cli_usage and int(cli_usage.get('total_tokens', 0)) > 0:
+                    usage_payload = {
+                        'prompt_tokens': int(cli_usage.get('prompt_tokens', 0)),
+                        'completion_tokens': int(cli_usage.get('completion_tokens', 0)),
+                        'total_tokens': int(cli_usage.get('total_tokens', 0)),
+                        'cached_input_tokens': int(cli_usage.get('cached_input_tokens', 0) or 0),
+                        'cache_creation_input_tokens': int(cli_usage.get('cache_creation_input_tokens', 0) or 0),
+                    }
+                else:
+                    prompt_estimate = self._estimate_tokens(f'{task.title}\n{task.description or ""}')
+                    completion_estimate = self._estimate_tokens(final_code)
+                    usage_payload = {
+                        'prompt_tokens': prompt_estimate,
+                        'completion_tokens': completion_estimate,
+                        'total_tokens': prompt_estimate + completion_estimate,
+                        'cached_input_tokens': 0,
+                    }
                 state = {
                     'spec': {'goal': 'claude_cli execution'},
                     'generated_code': final_code,
                     'reviewed_code': final_code,
                     'final_code': final_code,
-                    'usage': {
-                        'prompt_tokens': prompt_estimate,
-                        'completion_tokens': completion_estimate,
-                        'total_tokens': prompt_estimate + completion_estimate,
-                    },
+                    'usage': usage_payload,
                     'model_usage': [f"claude-cli:{routing.preferred_agent_model or 'default'}"],
                 }
+                if cli_cost is not None:
+                    state['provider_cost_usd'] = float(cli_cost)
                 await task_service.add_log(task.id, organization_id, 'agent', 'Using claude_cli preferred agent')
             elif mode == 'mcp_agent':
                 _is_local = bool(routing.local_repo_path)
@@ -585,17 +619,18 @@ class OrchestrationService:
                 flow_state: dict[str, Any] = {
                     'task': payload_with_context,
                     'mode': mode,
-                    'usage': {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0},
+                    'usage': {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0, 'cached_input_tokens': 0},
                     'model_usage': [],
                 }
                 def _get_usage(fs: dict) -> dict:
-                    return dict(fs.get('usage', {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0}))
+                    return dict(fs.get('usage', {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0, 'cached_input_tokens': 0}))
 
                 def _usage_delta(before: dict, after: dict) -> dict:
                     return {
                         'prompt_tokens': after.get('prompt_tokens', 0) - before.get('prompt_tokens', 0),
                         'completion_tokens': after.get('completion_tokens', 0) - before.get('completion_tokens', 0),
                         'total_tokens': after.get('total_tokens', 0) - before.get('total_tokens', 0),
+                        'cached_input_tokens': after.get('cached_input_tokens', 0) - before.get('cached_input_tokens', 0),
                     }
 
                 async def _step_event(step_name: str, delta: dict, step_model: str, step_start: datetime, step_dur: float):
@@ -603,6 +638,7 @@ class OrchestrationService:
                         prompt_tokens=int(delta.get('prompt_tokens', 0)),
                         completion_tokens=int(delta.get('completion_tokens', 0)),
                         model=step_model or routing.preferred_agent_model or 'gpt-4o-mini',
+                        cached_input_tokens=int(delta.get('cached_input_tokens', 0) or 0),
                     )
                     await usage_event_service.create_event(
                         organization_id=organization_id,
@@ -620,6 +656,9 @@ class OrchestrationService:
                         ended_at=datetime.utcnow(),
                         duration_ms=int(step_dur * 1000),
                         local_repo_path=routing.local_repo_path,
+                        details_json={
+                            'cached_input_tokens': int(delta.get('cached_input_tokens', 0) or 0),
+                        },
                     )
 
                 # Step 1: Fetch context
@@ -1032,11 +1071,18 @@ class OrchestrationService:
                 )
             usage = state.get('usage', {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0})
             model_for_cost = (state.get('model_usage') or ['gpt-4o-mini'])[-1]
-            estimated_cost = self.cost_tracker.estimate_cost_usd(
-                prompt_tokens=int(usage.get('prompt_tokens', 0)),
-                completion_tokens=int(usage.get('completion_tokens', 0)),
-                model=model_for_cost,
-            )
+            provider_cost = state.get('provider_cost_usd')
+            if isinstance(provider_cost, (int, float)) and provider_cost >= 0:
+                # Claude Code reports a real billed cost in its result
+                # event; trust that over the local rate-card estimate.
+                estimated_cost = float(provider_cost)
+            else:
+                estimated_cost = self.cost_tracker.estimate_cost_usd(
+                    prompt_tokens=int(usage.get('prompt_tokens', 0)),
+                    completion_tokens=int(usage.get('completion_tokens', 0)),
+                    model=model_for_cost,
+                    cached_input_tokens=int(usage.get('cached_input_tokens', 0) or 0),
+                )
             guardrail_error = self._validate_cost_guardrails(
                 max_tokens=task.max_tokens,
                 max_cost_usd=task.max_cost_usd,
@@ -1497,6 +1543,13 @@ class OrchestrationService:
                     'generated_code_len': len(state.get('generated_code', '')),
                     'final_code_len': len(state.get('final_code', '')),
                     'files_count': len(self._parse_reviewed_output_to_files(state.get('final_code', ''))),
+                    'cached_input_tokens': int(usage.get('cached_input_tokens', 0) or 0),
+                    'cache_creation_input_tokens': int(usage.get('cache_creation_input_tokens', 0) or 0),
+                    'provider_cost_usd': (
+                        float(state['provider_cost_usd'])
+                        if isinstance(state.get('provider_cost_usd'), (int, float))
+                        else None
+                    ),
                 },
             )
             await task_service.add_log(
@@ -1564,11 +1617,16 @@ class OrchestrationService:
             run_finished_at = datetime.utcnow()
             duration_sec = round(time.perf_counter() - run_started_clock, 2)
             provider_name, model_name = self._extract_provider_model(state)
-            estimated_cost = self.cost_tracker.estimate_cost_usd(
-                prompt_tokens=int(usage.get('prompt_tokens', 0)),
-                completion_tokens=int(usage.get('completion_tokens', 0)),
-                model=model_name or provider_name or 'gpt-4o-mini',
-            )
+            provider_cost = state.get('provider_cost_usd')
+            if isinstance(provider_cost, (int, float)) and provider_cost >= 0:
+                estimated_cost = float(provider_cost)
+            else:
+                estimated_cost = self.cost_tracker.estimate_cost_usd(
+                    prompt_tokens=int(usage.get('prompt_tokens', 0)),
+                    completion_tokens=int(usage.get('completion_tokens', 0)),
+                    model=model_name or provider_name or 'gpt-4o-mini',
+                    cached_input_tokens=int(usage.get('cached_input_tokens', 0) or 0),
+                )
             await usage_event_service.create_event(
                 organization_id=organization_id,
                 user_id=task.created_by_user_id,

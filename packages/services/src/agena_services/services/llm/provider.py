@@ -126,11 +126,17 @@ class LLMProvider:
     def _parse_usage(self, response: Any) -> dict[str, int]:
         usage = getattr(response, 'usage', None)
         if not usage:
-            return {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0}
+            return {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0, 'cached_input_tokens': 0}
+        # OpenAI Responses API exposes cache hits under input_tokens_details.
+        cached = 0
+        details = getattr(usage, 'input_tokens_details', None)
+        if details is not None:
+            cached = int(getattr(details, 'cached_tokens', 0) or 0)
         return {
             'prompt_tokens': int(getattr(usage, 'input_tokens', 0) or 0),
             'completion_tokens': int(getattr(usage, 'output_tokens', 0) or 0),
             'total_tokens': int(getattr(usage, 'total_tokens', 0) or 0),
+            'cached_input_tokens': cached,
         }
 
     def _mock_output(self, system_prompt: str, user_prompt: str) -> str:
@@ -206,10 +212,16 @@ class LLMProvider:
             msg = chat.choices[0].message
             text = (msg.content or '').strip()
         usage_obj = getattr(chat, 'usage', None)
+        cached = 0
+        if usage_obj is not None:
+            details = getattr(usage_obj, 'prompt_tokens_details', None)
+            if details is not None:
+                cached = int(getattr(details, 'cached_tokens', 0) or 0)
         usage = {
             'prompt_tokens': int(getattr(usage_obj, 'prompt_tokens', 0) or 0),
             'completion_tokens': int(getattr(usage_obj, 'completion_tokens', 0) or 0),
             'total_tokens': int(getattr(usage_obj, 'total_tokens', 0) or 0),
+            'cached_input_tokens': cached,
         }
         return text, usage
 
@@ -246,5 +258,6 @@ class LLMProvider:
             'prompt_tokens': int(usage_meta.get('promptTokenCount', 0) or 0),
             'completion_tokens': int(usage_meta.get('candidatesTokenCount', 0) or 0),
             'total_tokens': int(usage_meta.get('totalTokenCount', 0) or 0),
+            'cached_input_tokens': int(usage_meta.get('cachedContentTokenCount', 0) or 0),
         }
         return output, usage
