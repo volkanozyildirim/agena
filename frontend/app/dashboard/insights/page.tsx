@@ -53,10 +53,13 @@ export default function InsightsPage() {
   const [items, setItems] = useState<Correlation[] | null>(null);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Default: hide cluster the user already triaged. They can flip to "all"
+  // to see the full audit log of correlations the engine has found.
+  const [showAcked, setShowAcked] = useState(false);
 
   async function load() {
     try {
-      const rows = await apiFetch<Correlation[]>('/insights/correlations?min_confidence=70&limit=50');
+      const rows = await apiFetch<Correlation[]>('/insights/correlations?min_confidence=70&limit=200');
       setItems(rows);
       setError(null);
     } catch (e) {
@@ -65,6 +68,9 @@ export default function InsightsPage() {
   }
 
   useEffect(() => { void load(); }, []);
+
+  const visibleItems = items?.filter((c) => showAcked || !c.acknowledged_at) ?? null;
+  const hiddenAckedCount = items && !showAcked ? items.filter((c) => c.acknowledged_at).length : 0;
 
   async function scanNow() {
     setScanning(true);
@@ -91,29 +97,46 @@ export default function InsightsPage() {
   }
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gap: 24 }}>
-      <header style={{ display: 'flex', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
-        <div style={{ flex: 1, minWidth: 280 }}>
-          <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0, color: 'var(--ink-90)' }}>
+    <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gap: 16 }}>
+      <header style={{ display: 'grid', gap: 12 }}>
+        <div>
+          <h1 style={{ fontSize: 'clamp(20px, 5vw, 28px)', fontWeight: 800, margin: 0, color: 'var(--ink-90)', lineHeight: 1.2 }}>
             {t('insights.title')}
           </h1>
-          <p style={{ fontSize: 14, color: 'var(--ink-58)', marginTop: 6, marginBottom: 0, lineHeight: 1.55 }}>
+          <p style={{ fontSize: 'clamp(12px, 3.4vw, 14px)', color: 'var(--ink-58)', marginTop: 6, marginBottom: 0, lineHeight: 1.5 }}>
             {t('insights.subtitle')}
           </p>
         </div>
-        <button
-          onClick={scanNow}
-          disabled={scanning}
-          style={{
-            padding: '10px 18px', borderRadius: 10,
-            background: scanning ? 'var(--panel)' : 'linear-gradient(135deg, #6366f1, #06b6d4)',
-            color: scanning ? 'var(--ink-58)' : '#fff',
-            border: scanning ? '1px solid var(--panel-border)' : 'none',
-            fontSize: 13, fontWeight: 700, cursor: scanning ? 'wait' : 'pointer',
-          }}
-        >
-          {scanning ? t('insights.scanning') : t('insights.scanNow')}
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            onClick={scanNow}
+            disabled={scanning}
+            style={{
+              padding: '8px 14px', borderRadius: 10,
+              background: scanning ? 'var(--panel)' : 'linear-gradient(135deg, #6366f1, #06b6d4)',
+              color: scanning ? 'var(--ink-58)' : '#fff',
+              border: scanning ? '1px solid var(--panel-border)' : 'none',
+              fontSize: 12, fontWeight: 700, cursor: scanning ? 'wait' : 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {scanning ? t('insights.scanning') : t('insights.scanNow')}
+          </button>
+          <button
+            onClick={() => setShowAcked((v) => !v)}
+            style={{
+              padding: '8px 12px', borderRadius: 10,
+              background: showAcked ? 'rgba(99,102,241,0.12)' : 'var(--panel)',
+              color: showAcked ? '#818cf8' : 'var(--ink-78)',
+              border: `1px solid ${showAcked ? 'rgba(99,102,241,0.3)' : 'var(--panel-border)'}`,
+              fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {showAcked ? t('insights.hideAcked') : t('insights.showAcked')}
+            {hiddenAckedCount > 0 && !showAcked ? ` (${hiddenAckedCount})` : ''}
+          </button>
+        </div>
       </header>
 
       {error && (
@@ -122,19 +145,19 @@ export default function InsightsPage() {
         </div>
       )}
 
-      {items === null ? (
+      {visibleItems === null ? (
         <div style={{ padding: 24, color: 'var(--ink-58)', fontSize: 14 }}>{t('insights.loading')}</div>
-      ) : items.length === 0 ? (
-        <div style={{ padding: 32, borderRadius: 14, background: 'var(--panel)', border: '1px solid var(--panel-border)', textAlign: 'center' }}>
-          <div style={{ fontSize: 36, marginBottom: 8 }}>🔍</div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-90)', marginBottom: 4 }}>{t('insights.empty.title')}</div>
-          <div style={{ fontSize: 13, color: 'var(--ink-58)', maxWidth: 480, margin: '0 auto', lineHeight: 1.55 }}>
+      ) : visibleItems.length === 0 ? (
+        <div style={{ padding: 24, borderRadius: 14, background: 'var(--panel)', border: '1px solid var(--panel-border)', textAlign: 'center' }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink-90)', marginBottom: 4 }}>{t('insights.empty.title')}</div>
+          <div style={{ fontSize: 12, color: 'var(--ink-58)', maxWidth: 460, margin: '0 auto', lineHeight: 1.55 }}>
             {t('insights.empty.body')}
           </div>
         </div>
       ) : (
         <div style={{ display: 'grid', gap: 12 }}>
-          {items.map((c) => {
+          {visibleItems.map((c) => {
             const sev = c.severity || 'medium';
             const color = SEVERITY_COLOR[sev] || '#f59e0b';
             const acked = !!c.acknowledged_at;
@@ -146,9 +169,9 @@ export default function InsightsPage() {
                   background: 'var(--panel)',
                   border: `1px solid ${color}55`,
                   borderLeft: `4px solid ${color}`,
-                  padding: 18,
+                  padding: 'clamp(12px, 3vw, 18px)',
                   display: 'grid',
-                  gap: 12,
+                  gap: 10,
                   opacity: acked && c.user_verdict === 'false_positive' ? 0.55 : 1,
                 }}
               >
@@ -191,19 +214,19 @@ export default function InsightsPage() {
                           <li
                             key={`${evt.kind}-${evt.ref || ''}-${i}`}
                             style={{
-                              display: 'flex', alignItems: 'center', gap: 10,
+                              display: 'flex', alignItems: 'center', gap: 8,
                               padding: '6px 10px', borderRadius: 8,
                               background: 'rgba(99,102,241,0.06)',
                               fontSize: 12,
                             }}
                           >
-                            <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, color: 'var(--ink-58)', flexShrink: 0, minWidth: 56 }}>
+                            <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 11, color: 'var(--ink-58)', flexShrink: 0, minWidth: 44 }}>
                               {new Date(evt.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                             <span style={{ fontSize: 14, flexShrink: 0 }}>
                               {KIND_ICON[evt.kind] || '◉'}
                             </span>
-                            <span style={{ color: 'var(--ink-78)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <span style={{ color: 'var(--ink-78)', flex: 1, minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', lineHeight: 1.35 }}>
                               {evt.label}
                             </span>
                           </li>

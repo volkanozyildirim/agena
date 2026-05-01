@@ -3241,5 +3241,7 @@
   "insights.empty.body": "AGENA sta osservando i cluster. Non appena un merge di PR si correla con un evento Sentry / NewRelic / Jira nella stessa finestra, lo vedrai qui. Il poller viene eseguito ogni 5 minuti — o clicca su Scansiona ora.",
   "insights.timeline": "Timeline",
   "insights.confirm": "✓ Confermato",
-  "insights.falsePositive": "✗ Falso positivo"
+  "insights.falsePositive": "✗ Falso positivo",
+  "insights.showAcked": "Mostra archiviati",
+  "insights.hideAcked": "Nascondi archiviati"
 }

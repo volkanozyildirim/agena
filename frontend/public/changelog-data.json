@@ -1,5 +1,13 @@
 [
   {
+    "hash": "c856c9d",
+    "short": "c856c9d",
+    "message": "Insights: cross-source correlation engine + UI",
+    "date": "2026-05-01",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "f13f0c6",
     "short": "f13f0c6",
     "message": "bump CLI timeout + parse Azure API-format PR URLs + scope hint",

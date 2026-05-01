@@ -3241,5 +3241,7 @@
   "insights.empty.body": "AGENA はクラスターを監視しています。PR マージが同じウィンドウ内の Sentry / NewRelic / Jira イベントと相関すると、ここに表示されます。ポーラーは 5 分ごとに実行されます — または「今すぐスキャン」をクリック。",
   "insights.timeline": "タイムライン",
   "insights.confirm": "✓ 確認済み",
-  "insights.falsePositive": "✗ 誤検知"
+  "insights.falsePositive": "✗ 誤検知",
+  "insights.showAcked": "処理済みを表示",
+  "insights.hideAcked": "処理済みを隠す"
 }

@@ -3241,5 +3241,7 @@
   "insights.empty.body": "AGENA beobachtet Cluster. Sobald ein PR-Merge mit einem Sentry-/NewRelic-/Jira-Ereignis im selben Fenster korreliert, erscheint es hier. Der Poller läuft alle 5 Minuten — oder klicke auf Jetzt scannen.",
   "insights.timeline": "Zeitleiste",
   "insights.confirm": "✓ Bestätigt",
-  "insights.falsePositive": "✗ Fehlalarm"
+  "insights.falsePositive": "✗ Fehlalarm",
+  "insights.showAcked": "Bearbeitete anzeigen",
+  "insights.hideAcked": "Bearbeitete ausblenden"
 }

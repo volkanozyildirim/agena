@@ -3241,5 +3241,7 @@
   "insights.empty.body": "AGENA kümeleri izliyor. Bir PR merge'i, aynı pencerede bir Sentry / NewRelic / Jira olayıyla ilişkilendiği anda burada görünür. Poller 5 dakikada bir çalışır — ya da Şimdi tara'ya tıkla.",
   "insights.timeline": "Zaman çizelgesi",
   "insights.confirm": "✓ Onayla",
-  "insights.falsePositive": "✗ Yanlış pozitif"
+  "insights.falsePositive": "✗ Yanlış pozitif",
+  "insights.showAcked": "Geçmişi göster",
+  "insights.hideAcked": "Geçmişi gizle"
 }

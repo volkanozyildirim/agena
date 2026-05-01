@@ -3241,5 +3241,7 @@
   "insights.empty.body": "AGENA 正在监视聚类。一旦 PR 合并与同一窗口中的 Sentry/NewRelic/Jira 事件相关联，您将在此处看到。轮询器每 5 分钟运行一次 — 或点击立即扫描。",
   "insights.timeline": "时间线",
   "insights.confirm": "✓ 已确认",
-  "insights.falsePositive": "✗ 误报"
+  "insights.falsePositive": "✗ 误报",
+  "insights.showAcked": "显示已处理",
+  "insights.hideAcked": "隐藏已处理"
 }
