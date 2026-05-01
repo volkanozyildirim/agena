@@ -21,6 +21,7 @@ frontend/out/
 *.log
 data/agents_md/
 data/uploads/
+backups/
 
 # OS
 .DS_Store
