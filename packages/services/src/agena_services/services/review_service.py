@@ -196,6 +196,25 @@ async def trigger_review(
     if task is None or task.organization_id != organization_id:
         raise ValueError('Task not found')
 
+    # Refuse to review tasks with no code anchor — without a PR, branch,
+    # or local repo binding the LLM has nothing to review and the result
+    # is generic boilerplate that masquerades as a real verdict. Force the
+    # caller to wire the task to code first (Run → opens PR, or attach a
+    # local repo mapping).
+    desc_lower = (task.description or '').lower()
+    has_code_anchor = bool(
+        (task.pr_url or '').strip()
+        or (task.branch_name or '').strip()
+        or task.repo_mapping_id
+        or 'local repo path:' in desc_lower
+        or 'local repo mapping:' in desc_lower
+    )
+    if not has_code_anchor:
+        raise ValueError(
+            'No code to review on this task. Open a PR via Run, or attach a '
+            'local repo mapping, then re-run the review.'
+        )
+
     role_norm = _resolve_reviewer_role_from_task(task, reviewer_agent_role)
 
     # Snapshot what the reviewer is looking at.
