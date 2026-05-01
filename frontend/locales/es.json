@@ -3243,5 +3243,6 @@
   "insights.confirm": "✓ Confirmado",
   "insights.falsePositive": "✗ Falso positivo",
   "insights.showAcked": "Mostrar triados",
-  "insights.hideAcked": "Ocultar triados"
+  "insights.hideAcked": "Ocultar triados",
+  "insights.undo": "Deshacer"
 }

@@ -3243,5 +3243,6 @@
   "insights.confirm": "✓ Confermato",
   "insights.falsePositive": "✗ Falso positivo",
   "insights.showAcked": "Mostra archiviati",
-  "insights.hideAcked": "Nascondi archiviati"
+  "insights.hideAcked": "Nascondi archiviati",
+  "insights.undo": "Annulla"
 }

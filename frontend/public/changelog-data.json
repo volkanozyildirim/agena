@@ -1,5 +1,13 @@
 [
   {
+    "hash": "5327f63",
+    "short": "5327f63",
+    "message": "Insights: tighter mobile layout + triaged-toggle filter",
+    "date": "2026-05-01",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "c856c9d",
     "short": "c856c9d",
     "message": "Insights: cross-source correlation engine + UI",

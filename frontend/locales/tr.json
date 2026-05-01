@@ -3243,5 +3243,6 @@
   "insights.confirm": "✓ Onayla",
   "insights.falsePositive": "✗ Yanlış pozitif",
   "insights.showAcked": "Geçmişi göster",
-  "insights.hideAcked": "Geçmişi gizle"
+  "insights.hideAcked": "Geçmişi gizle",
+  "insights.undo": "Geri al"
 }

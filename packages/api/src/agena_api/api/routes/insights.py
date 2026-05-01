@@ -100,3 +100,29 @@ async def acknowledge(
     row.user_verdict = body.verdict
     await db.commit()
     return {'ok': True}
+
+
+@router.post('/correlations/{correlation_id}/unack')
+async def clear_acknowledgement(
+    correlation_id: int,
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> dict:
+    """Undo a previous triage decision so the cluster reappears in the
+    default list. Useful when a user clicked the wrong verdict."""
+    row = (
+        await db.execute(
+            select(Correlation).where(
+                Correlation.id == correlation_id,
+                Correlation.organization_id == tenant.organization_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail='correlation not found')
+
+    row.acknowledged_at = None
+    row.acknowledged_by_user_id = None
+    row.user_verdict = None
+    await db.commit()
+    return {'ok': True}

@@ -3243,5 +3243,6 @@
   "insights.confirm": "✓ Bestätigt",
   "insights.falsePositive": "✗ Fehlalarm",
   "insights.showAcked": "Bearbeitete anzeigen",
-  "insights.hideAcked": "Bearbeitete ausblenden"
+  "insights.hideAcked": "Bearbeitete ausblenden",
+  "insights.undo": "Rückgängig"
 }

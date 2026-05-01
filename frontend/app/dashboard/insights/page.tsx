@@ -96,6 +96,15 @@ export default function InsightsPage() {
     }
   }
 
+  async function undoAck(id: number) {
+    try {
+      await apiFetch(`/insights/correlations/${id}/unack`, { method: 'POST' });
+      setItems((prev) => prev?.map((c) => c.id === id ? { ...c, user_verdict: null, acknowledged_at: null } : c) ?? null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gap: 16 }}>
       <header style={{ display: 'grid', gap: 12 }}>
@@ -241,9 +250,17 @@ export default function InsightsPage() {
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     {acked ? (
-                      <span style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, background: 'rgba(16,185,129,0.1)', color: '#10b981', fontWeight: 700 }}>
-                        ✓ {c.user_verdict || 'noted'}
-                      </span>
+                      <>
+                        <span style={{ fontSize: 11, padding: '4px 10px', borderRadius: 999, background: c.user_verdict === 'false_positive' ? 'rgba(239,68,68,0.12)' : 'rgba(16,185,129,0.1)', color: c.user_verdict === 'false_positive' ? '#ef4444' : '#10b981', fontWeight: 700 }}>
+                          {c.user_verdict === 'false_positive' ? '✗' : '✓'} {c.user_verdict || 'noted'}
+                        </span>
+                        <button
+                          onClick={() => void undoAck(c.id)}
+                          style={{ padding: '5px 11px', borderRadius: 8, background: 'transparent', color: 'var(--ink-58)', border: '1px solid var(--panel-border)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                        >
+                          ↩ {t('insights.undo')}
+                        </button>
+                      </>
                     ) : (
                       <>
                         <button

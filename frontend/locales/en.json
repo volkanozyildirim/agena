@@ -3243,5 +3243,6 @@
   "insights.confirm": "✓ Confirmed",
   "insights.falsePositive": "✗ False positive",
   "insights.showAcked": "Show triaged",
-  "insights.hideAcked": "Hide triaged"
+  "insights.hideAcked": "Hide triaged",
+  "insights.undo": "Undo"
 }

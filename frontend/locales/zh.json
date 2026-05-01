@@ -3243,5 +3243,6 @@
   "insights.confirm": "✓ 已确认",
   "insights.falsePositive": "✗ 误报",
   "insights.showAcked": "显示已处理",
-  "insights.hideAcked": "隐藏已处理"
+  "insights.hideAcked": "隐藏已处理",
+  "insights.undo": "撤销"
 }

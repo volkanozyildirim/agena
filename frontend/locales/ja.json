@@ -3243,5 +3243,6 @@
   "insights.confirm": "✓ 確認済み",
   "insights.falsePositive": "✗ 誤検知",
   "insights.showAcked": "処理済みを表示",
-  "insights.hideAcked": "処理済みを隠す"
+  "insights.hideAcked": "処理済みを隠す",
+  "insights.undo": "取り消し"
 }
