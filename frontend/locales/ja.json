@@ -3230,5 +3230,16 @@
   "reviews.output": "レビュアー出力",
   "agents.toggleReviewer": "コードレビュアーとして使う",
   "agents.toggleReviewerDesc": "オンの場合、このエージェントはタスクの 🔎 Review ドロップダウンと Reviews タブに表示されます。レビューはコードを変更せず PR も作成しません。",
-  "reviews.pickReviewer": "レビュアーを選択"
+  "reviews.pickReviewer": "レビュアーを選択",
+  "nav.insights": "インサイト",
+  "insights.title": "クロスソースインサイト",
+  "insights.subtitle": "PR、デプロイ、監視、チケットからの関連イベントのクラスター — 5 分ごとに自動検出。信頼度 ≥ 70 がここに表示されます。",
+  "insights.scanNow": "⚡ 今すぐスキャン",
+  "insights.scanning": "スキャン中…",
+  "insights.loading": "インサイト読み込み中…",
+  "insights.empty.title": "まだ相関関係はありません",
+  "insights.empty.body": "AGENA はクラスターを監視しています。PR マージが同じウィンドウ内の Sentry / NewRelic / Jira イベントと相関すると、ここに表示されます。ポーラーは 5 分ごとに実行されます — または「今すぐスキャン」をクリック。",
+  "insights.timeline": "タイムライン",
+  "insights.confirm": "✓ 確認済み",
+  "insights.falsePositive": "✗ 誤検知"
 }

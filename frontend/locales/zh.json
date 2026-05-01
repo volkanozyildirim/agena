@@ -3230,5 +3230,16 @@
   "reviews.output": "审查员输出",
   "agents.toggleReviewer": "作为代码审查员",
   "agents.toggleReviewerDesc": "开启后,此 agent 出现在任务的 🔎 Review 下拉框和 Reviews 标签页中。审查不会修改代码或打开 PR。",
-  "reviews.pickReviewer": "选择审查员"
+  "reviews.pickReviewer": "选择审查员",
+  "nav.insights": "洞察",
+  "insights.title": "跨源洞察",
+  "insights.subtitle": "来自 PR、部署、监控和工单的相关事件聚类 — 每 5 分钟自动检测。置信度 ≥ 70 在此显示。",
+  "insights.scanNow": "⚡ 立即扫描",
+  "insights.scanning": "扫描中…",
+  "insights.loading": "加载洞察…",
+  "insights.empty.title": "尚无关联",
+  "insights.empty.body": "AGENA 正在监视聚类。一旦 PR 合并与同一窗口中的 Sentry/NewRelic/Jira 事件相关联，您将在此处看到。轮询器每 5 分钟运行一次 — 或点击立即扫描。",
+  "insights.timeline": "时间线",
+  "insights.confirm": "✓ 已确认",
+  "insights.falsePositive": "✗ 误报"
 }

@@ -171,6 +171,21 @@ async def _poll_sentry_auto_imports() -> None:
                 logger.exception('Sentry auto-import failed for project %s', mapping.project_slug)
 
 
+async def _poll_correlations() -> None:
+    """Run a correlation pass for every org. Quick, no external network
+    calls — just reads from our own DB and writes back any new clusters
+    above the surface threshold."""
+    from agena_services.services.correlation_service import detect_for_all_orgs
+
+    async with SessionLocal() as session:
+        try:
+            n = await detect_for_all_orgs(session)
+            if n:
+                logger.info('Correlations: %s new cluster(s) detected', n)
+        except Exception:
+            logger.exception('Correlation pass failed')
+
+
 async def _cleanup_stale_repo_locks() -> None:
     """Best-effort cleanup for leaked repo locks from crashed/interrupted workers."""
     queue_service = QueueService()
@@ -448,6 +463,7 @@ async def process_queue() -> None:
     last_health_check = 0.0
     last_nr_poll = 0.0
     last_sentry_poll = 0.0
+    last_correlation_poll = 0.0
 
     while True:
         now = asyncio.get_running_loop().time()
@@ -469,6 +485,13 @@ async def process_queue() -> None:
             except Exception:
                 logger.exception('Sentry auto-import poll failed')
             last_sentry_poll = now
+
+        if now - last_correlation_poll >= 300:  # 5 minutes
+            try:
+                await _poll_correlations()
+            except Exception:
+                logger.exception('Correlation poll failed')
+            last_correlation_poll = now
 
         queue_size = await queue_service.queue_size()
         desired_concurrency = min(max_workers, max(1, queue_size))

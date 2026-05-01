@@ -3230,5 +3230,16 @@
   "reviews.output": "Reviewer output",
   "agents.toggleReviewer": "Use as code reviewer",
   "agents.toggleReviewerDesc": "When on, this agent shows up in the 🔎 Review dropdowns on tasks and on the Reviews tab. Reviews never modify code or open PRs.",
-  "reviews.pickReviewer": "Pick reviewer"
+  "reviews.pickReviewer": "Pick reviewer",
+  "nav.insights": "Insights",
+  "insights.title": "Cross-Source Insights",
+  "insights.subtitle": "Clusters of related events from PRs, deploys, monitoring, and tickets — auto-detected every 5 minutes. Confidence ≥ 70 surfaces here.",
+  "insights.scanNow": "⚡ Scan now",
+  "insights.scanning": "Scanning…",
+  "insights.loading": "Loading insights…",
+  "insights.empty.title": "No correlations yet",
+  "insights.empty.body": "AGENA is watching for clusters. As soon as a PR merge correlates with a Sentry / NewRelic / Jira event in the same window, you'll see it here. The poller runs every 5 minutes — or click Scan now.",
+  "insights.timeline": "Timeline",
+  "insights.confirm": "✓ Confirmed",
+  "insights.falsePositive": "✗ False positive"
 }

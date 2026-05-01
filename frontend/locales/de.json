@@ -3230,5 +3230,16 @@
   "reviews.output": "Reviewer-Output",
   "agents.toggleReviewer": "Als Code-Reviewer einsetzen",
   "agents.toggleReviewerDesc": "Wenn aktiv, taucht dieser Agent in den 🔎 Review-Dropdowns auf Tasks und im Reviews-Tab auf. Reviews ändern niemals Code und öffnen keine PRs.",
-  "reviews.pickReviewer": "Reviewer wählen"
+  "reviews.pickReviewer": "Reviewer wählen",
+  "nav.insights": "Insights",
+  "insights.title": "Quellenübergreifende Insights",
+  "insights.subtitle": "Cluster verwandter Ereignisse aus PRs, Deploys, Monitoring und Tickets — alle 5 Minuten automatisch erkannt. Konfidenz ≥ 70 erscheint hier.",
+  "insights.scanNow": "⚡ Jetzt scannen",
+  "insights.scanning": "Scanne…",
+  "insights.loading": "Insights werden geladen…",
+  "insights.empty.title": "Noch keine Korrelationen",
+  "insights.empty.body": "AGENA beobachtet Cluster. Sobald ein PR-Merge mit einem Sentry-/NewRelic-/Jira-Ereignis im selben Fenster korreliert, erscheint es hier. Der Poller läuft alle 5 Minuten — oder klicke auf Jetzt scannen.",
+  "insights.timeline": "Zeitleiste",
+  "insights.confirm": "✓ Bestätigt",
+  "insights.falsePositive": "✗ Fehlalarm"
 }

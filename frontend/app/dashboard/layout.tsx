@@ -34,7 +34,6 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/dashboard/tasks', key: 'nav.tasks', icon: '📋', permission: 'tasks:read' as const, module: 'core' },
       { href: '/dashboard/sprints', key: 'nav.sprints', icon: '🗂', permission: 'tasks:read' as const, module: 'sprints' },
       { href: '/dashboard/refinement', key: 'nav.refinement', icon: '🔬', permission: 'tasks:read' as const, module: 'refinement' },
-      { href: '/dashboard/reviews', key: 'nav.reviews', icon: '🔎', permission: 'tasks:read' as const, module: 'core' },
       { href: '/dashboard/skills', key: 'nav.skills', icon: '📚', permission: 'tasks:read' as const, module: 'skills' },
       { href: '/dashboard/runtimes', key: 'nav.runtimes', icon: '💻', permission: 'tasks:read' as const, module: 'runtimes' },
     ],
@@ -45,6 +44,8 @@ const NAV_GROUPS: NavGroup[] = [
     module: 'core',
     items: [
       { href: '/dashboard/agents', key: 'nav.agents', icon: '🤖', module: 'core' },
+      { href: '/dashboard/reviews', key: 'nav.reviews', icon: '🔎', permission: 'tasks:read' as const, module: 'core' },
+      { href: '/dashboard/insights', key: 'nav.insights', icon: '🧠', module: 'core' },
       { href: '/dashboard/flows', key: 'nav.flows', icon: '🔀', module: 'flows' },
       { href: '/dashboard/prompt-studio', key: 'nav.promptStudio', icon: '✏️', module: 'prompt_studio' },
       { href: '/dashboard/templates', key: 'nav.templates', icon: '📦', module: 'flows' },

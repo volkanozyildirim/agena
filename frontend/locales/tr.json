@@ -3230,5 +3230,16 @@
   "reviews.output": "Reviewer output",
   "agents.toggleReviewer": "Kod reviewer olarak kullan",
   "agents.toggleReviewerDesc": "Açıkken bu agent task'larda ve Reviews sekmesindeki 🔎 Review dropdown'unda görünür. Review hiçbir zaman kodu değiştirmez ya da PR açmaz.",
-  "reviews.pickReviewer": "Reviewer seç"
+  "reviews.pickReviewer": "Reviewer seç",
+  "nav.insights": "İçgörüler",
+  "insights.title": "Çapraz Kaynak İçgörüleri",
+  "insights.subtitle": "PR'lar, deploy'lar, monitoring ve ticket'lardan gelen ilişkili olay kümeleri — her 5 dakikada otomatik tespit edilir. Güven ≥ 70 olanlar burada görünür.",
+  "insights.scanNow": "⚡ Şimdi tara",
+  "insights.scanning": "Taranıyor…",
+  "insights.loading": "İçgörüler yükleniyor…",
+  "insights.empty.title": "Henüz korelasyon yok",
+  "insights.empty.body": "AGENA kümeleri izliyor. Bir PR merge'i, aynı pencerede bir Sentry / NewRelic / Jira olayıyla ilişkilendiği anda burada görünür. Poller 5 dakikada bir çalışır — ya da Şimdi tara'ya tıkla.",
+  "insights.timeline": "Zaman çizelgesi",
+  "insights.confirm": "✓ Onayla",
+  "insights.falsePositive": "✗ Yanlış pozitif"
 }
