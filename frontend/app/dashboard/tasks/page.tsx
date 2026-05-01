@@ -2478,7 +2478,7 @@ function AssignPopup({ taskId, mode, tasks, agents, flows, defaultCreatePr: init
                   border: isSelected ? '1px solid rgba(94,234,212,0.6)' : '1px solid var(--panel-border-3)',
                   background: isSelected ? 'rgba(94,234,212,0.12)' : 'var(--panel)',
                   cursor: 'pointer', textAlign: 'left', width: '100%',
-                  opacity: selected && !isSelected ? 0.4 : 1, transition: 'all 0.15s' }}>
+                  transition: 'all 0.15s' }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: isSelected ? '#5eead4' : 'var(--ink)', textTransform: 'capitalize' }}>{agent.role}</div>
                   <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{agent.model || 'default'} {agent.provider ? `· ${agent.provider}` : ''}</div>
@@ -2502,7 +2502,7 @@ function AssignPopup({ taskId, mode, tasks, agents, flows, defaultCreatePr: init
                   border: isSelected ? `1px solid ${cli.color}80` : `1px solid ${cli.color}40`,
                   background: isSelected ? `${cli.color}1a` : `${cli.color}0a`,
                   cursor: 'pointer', textAlign: 'left', width: '100%',
-                  opacity: selected && !isSelected ? 0.4 : 1, transition: 'all 0.15s' }}>
+                  transition: 'all 0.15s' }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: cli.color }}>{cli.icon} {cli.label}</div>
                   <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{cli.provider} · {cli.model}</div>
@@ -2524,7 +2524,7 @@ function AssignPopup({ taskId, mode, tasks, agents, flows, defaultCreatePr: init
                       border: isSelected ? '1px solid rgba(168,85,247,0.6)' : '1px solid rgba(124,58,237,0.3)',
                       background: isSelected ? 'rgba(168,85,247,0.15)' : 'rgba(124,58,237,0.06)',
                       cursor: 'pointer', textAlign: 'left', width: '100%',
-                      opacity: selected && !isSelected ? 0.4 : 1, transition: 'all 0.15s' }}>
+                      transition: 'all 0.15s' }}>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 700, color: isSelected ? '#c084fc' : 'var(--ink)' }}>{flow.name}</div>
                     </div>
