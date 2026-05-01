@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -496,9 +496,11 @@ export default function DashboardTasksPage() {
   }
 
   // Reviewer picker — opened when user clicks 🔎 Review on a task. Closed
-  // (null) by default; opening sets the task id, the task list re-renders
-  // a small floating menu next to that row.
+  // (null) by default; opening sets the task id + anchor element, the
+  // popover renders via portal positioned next to the button (flips up
+  // when the row is near the viewport bottom).
   const [reviewPickerTaskId, setReviewPickerTaskId] = useState<number | null>(null);
+  const [reviewPickerAnchor, setReviewPickerAnchor] = useState<HTMLElement | null>(null);
   const [reviewerAgentOptions, setReviewerAgentOptions] = useState<Array<{ role: string; label: string }>>([]);
 
   useEffect(() => {
@@ -522,13 +524,19 @@ export default function DashboardTasksPage() {
       .catch(() => {});
   }, []);
 
-  function openReviewPicker(taskId: number) {
+  function openReviewPicker(taskId: number, anchor?: HTMLElement | null) {
     if (reviewerAgentOptions.length <= 1) {
       // Only one reviewer agent → run it immediately, no menu needed.
       void triggerReview(taskId, reviewerAgentOptions[0]?.role || 'auto');
       return;
     }
-    setReviewPickerTaskId(reviewPickerTaskId === taskId ? null : taskId);
+    if (reviewPickerTaskId === taskId) {
+      setReviewPickerTaskId(null);
+      setReviewPickerAnchor(null);
+    } else {
+      setReviewPickerTaskId(taskId);
+      setReviewPickerAnchor(anchor || null);
+    }
   }
 
   // Close the reviewer popover when the user clicks outside it or hits Esc.
@@ -541,9 +549,10 @@ export default function DashboardTasksPage() {
       if (target?.closest('[data-review-picker]')) return;
       if (target?.closest('[data-review-trigger]')) return;
       setReviewPickerTaskId(null);
+      setReviewPickerAnchor(null);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setReviewPickerTaskId(null);
+      if (e.key === 'Escape') { setReviewPickerTaskId(null); setReviewPickerAnchor(null); }
     };
     document.addEventListener('mousedown', onDocClick);
     document.addEventListener('keydown', onKey);
@@ -555,6 +564,7 @@ export default function DashboardTasksPage() {
 
   async function triggerReview(taskId: number, role: string) {
     setReviewPickerTaskId(null);
+    setReviewPickerAnchor(null);
     setError('');
     try {
       const res = await apiFetch<{ id: number; status: string; severity: string | null; findings_count: number | null; score: number | null }>('/reviews', {
@@ -1588,37 +1598,12 @@ export default function DashboardTasksPage() {
                   </span>
                 ) : (
                   <>
-                    <div style={{ position: 'relative' }}>
-                      <button onClick={() => openReviewPicker(task.id)}
-                        title={t('reviews.runReview' as TranslationKey) || 'Run review'}
-                        data-review-trigger
-                        style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: '1px solid rgba(168,85,247,0.4)', background: 'rgba(168,85,247,0.10)', color: '#c084fc', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                        🔎 Review
-                      </button>
-                      {reviewPickerTaskId === task.id && (
-                        <div data-review-picker onClick={(e) => e.stopPropagation()} style={{
-                          position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 100,
-                          minWidth: 200, padding: 4,
-                          background: 'var(--surface)', border: '1px solid var(--panel-border)',
-                          borderRadius: 10, boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
-                        }}>
-                          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', padding: '6px 10px 4px' }}>
-                            {t('reviews.pickReviewer' as TranslationKey) || 'Pick reviewer'}
-                          </div>
-                          <button onClick={() => void triggerReview(task.id, 'auto')}
-                            style={{ width: '100%', textAlign: 'left', padding: '6px 10px', fontSize: 11, fontWeight: 600, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--ink)', cursor: 'pointer' }}>
-                            ✨ Auto <span style={{ color: 'var(--ink-35)', fontWeight: 400 }}>(task config)</span>
-                          </button>
-                          <div style={{ height: 1, background: 'var(--panel-border)', margin: '4px 0' }} />
-                          {reviewerAgentOptions.map((opt) => (
-                            <button key={opt.role} onClick={() => void triggerReview(task.id, opt.role)}
-                              style={{ width: '100%', textAlign: 'left', padding: '6px 10px', fontSize: 11, fontWeight: 600, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--ink)', cursor: 'pointer' }}>
-                              🔎 {opt.label} <span style={{ color: 'var(--ink-35)', fontWeight: 400, fontFamily: 'monospace' }}>({opt.role})</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <button onClick={(e) => openReviewPicker(task.id, e.currentTarget)}
+                      title={t('reviews.runReview' as TranslationKey) || 'Run review'}
+                      data-review-trigger
+                      style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: '1px solid rgba(168,85,247,0.4)', background: 'rgba(168,85,247,0.10)', color: '#c084fc', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                      🔎 Review
+                    </button>
                     <button onClick={() => void onAssignMCP(task.id)}
                       style={{ padding: '6px 12px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #0d9488, #7c3aed)', color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                       Run
@@ -1735,36 +1720,11 @@ export default function DashboardTasksPage() {
                         <span style={{ fontSize: 11, fontWeight: 700, color: statusColor(task.status) }}>{statusLabel(task.status, t)}</span>
                       ) : (
                         <>
-                          <div style={{ position: 'relative' }}>
-                            <button onClick={() => openReviewPicker(task.id)}
-                              data-review-trigger
-                              style={{ padding: '7px 12px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: '1px solid rgba(168,85,247,0.4)', background: 'rgba(168,85,247,0.10)', color: '#c084fc', cursor: 'pointer' }}>
-                              🔎 Review
-                            </button>
-                            {reviewPickerTaskId === task.id && (
-                              <div data-review-picker onClick={(e) => e.stopPropagation()} style={{
-                                position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 100,
-                                minWidth: 220, padding: 4,
-                                background: 'var(--surface)', border: '1px solid var(--panel-border)',
-                                borderRadius: 10, boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
-                              }}>
-                                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', padding: '6px 10px 4px' }}>
-                                  {t('reviews.pickReviewer' as TranslationKey) || 'Pick reviewer'}
-                                </div>
-                                <button onClick={() => void triggerReview(task.id, 'auto')}
-                                  style={{ width: '100%', textAlign: 'left', padding: '8px 10px', fontSize: 12, fontWeight: 600, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--ink)', cursor: 'pointer' }}>
-                                  ✨ Auto
-                                </button>
-                                <div style={{ height: 1, background: 'var(--panel-border)', margin: '4px 0' }} />
-                                {reviewerAgentOptions.map((opt) => (
-                                  <button key={opt.role} onClick={() => void triggerReview(task.id, opt.role)}
-                                    style={{ width: '100%', textAlign: 'left', padding: '8px 10px', fontSize: 12, fontWeight: 600, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--ink)', cursor: 'pointer' }}>
-                                    🔎 {opt.label}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
+                          <button onClick={(e) => openReviewPicker(task.id, e.currentTarget)}
+                            data-review-trigger
+                            style={{ padding: '7px 12px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: '1px solid rgba(168,85,247,0.4)', background: 'rgba(168,85,247,0.10)', color: '#c084fc', cursor: 'pointer' }}>
+                            🔎 Review
+                          </button>
                           <button onClick={() => void onAssignMCP(task.id)}
                             style={{ padding: '7px 14px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #0d9488, #7c3aed)', color: '#fff', cursor: 'pointer' }}>
                             Run
@@ -1834,6 +1794,18 @@ export default function DashboardTasksPage() {
           </button>
         </div>
       </div>
+      {/* Reviewer picker — single portal-based popover. Positions next to
+          the anchor button, flips above when there's not enough room
+          below. Closes via outside-click / Esc handler set up earlier. */}
+      {reviewPickerTaskId !== null && reviewPickerAnchor !== null && (
+        <ReviewerPickerPopover
+          anchor={reviewPickerAnchor}
+          options={reviewerAgentOptions}
+          onPick={(role) => void triggerReview(reviewPickerTaskId, role)}
+          t={t}
+        />
+      )}
+
       {/* AI Agent Select Popup — with repo config */}
       {aiPopupTaskId !== null && (
         <AssignPopup
@@ -2313,6 +2285,74 @@ function McpModelSelect({ taskId, agents, hasRepo, repoSel, mappingIds, createPr
     </div>
   );
 }
+
+function ReviewerPickerPopover({ anchor, options, onPick, t }: {
+  anchor: HTMLElement;
+  options: Array<{ role: string; label: string }>;
+  onPick: (role: string) => void;
+  t: (key: TranslationKey, vars?: Record<string, string | number>) => string;
+}) {
+  // Compute viewport-relative coords from the anchor's bounding rect and
+  // flip above if the menu would clip below the viewport. Recomputes on
+  // window resize / scroll so the popover sticks to the button.
+  const [coords, setCoords] = useState<{ top: number; left: number; flippedUp: boolean } | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const compute = () => {
+      const rect = anchor.getBoundingClientRect();
+      const menuH = menuRef.current?.offsetHeight ?? 240;
+      const menuW = 240;
+      const margin = 8;
+      const fitsBelow = rect.bottom + menuH + margin <= window.innerHeight;
+      const top = fitsBelow ? rect.bottom + 4 : Math.max(margin, rect.top - menuH - 4);
+      // Right-align with the button — but never overflow viewport edges.
+      let left = Math.min(rect.right - menuW, window.innerWidth - menuW - margin);
+      if (left < margin) left = margin;
+      setCoords({ top, left, flippedUp: !fitsBelow });
+    };
+    compute();
+    window.addEventListener('resize', compute);
+    window.addEventListener('scroll', compute, true);
+    return () => {
+      window.removeEventListener('resize', compute);
+      window.removeEventListener('scroll', compute, true);
+    };
+  }, [anchor]);
+
+  if (!coords) return null;
+
+  return createPortal(
+    <div
+      ref={menuRef}
+      data-review-picker
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        position: 'fixed', top: coords.top, left: coords.left,
+        width: 240, padding: 4, zIndex: 9999,
+        background: 'var(--surface)', border: '1px solid var(--panel-border)',
+        borderRadius: 10, boxShadow: '0 12px 32px rgba(0,0,0,0.45)',
+      }}
+    >
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', padding: '6px 10px 4px' }}>
+        {t('reviews.pickReviewer' as TranslationKey) || 'Pick reviewer'}
+      </div>
+      <button onClick={() => onPick('auto')}
+        style={{ width: '100%', textAlign: 'left', padding: '8px 10px', fontSize: 12, fontWeight: 600, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--ink)', cursor: 'pointer' }}>
+        ✨ Auto <span style={{ color: 'var(--ink-35)', fontWeight: 400 }}>(task config)</span>
+      </button>
+      <div style={{ height: 1, background: 'var(--panel-border)', margin: '4px 0' }} />
+      {options.map((opt) => (
+        <button key={opt.role} onClick={() => onPick(opt.role)}
+          style={{ width: '100%', textAlign: 'left', padding: '8px 10px', fontSize: 12, fontWeight: 600, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--ink)', cursor: 'pointer' }}>
+          🔎 {opt.label} <span style={{ color: 'var(--ink-35)', fontWeight: 400, fontFamily: 'monospace' }}>({opt.role})</span>
+        </button>
+      ))}
+    </div>,
+    document.body,
+  );
+}
+
 
 function AssignPopup({ taskId, mode, tasks, agents, flows, defaultCreatePr: initialCreatePr, onAssignAI, onAssignFlow, onClose, t }: {
   taskId: number;
