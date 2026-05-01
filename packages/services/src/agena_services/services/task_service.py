@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -108,6 +109,38 @@ class TaskService:
         await self.add_log(task.id, organization_id, 'created', 'Task created')
         return task
 
+    @staticmethod
+    def _pick_primary_azure_pr(
+        refs: list[str],
+        meta_by_ref: dict[str, dict[str, Any]],
+    ) -> tuple[str | None, str | None]:
+        """Pick the most relevant linked PR for an Azure work item:
+        active first, otherwise most recently completed (closedDate desc).
+        Skips abandoned. Returns (web_url, source_branch) — both may be None."""
+        if not refs:
+            return None, None
+        candidates: list[dict[str, Any]] = []
+        for r in refs:
+            meta = meta_by_ref.get(r)
+            if not meta:
+                continue
+            status = (meta.get('status') or '').lower()
+            if status == 'abandoned':
+                continue
+            candidates.append(meta)
+        if not candidates:
+            return None, None
+        # Active beats completed; within a status, newer closed_date wins.
+        candidates.sort(
+            key=lambda m: (
+                0 if (m.get('status') or '') == 'active' else 1,
+                # Newer last/closed timestamp first; missing dates sink.
+                -1 * (sum(ord(c) for c in (m.get('closed_date') or ''))),
+            ),
+        )
+        primary = candidates[0]
+        return (primary.get('url') or None), (primary.get('branch') or None)
+
     async def _apply_integration_rules(
         self,
         task: TaskRecord,
@@ -183,6 +216,8 @@ class TaskService:
         last_seen_at: str | None = None,
         occurrences: int | None = None,
         assigned_to: str | None = None,
+        pr_url: str | None = None,
+        branch_name: str | None = None,
     ) -> TaskRecord:
         if self.db is None:
             raise ValueError('DB session required')
@@ -237,6 +272,8 @@ class TaskService:
             sprint_name=sprint_name or None,
             sprint_path=sprint_path or None,
             assigned_to=(assigned_to.strip() if assigned_to else None) or None,
+            pr_url=(pr_url.strip() if pr_url else None) or None,
+            branch_name=(branch_name.strip() if branch_name else None) or None,
         )
         self.db.add(task)
         await self.db.commit()
@@ -272,6 +309,34 @@ class TaskService:
             'state': state or '',
         }
         external_items = await self.azure_client.fetch_new_work_items(cfg)
+
+        # Enrich with linked PR metadata so review can anchor on real code.
+        # Each item already has linked_pr_refs parsed from work-item
+        # relations; here we batch-fetch their full metadata once and pick
+        # the primary (active first, otherwise most recently completed) per
+        # item. Skipped silently when there are no refs across the batch.
+        all_refs: list[str] = []
+        seen_refs: set[str] = set()
+        for it in external_items:
+            for r in (it.linked_pr_refs or []):
+                if r and r not in seen_refs:
+                    seen_refs.add(r)
+                    all_refs.append(r)
+        pr_meta_by_ref: dict[str, dict[str, Any]] = {}
+        if all_refs:
+            try:
+                pr_meta_by_ref = await self.azure_client.fetch_pr_details(cfg, pr_refs=all_refs)
+            except Exception:
+                pr_meta_by_ref = {}
+        for it in external_items:
+            primary_url, primary_branch = self._pick_primary_azure_pr(
+                it.linked_pr_refs or [], pr_meta_by_ref
+            )
+            if primary_url:
+                it.pr_url = primary_url
+            if primary_branch:
+                it.branch_name = primary_branch
+
         imported = 0
         skipped = 0
 
@@ -300,6 +365,8 @@ class TaskService:
                     title=item.title,
                     description=description,
                     assigned_to=getattr(item, 'assigned_to', None),
+                    pr_url=getattr(item, 'pr_url', None),
+                    branch_name=getattr(item, 'branch_name', None),
                 )
                 await self._apply_integration_rules(task, provider='azure', payload={
                     'reporter_email': getattr(item, 'reporter_email', None),
@@ -402,6 +469,30 @@ class TaskService:
             )
         else:
             external_items = await self.jira_client.fetch_todo_issues(jira_cfg)
+
+        # Enrich with linked PR metadata in parallel — Jira's dev-status
+        # endpoint is one HTTP call per issue, so we fan out with a small
+        # semaphore. Open PRs win over merged; declined/abandoned skipped.
+        if external_items:
+            import asyncio as _asyncio
+            sem = _asyncio.Semaphore(5)
+
+            async def _enrich(it: ExternalTask) -> None:
+                async with sem:
+                    issue_internal_id = (it.internal_id or '').strip() or it.id
+                    try:
+                        info = await self.jira_client.fetch_dev_info(
+                            jira_cfg, issue_id=issue_internal_id,
+                        )
+                    except Exception:
+                        return
+                    if info.get('primary_pr_url'):
+                        it.pr_url = info['primary_pr_url']
+                    if info.get('primary_branch_name'):
+                        it.branch_name = info['primary_branch_name']
+
+            await _asyncio.gather(*(_enrich(it) for it in external_items))
+
         imported = 0
         skipped = 0
 
@@ -426,6 +517,8 @@ class TaskService:
                     title=item.title,
                     description=item.description,
                     assigned_to=getattr(item, 'assigned_to', None),
+                    pr_url=getattr(item, 'pr_url', None),
+                    branch_name=getattr(item, 'branch_name', None),
                 )
                 await self._apply_integration_rules(task, provider='jira', payload={
                     'reporter_email': getattr(item, 'reporter_email', None),

@@ -33,6 +33,11 @@ class ExternalTask(BaseModel):
     # Each ref is "projectId/repoId/prId" so we can resolve titles later
     linked_pr_refs: list[str] = Field(default_factory=list)
     linked_pr_titles: list[str] = Field(default_factory=list)
+    # Primary PR url + source branch — populated at import time when the
+    # source platform reports a linked open or merged PR. Used by review
+    # to anchor on real code instead of running blind on the description.
+    pr_url: str | None = None
+    branch_name: str | None = None
     linked_commit_shas: list[str] = Field(default_factory=list)
     linked_commit_subjects: list[str] = Field(default_factory=list)
     refined_before: bool = False

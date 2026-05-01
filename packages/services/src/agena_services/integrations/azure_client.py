@@ -1109,9 +1109,29 @@ class AzureDevOpsClient:
         pr_refs: list[str],  # ["projectId/repoId/prId", ...]
         concurrency: int = 10,
     ) -> dict[str, str]:
-        """Resolve a batch of PR refs to their titles. Returns a map of
-        'projectId/repoId/prId' -> title. Missing / unauthorized PRs are
-        simply absent from the result.
+        """Backwards-compatible thin wrapper over fetch_pr_details — returns
+        just ref → title for callers that don't need URL/branch/status."""
+        details = await self.fetch_pr_details(cfg, pr_refs=pr_refs, concurrency=concurrency)
+        return {ref: meta['title'] for ref, meta in details.items() if meta.get('title')}
+
+    async def fetch_pr_details(
+        self,
+        cfg: dict[str, str],
+        *,
+        pr_refs: list[str],  # ["projectId/repoId/prId", ...]
+        concurrency: int = 10,
+    ) -> dict[str, dict[str, Any]]:
+        """Batch-resolve PR refs to full metadata.
+
+        Returns a map of 'projectId/repoId/prId' -> {
+            'title':  human PR title (str),
+            'url':    web URL (str, derived from _links.web.href),
+            'branch': source branch name without refs/heads/ prefix (str),
+            'status': 'active' | 'completed' | 'abandoned' | '' (lowercase),
+            'closed_date': ISO timestamp string for completed/abandoned PRs,
+        }
+
+        Missing / unauthorized PRs are simply absent from the result.
         """
         import asyncio
         org_url = cfg.get('org_url') or self.settings.azure_org_url
@@ -1120,7 +1140,7 @@ class AzureDevOpsClient:
             return {}
         headers = self._headers(pat)
         sem = asyncio.Semaphore(concurrency)
-        out: dict[str, str] = {}
+        out: dict[str, dict[str, Any]] = {}
 
         async def one(client: httpx.AsyncClient, ref: str) -> None:
             parts = ref.split('/')
@@ -1133,10 +1153,21 @@ class AzureDevOpsClient:
                     resp = await client.get(url, headers=headers, timeout=15)
                     if resp.status_code != 200:
                         return
-                    data = resp.json()
+                    data = resp.json() if resp.content else {}
                     title = str(data.get('title') or '').strip()
-                    if title:
-                        out[ref] = title[:300]
+                    web = ((data.get('_links') or {}).get('web') or {}).get('href') or ''
+                    branch = str(data.get('sourceRefName') or '').strip()
+                    if branch.startswith('refs/heads/'):
+                        branch = branch[len('refs/heads/'):]
+                    status = str(data.get('status') or '').strip().lower()
+                    closed_date = str(data.get('closedDate') or '').strip()
+                    out[ref] = {
+                        'title': title[:300],
+                        'url': str(web).strip(),
+                        'branch': branch,
+                        'status': status,
+                        'closed_date': closed_date,
+                    }
                 except Exception:
                     pass
 

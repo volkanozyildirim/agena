@@ -567,11 +567,19 @@ class JiraClient:
         Tries common applicationTypes: github, bitbucket, stash, GitLab.
         """
         base_url, email, api_token = self._resolve_config(cfg)
+        empty: dict[str, Any] = {
+            'branches': [], 'pr_titles': [], 'pr_count': 0, 'commit_count': 0,
+            'primary_pr_url': None, 'primary_branch_name': None,
+        }
         if not base_url or not issue_id:
-            return {'branches': [], 'pr_titles': [], 'pr_count': 0, 'commit_count': 0}
+            return empty
         url = f"{base_url.rstrip('/')}/rest/dev-status/1.0/issue/detail"
         branches: list[str] = []
         pr_titles: list[str] = []
+        # Track full PR records so we can pick the most relevant one (open
+        # first, otherwise most recently merged) and surface its URL +
+        # source branch to the importer.
+        pr_records: list[dict[str, Any]] = []
         pr_count = 0
         commit_count = 0
         async with httpx.AsyncClient(timeout=15) as client:
@@ -600,6 +608,13 @@ class JiraClient:
                             if isinstance(pr, dict) and pr.get('name'):
                                 pr_titles.append(str(pr['name'])[:300])
                                 pr_count += 1
+                                pr_records.append({
+                                    'url': str(pr.get('url') or '').strip(),
+                                    'status': str(pr.get('status') or '').strip().lower(),
+                                    'source_branch': str(pr.get('source', {}).get('branch') or '').strip()
+                                        if isinstance(pr.get('source'), dict) else '',
+                                    'last_update': str(pr.get('lastUpdate') or '').strip(),
+                                })
                         for br in entry.get('branches') or []:
                             if isinstance(br, dict) and br.get('name'):
                                 branches.append(str(br['name']))
@@ -619,11 +634,34 @@ class JiraClient:
                     out.append(x)
             return out
 
+        # Pick the primary PR: prefer 'open', fall back to most recent
+        # 'merged'. Skip 'declined' / 'closed' / 'abandoned'.
+        primary_pr_url: str | None = None
+        primary_branch_name: str | None = None
+        ranked = sorted(
+            pr_records,
+            key=lambda p: (
+                0 if p['status'] == 'open' else (1 if p['status'] == 'merged' else 2),
+                # Newer lastUpdate wins within the same status bucket. We
+                # invert by string sort since Jira returns ISO-8601 timestamps.
+                -1 * (sum(ord(c) for c in (p.get('last_update') or ''))),
+            ),
+        )
+        for p in ranked:
+            if p['status'] in ('declined', 'closed', 'abandoned'):
+                continue
+            if p['url']:
+                primary_pr_url = p['url']
+                primary_branch_name = p['source_branch'] or None
+                break
+
         return {
             'branches': _dedup(branches)[:10],
             'pr_titles': _dedup(pr_titles)[:10],
             'pr_count': len(_dedup(pr_titles)),
             'commit_count': commit_count,
+            'primary_pr_url': primary_pr_url,
+            'primary_branch_name': primary_branch_name,
         }
 
     def _to_external_task(self, issue: dict[str, Any], *, story_point_field: str | None = None) -> ExternalTask:
