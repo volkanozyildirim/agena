@@ -173,6 +173,60 @@ async def _fetch_pr_diff_for_review(
     return '', ''
 
 
+async def _build_llm_for_org(
+    db: AsyncSession,
+    *,
+    organization_id: int,
+    provider: str,
+    model: str | None,
+) -> LLMProvider:
+    """Construct an LLMProvider strictly from the org's
+    integration_configs row — env-level keys are intentionally NOT
+    consulted. LLM credentials are organisation-scoped, not deployment-
+    scoped: each tenant configures its own key via Settings →
+    Integrations, and that's the single source of truth.
+
+    Raises ValueError when no key is configured for this org, so the
+    UI shows a real "configure your provider" toast instead of silently
+    falling back to the deployment-wide env var or LLMProvider's mock.
+    """
+    from sqlalchemy import select
+    p = (provider or 'openai').strip().lower()
+    if p not in {'openai', 'gemini', 'anthropic'}:
+        p = 'openai'
+
+    cfg = (await db.execute(
+        select(IntegrationConfig).where(
+            IntegrationConfig.organization_id == organization_id,
+            IntegrationConfig.provider == p,
+        )
+    )).scalar_one_or_none()
+    api_key = ((cfg.secret if cfg else '') or '').strip()
+    base_url = ((cfg.base_url if cfg else '') or '').strip()
+
+    if not base_url:
+        if p == 'anthropic':
+            base_url = 'https://api.anthropic.com'
+        elif p == 'gemini':
+            base_url = 'https://generativelanguage.googleapis.com'
+
+    if not api_key:
+        raise ValueError(
+            f'{p} integration is not configured for this organization. '
+            f'Add a key under Settings → Integrations, or pick a '
+            f'claude_cli / codex_cli reviewer agent that uses the local CLI.'
+        )
+
+    used_model = (model or 'gpt-4.1').strip()
+    return LLMProvider(
+        provider=p,
+        api_key=api_key,
+        base_url=base_url,
+        small_model=used_model,
+        large_model=used_model,
+    )
+
+
 async def _resolve_repo_path_for_task(db: AsyncSession, task: TaskRecord) -> str:
     """Look up the local checkout path for a task's repo_mapping. Falls
     back to /tmp when nothing is configured — the CLI bridge will still
@@ -545,7 +599,12 @@ async def trigger_review(
             )
             await db.commit()
         else:
-            llm = LLMProvider(provider=provider_norm or 'openai')
+            llm = await _build_llm_for_org(
+                db,
+                organization_id=organization_id,
+                provider=provider_norm or 'openai',
+                model=model,
+            )
             output, _usage, used_model, _cached = await llm.generate(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
