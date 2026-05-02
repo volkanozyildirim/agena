@@ -677,10 +677,27 @@ function RiskBadges({ risks, t }: { risks: string[]; t: TFn }) {
 }
 
 function StatusBadge({ status, t }: { status: string; t: TFn }) {
-  const colors: Record<string, string> = { merged: '#8b5cf6', open: '#22c55e', closed: '#ef4444' };
+  // Cover both GitHub (open / closed / merged) and Azure (active /
+  // completed / abandoned) status vocabularies. Anything unknown falls
+  // through to a neutral grey + the raw status as label.
+  const colors: Record<string, string> = {
+    merged:    '#8b5cf6',
+    completed: '#8b5cf6',  // Azure's "merged"
+    open:      '#22c55e',
+    active:    '#22c55e',  // Azure's "open"
+    closed:    '#ef4444',
+    abandoned: '#94a3b8',  // Azure's "won't merge"
+  };
+  const key = `dora.pr.${status}` as TranslationKey;
+  // i18n.t returns the key string when the translation is missing —
+  // fall back to a capitalised raw status so we never render "dora.pr.x".
+  const localised = t(key);
+  const label = localised && !localised.startsWith('dora.pr.')
+    ? localised
+    : (status.charAt(0).toUpperCase() + status.slice(1));
   return (
     <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 999, color: '#fff', background: colors[status] || '#6b7280' }}>
-      {t(`dora.pr.${status}` as TranslationKey)}
+      {label}
     </span>
   );
 }
