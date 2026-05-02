@@ -51,6 +51,7 @@ async def list_decisions(
     status: str = 'pending',
     source: str | None = None,
     project: str | None = None,
+    state: str | None = None,
     limit: int = 100,
 ) -> list[DecisionResponse]:
     stmt = (
@@ -65,6 +66,8 @@ async def list_decisions(
             stmt = stmt.where(TriageDecision.source == source.lower())
     if project and project not in ('all', ''):
         stmt = stmt.where(TriageDecision.project_key == project)
+    if state and state not in ('all', ''):
+        stmt = stmt.where(TriageDecision.ticket_state == state)
     stmt = stmt.order_by(desc(TriageDecision.idle_days)).limit(min(limit, 500))
     rows = (await db.execute(stmt)).scalars().all()
     # Defensive filter: drop rows whose source ticket is now in a
@@ -82,6 +85,35 @@ async def list_decisions(
         if (r.ticket_state or '').strip().lower() not in DEAD
     ]
     return [DecisionResponse.model_validate(r, from_attributes=True) for r in rows]
+
+
+@router.get('/states')
+async def list_states(
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+    status: str = 'pending',
+) -> list[dict[str, Any]]:
+    """Distinct (source, ticket_state, count) tuples across the org's
+    pending decisions. Drives the state filter chips so the user can
+    scope the queue to one workflow column (Design / In Progress /
+    Code Review / etc.) without exporting the list."""
+    from sqlalchemy import func
+    rows = (await db.execute(
+        select(
+            TriageDecision.source,
+            TriageDecision.ticket_state,
+            func.count(TriageDecision.id).label('n'),
+        )
+        .where(TriageDecision.organization_id == tenant.organization_id)
+        .where(TriageDecision.status == status)
+        .where(TriageDecision.ticket_state.is_not(None))
+        .group_by(TriageDecision.source, TriageDecision.ticket_state)
+        .order_by(func.count(TriageDecision.id).desc())
+    )).all()
+    return [
+        {'source': r[0], 'state': r[1], 'count': int(r[2] or 0)}
+        for r in rows
+    ]
 
 
 @router.get('/projects')

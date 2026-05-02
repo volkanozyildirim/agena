@@ -355,7 +355,7 @@ async def _scan_jira_source(
     org_id: int,
     *,
     idle_days: int,
-    max_results: int = 200,
+    max_results: int = 500,
 ) -> list[dict]:
     """Pull stale Jira issues directly via JQL — no AGENA import needed.
     Filters on (statusCategory != Done) and (updated <= -Ndays). Returns
@@ -459,7 +459,7 @@ async def _scan_azure_source(
     org_id: int,
     *,
     idle_days: int,
-    max_results: int = 200,
+    max_results: int = 500,
 ) -> list[dict]:
     """Pull stale Azure DevOps work items via WIQL — query against the
     user's preferred azure_project (from user_preferences). Skips when

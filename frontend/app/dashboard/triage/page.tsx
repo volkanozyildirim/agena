@@ -76,16 +76,23 @@ export default function TriagePage() {
   // exists in the queue.
   const [projectFilter, setProjectFilter] = useState<string>('all');
   const [projectsList, setProjectsList] = useState<Array<{ source: string; project_key: string; count: number }>>([]);
+  // Source-state filter (Design / In Progress / Code Review / …).
+  // Populated from /triage/states so the chips reflect the actual
+  // distribution in the queue, not a hardcoded list.
+  const [stateFilter, setStateFilter] = useState<string>('all');
+  const [statesList, setStatesList] = useState<Array<{ source: string; state: string; count: number }>>([]);
 
   async function load(
     filter: typeof statusFilter = statusFilter,
     src: typeof sourceFilter = sourceFilter,
     proj: string = projectFilter,
+    st: string = stateFilter,
   ) {
     try {
-      const params = new URLSearchParams({ status: filter, limit: '200' });
+      const params = new URLSearchParams({ status: filter, limit: '500' });
       if (src && src !== 'all') params.set('source', src);
       if (proj && proj !== 'all') params.set('project', proj);
+      if (st && st !== 'all') params.set('state', st);
       const rows = await apiFetch<Decision[]>(`/triage/decisions?${params.toString()}`);
       setDecisions(rows);
       setError(null);
@@ -101,6 +108,13 @@ export default function TriagePage() {
     } catch { /* non-fatal */ }
   }
 
+  async function loadStates() {
+    try {
+      const rows = await apiFetch<Array<{ source: string; state: string; count: number }>>('/triage/states');
+      setStatesList(rows);
+    } catch { /* non-fatal */ }
+  }
+
   async function loadSettings() {
     try {
       const s = await apiFetch<Settings>('/workflow-settings');
@@ -110,11 +124,11 @@ export default function TriagePage() {
     }
   }
 
-  useEffect(() => { void load(); void loadSettings(); void loadProjects(); }, []);
-  useEffect(() => { void load(statusFilter, sourceFilter, projectFilter); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [statusFilter, sourceFilter, projectFilter]);
-  // Reset project pick when source tab changes — the previous project
-  // probably doesn't belong to the new source.
-  useEffect(() => { setProjectFilter('all'); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [sourceFilter]);
+  useEffect(() => { void load(); void loadSettings(); void loadProjects(); void loadStates(); }, []);
+  useEffect(() => { void load(statusFilter, sourceFilter, projectFilter, stateFilter); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [statusFilter, sourceFilter, projectFilter, stateFilter]);
+  // Reset project + state pick when source tab changes — the previous
+  // selection probably doesn't belong to the new source.
+  useEffect(() => { setProjectFilter('all'); setStateFilter('all'); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [sourceFilter]);
 
   // Source-side scans walk hundreds of tickets through the LLM, so we
   // run them in the background. POST returns immediately with
@@ -181,6 +195,7 @@ export default function TriagePage() {
           });
           await load();
           await loadProjects();
+          await loadStates();
           if (p.status === 'done' || p.status === 'failed' || p.status === 'idle') {
             setScanning(false);
             if (p.status === 'failed' && p.error) setError(p.error);
@@ -422,6 +437,53 @@ export default function TriagePage() {
                   >
                     {p.source === 'jira' ? '📋' : '☁️'} {p.project_key}
                     <span style={{ opacity: 0.6, marginLeft: 4 }}>({p.count})</span>
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })()}
+
+        {/* State chips — Design / In Progress / Code Review / etc.
+            Reflects whatever ticket_state values exist in the queue
+            for the current source filter. Chip count comes from
+            /triage/states (filtered by status=pending). */}
+        {(() => {
+          const visible = statesList.filter((s) => {
+            if (sourceFilter === 'all') return true;
+            if (sourceFilter === 'jira') return s.source === 'jira';
+            return s.source === 'azure' || s.source === 'azure_devops';
+          });
+          if (visible.length === 0) return null;
+          return (
+            <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--panel)', border: '1px solid var(--panel-border)', borderRadius: 10, alignSelf: 'flex-start', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setStateFilter('all')}
+                style={{
+                  padding: '6px 10px', borderRadius: 7, border: 'none',
+                  background: stateFilter === 'all' ? 'rgba(56,189,248,0.16)' : 'transparent',
+                  color: stateFilter === 'all' ? '#38bdf8' : 'var(--ink-58)',
+                  fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                {t('triage.source.all' as TranslationKey)}
+              </button>
+              {visible.map((s) => {
+                const isActive = stateFilter === s.state;
+                return (
+                  <button
+                    key={`${s.source}:${s.state}`}
+                    onClick={() => setStateFilter(s.state)}
+                    style={{
+                      padding: '6px 10px', borderRadius: 7, border: 'none',
+                      background: isActive ? 'rgba(56,189,248,0.16)' : 'transparent',
+                      color: isActive ? '#38bdf8' : 'var(--ink-58)',
+                      fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                      textTransform: 'uppercase', letterSpacing: 0.4,
+                    }}
+                  >
+                    {s.state}
+                    <span style={{ opacity: 0.6, marginLeft: 4 }}>({s.count})</span>
                   </button>
                 );
               })}
