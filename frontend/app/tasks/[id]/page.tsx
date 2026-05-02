@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { apiDownloadBlob, apiFetch, getToken, loadPrefs, resolveApiBase } from '@/lib/api';
+import { useEnabledModules } from '@/lib/useEnabledModules';
 import { renderMarkdown } from '@/lib/markdown';
 import RichDescription from '@/components/RichDescription';
 import ShareTaskModal from '@/components/ShareTaskModal';
@@ -257,6 +258,8 @@ export default function TaskDetailPage() {
   const { t } = useLocale();
   const params = useParams<{ id: string }>();
   const taskId = params.id;
+  const enabledModules = useEnabledModules();
+  const reviewsEnabled = enabledModules?.has('reviews') ?? true;
   const terminalRef = useRef<HTMLDivElement | null>(null);
   const lastLogIdRef = useRef(0);
   const [isMobile, setIsMobile] = useState(false);
@@ -1445,15 +1448,15 @@ export default function TaskDetailPage() {
             background: 'var(--panel-alt)',
             overflowX: 'auto',
           }}>
-            {([
+            {(([
               { id: 'activity', label: '⚡ ' + (t('taskDetail.activityTab' as never) || 'Activity') },
               { id: 'agent', label: '🤖 ' + (t('taskDetail.liveLogs') || 'Agent') },
               { id: 'steps', label: '⚙ ' + (t('taskDetail.executionSteps') || 'Steps') },
-              { id: 'reviews', label: '🔎 ' + (t('reviews.title') || 'Reviews') },
+              ...(reviewsEnabled ? [{ id: 'reviews', label: '🔎 ' + (t('reviews.title') || 'Reviews') }] : []),
               { id: 'memory', label: '🧠 ' + (t('taskDetail.memoryImpact') || 'Memory') },
               { id: 'diff', label: '📝 ' + (t('taskDetail.codeDiffPreview') || 'Diff') },
               { id: 'logs', label: '📜 Logs' },
-            ] as const).map((tab) => {
+            ]) as const).map((tab) => {
               const active = rightTab === tab.id;
               return (
                 <button

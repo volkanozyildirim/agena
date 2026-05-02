@@ -46,7 +46,7 @@ const NAV_GROUPS: NavGroup[] = [
     module: 'core',
     items: [
       { href: '/dashboard/agents', key: 'nav.agents', icon: '🤖', module: 'core' },
-      { href: '/dashboard/reviews', key: 'nav.reviews', icon: '🔎', permission: 'tasks:read' as const, module: 'core' },
+      { href: '/dashboard/reviews', key: 'nav.reviews', icon: '🔎', permission: 'tasks:read' as const, module: 'reviews' },
       { href: '/dashboard/insights', key: 'nav.insights', icon: '🧠', module: 'insights' },
       { href: '/dashboard/flows', key: 'nav.flows', icon: '🔀', module: 'flows' },
       { href: '/dashboard/prompt-studio', key: 'nav.promptStudio', icon: '✏️', module: 'prompt_studio' },

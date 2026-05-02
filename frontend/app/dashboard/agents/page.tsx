@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { apiFetch, loadPrefs, savePrefs, getAgentAnalytics, loadPromptCatalog, type PromptCatalog } from '@/lib/api';
+import { useEnabledModules } from '@/lib/useEnabledModules';
 import { useLocale } from '@/lib/i18n';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -335,6 +336,8 @@ function AgentCharIcon({ palette, color, size }: { palette: number; color: strin
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function AgentsPage() {
   const { t } = useLocale();
+  const enabledModules = useEnabledModules();
+  const reviewsEnabled = enabledModules?.has('reviews') ?? true;
   const [agents, setAgents] = useState<AgentConfig[]>([]);
   const [editing, setEditing] = useState<AgentRole | null>(null);
   const [editModalAgent, setEditModalAgent] = useState<AgentConfig | null>(null);
@@ -644,6 +647,8 @@ function AgentModal({ agent: initial, isNew, onClose, onSave, onDelete, t, promp
   const [saveError, setSaveError] = useState<string>('');
   const models = a.provider === 'openai' ? OPENAI_MODELS : a.provider === 'gemini' ? GEMINI_MODELS : [];
   const color = a.color || '#38bdf8';
+  const enabledModules = useEnabledModules();
+  const reviewsEnabled = enabledModules?.has('reviews') ?? true;
 
   function handleSave() {
     setSaveError('');
@@ -670,8 +675,8 @@ function AgentModal({ agent: initial, isNew, onClose, onSave, onDelete, t, promp
         </div>
 
         <div style={{ padding: '16px 24px 24px', display: 'grid', gap: 14 }}>
-          {/* Review history banner — visible on existing agents that have reviewer activity */}
-          {!isNew && reviewStat && reviewStat.count > 0 && (() => {
+          {/* Review history banner — gated on the Reviews module */}
+          {reviewsEnabled && !isNew && reviewStat && reviewStat.count > 0 && (() => {
             const sevColors: Record<string, string> = { critical: '#ef4444', high: '#f97316', medium: '#eab308', low: '#60a5fa', clean: '#22c55e' };
             const sevColor = reviewStat.lastSeverity ? (sevColors[reviewStat.lastSeverity] || 'var(--ink-35)') : 'var(--ink-35)';
             return (
@@ -815,25 +820,27 @@ function AgentModal({ agent: initial, isNew, onClose, onSave, onDelete, t, promp
             </div>
           </div>
 
-          {/* Reviewer toggle — when on, this agent appears in 🔎 Review dropdowns */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            padding: '10px 12px', borderRadius: 10,
-            background: a.is_reviewer ? 'rgba(168,85,247,0.10)' : 'var(--panel)',
-            border: `1px solid ${a.is_reviewer ? 'rgba(168,85,247,0.35)' : 'var(--panel-border)'}`,
-          }}>
-            <span style={{ fontSize: 18 }}>🔎</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{t('agents.toggleReviewer') || 'Use as code reviewer'}</div>
-              <div style={{ fontSize: 11, color: 'var(--ink-50)', marginTop: 2, lineHeight: 1.5 }}>
-                {t('agents.toggleReviewerDesc') || 'When on, this agent shows up in the 🔎 Review dropdowns on tasks and on the Reviews tab. Reviews never modify code or open PRs.'}
+          {/* Reviewer toggle — only surfaces when the Reviews module is on */}
+          {reviewsEnabled && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '10px 12px', borderRadius: 10,
+              background: a.is_reviewer ? 'rgba(168,85,247,0.10)' : 'var(--panel)',
+              border: `1px solid ${a.is_reviewer ? 'rgba(168,85,247,0.35)' : 'var(--panel-border)'}`,
+            }}>
+              <span style={{ fontSize: 18 }}>🔎</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{t('agents.toggleReviewer') || 'Use as code reviewer'}</div>
+                <div style={{ fontSize: 11, color: 'var(--ink-50)', marginTop: 2, lineHeight: 1.5 }}>
+                  {t('agents.toggleReviewerDesc') || 'When on, this agent shows up in the 🔎 Review dropdowns on tasks and on the Reviews tab. Reviews never modify code or open PRs.'}
+                </div>
+              </div>
+              <div onClick={() => setA((v) => ({ ...v, is_reviewer: !v.is_reviewer }))}
+                style={{ width: 40, height: 22, borderRadius: 999, background: a.is_reviewer ? '#a855f7' : 'var(--panel-border-3)', position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 }}>
+                <div style={{ position: 'absolute', top: 3, left: a.is_reviewer ? 21 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
               </div>
             </div>
-            <div onClick={() => setA((v) => ({ ...v, is_reviewer: !v.is_reviewer }))}
-              style={{ width: 40, height: 22, borderRadius: 999, background: a.is_reviewer ? '#a855f7' : 'var(--panel-border-3)', position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 }}>
-              <div style={{ position: 'absolute', top: 3, left: a.is_reviewer ? 21 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
-            </div>
-          </div>
+          )}
 
           {/* Confirm delete overlay */}
           {confirmDelete && onDelete && (
@@ -900,6 +907,8 @@ function AgentCard({ agent, isEditing, onEdit, onUpdate, promptSlugs, reviewStat
 }) {
   const { t } = useLocale();
   const models = agent.provider === 'openai' ? OPENAI_MODELS : agent.provider === 'gemini' ? GEMINI_MODELS : [];
+  const enabledModules = useEnabledModules();
+  const reviewsEnabled = enabledModules?.has('reviews') ?? true;
 
   return (
     <div style={{ width: '100%', minWidth: 0, minHeight: isEditing ? 'auto' : 118, borderRadius: 14, border: '1px solid ' + (isEditing ? agent.color + '40' : 'var(--panel-border)'), background: isEditing ? agent.color + '08' : 'var(--panel)', overflow: 'hidden', transition: 'all 0.2s' }}>
@@ -929,8 +938,8 @@ function AgentCard({ agent, isEditing, onEdit, onUpdate, promptSlugs, reviewStat
         </div>
       </div>
 
-      {/* Review history mini stat — visible when this agent has been used as a reviewer at least once. */}
-      {reviewStat && reviewStat.count > 0 && !isEditing && (() => {
+      {/* Review history mini stat — gated on the Reviews module */}
+      {reviewsEnabled && reviewStat && reviewStat.count > 0 && !isEditing && (() => {
         const sevColors: Record<string, string> = { critical: '#ef4444', high: '#f97316', medium: '#eab308', low: '#60a5fa', clean: '#22c55e' };
         const sevColor = reviewStat.lastSeverity ? (sevColors[reviewStat.lastSeverity] || 'var(--ink-35)') : 'var(--ink-35)';
         return (

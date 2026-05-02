@@ -1,5 +1,13 @@
 [
   {
+    "hash": "49d98e4",
+    "short": "49d98e4",
+    "message": "Triage + Review Backlog: two new workflow automations",
+    "date": "2026-05-02",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "a5723aa",
     "short": "a5723aa",
     "message": "Insights: gate behind a toggleable module",

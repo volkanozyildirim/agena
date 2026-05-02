@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { apiFetch, apiUpload, loadPrefs, type BackendRepoMapping, type RepoMapping } from '@/lib/api';
 import { TaskItem, type RepoAssignment } from '@/components/TaskTable';
 import { useLocale, type TranslationKey } from '@/lib/i18n';
+import { useEnabledModules } from '@/lib/useEnabledModules';
 import RemoteRepoSelector from '@/components/RemoteRepoSelector';
 import RichDescription from '@/components/RichDescription';
 import ShareTaskModal from '@/components/ShareTaskModal';
@@ -55,6 +56,8 @@ export default function DashboardTasksPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const mob = useIsMobile();
+  const enabledModules = useEnabledModules();
+  const reviewsEnabled = enabledModules?.has('reviews') ?? true;
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [total, setTotal] = useState(0);
   const [queueItems, setQueueItems] = useState<{
@@ -1598,12 +1601,14 @@ export default function DashboardTasksPage() {
                   </span>
                 ) : (
                   <>
-                    <button onClick={(e) => openReviewPicker(task.id, e.currentTarget)}
-                      title={t('reviews.runReview' as TranslationKey) || 'Run review'}
-                      data-review-trigger
-                      style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: '1px solid rgba(168,85,247,0.4)', background: 'rgba(168,85,247,0.10)', color: '#c084fc', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                      🔎 Review
-                    </button>
+                    {reviewsEnabled && (
+                      <button onClick={(e) => openReviewPicker(task.id, e.currentTarget)}
+                        title={t('reviews.runReview' as TranslationKey) || 'Run review'}
+                        data-review-trigger
+                        style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: '1px solid rgba(168,85,247,0.4)', background: 'rgba(168,85,247,0.10)', color: '#c084fc', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        🔎 Review
+                      </button>
+                    )}
                     <button onClick={() => void onAssignMCP(task.id)}
                       style={{ padding: '6px 12px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #0d9488, #7c3aed)', color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                       Run
@@ -1720,11 +1725,13 @@ export default function DashboardTasksPage() {
                         <span style={{ fontSize: 11, fontWeight: 700, color: statusColor(task.status) }}>{statusLabel(task.status, t)}</span>
                       ) : (
                         <>
-                          <button onClick={(e) => openReviewPicker(task.id, e.currentTarget)}
-                            data-review-trigger
-                            style={{ padding: '7px 12px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: '1px solid rgba(168,85,247,0.4)', background: 'rgba(168,85,247,0.10)', color: '#c084fc', cursor: 'pointer' }}>
-                            🔎 Review
-                          </button>
+                          {reviewsEnabled && (
+                            <button onClick={(e) => openReviewPicker(task.id, e.currentTarget)}
+                              data-review-trigger
+                              style={{ padding: '7px 12px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: '1px solid rgba(168,85,247,0.4)', background: 'rgba(168,85,247,0.10)', color: '#c084fc', cursor: 'pointer' }}>
+                              🔎 Review
+                            </button>
+                          )}
                           <button onClick={() => void onAssignMCP(task.id)}
                             style={{ padding: '7px 14px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #0d9488, #7c3aed)', color: '#fff', cursor: 'pointer' }}>
                             Run
