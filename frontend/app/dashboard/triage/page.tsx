@@ -60,10 +60,14 @@ export default function TriagePage() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Filter: which decision status the list shows. Defaults to pending
+  // (the to-do queue), but the user can switch to applied / skipped to
+  // audit what was actioned previously.
+  const [statusFilter, setStatusFilter] = useState<'pending' | 'applied' | 'skipped'>('pending');
 
-  async function load() {
+  async function load(filter: typeof statusFilter = statusFilter) {
     try {
-      const rows = await apiFetch<Decision[]>('/triage/decisions?status=pending&limit=200');
+      const rows = await apiFetch<Decision[]>(`/triage/decisions?status=${filter}&limit=200`);
       setDecisions(rows);
       setError(null);
     } catch (e) {
@@ -81,6 +85,7 @@ export default function TriagePage() {
   }
 
   useEffect(() => { void load(); void loadSettings(); }, []);
+  useEffect(() => { void load(statusFilter); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [statusFilter]);
 
   async function scanNow() {
     setScanning(true);
@@ -192,6 +197,32 @@ export default function TriagePage() {
           </p>
         </div>
 
+        {/* Info card — explain what the action buttons do. Localised
+            in all 7 languages so first-time users on any locale know
+            'close' acts on AGENA only, 'snooze' pauses the row, etc. */}
+        <details
+          style={{
+            border: '1px solid var(--panel-border)',
+            background: 'var(--panel)',
+            borderRadius: 12,
+            padding: '10px 14px',
+            fontSize: 12,
+            color: 'var(--ink-78)',
+          }}
+        >
+          <summary style={{ cursor: 'pointer', fontWeight: 700, color: 'var(--ink-90)' }}>
+            💡 {t('triage.help.title' as TranslationKey)}
+          </summary>
+          <div style={{ marginTop: 8, lineHeight: 1.55, display: 'grid', gap: 4 }}>
+            <div>{t('triage.help.body' as TranslationKey)}</div>
+            <div style={{ marginTop: 6 }}>{t('triage.help.applyAi' as TranslationKey)}</div>
+            <div>{t('triage.help.close' as TranslationKey)}</div>
+            <div>{t('triage.help.snooze' as TranslationKey)}</div>
+            <div>{t('triage.help.keep' as TranslationKey)}</div>
+            <div>{t('triage.help.skip' as TranslationKey)}</div>
+          </div>
+        </details>
+
         {decisions && decisions.length > 0 && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
             <TriageStatTile label={t('triage.stat.total')} value={decisions.length} accent='#6366f1' />
@@ -239,6 +270,22 @@ export default function TriagePage() {
           >
             ⚙ {t('triage.settings')}
           </button>
+          <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--panel)', border: '1px solid var(--panel-border)', borderRadius: 10 }}>
+            {(['pending', 'applied', 'skipped'] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                style={{
+                  padding: '6px 10px', borderRadius: 7, border: 'none',
+                  background: statusFilter === s ? 'rgba(16,185,129,0.16)' : 'transparent',
+                  color: statusFilter === s ? '#10b981' : 'var(--ink-58)',
+                  fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                {t(('triage.filter.' + s) as TranslationKey)}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
@@ -363,37 +410,65 @@ export default function TriagePage() {
                     🤖 {d.ai_reasoning}
                   </p>
                 )}
-                <footer style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  <button
-                    onClick={() => void applyOne(d.id, verdict)}
-                    style={{ padding: '5px 11px', borderRadius: 8, background: `${color}22`, color, border: `1px solid ${color}55`, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    ✓✓ {t('triage.applyAi')}
-                  </button>
-                  <button
-                    onClick={() => void applyOne(d.id, 'close')}
-                    style={{ padding: '5px 11px', borderRadius: 8, background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.25)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    ✓ {t('triage.close')}
-                  </button>
-                  <button
-                    onClick={() => void applyOne(d.id, 'snooze')}
-                    style={{ padding: '5px 11px', borderRadius: 8, background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    ⏸ {t('triage.snooze')}
-                  </button>
-                  <button
-                    onClick={() => void applyOne(d.id, 'keep')}
-                    style={{ padding: '5px 11px', borderRadius: 8, background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    ⛔ {t('triage.keep')}
-                  </button>
-                  <button
-                    onClick={() => void skipOne(d.id)}
-                    style={{ padding: '5px 11px', borderRadius: 8, background: 'transparent', color: 'var(--ink-58)', border: '1px solid var(--panel-border)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    ↩ {t('triage.skip')}
-                  </button>
+                <footer style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {statusFilter === 'pending' ? (
+                    <>
+                      <button
+                        onClick={() => void applyOne(d.id, verdict)}
+                        style={{ padding: '5px 11px', borderRadius: 8, background: `${color}22`, color, border: `1px solid ${color}55`, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        ✓✓ {t('triage.applyAi')}
+                      </button>
+                      <button
+                        onClick={() => void applyOne(d.id, 'close')}
+                        style={{ padding: '5px 11px', borderRadius: 8, background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.25)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        ✓ {t('triage.close')}
+                      </button>
+                      <button
+                        onClick={() => void applyOne(d.id, 'snooze')}
+                        style={{ padding: '5px 11px', borderRadius: 8, background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        ⏸ {t('triage.snooze')}
+                      </button>
+                      <button
+                        onClick={() => void applyOne(d.id, 'keep')}
+                        style={{ padding: '5px 11px', borderRadius: 8, background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        ⛔ {t('triage.keep')}
+                      </button>
+                      <button
+                        onClick={() => void skipOne(d.id)}
+                        style={{ padding: '5px 11px', borderRadius: 8, background: 'transparent', color: 'var(--ink-58)', border: '1px solid var(--panel-border)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        ↩ {t('triage.skip')}
+                      </button>
+                    </>
+                  ) : (
+                    <span
+                      style={{
+                        padding: '4px 10px', borderRadius: 999,
+                        background: d.applied_verdict === 'close' ? 'rgba(16,185,129,0.16)'
+                                  : d.applied_verdict === 'snooze' ? 'rgba(245,158,11,0.16)'
+                                  : d.applied_verdict === 'keep'   ? 'rgba(99,102,241,0.16)'
+                                  : 'rgba(148,163,184,0.16)',
+                        color:      d.applied_verdict === 'close' ? '#10b981'
+                                  : d.applied_verdict === 'snooze' ? '#f59e0b'
+                                  : d.applied_verdict === 'keep'   ? '#818cf8'
+                                  : 'var(--ink-58)',
+                        fontSize: 11, fontWeight: 700,
+                      }}
+                    >
+                      {d.applied_verdict
+                        ? `✓ ${t(('triage.' + d.applied_verdict) as TranslationKey)}`
+                        : `↩ ${t('triage.skip')}`}
+                      {d.applied_at && (
+                        <span style={{ opacity: 0.7, marginLeft: 6, fontWeight: 500 }}>
+                          · {new Date(d.applied_at).toLocaleString()}
+                        </span>
+                      )}
+                    </span>
+                  )}
                 </footer>
               </article>
             );
