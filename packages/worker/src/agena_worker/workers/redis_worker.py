@@ -171,6 +171,35 @@ async def _poll_sentry_auto_imports() -> None:
                 logger.exception('Sentry auto-import failed for project %s', mapping.project_slug)
 
 
+async def _poll_triage() -> None:
+    """Daily-ish stale-ticket triage. The poller schedules itself; the
+    actual cadence (e.g. Sunday 18:00 UTC) is enforced by the cron-style
+    config inside each org's OrgWorkflowSettings — for now we just call
+    the service every 6 hours and the LLM-skip dedup keeps cost low."""
+    from agena_services.services import triage_service
+
+    async with SessionLocal() as session:
+        try:
+            n = await triage_service.scan_all_orgs(session)
+            if n:
+                logger.info('Triage: %s decisions surfaced', n)
+        except Exception:
+            logger.exception('Triage scan failed')
+
+
+async def _poll_review_backlog() -> None:
+    """Updates the review-backlog rows for every org. Cheap (SQL only)."""
+    from agena_services.services import review_backlog_service
+
+    async with SessionLocal() as session:
+        try:
+            n = await review_backlog_service.scan_all_orgs(session)
+            if n:
+                logger.info('Review backlog: %s nudge rows updated', n)
+        except Exception:
+            logger.exception('Review-backlog scan failed')
+
+
 async def _poll_correlations() -> None:
     """Run a correlation pass for every org. Quick, no external network
     calls — just reads from our own DB and writes back any new clusters
@@ -464,6 +493,8 @@ async def process_queue() -> None:
     last_nr_poll = 0.0
     last_sentry_poll = 0.0
     last_correlation_poll = 0.0
+    last_triage_poll = 0.0
+    last_backlog_poll = 0.0
 
     while True:
         now = asyncio.get_running_loop().time()
@@ -492,6 +523,20 @@ async def process_queue() -> None:
             except Exception:
                 logger.exception('Correlation poll failed')
             last_correlation_poll = now
+
+        if now - last_backlog_poll >= 1800:  # 30 minutes
+            try:
+                await _poll_review_backlog()
+            except Exception:
+                logger.exception('Review-backlog poll failed')
+            last_backlog_poll = now
+
+        if now - last_triage_poll >= 21600:  # 6 hours
+            try:
+                await _poll_triage()
+            except Exception:
+                logger.exception('Triage poll failed')
+            last_triage_poll = now
 
         queue_size = await queue_service.queue_size()
         desired_concurrency = min(max_workers, max(1, queue_size))

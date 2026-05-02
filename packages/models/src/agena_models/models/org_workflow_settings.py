@@ -1,0 +1,36 @@
+"""OrgWorkflowSettings — per-organization configuration for the Triage
+and Review-Backlog automations. One row per org; we lazily create on
+first read."""
+from datetime import datetime
+from typing import Optional
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from agena_core.db.base import Base
+
+
+class OrgWorkflowSettings(Base):
+    __tablename__ = 'org_workflow_settings'
+
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey('organizations.id', ondelete='CASCADE'), primary_key=True,
+    )
+
+    # Triage
+    triage_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    triage_idle_days: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
+    triage_schedule_cron: Mapped[str] = mapped_column(String(64), nullable=False, default='0 18 * * 0')
+    triage_sources: Mapped[str] = mapped_column(String(128), nullable=False, default='jira,azure_devops')
+
+    # Backlog
+    backlog_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    backlog_warn_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=24)
+    backlog_critical_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=48)
+    backlog_nudge_interval_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=6)
+    backlog_channel: Mapped[str] = mapped_column(String(64), nullable=False, default='slack_dm')
+    backlog_exempt_repos: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    organization = relationship('Organization')
