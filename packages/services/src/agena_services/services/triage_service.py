@@ -87,9 +87,69 @@ def _parse_verdict(output: str) -> tuple[str, str]:
     return verdict, reason
 
 
-async def _evaluate(task: TaskRecord, idle_days: int) -> tuple[str, int, str]:
+async def _resolve_org_agent(db: AsyncSession, organization_id: int) -> tuple[str, str]:
+    """Pick an agent from the org's user prefs. Returns (provider, model).
+    Prefers claude_cli, then codex_cli (no API key required), then any
+    configured API agent. Returns ('', '') when nothing is configured."""
+    import json as _json
+    from agena_models.models.organization_member import OrganizationMember
+    from agena_models.models.user_preference import UserPreference
+    pref = (await db.execute(
+        select(UserPreference)
+        .join(OrganizationMember, OrganizationMember.user_id == UserPreference.user_id)
+        .where(OrganizationMember.organization_id == organization_id)
+        .where(UserPreference.agents_json.is_not(None))
+        .limit(1)
+    )).scalars().first()
+    if pref is None or not pref.agents_json:
+        return '', ''
+    try:
+        agents = _json.loads(pref.agents_json) or []
+    except (ValueError, TypeError):
+        return '', ''
+    if not isinstance(agents, list):
+        return '', ''
+    cli_match: tuple[str, str] | None = None
+    api_match: tuple[str, str] | None = None
+    for preferred in ('claude_cli', 'codex_cli'):
+        for a in agents:
+            if not isinstance(a, dict) or a.get('enabled') is False:
+                continue
+            p = str(a.get('provider') or '').strip().lower()
+            if p == preferred and cli_match is None:
+                m = str(a.get('custom_model') or a.get('model') or '').strip()
+                cli_match = (preferred, m)
+                break
+        if cli_match:
+            break
+    if cli_match is None:
+        for a in agents:
+            if not isinstance(a, dict) or a.get('enabled') is False:
+                continue
+            p = str(a.get('provider') or '').strip().lower()
+            if p in ('openai', 'gemini', 'anthropic'):
+                m = str(a.get('custom_model') or a.get('model') or '').strip()
+                api_match = (p, m)
+                break
+    return cli_match or api_match or ('', '')
+
+
+async def _evaluate(
+    task: TaskRecord,
+    idle_days: int,
+    *,
+    db: AsyncSession,
+    organization_id: int,
+) -> tuple[str, int, str]:
     """Run a single LLM call to classify one stale ticket.
-    Returns (verdict, confidence_0_100, reasoning)."""
+    Returns (verdict, confidence_0_100, reasoning).
+
+    Routing mirrors review_service: claude_cli / codex_cli agents go
+    through the local bridge (host's CLI auth, no API key needed).
+    openai / gemini / anthropic agents pull credentials from the org's
+    integration_configs row — env-level OPENAI_API_KEY is intentionally
+    NOT consulted. When no agent is configured at all, raises so the
+    scan loop can mark the row as failed instead of silently mocking."""
     user_prompt = (
         f'Source: {task.source}\n'
         f'External ID: {task.external_id}\n'
@@ -102,13 +162,56 @@ async def _evaluate(task: TaskRecord, idle_days: int) -> tuple[str, int, str]:
         f'Has branch: {"yes" if task.branch_name else "no"}\n\n'
         f'## Description\n{(task.description or "")[:3000]}\n'
     )
-    llm = LLMProvider(provider='openai')
-    output, _usage, _model, _cached = await llm.generate(
-        system_prompt=SYSTEM_PROMPT,
-        user_prompt=user_prompt,
-        complexity_hint='light',
-        max_output_tokens=200,
-    )
+
+    provider, model = await _resolve_org_agent(db, organization_id)
+    if not provider:
+        raise RuntimeError(
+            'No agent configured for this organization. Add a claude_cli / '
+            'codex_cli / openai / gemini / anthropic agent under '
+            '/dashboard/agents to enable triage.'
+        )
+
+    output = ''
+    if provider in ('claude_cli', 'codex_cli'):
+        # CLI bridge — read-only, /tmp working dir (no repo access needed
+        # for triage; the verdict is description-driven).
+        import os as _os
+        import httpx as _httpx
+        bridge_url = _os.getenv('CLI_BRIDGE_URL', 'http://cli-bridge:9876')
+        cli = 'claude' if provider == 'claude_cli' else 'codex'
+        full_prompt = f'{SYSTEM_PROMPT}\n\n---\n\n{user_prompt}'
+        async with _httpx.AsyncClient(timeout=120) as client:
+            resp = await client.post(
+                f'{bridge_url}/{cli}',
+                json={
+                    'repo_path': '/tmp',
+                    'prompt': full_prompt,
+                    'model': model or '',
+                    'timeout': 90,
+                    'read_only': True,
+                },
+            )
+            data = resp.json() if resp.content else {}
+        if data.get('status') == 'ok':
+            output = (data.get('stdout') or '').strip()
+        else:
+            raise RuntimeError(
+                f'{cli} bridge error: {data.get("message", data.get("stderr", "unknown"))}'
+            )
+    else:
+        # API provider via the same org-scoped helper review_service uses.
+        from agena_services.services.review_service import _build_llm_for_org
+        llm = await _build_llm_for_org(
+            db, organization_id=organization_id,
+            provider=provider, model=model or None,
+        )
+        output, _usage, _model, _cached = await llm.generate(
+            system_prompt=SYSTEM_PROMPT,
+            user_prompt=user_prompt,
+            complexity_hint='light',
+            max_output_tokens=200,
+        )
+
     verdict, reason = _parse_verdict(output or '')
     # Confidence: a coarse mapping. We don't ask the LLM for a number
     # explicitly because that adds tokens for marginal value; instead
@@ -213,7 +316,9 @@ async def scan_for_org(
 
         idle_days = max(1, (now - task.updated_at).days)
         try:
-            verdict, confidence, reasoning = await _evaluate(task, idle_days)
+            verdict, confidence, reasoning = await _evaluate(
+                task, idle_days, db=db, organization_id=org_id,
+            )
         except Exception:
             logger.exception('Triage LLM call failed for task=%s', task.id)
             continue

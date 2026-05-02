@@ -265,6 +265,8 @@ export default function TriagePage() {
               onChange={(v) => void saveSettings({ triage_idle_days: v })}
               accent='#10b981'
               options={[
+                { value: 1, label: t('duration.1d') },
+                { value: 3, label: t('duration.3d') },
                 { value: 7, label: t('duration.7d') },
                 { value: 14, label: t('duration.14d') },
                 { value: 30, label: t('duration.30d') },
