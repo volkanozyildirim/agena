@@ -19,10 +19,11 @@ router = APIRouter(prefix='/triage', tags=['triage'])
 
 class DecisionResponse(BaseModel):
     id: int
-    task_id: int
+    task_id: int | None = None  # nullable for source-side decisions (no local TaskRecord)
     source: str
     external_id: str
     ticket_title: str | None = None
+    ticket_url: str | None = None
     idle_days: int
     ai_verdict: str | None = None
     ai_confidence: int

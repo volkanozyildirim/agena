@@ -254,6 +254,230 @@ def _expand_sources(sources: list[str]) -> list[str]:
     return out
 
 
+def _make_stub_task(payload: dict):
+    """Build a TaskRecord-shaped stub for _evaluate(). Source-side scans
+    don't have a real DB row to feed in — _evaluate only reads attributes
+    so a SimpleNamespace clone works without polluting task_records."""
+    from types import SimpleNamespace
+    return SimpleNamespace(
+        id=None,
+        organization_id=payload.get('organization_id'),
+        source=payload.get('source', ''),
+        external_id=payload.get('external_id', ''),
+        title=payload.get('title', '') or '',
+        description=payload.get('description', '') or '',
+        status=payload.get('status', '') or 'open',
+        priority=payload.get('priority'),
+        assigned_to=payload.get('assigned_to'),
+        pr_url=payload.get('pr_url'),
+        branch_name=payload.get('branch_name'),
+        repo_mapping_id=None,
+    )
+
+
+async def _scan_jira_source(
+    db: AsyncSession,
+    org_id: int,
+    *,
+    idle_days: int,
+    max_results: int = 200,
+) -> list[dict]:
+    """Pull stale Jira issues directly via JQL — no AGENA import needed.
+    Filters on (statusCategory != Done) and (updated <= -Ndays). Returns
+    a list of normalised dicts the scan loop turns into TriageDecisions.
+    Empty list when Jira isn't configured."""
+    from agena_models.models.integration_config import IntegrationConfig
+    import base64 as _b64
+    import httpx as _httpx
+    cfg = (await db.execute(
+        select(IntegrationConfig).where(
+            IntegrationConfig.organization_id == org_id,
+            IntegrationConfig.provider == 'jira',
+        )
+    )).scalar_one_or_none()
+    if cfg is None or not cfg.secret:
+        return []
+    base_url = (cfg.base_url or '').rstrip('/')
+    if not base_url:
+        return []
+    email = (cfg.username or '').strip()
+    auth = _b64.b64encode(f'{email}:{cfg.secret}'.encode()).decode()
+    headers = {'Authorization': f'Basic {auth}', 'Accept': 'application/json'}
+    jql = f'statusCategory != Done AND updated <= -{int(idle_days)}d ORDER BY updated ASC'
+    out: list[dict] = []
+    start_at = 0
+    page = 50
+    async with _httpx.AsyncClient(timeout=20) as client:
+        while len(out) < max_results:
+            resp = await client.get(
+                f'{base_url}/rest/api/3/search',
+                params={'jql': jql, 'startAt': start_at, 'maxResults': page,
+                        'fields': 'summary,status,priority,assignee,updated,reporter'},
+                headers=headers,
+            )
+            if resp.status_code != 200:
+                logger.info('Jira JQL scan failed: status=%s', resp.status_code)
+                break
+            data = resp.json() if resp.content else {}
+            issues = data.get('issues') or []
+            for it in issues:
+                if not isinstance(it, dict):
+                    continue
+                key = str(it.get('key') or '').strip()
+                fields = it.get('fields') or {}
+                if not key:
+                    continue
+                from datetime import datetime as _dt
+                updated = str(fields.get('updated') or '').strip()
+                idle = idle_days
+                try:
+                    if updated:
+                        dt = _dt.fromisoformat(updated.replace('Z', '+00:00'))
+                        idle = max(1, (datetime.utcnow() - dt.replace(tzinfo=None)).days)
+                except Exception:
+                    pass
+                priority = ((fields.get('priority') or {}).get('name')) if isinstance(fields.get('priority'), dict) else None
+                assignee = ((fields.get('assignee') or {}).get('displayName')) if isinstance(fields.get('assignee'), dict) else None
+                status_name = ((fields.get('status') or {}).get('name')) if isinstance(fields.get('status'), dict) else ''
+                out.append({
+                    'organization_id': org_id,
+                    'source': 'jira',
+                    'external_id': key,
+                    'title': str(fields.get('summary') or '')[:512],
+                    'description': '',
+                    'status': str(status_name) or 'open',
+                    'priority': priority,
+                    'assigned_to': assignee,
+                    'idle_days': idle,
+                    'url': f'{base_url}/browse/{key}',
+                })
+                if len(out) >= max_results:
+                    break
+            if len(issues) < page or len(out) >= max_results:
+                break
+            start_at += len(issues)
+    return out
+
+
+async def _scan_azure_source(
+    db: AsyncSession,
+    org_id: int,
+    *,
+    idle_days: int,
+    max_results: int = 200,
+) -> list[dict]:
+    """Pull stale Azure DevOps work items via WIQL — query against the
+    user's preferred azure_project (from user_preferences). Skips when
+    the org has no Azure integration or no project picked."""
+    from agena_models.models.integration_config import IntegrationConfig
+    from agena_models.models.organization_member import OrganizationMember
+    from agena_models.models.user_preference import UserPreference
+    import base64 as _b64
+    import httpx as _httpx
+    from urllib.parse import quote as _q
+
+    cfg = (await db.execute(
+        select(IntegrationConfig).where(
+            IntegrationConfig.organization_id == org_id,
+            IntegrationConfig.provider == 'azure',
+        )
+    )).scalar_one_or_none()
+    if cfg is None or not cfg.secret:
+        return []
+    org_url = (cfg.base_url or '').rstrip('/')
+    if not org_url:
+        return []
+    # Project comes from any org member's saved preference
+    pref = (await db.execute(
+        select(UserPreference)
+        .join(OrganizationMember, OrganizationMember.user_id == UserPreference.user_id)
+        .where(OrganizationMember.organization_id == org_id)
+        .limit(1)
+    )).scalars().first()
+    project = (pref.azure_project if pref else '') or ''
+    if not project:
+        logger.info('Azure source-side triage skipped: no azure_project preference for org=%s', org_id)
+        return []
+
+    auth = _b64.b64encode(f':{cfg.secret}'.encode()).decode()
+    headers = {
+        'Authorization': f'Basic {auth}',
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+    }
+    wiql = (
+        "SELECT [System.Id] FROM WorkItems "
+        "WHERE [System.TeamProject] = @project "
+        "AND [System.State] NOT IN ('Done','Closed','Removed','Resolved') "
+        f"AND [System.ChangedDate] <= @today - {int(idle_days)} "
+        "ORDER BY [System.ChangedDate] ASC"
+    )
+    out: list[dict] = []
+    async with _httpx.AsyncClient(timeout=20) as client:
+        wiql_resp = await client.post(
+            f'{org_url}/{_q(project)}/_apis/wit/wiql?api-version=7.1-preview.2',
+            json={'query': wiql},
+            headers=headers,
+        )
+        if wiql_resp.status_code != 200:
+            logger.info('Azure WIQL scan failed: status=%s body=%s',
+                        wiql_resp.status_code, wiql_resp.text[:200])
+            return []
+        ids = [int(w.get('id', 0)) for w in (wiql_resp.json() or {}).get('workItems') or [] if isinstance(w, dict)]
+        ids = [i for i in ids if i][:max_results]
+        if not ids:
+            return []
+        # Hydrate in chunks (Azure's "ids" param caps around 200)
+        chunk = 100
+        from datetime import datetime as _dt
+        for i in range(0, len(ids), chunk):
+            batch = ids[i:i + chunk]
+            ids_str = ','.join(str(x) for x in batch)
+            hyd = await client.get(
+                f'{org_url}/_apis/wit/workitems?ids={ids_str}'
+                f'&fields=System.Id,System.Title,System.State,System.ChangedDate,'
+                f'System.AssignedTo,Microsoft.VSTS.Common.Priority,System.TeamProject'
+                f'&api-version=7.1-preview.3',
+                headers=headers,
+            )
+            if hyd.status_code != 200:
+                continue
+            for w in (hyd.json() or {}).get('value') or []:
+                if not isinstance(w, dict):
+                    continue
+                fields = w.get('fields') or {}
+                wid = fields.get('System.Id') or w.get('id')
+                if not wid:
+                    continue
+                changed = str(fields.get('System.ChangedDate') or '').strip()
+                idle = idle_days
+                try:
+                    if changed:
+                        dt = _dt.fromisoformat(changed.replace('Z', '+00:00'))
+                        idle = max(1, (datetime.utcnow() - dt.replace(tzinfo=None)).days)
+                except Exception:
+                    pass
+                assigned_raw = fields.get('System.AssignedTo')
+                if isinstance(assigned_raw, dict):
+                    assignee = assigned_raw.get('displayName') or assigned_raw.get('uniqueName')
+                else:
+                    assignee = assigned_raw
+                proj = fields.get('System.TeamProject') or project
+                out.append({
+                    'organization_id': org_id,
+                    'source': 'azure',
+                    'external_id': str(wid),
+                    'title': str(fields.get('System.Title') or '')[:512],
+                    'description': '',
+                    'status': str(fields.get('System.State') or 'open'),
+                    'priority': str(fields.get('Microsoft.VSTS.Common.Priority') or ''),
+                    'assigned_to': assignee,
+                    'idle_days': idle,
+                    'url': f'{org_url}/{_q(proj)}/_workitems/edit/{wid}',
+                })
+    return out
+
+
 async def scan_for_org(
     db: AsyncSession,
     org_id: int,
@@ -290,49 +514,65 @@ async def scan_for_org(
         }
 
     now = now or datetime.utcnow()
-    cutoff = now - timedelta(days=settings.triage_idle_days)
+    idle_days = settings.triage_idle_days
 
-    rows = (
-        await db.execute(
+    # Source-side scan: hit Jira / Azure REST directly so we triage the
+    # whole project, not just the slice that's been imported into AGENA.
+    candidates: list[dict] = []
+    if any(s in {'jira'} for s in sources):
+        candidates.extend(await _scan_jira_source(db, org_id, idle_days=idle_days))
+    if any(s in {'azure', 'azure_devops'} for s in sources):
+        candidates.extend(await _scan_azure_source(db, org_id, idle_days=idle_days))
+
+    # Resolve any candidate that's already been imported into task_records,
+    # so the apply path can flip the local task.status when the user
+    # confirms the AI verdict.
+    by_external = {(c['source'], c['external_id']): c for c in candidates}
+    if candidates:
+        existing_tasks = (await db.execute(
             select(TaskRecord).where(
                 TaskRecord.organization_id == org_id,
-                TaskRecord.source.in_(sources),
-                TaskRecord.status.in_(list(ACTIVE_STATUSES)),
-                TaskRecord.updated_at <= cutoff,
+                TaskRecord.external_id.in_([c['external_id'] for c in candidates]),
             )
-        )
-    ).scalars().all()
+        )).scalars().all()
+        for t in existing_tasks:
+            key = (t.source, t.external_id)
+            if key in by_external:
+                by_external[key]['_local_task_id'] = t.id
 
     new_decisions = 0
-    for task in rows:
-        existing = (
-            await db.execute(
-                select(TriageDecision).where(
-                    TriageDecision.organization_id == org_id,
-                    TriageDecision.task_id == task.id,
-                )
+    for cand in candidates:
+        existing = (await db.execute(
+            select(TriageDecision).where(
+                TriageDecision.organization_id == org_id,
+                TriageDecision.source == cand['source'],
+                TriageDecision.external_id == cand['external_id'],
             )
-        ).scalar_one_or_none()
-        # Skip if a pending decision already exists — user hasn't acted.
-        # Re-evaluate once a decision has been applied / skipped so we can
-        # surface a fresh recommendation if the ticket goes stale again.
+        )).scalar_one_or_none()
+        # Don't churn LLM cost on rows the user hasn't actioned yet.
         if existing and existing.status == 'pending':
             continue
 
-        idle_days = max(1, (now - task.updated_at).days)
         try:
+            stub = _make_stub_task(cand)
             verdict, confidence, reasoning = await _evaluate(
-                task, idle_days, db=db, organization_id=org_id,
+                stub, cand['idle_days'], db=db, organization_id=org_id,
             )
         except Exception:
-            logger.exception('Triage LLM call failed for task=%s', task.id)
+            logger.exception(
+                'Triage LLM call failed for source=%s external_id=%s',
+                cand['source'], cand['external_id'],
+            )
             continue
 
         if existing is not None:
-            existing.idle_days = idle_days
+            existing.task_id = cand.get('_local_task_id')
+            existing.idle_days = cand['idle_days']
             existing.ai_verdict = verdict
             existing.ai_confidence = confidence
             existing.ai_reasoning = reasoning
+            existing.ticket_title = cand['title']
+            existing.ticket_url = cand.get('url')
             existing.status = 'pending'
             existing.applied_verdict = None
             existing.applied_at = None
@@ -340,11 +580,12 @@ async def scan_for_org(
         else:
             db.add(TriageDecision(
                 organization_id=org_id,
-                task_id=task.id,
-                source=task.source,
-                external_id=task.external_id,
-                ticket_title=task.title,
-                idle_days=idle_days,
+                task_id=cand.get('_local_task_id'),
+                source=cand['source'],
+                external_id=cand['external_id'],
+                ticket_title=cand['title'],
+                ticket_url=cand.get('url'),
+                idle_days=cand['idle_days'],
                 ai_verdict=verdict,
                 ai_confidence=confidence,
                 ai_reasoning=reasoning,
@@ -354,19 +595,18 @@ async def scan_for_org(
 
     if new_decisions:
         await db.commit()
-        logger.info('Triage scan: org=%s new/refreshed decisions=%s', org_id, new_decisions)
+        logger.info('Triage source-side scan: org=%s decisions=%s candidates=%s',
+                    org_id, new_decisions, len(candidates))
 
     reason = ''
     if new_decisions == 0:
-        if not rows:
-            reason = (
-                f'no_stale_candidates'  # nothing met the {idle_days}-day cutoff
-            )
+        if not candidates:
+            reason = 'no_stale_candidates'
         else:
             reason = 'all_candidates_have_pending_decisions'
     return {
         'new_or_refreshed': new_decisions,
-        'considered': len(rows),
+        'considered': len(candidates),
         'threshold_days': settings.triage_idle_days,
         'sources': sources,
         'reason': reason,

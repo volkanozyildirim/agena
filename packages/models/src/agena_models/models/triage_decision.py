@@ -17,12 +17,15 @@ class TriageDecision(Base):
     organization_id: Mapped[int] = mapped_column(
         ForeignKey('organizations.id', ondelete='CASCADE'), nullable=False, index=True,
     )
-    task_id: Mapped[int] = mapped_column(
-        ForeignKey('task_records.id', ondelete='CASCADE'), nullable=False,
+    # Nullable: source-side triage produces decisions for tickets that
+    # have never been imported into AGENA's task_records.
+    task_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey('task_records.id', ondelete='CASCADE'), nullable=True,
     )
     source: Mapped[str] = mapped_column(String(32), nullable=False)
     external_id: Mapped[str] = mapped_column(String(128), nullable=False)
     ticket_title: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    ticket_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     idle_days: Mapped[int] = mapped_column(Integer, default=0)
 
     ai_verdict: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)

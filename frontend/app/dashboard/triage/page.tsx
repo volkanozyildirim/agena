@@ -1,16 +1,18 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { apiFetch } from '@/lib/api';
 import { useLocale, type TranslationKey } from '@/lib/i18n';
 import { ChipSelect, MultiChipSelect, SwitchToggle, SettingsField, SettingsCard } from '@/components/SettingsControls';
 
 type Decision = {
   id: number;
-  task_id: number;
+  task_id: number | null;
   source: string;
   external_id: string;
   ticket_title: string | null;
+  ticket_url: string | null;
   idle_days: number;
   ai_verdict: string | null;
   ai_confidence: number;
@@ -129,6 +131,19 @@ export default function TriagePage() {
     } finally {
       setScanning(false);
     }
+  }
+
+  // Confirm-before-apply: clicking a verdict button opens a modal so
+  // the user has one last chance to back out before AGENA flips the
+  // task / posts a comment / etc. State holds the pending intent.
+  const [confirmIntent, setConfirmIntent] = useState<{
+    id: number;
+    verdict: string;
+    decision: Decision;
+  } | null>(null);
+
+  function requestApply(d: Decision, verdict: string) {
+    setConfirmIntent({ id: d.id, verdict, decision: d });
   }
 
   async function applyOne(id: number, verdict: string) {
@@ -403,7 +418,14 @@ export default function TriagePage() {
                   </span>
                 </header>
                 <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink-90)' }}>
-                  {d.ticket_title || '(no title)'}
+                  {d.ticket_url ? (
+                    <a href={d.ticket_url} target='_blank' rel='noopener noreferrer'
+                      style={{ color: 'var(--ink-90)', textDecoration: 'underline', textUnderlineOffset: 3 }}>
+                      {d.ticket_title || '(no title)'} ↗
+                    </a>
+                  ) : (
+                    d.ticket_title || '(no title)'
+                  )}
                 </div>
                 {d.ai_reasoning && (
                   <p style={{ fontSize: 12, color: 'var(--ink-58)', margin: 0, lineHeight: 1.55, fontStyle: 'italic' }}>
@@ -414,25 +436,25 @@ export default function TriagePage() {
                   {statusFilter === 'pending' ? (
                     <>
                       <button
-                        onClick={() => void applyOne(d.id, verdict)}
+                        onClick={() => requestApply(d, verdict)}
                         style={{ padding: '5px 11px', borderRadius: 8, background: `${color}22`, color, border: `1px solid ${color}55`, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
                       >
                         ✓✓ {t('triage.applyAi')}
                       </button>
                       <button
-                        onClick={() => void applyOne(d.id, 'close')}
+                        onClick={() => requestApply(d, 'close')}
                         style={{ padding: '5px 11px', borderRadius: 8, background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.25)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
                       >
                         ✓ {t('triage.close')}
                       </button>
                       <button
-                        onClick={() => void applyOne(d.id, 'snooze')}
+                        onClick={() => requestApply(d, 'snooze')}
                         style={{ padding: '5px 11px', borderRadius: 8, background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
                       >
                         ⏸ {t('triage.snooze')}
                       </button>
                       <button
-                        onClick={() => void applyOne(d.id, 'keep')}
+                        onClick={() => requestApply(d, 'keep')}
                         style={{ padding: '5px 11px', borderRadius: 8, background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
                       >
                         ⛔ {t('triage.keep')}
@@ -474,6 +496,66 @@ export default function TriagePage() {
             );
           })}
         </div>
+      )}
+
+      {confirmIntent && typeof document !== 'undefined' && createPortal(
+        <div
+          onClick={() => setConfirmIntent(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+            backdropFilter: 'blur(6px)', zIndex: 9999,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{
+            width: 'min(480px, 100%)', borderRadius: 14, padding: 20,
+            background: 'var(--surface)', border: '1px solid var(--panel-border)',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.5)', display: 'grid', gap: 12,
+          }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--ink-90)' }}>
+              {t(('triage.confirm.' + confirmIntent.verdict) as TranslationKey, { defaultValue: '' }) ||
+               t('triage.confirm.title' as TranslationKey)}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--ink-78)', lineHeight: 1.5 }}>
+              <strong>{confirmIntent.decision.source}</strong>:{' '}
+              <span style={{ fontFamily: 'monospace' }}>{confirmIntent.decision.external_id}</span>
+              {confirmIntent.decision.ticket_title && (
+                <> — {confirmIntent.decision.ticket_title}</>
+              )}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--ink-58)', lineHeight: 1.5,
+                          padding: '8px 10px', background: 'var(--panel)',
+                          border: '1px solid var(--panel-border)', borderRadius: 8 }}>
+              {t(('triage.help.' + confirmIntent.verdict) as TranslationKey)}
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setConfirmIntent(null)}
+                style={{ padding: '8px 14px', borderRadius: 8,
+                         background: 'transparent', color: 'var(--ink-58)',
+                         border: '1px solid var(--panel-border)',
+                         fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+              >
+                {t('triage.confirm.cancel' as TranslationKey)}
+              </button>
+              <button
+                onClick={async () => {
+                  const intent = confirmIntent;
+                  setConfirmIntent(null);
+                  await applyOne(intent.id, intent.verdict);
+                }}
+                style={{ padding: '8px 14px', borderRadius: 8,
+                         background: 'linear-gradient(135deg, #10b981, #06b6d4)',
+                         color: '#fff', border: 'none',
+                         fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+              >
+                {t('triage.confirm.confirm' as TranslationKey)}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
