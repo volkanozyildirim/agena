@@ -250,26 +250,34 @@ function DashboardInner({ children }: { children: ReactNode }) {
       if (!active) return;
       setChecked(true);
 
-      apiFetch<{ full_name?: string; email: string; org_slug?: string; org_name?: string; is_platform_admin?: boolean }>('/auth/me').then((u) => {
+      // /auth/me is awaited inline so the platform-admin flag is captured
+      // in a local variable before the onboarding-redirect check below
+      // runs. Reading React state (`isPlatformAdmin`) at that point would
+      // see a stale `false`, which used to bounce admins to /onboarding
+      // before /auth/me had a chance to resolve.
+      let meIsAdmin = false;
+      try {
+        const u = await apiFetch<{ full_name?: string; email: string; org_slug?: string; org_name?: string; is_platform_admin?: boolean }>('/auth/me');
         if (!active) return;
+        meIsAdmin = !!u.is_platform_admin;
         setUserName(u.full_name || u.email);
-        if (u.is_platform_admin) {
+        if (meIsAdmin) {
           setIsPlatformAdmin(true);
-          // Redirect platform admin to admin panel if on generic dashboard pages
           if (pathname === '/dashboard' || pathname === '/dashboard/onboarding') {
             router.replace('/dashboard/admin');
+            return;
           }
         }
-        // Store org slug/name from the /me response
         if (u.org_slug) { setOrgSlugState(u.org_slug); setOrgSlug(u.org_slug); }
         if (u.org_name) { setOrgNameDisplay(u.org_name); setOrgName(u.org_name); }
-        // Fetch current user's role from org members list
         apiFetch<Array<{ email: string; role: string }>>('/org/members').then((members) => {
           if (!active) return;
           const me = members.find((m) => m.email === u.email);
           if (me) setUserRole(me.role as Role);
         }).catch(() => {});
-      }).catch(() => {});
+      } catch {
+        // /me failed — keep meIsAdmin=false so non-admin onboarding flow runs
+      }
 
       // Fetch enabled modules (retry once on failure to avoid leaving sidebar in indeterminate state)
       const fetchModules = (retries = 1): Promise<void> =>
@@ -315,8 +323,10 @@ function DashboardInner({ children }: { children: ReactNode }) {
         const raw = (prefs.profile_settings || {}) as Record<string, unknown>;
         setProfileSettings(raw);
         setWebPushEnabled(raw.web_push_notifications !== false);
-        // Auto-redirect to onboarding if not completed (skip for platform admins and onboarding page)
-        if (!isPlatformAdmin && !raw.onboarding_completed && !pathname.startsWith('/dashboard/onboarding')) {
+        // Auto-redirect to onboarding if not completed (skip for platform admins and onboarding page).
+        // Use the local meIsAdmin flag captured from /auth/me — the React state
+        // value is stale here because setIsPlatformAdmin hasn't flushed yet.
+        if (!meIsAdmin && !raw.onboarding_completed && !pathname.startsWith('/dashboard/onboarding')) {
           // Check if user already has integrations — if so, skip onboarding
           try {
             const integrations = await apiFetch<Array<{ has_secret: boolean; base_url?: string | null }>>('/integrations');
