@@ -28,6 +28,10 @@ class OrgWorkflowSettings(Base):
 
     # Backlog
     backlog_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Worker auto-nudge opt-in. When False (default), nudges only fire
+    # on explicit button clicks; when True, the 30-min worker poller
+    # auto-posts using the configured channels.
+    backlog_auto_nudge: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     backlog_warn_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=24)
     backlog_critical_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=48)
     backlog_nudge_interval_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=6)

@@ -244,11 +244,20 @@ async def auto_nudge_for_org(db: AsyncSession, org_id: int) -> int:
     settings = await _settings_for(db, org_id)
     if not settings.backlog_enabled:
         return 0
-    channel = (settings.backlog_channel or 'manual').strip()
-    if not channel or channel == 'manual':
-        # Manual-only: user hasn't opted into auto-nudging.
+    if not bool(getattr(settings, 'backlog_auto_nudge', False)):
+        # Explicit opt-in: only auto-post when the toggle is on. Channel
+        # selection is independent — the user might have Slack + PR
+        # comment configured but only want manual button clicks.
         return 0
-    interval_hours = max(1, int(settings.backlog_nudge_interval_hours or 6))
+    channel = (settings.backlog_channel or 'manual').strip()
+    if not channel:
+        return 0
+    # Auto-nudge enforces a 24-hour floor regardless of the per-row
+    # interval. Manual clicks can be faster (you might intentionally
+    # ping twice on a critical PR), but the worker shouldn't spam a
+    # reviewer more than once a day. Reviewer needs a real chance to
+    # respond between automated pings.
+    interval_hours = max(24, int(settings.backlog_nudge_interval_hours or 24))
     cutoff = datetime.utcnow() - timedelta(hours=interval_hours)
 
     # Pick rows that:

@@ -22,6 +22,7 @@ class WorkflowSettingsResponse(BaseModel):
     triage_schedule_cron: str
     triage_sources: str
     backlog_enabled: bool
+    backlog_auto_nudge: bool = False
     backlog_warn_hours: int
     backlog_critical_hours: int
     backlog_nudge_interval_hours: int
@@ -39,6 +40,7 @@ class WorkflowSettingsUpdate(BaseModel):
     triage_schedule_cron: str | None = None
     triage_sources: str | None = None
     backlog_enabled: bool | None = None
+    backlog_auto_nudge: bool | None = None
     backlog_warn_hours: int | None = Field(default=None, ge=1, le=720)
     backlog_critical_hours: int | None = Field(default=None, ge=1, le=720)
     backlog_nudge_interval_hours: int | None = Field(default=None, ge=1, le=168)

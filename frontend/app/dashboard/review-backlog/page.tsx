@@ -31,6 +31,7 @@ type Settings = {
   triage_schedule_cron: string;
   triage_sources: string;
   backlog_enabled: boolean;
+  backlog_auto_nudge?: boolean;
   backlog_warn_hours: number;
   backlog_critical_hours: number;
   backlog_nudge_interval_hours: number;
@@ -68,6 +69,10 @@ export default function ReviewBacklogPage() {
   // git_sync hasn't synced any repo's PRs yet.
   const [repoFilter, setRepoFilter] = useState<string>('all');
   const [reposInScope, setReposInScope] = useState<Array<{ repo_mapping_id: string; label: string; count: number }>>([]);
+  // All configured repo mappings — used by the "Exempt repos"
+  // multi-toggle so the user picks from real repos instead of typing
+  // numeric ids by hand.
+  const [allMappings, setAllMappings] = useState<Array<{ id: number; provider: string; owner: string; repo_name: string }>>([]);
 
   async function load(repo: string = repoFilter) {
     try {
@@ -90,6 +95,13 @@ export default function ReviewBacklogPage() {
     } catch { /* non-fatal */ }
   }
 
+  async function loadAllMappings() {
+    try {
+      const rows = await apiFetch<Array<{ id: number; provider: string; owner: string; repo_name: string }>>('/repo-mappings');
+      setAllMappings(rows);
+    } catch { /* non-fatal */ }
+  }
+
   async function loadSettings() {
     try {
       const s = await apiFetch<Settings>('/workflow-settings');
@@ -99,7 +111,7 @@ export default function ReviewBacklogPage() {
     }
   }
 
-  useEffect(() => { void load(); void loadSettings(); void loadRepos(); }, []);
+  useEffect(() => { void load(); void loadSettings(); void loadRepos(); void loadAllMappings(); }, []);
   useEffect(() => { void load(repoFilter); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [repoFilter]);
 
   async function scanNow() {
@@ -348,6 +360,16 @@ export default function ReviewBacklogPage() {
               accent='#f59e0b'
             />
           </SettingsField>
+          <SettingsField
+            label={t('backlog.set.autoNudge' as TranslationKey)}
+            hint={t('backlog.set.autoNudgeHint' as TranslationKey)}
+          >
+            <SwitchToggle
+              value={!!settings.backlog_auto_nudge}
+              onChange={(v) => void saveSettings({ backlog_auto_nudge: v } as Partial<Settings>)}
+              accent='#10b981'
+            />
+          </SettingsField>
           <SettingsField label={t('backlog.set.warnHours')} hint={t('backlog.set.warnHint')}>
             <ChipSelect<number>
               value={settings.backlog_warn_hours}
@@ -449,13 +471,53 @@ export default function ReviewBacklogPage() {
             })()}
           </SettingsField>
           <SettingsField label={t('backlog.set.exemptRepos')} hint={t('backlog.set.exemptHint')}>
-            <input
-              type='text'
-              value={settings.backlog_exempt_repos || ''}
-              onChange={(e) => void saveSettings({ backlog_exempt_repos: e.target.value })}
-              style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--panel-border)', background: 'var(--surface)', color: 'var(--ink)', fontSize: 13, width: '100%', maxWidth: 320 }}
-              placeholder='1, 3, 7'
-            />
+            {(() => {
+              // Multi-toggle from real repo_mappings — user clicks the
+              // chip instead of looking up numeric IDs.
+              const selected = new Set(
+                (settings.backlog_exempt_repos || '')
+                  .split(',').map((s) => s.trim()).filter(Boolean),
+              );
+              const toggle = (id: string) => {
+                const next = new Set(selected);
+                if (next.has(id)) next.delete(id); else next.add(id);
+                void saveSettings({
+                  backlog_exempt_repos: Array.from(next).join(','),
+                } as Partial<Settings>);
+              };
+              if (allMappings.length === 0) {
+                return (
+                  <div style={{ fontSize: 11, color: 'var(--ink-35)' }}>
+                    {t('backlog.set.exempt.empty' as TranslationKey)}
+                  </div>
+                );
+              }
+              return (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, maxWidth: 600 }}>
+                  {allMappings.map((m) => {
+                    const id = String(m.id);
+                    const on = selected.has(id);
+                    const icon = (m.provider || '').toLowerCase() === 'github' ? '🐙' : '☁️';
+                    return (
+                      <button
+                        key={id}
+                        type='button'
+                        onClick={() => toggle(id)}
+                        style={{
+                          padding: '6px 10px', borderRadius: 8,
+                          border: '1px solid ' + (on ? 'rgba(245,158,11,0.55)' : 'var(--panel-border)'),
+                          background: on ? 'rgba(245,158,11,0.16)' : 'var(--panel)',
+                          color: on ? '#f59e0b' : 'var(--ink-78)',
+                          fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                        }}
+                      >
+                        {on ? '✓ ' : ''}{icon} {m.provider}:{m.owner}/{m.repo_name}
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </SettingsField>
           <SettingsField
             label={t('backlog.set.commentLanguage' as TranslationKey)}
