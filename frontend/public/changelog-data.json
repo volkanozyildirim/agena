@@ -1,5 +1,13 @@
 [
   {
+    "hash": "be06da9",
+    "short": "be06da9",
+    "message": "i18n: pass 2 \u2014 common chrome words (Name, Status, Save, Cancel\u2026)",
+    "date": "2026-05-02",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "7f8e2cc",
     "short": "7f8e2cc",
     "message": "i18n: localise the rest of the dashboard chrome",

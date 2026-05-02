@@ -176,6 +176,46 @@ they get re-applied.
 - Guided tour onboarding for new users
 - 7 languages (TR, EN, ES, ZH, IT, DE, JA)
 
+**Cross-Source Insights** *(module: `insights`, default off)*
+- Correlation engine that ties PR merges + deploys + Sentry / NewRelic
+  / Datadog / AppDynamics / Jira / Azure events into one timeline
+- Confidence-scored clusters (0-100); ≥ 70 surfaces on
+  `/dashboard/insights` with a one-sentence narrative + full timeline
+- "Which deploy caused this bug?" answered in seconds — replaces the
+  20-minute tab-hop during incidents
+- Confirm / False positive / Undo triage; Confirm can open a one-click
+  rollback PR for the suspected commit
+- Poller runs every 5 minutes, no extra integration setup — re-uses
+  the data the existing AGENA clients already cache
+- Marketing page: [`/cross-source-insights`](https://agena.dev/cross-source-insights)
+
+**Stale Ticket Triage** *(module: `triage`, default off)*
+- Schedule-driven scan (chip pickers: every 6h / 12h / daily / weekly /
+  monthly) of every Jira and Azure DevOps task whose `updated_at` is
+  past the org's idle threshold
+- LLM emits one of three verdicts per ticket — `close` /
+  `snooze` / `keep` — plus a one-sentence reason
+- "Apply all AI suggestions" bulk-approves the queue in one click;
+  per-row override still available
+- Conservative defaults: only picks `close` when the ticket itself
+  signals resolution; otherwise prefers `snooze`
+- Audit trail per decision (AI verdict + user override + timestamp)
+  in the `triage_decisions` table
+- Marketing page: [`/stale-ticket-triage`](https://agena.dev/stale-ticket-triage)
+
+**Review Backlog Killer** *(module: `review_backlog`, default off)*
+- 30-minute poller flags every open PR aging past warn / critical
+  thresholds (defaults 24h / 48h, both chip-configurable)
+- Severity tiers (info / warning / critical) drive dashboard sorting
+  and auto-escalation flags
+- Multi-channel reviewer nudge: Slack DM, Slack channel, email, or a
+  comment posted directly on the PR via the GitHub client
+- Per-PR nudge counter + last-nudged-channel + last-nudged-at so the
+  same reviewer doesn't get spammed
+- Per-org settings: warn / critical / nudge interval (chips), notify
+  channel (chips), exempt repo list (comma-separated repo mapping ids)
+- Marketing page: [`/review-backlog-killer`](https://agena.dev/review-backlog-killer)
+
 ---
 
 ## Architecture
