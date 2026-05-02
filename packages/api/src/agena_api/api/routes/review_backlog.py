@@ -72,11 +72,53 @@ def _build_pr_url(
     return None
 
 
+@router.get('/repos')
+async def list_backlog_repos(
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[dict[str, Any]]:
+    """Distinct repos that currently have at least one tracked nudge,
+    with per-repo counts. Drives the repo filter chips on the backlog
+    page so the user can scope the queue to one repo."""
+    from sqlalchemy import func
+    rows = (await db.execute(
+        select(
+            ReviewBacklogNudge.repo_mapping_id,
+            func.count(ReviewBacklogNudge.id).label('n'),
+        )
+        .where(ReviewBacklogNudge.organization_id == tenant.organization_id)
+        .where(ReviewBacklogNudge.resolved_at.is_(None))
+        .group_by(ReviewBacklogNudge.repo_mapping_id)
+    )).all()
+    out: list[dict[str, Any]] = []
+    for repo_id_str, count in rows:
+        m = None
+        if repo_id_str and repo_id_str.isdigit():
+            m = (await db.execute(
+                select(RepoMapping).where(
+                    RepoMapping.id == int(repo_id_str),
+                    RepoMapping.organization_id == tenant.organization_id,
+                )
+            )).scalar_one_or_none()
+        if m is None:
+            label = f'#{repo_id_str}'
+        else:
+            label = f'{(m.provider or "").lower()}:{m.owner}/{m.repo_name}'
+        out.append({
+            'repo_mapping_id': repo_id_str,
+            'label': label,
+            'count': int(count or 0),
+        })
+    out.sort(key=lambda r: -r['count'])
+    return out
+
+
 @router.get('', response_model=list[NudgeResponse])
 async def list_backlog(
     tenant: CurrentTenant = Depends(get_current_tenant),
     db: AsyncSession = Depends(get_db_session),
     include_resolved: bool = False,
+    repo_mapping_id: str | None = None,
     limit: int = 100,
 ) -> list[NudgeResponse]:
     stmt = (
@@ -88,6 +130,8 @@ async def list_backlog(
     )
     if not include_resolved:
         stmt = stmt.where(ReviewBacklogNudge.resolved_at.is_(None))
+    if repo_mapping_id and repo_mapping_id != 'all':
+        stmt = stmt.where(ReviewBacklogNudge.repo_mapping_id == repo_mapping_id)
     rows = (await db.execute(stmt)).all()
 
     # Resolve repo mappings + the org's azure base URL once for the batch

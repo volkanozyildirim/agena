@@ -62,15 +62,30 @@ export default function ReviewBacklogPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Repo filter chips — backed by /review-backlog/repos which returns
+  // (repo_mapping_id, label, count) for repos that currently have at
+  // least one tracked PR. Empty list = no PRs in scope, expected when
+  // git_sync hasn't synced any repo's PRs yet.
+  const [repoFilter, setRepoFilter] = useState<string>('all');
+  const [reposInScope, setReposInScope] = useState<Array<{ repo_mapping_id: string; label: string; count: number }>>([]);
 
-  async function load() {
+  async function load(repo: string = repoFilter) {
     try {
-      const rows = await apiFetch<Nudge[]>('/review-backlog?limit=200');
+      const params = new URLSearchParams({ limit: '200' });
+      if (repo && repo !== 'all') params.set('repo_mapping_id', repo);
+      const rows = await apiFetch<Nudge[]>(`/review-backlog?${params.toString()}`);
       setItems(rows);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
+  }
+
+  async function loadRepos() {
+    try {
+      const rows = await apiFetch<Array<{ repo_mapping_id: string; label: string; count: number }>>('/review-backlog/repos');
+      setReposInScope(rows);
+    } catch { /* non-fatal */ }
   }
 
   async function loadSettings() {
@@ -82,7 +97,8 @@ export default function ReviewBacklogPage() {
     }
   }
 
-  useEffect(() => { void load(); void loadSettings(); }, []);
+  useEffect(() => { void load(); void loadSettings(); void loadRepos(); }, []);
+  useEffect(() => { void load(repoFilter); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [repoFilter]);
 
   async function scanNow() {
     setScanning(true);
@@ -94,6 +110,7 @@ export default function ReviewBacklogPage() {
         resolved?: number;
       }>('/review-backlog/scan', { method: 'POST' });
       await load();
+      await loadRepos();
       // Surface a no-op scan so the user knows why the list is empty
       // (no open PRs over the warn threshold, vs the feature being
       // broken). Localised through t() — keys are backlog.scan.*.
@@ -186,6 +203,43 @@ export default function ReviewBacklogPage() {
             {t('backlog.longSubtitle')}
           </p>
         </div>
+
+        {/* Repo filter chips — show ONLY repos that currently carry
+            a tracked PR. Makes "what's actually in scope" obvious;
+            mapped repos with zero PRs aren't shown because they'd
+            mislead the user. Click to scope the queue to one repo. */}
+        {reposInScope.length > 0 && (
+          <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--panel)', border: '1px solid var(--panel-border)', borderRadius: 10, alignSelf: 'flex-start', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setRepoFilter('all')}
+              style={{
+                padding: '6px 10px', borderRadius: 7, border: 'none',
+                background: repoFilter === 'all' ? 'rgba(245,158,11,0.18)' : 'transparent',
+                color: repoFilter === 'all' ? '#f59e0b' : 'var(--ink-58)',
+                fontSize: 11, fontWeight: 700, cursor: 'pointer',
+              }}
+            >
+              {t('triage.source.all' as TranslationKey)} ({reposInScope.reduce((s, r) => s + r.count, 0)})
+            </button>
+            {reposInScope.map((r) => {
+              const isActive = repoFilter === r.repo_mapping_id;
+              return (
+                <button
+                  key={r.repo_mapping_id}
+                  onClick={() => setRepoFilter(r.repo_mapping_id)}
+                  style={{
+                    padding: '6px 10px', borderRadius: 7, border: 'none',
+                    background: isActive ? 'rgba(245,158,11,0.18)' : 'transparent',
+                    color: isActive ? '#f59e0b' : 'var(--ink-58)',
+                    fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                  }}
+                >
+                  📦 {r.label} <span style={{ opacity: 0.6, marginLeft: 4 }}>({r.count})</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Stat strip — corporate at-a-glance summary */}
         {stats && (
