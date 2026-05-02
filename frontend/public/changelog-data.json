@@ -1,5 +1,13 @@
 [
   {
+    "hash": "9c477ce",
+    "short": "9c477ce",
+    "message": "SEO: landing pages + README entries for the 3 new workflow modules",
+    "date": "2026-05-02",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "be06da9",
     "short": "be06da9",
     "message": "i18n: pass 2 \u2014 common chrome words (Name, Status, Save, Cancel\u2026)",
