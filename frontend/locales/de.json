@@ -3334,5 +3334,22 @@
   "backlog.stat.warning": "Warnung",
   "backlog.stat.avgAge": "Ø Alter",
   "backlog.stat.escalated": "Eskaliert",
-  "backlog.set.channel.prComment": "💬 PR-Kommentar"
+  "backlog.set.channel.prComment": "💬 PR-Kommentar",
+  "modules.pageTitle": "Module",
+  "modules.active": "aktiv",
+  "modules.subtitle": "Funktionen für eure Organisation aktivieren oder deaktivieren. Core-Module sind immer an.",
+  "modules.loading": "Lädt…",
+  "modules.toggleEnabled": "aktiviert",
+  "modules.toggleDisabled": "deaktiviert",
+  "modules.updateFailed": "Modul konnte nicht aktualisiert werden",
+  "modules.coreBadge": "CORE",
+  "modules.group.core": "Kern & Workspace",
+  "modules.group.ai": "KI & Automatisierung",
+  "modules.group.workflows": "Workflows & Insights",
+  "modules.group.llm": "LLM-Anbieter",
+  "modules.group.scm": "Versionskontrolle",
+  "modules.group.issues": "Issue-Tracking",
+  "modules.group.analytics": "Analytics & Metriken",
+  "modules.group.notifications": "Benachrichtigungen",
+  "modules.group.other": "Andere"
 }

@@ -71,10 +71,10 @@ export default function ModulesPage() {
       setModules((prev) => prev.map((m) => m.slug === slug ? { ...m, enabled: updated.enabled } : m));
       // Notify layout to refresh sidebar
       window.dispatchEvent(new CustomEvent('agena:modules-changed'));
-      setMsg(`${updated.name} ${updated.enabled ? 'enabled' : 'disabled'}`);
+      setMsg(`${updated.name} ${updated.enabled ? t('modules.toggleEnabled') : t('modules.toggleDisabled')}`);
       setTimeout(() => setMsg(''), 2000);
     } catch {
-      setMsg('Failed to update module');
+      setMsg(t('modules.updateFailed'));
       setTimeout(() => setMsg(''), 2000);
     } finally {
       setToggling(null);
@@ -83,15 +83,15 @@ export default function ModulesPage() {
 
   const enabledCount = modules.filter((m) => m.enabled).length;
 
-  const MODULE_GROUPS: { label: string; slugs: string[] }[] = [
-    { label: 'Core & Workspace', slugs: ['core', 'boss_mode', 'sprints', 'refinement', 'skills', 'runtimes', 'permissions'] },
-    { label: 'AI & Automation', slugs: ['flows', 'prompt_studio', 'playbook', 'reviews'] },
-    { label: 'Workflows & Insights', slugs: ['insights', 'triage', 'review_backlog'] },
-    { label: 'LLM Providers', slugs: ['openai', 'gemini', 'hal', 'cli_agents'] },
-    { label: 'Source Control', slugs: ['github', 'gitlab', 'bitbucket', 'azure'] },
-    { label: 'Issue Tracking', slugs: ['jira', 'sentry', 'newrelic', 'datadog', 'appdynamics'] },
-    { label: 'Analytics & Metrics', slugs: ['dora'] },
-    { label: 'Notifications', slugs: ['slack', 'teams', 'telegram', 'notifications'] },
+  const MODULE_GROUPS: { labelKey: string; slugs: string[] }[] = [
+    { labelKey: 'modules.group.core', slugs: ['core', 'boss_mode', 'sprints', 'refinement', 'skills', 'runtimes', 'permissions'] },
+    { labelKey: 'modules.group.ai', slugs: ['flows', 'prompt_studio', 'playbook', 'reviews'] },
+    { labelKey: 'modules.group.workflows', slugs: ['insights', 'triage', 'review_backlog'] },
+    { labelKey: 'modules.group.llm', slugs: ['openai', 'gemini', 'hal', 'cli_agents'] },
+    { labelKey: 'modules.group.scm', slugs: ['github', 'gitlab', 'bitbucket', 'azure'] },
+    { labelKey: 'modules.group.issues', slugs: ['jira', 'sentry', 'newrelic', 'datadog', 'appdynamics'] },
+    { labelKey: 'modules.group.analytics', slugs: ['dora'] },
+    { labelKey: 'modules.group.notifications', slugs: ['slack', 'teams', 'telegram', 'notifications'] },
   ];
 
   // Catch-all: any module the DB returns but isn't slotted into a group
@@ -99,19 +99,19 @@ export default function ModulesPage() {
   // again like we did with the new workflow modules.
   const KNOWN = new Set(MODULE_GROUPS.flatMap((g) => g.slugs));
   const orphans = modules.filter((m) => !KNOWN.has(m.slug)).map((m) => m.slug);
-  if (orphans.length) MODULE_GROUPS.push({ label: 'Other', slugs: orphans });
+  if (orphans.length) MODULE_GROUPS.push({ labelKey: 'modules.group.other', slugs: orphans });
 
   return (
     <div style={{ display: 'grid', gap: 16 }}>
       <div>
         <h1 style={{ fontSize: 18, fontWeight: 800, color: 'var(--ink-90)', margin: 0 }}>
-          Modules
+          {t('modules.pageTitle')}
           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-30)', marginLeft: 10 }}>
-            {enabledCount}/{modules.length} active
+            {enabledCount}/{modules.length} {t('modules.active')}
           </span>
         </h1>
         <p style={{ fontSize: 12, color: 'var(--ink-40)', marginTop: 4 }}>
-          Enable or disable features for your organization. Core modules cannot be disabled.
+          {t('modules.subtitle')}
         </p>
       </div>
 
@@ -122,15 +122,15 @@ export default function ModulesPage() {
       )}
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-25)' }}>Loading...</div>
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-25)' }}>{t('modules.loading')}</div>
       ) : (
         <div style={{ display: 'grid', gap: 16 }}>
           {MODULE_GROUPS.map((group) => {
             const groupModules = group.slugs.map((s) => modules.find((m) => m.slug === s)).filter(Boolean) as ModuleItem[];
             if (!groupModules.length) return null;
             return (
-              <div key={group.label}>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', marginBottom: 8 }}>{group.label}</div>
+              <div key={group.labelKey}>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', marginBottom: 8 }}>{t(group.labelKey as Parameters<typeof t>[0])}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 8 }}>
                   {groupModules.map((m) => (
             <div key={m.slug} style={{
@@ -151,7 +151,7 @@ export default function ModulesPage() {
                 </div>
                 <button onClick={() => setHelpModule(m)} style={{ width: 18, height: 18, borderRadius: 5, border: '1px solid var(--panel-border-2)', background: 'transparent', color: 'var(--ink-30)', fontSize: 10, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>?</button>
                 {m.is_core ? (
-                  <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 999, background: 'rgba(56,189,248,0.1)', color: '#38bdf8' }}>CORE</span>
+                  <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 999, background: 'rgba(56,189,248,0.1)', color: '#38bdf8' }}>{t('modules.coreBadge')}</span>
                 ) : (
                   <div
                     onClick={() => !toggling && toggle(m.slug, !m.enabled)}

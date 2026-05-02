@@ -3334,5 +3334,22 @@
   "backlog.stat.warning": "Warning",
   "backlog.stat.avgAge": "Avg age",
   "backlog.stat.escalated": "Escalated",
-  "backlog.set.channel.prComment": "💬 PR comment"
+  "backlog.set.channel.prComment": "💬 PR comment",
+  "modules.pageTitle": "Modules",
+  "modules.active": "active",
+  "modules.subtitle": "Enable or disable features for your organization. Core modules cannot be disabled.",
+  "modules.loading": "Loading…",
+  "modules.toggleEnabled": "enabled",
+  "modules.toggleDisabled": "disabled",
+  "modules.updateFailed": "Failed to update module",
+  "modules.coreBadge": "CORE",
+  "modules.group.core": "Core & Workspace",
+  "modules.group.ai": "AI & Automation",
+  "modules.group.workflows": "Workflows & Insights",
+  "modules.group.llm": "LLM Providers",
+  "modules.group.scm": "Source Control",
+  "modules.group.issues": "Issue Tracking",
+  "modules.group.analytics": "Analytics & Metrics",
+  "modules.group.notifications": "Notifications",
+  "modules.group.other": "Other"
 }

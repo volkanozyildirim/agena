@@ -3334,5 +3334,22 @@
   "backlog.stat.warning": "Aviso",
   "backlog.stat.avgAge": "Edad prom.",
   "backlog.stat.escalated": "Escalado",
-  "backlog.set.channel.prComment": "💬 Comentario en PR"
+  "backlog.set.channel.prComment": "💬 Comentario en PR",
+  "modules.pageTitle": "Módulos",
+  "modules.active": "activos",
+  "modules.subtitle": "Habilita o deshabilita funciones para tu organización. Los módulos core no se pueden desactivar.",
+  "modules.loading": "Cargando…",
+  "modules.toggleEnabled": "habilitado",
+  "modules.toggleDisabled": "deshabilitado",
+  "modules.updateFailed": "Error al actualizar el módulo",
+  "modules.coreBadge": "CORE",
+  "modules.group.core": "Núcleo y Espacio",
+  "modules.group.ai": "IA y Automatización",
+  "modules.group.workflows": "Flujos e Insights",
+  "modules.group.llm": "Proveedores LLM",
+  "modules.group.scm": "Control de Código",
+  "modules.group.issues": "Seguimiento de Issues",
+  "modules.group.analytics": "Análisis y Métricas",
+  "modules.group.notifications": "Notificaciones",
+  "modules.group.other": "Otros"
 }

@@ -3334,5 +3334,22 @@
   "backlog.stat.warning": "Uyarı",
   "backlog.stat.avgAge": "Ort. yaş",
   "backlog.stat.escalated": "Escalated",
-  "backlog.set.channel.prComment": "💬 PR Yorumu"
+  "backlog.set.channel.prComment": "💬 PR Yorumu",
+  "modules.pageTitle": "Modüller",
+  "modules.active": "aktif",
+  "modules.subtitle": "Organizasyonunuz için özellikleri aç/kapat. Core modüller devre dışı bırakılamaz.",
+  "modules.loading": "Yükleniyor…",
+  "modules.toggleEnabled": "açıldı",
+  "modules.toggleDisabled": "kapatıldı",
+  "modules.updateFailed": "Modül güncellenemedi",
+  "modules.coreBadge": "TEMEL",
+  "modules.group.core": "Çekirdek & Çalışma Alanı",
+  "modules.group.ai": "AI & Otomasyon",
+  "modules.group.workflows": "İş Akışları & İçgörüler",
+  "modules.group.llm": "LLM Sağlayıcıları",
+  "modules.group.scm": "Versiyon Kontrol",
+  "modules.group.issues": "Sorun Takibi",
+  "modules.group.analytics": "Analitik & Metrikler",
+  "modules.group.notifications": "Bildirimler",
+  "modules.group.other": "Diğer"
 }

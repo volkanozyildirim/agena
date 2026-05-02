@@ -3334,5 +3334,22 @@
   "backlog.stat.warning": "Avviso",
   "backlog.stat.avgAge": "Età media",
   "backlog.stat.escalated": "Escalati",
-  "backlog.set.channel.prComment": "💬 Commento PR"
+  "backlog.set.channel.prComment": "💬 Commento PR",
+  "modules.pageTitle": "Moduli",
+  "modules.active": "attivi",
+  "modules.subtitle": "Abilita o disabilita funzionalità per la tua organizzazione. I moduli core non possono essere disabilitati.",
+  "modules.loading": "Caricamento…",
+  "modules.toggleEnabled": "abilitato",
+  "modules.toggleDisabled": "disabilitato",
+  "modules.updateFailed": "Aggiornamento del modulo non riuscito",
+  "modules.coreBadge": "CORE",
+  "modules.group.core": "Core & Workspace",
+  "modules.group.ai": "IA & Automazione",
+  "modules.group.workflows": "Flussi & Insights",
+  "modules.group.llm": "Provider LLM",
+  "modules.group.scm": "Controllo Versione",
+  "modules.group.issues": "Tracciamento Ticket",
+  "modules.group.analytics": "Analisi & Metriche",
+  "modules.group.notifications": "Notifiche",
+  "modules.group.other": "Altri"
 }

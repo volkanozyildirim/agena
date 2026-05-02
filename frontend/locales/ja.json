@@ -3334,5 +3334,22 @@
   "backlog.stat.warning": "警告",
   "backlog.stat.avgAge": "平均期間",
   "backlog.stat.escalated": "エスカレーション",
-  "backlog.set.channel.prComment": "💬 PR コメント"
+  "backlog.set.channel.prComment": "💬 PR コメント",
+  "modules.pageTitle": "モジュール",
+  "modules.active": "有効",
+  "modules.subtitle": "組織の機能を有効化または無効化します。コアモジュールは無効にできません。",
+  "modules.loading": "読み込み中…",
+  "modules.toggleEnabled": "有効化",
+  "modules.toggleDisabled": "無効化",
+  "modules.updateFailed": "モジュールの更新に失敗しました",
+  "modules.coreBadge": "コア",
+  "modules.group.core": "コア & ワークスペース",
+  "modules.group.ai": "AI & 自動化",
+  "modules.group.workflows": "ワークフロー & インサイト",
+  "modules.group.llm": "LLM プロバイダー",
+  "modules.group.scm": "ソース管理",
+  "modules.group.issues": "チケット追跡",
+  "modules.group.analytics": "分析 & メトリクス",
+  "modules.group.notifications": "通知",
+  "modules.group.other": "その他"
 }

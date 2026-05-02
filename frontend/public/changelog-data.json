@@ -1,5 +1,13 @@
 [
   {
+    "hash": "ef0fbe0",
+    "short": "ef0fbe0",
+    "message": "Triage / Backlog: corporate redesign + chip-based settings + PR comment",
+    "date": "2026-05-02",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "32fdc48",
     "short": "32fdc48",
     "message": "organization_modules: deduplicate + add unique (org_id, slug) constraint",

@@ -3334,5 +3334,22 @@
   "backlog.stat.warning": "警告",
   "backlog.stat.avgAge": "平均年龄",
   "backlog.stat.escalated": "已升级",
-  "backlog.set.channel.prComment": "💬 PR 评论"
+  "backlog.set.channel.prComment": "💬 PR 评论",
+  "modules.pageTitle": "模块",
+  "modules.active": "已启用",
+  "modules.subtitle": "为你的组织启用或禁用功能。核心模块无法禁用。",
+  "modules.loading": "加载中…",
+  "modules.toggleEnabled": "已启用",
+  "modules.toggleDisabled": "已禁用",
+  "modules.updateFailed": "模块更新失败",
+  "modules.coreBadge": "核心",
+  "modules.group.core": "核心与工作区",
+  "modules.group.ai": "AI 与自动化",
+  "modules.group.workflows": "工作流与洞察",
+  "modules.group.llm": "LLM 提供商",
+  "modules.group.scm": "源代码管理",
+  "modules.group.issues": "工单追踪",
+  "modules.group.analytics": "分析与指标",
+  "modules.group.notifications": "通知",
+  "modules.group.other": "其他"
 }
