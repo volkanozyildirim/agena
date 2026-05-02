@@ -519,23 +519,43 @@ export default function ReviewBacklogPage() {
                     </div>
                   );
                 })()}
-                <footer style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  <button
-                    onClick={() => void nudge(n.id)}
-                    disabled={nudgingIds.has(n.id)}
-                    style={{
-                      padding: '5px 11px', borderRadius: 8,
-                      background: nudgingIds.has(n.id) ? 'var(--panel)' : `${color}22`,
-                      color: nudgingIds.has(n.id) ? 'var(--ink-35)' : color,
-                      border: `1px solid ${nudgingIds.has(n.id) ? 'var(--panel-border)' : `${color}55`}`,
-                      fontSize: 11, fontWeight: 700,
-                      cursor: nudgingIds.has(n.id) ? 'wait' : 'pointer',
-                      opacity: nudgingIds.has(n.id) ? 0.6 : 1,
-                    }}
-                  >
-                    {nudgingIds.has(n.id) ? t('backlog.nudging' as TranslationKey) : `🔔 ${t('backlog.nudgeNow')}`}
-                  </button>
-                </footer>
+                {(() => {
+                  // Cooldown gating for the button: if we're still
+                  // inside the configured nudge interval since the
+                  // last successful delivery, the server will reject
+                  // the click anyway. Disable the button + show a
+                  // wait cursor so the user doesn't bother.
+                  const interval = settings?.backlog_nudge_interval_hours ?? 6;
+                  let inCooldown = false;
+                  if (n.last_nudged_at) {
+                    const elapsedH = (Date.now() - new Date(n.last_nudged_at).getTime()) / 3_600_000;
+                    inCooldown = elapsedH < interval;
+                  }
+                  const inFlight = nudgingIds.has(n.id);
+                  const disabled = inFlight || inCooldown;
+                  return (
+                    <footer style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <button
+                        onClick={() => void nudge(n.id)}
+                        disabled={disabled}
+                        title={inCooldown ? t('backlog.nudgeRateLimited' as TranslationKey) : ''}
+                        style={{
+                          padding: '5px 11px', borderRadius: 8,
+                          background: disabled ? 'var(--panel)' : `${color}22`,
+                          color: disabled ? 'var(--ink-35)' : color,
+                          border: `1px solid ${disabled ? 'var(--panel-border)' : `${color}55`}`,
+                          fontSize: 11, fontWeight: 700,
+                          cursor: inFlight ? 'wait' : (inCooldown ? 'not-allowed' : 'pointer'),
+                          opacity: disabled ? 0.55 : 1,
+                        }}
+                      >
+                        {inFlight
+                          ? t('backlog.nudging' as TranslationKey)
+                          : `🔔 ${t('backlog.nudgeNow')}`}
+                      </button>
+                    </footer>
+                  );
+                })()}
               </article>
             );
           })}
