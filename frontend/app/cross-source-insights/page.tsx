@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import Script from 'next/script';
+import { cookies } from 'next/headers';
 import { landingCopy, pickLang, LANGS } from '@/lib/landingI18n';
 
 const KEY = 'insights' as const;
@@ -14,7 +15,8 @@ const INSIGHTS_KEYWORDS = [
 ];
 
 export async function generateMetadata({ searchParams }: { searchParams: { lang?: string } }): Promise<Metadata> {
-  const lang = pickLang(searchParams?.lang);
+  const cookieLang = cookies().get('agena_lang')?.value;
+  const lang = pickLang(searchParams?.lang, cookieLang);
   const c = landingCopy(KEY, lang);
   const altLang: Record<string, string> = {};
   for (const l of LANGS) altLang[l] = `${URL}?lang=${l}`;
@@ -28,7 +30,8 @@ export async function generateMetadata({ searchParams }: { searchParams: { lang?
 }
 
 export default function CrossSourceInsightsPage({ searchParams }: { searchParams: { lang?: string } }) {
-  const lang = pickLang(searchParams?.lang);
+  const cookieLang = cookies().get('agena_lang')?.value;
+  const lang = pickLang(searchParams?.lang, cookieLang);
   const c = landingCopy(KEY, lang);
   const ldJson = {
     '@context': 'https://schema.org', '@type': 'SoftwareApplication',

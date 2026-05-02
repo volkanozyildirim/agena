@@ -11,9 +11,13 @@ export type Lang = 'tr' | 'en' | 'es' | 'de' | 'zh' | 'it' | 'ja';
 export const LANGS: Lang[] = ['tr', 'en', 'es', 'de', 'zh', 'it', 'ja'];
 const FALLBACK: Lang = 'en';
 
-export function pickLang(raw: string | string[] | undefined): Lang {
+export function pickLang(
+  raw: string | string[] | undefined,
+  cookieLang?: string,
+): Lang {
   const v = Array.isArray(raw) ? raw[0] : raw;
   if (v && (LANGS as string[]).includes(v)) return v as Lang;
+  if (cookieLang && (LANGS as string[]).includes(cookieLang)) return cookieLang as Lang;
   return FALLBACK;
 }
 

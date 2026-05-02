@@ -37,7 +37,13 @@ function getLang(): Lang {
 }
 
 function setLang(l: Lang) {
-  if (typeof window !== 'undefined') localStorage.setItem(LS_KEY, l);
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(LS_KEY, l);
+    // Also persist to a cookie so server-rendered pages (landings,
+    // /tasks/[id] OG tags, sitemap alternates, …) can pick up the user's
+    // preferred language without a query string.
+    document.cookie = `agena_lang=${l}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+  }
   _listeners.forEach((fn) => fn());
 }
 
@@ -46,7 +52,17 @@ export function useLocale() {
   const [lang, setLangState] = useState<Lang>('en');
 
   useEffect(() => {
-    setLangState(getLang());
+    const current = getLang();
+    setLangState(current);
+    // Migrate users who set their language before the cookie existed —
+    // copy localStorage to the cookie on first run so server-rendered
+    // pages start picking it up without requiring a re-toggle.
+    if (typeof document !== 'undefined') {
+      const hasCookie = document.cookie.split(';').some((c) => c.trim().startsWith('agena_lang='));
+      if (!hasCookie) {
+        document.cookie = `agena_lang=${current}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+      }
+    }
     const update = () => setLangState(getLang());
     _listeners.add(update);
     return () => { _listeners.delete(update); };
