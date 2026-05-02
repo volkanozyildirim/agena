@@ -164,6 +164,58 @@ async def scan_all_orgs(db: AsyncSession) -> int:
     return total
 
 
+async def _post_pr_comment(db: AsyncSession, n: ReviewBacklogNudge) -> bool:
+    """When channel='pr_comment', surface the nudge as an actual comment
+    on the PR via the matching git provider. Returns True on success.
+
+    Best-effort: a missing integration / unsupported provider just falls
+    through to "marked as nudged" without raising — the row still
+    captures intent, ops can wire the integration later.
+    """
+    pr = (
+        await db.execute(select(GitPullRequest).where(GitPullRequest.id == n.pr_id))
+    ).scalar_one_or_none()
+    if pr is None or not pr.external_id:
+        return False
+
+    body = (
+        f"⏱️ **AGENA Review Backlog**\n\n"
+        f"This PR has been waiting for review for **{n.age_hours} hours** "
+        f"(severity: {n.severity or 'info'}).\n"
+        f"Nudge #{(n.nudge_count or 0) + 1}. "
+        f"Configure thresholds at `/dashboard/review-backlog`."
+    )
+
+    try:
+        provider = (pr.provider or '').lower()
+        if provider != 'github':
+            # Azure / GitLab / Bitbucket: not yet wired — fall through.
+            # The row still records the attempt as channel='pr_comment'.
+            return False
+        if not (pr.repo_mapping_id and pr.repo_mapping_id.isdigit()):
+            return False
+        from agena_models.models.repo_mapping import RepoMapping
+        mapping = (
+            await db.execute(
+                select(RepoMapping).where(
+                    RepoMapping.id == int(pr.repo_mapping_id),
+                    RepoMapping.organization_id == n.organization_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if mapping is None:
+            return False
+        from agena_services.integrations.github_client import GitHubClient
+        client = GitHubClient()
+        await client.post_pr_issue_comment(
+            mapping.owner, mapping.repo_name, int(pr.external_id), body,
+        )
+        return True
+    except Exception:
+        logger.exception('PR comment nudge failed for nudge=%s', n.id)
+        return False
+
+
 async def record_nudge(
     db: AsyncSession,
     nudge_id: int,
@@ -171,9 +223,11 @@ async def record_nudge(
     organization_id: int,
     channel: str,
 ) -> ReviewBacklogNudge:
-    """Mark that a nudge was sent via the given channel. The actual
-    Slack/email send happens in caller code; this function only records
-    the timestamp + counter."""
+    """Mark that a nudge was sent via the given channel. For
+    channel='pr_comment' we also try to post a comment on the PR
+    via the configured git provider. Slack/email delivery is wired
+    elsewhere; this function records the timestamp + counter no
+    matter which channel succeeds."""
     n = (
         await db.execute(
             select(ReviewBacklogNudge).where(
@@ -184,6 +238,9 @@ async def record_nudge(
     ).scalar_one_or_none()
     if n is None:
         raise ValueError('nudge not found')
+
+    if channel == 'pr_comment':
+        await _post_pr_comment(db, n)
 
     n.last_nudged_at = datetime.utcnow()
     n.nudge_count = (n.nudge_count or 0) + 1

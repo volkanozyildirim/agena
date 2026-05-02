@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
+import { ChipSelect, SwitchToggle, SettingsField, SettingsCard } from '@/components/SettingsControls';
 
 type Nudge = {
   id: number;
@@ -119,18 +120,39 @@ export default function ReviewBacklogPage() {
   }
 
   const open = items?.filter((n) => n.resolved_at === null) ?? null;
+  const stats = open ? {
+    total: open.length,
+    critical: open.filter((n) => n.severity === 'critical').length,
+    warning: open.filter((n) => n.severity === 'warning').length,
+    avgAge: open.length ? Math.round(open.reduce((s, n) => s + n.age_hours, 0) / open.length) : 0,
+    escalated: open.filter((n) => n.escalated_at).length,
+  } : null;
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gap: 16 }}>
       <header style={{ display: 'grid', gap: 12 }}>
         <div>
+          <div style={{ fontSize: 10, fontWeight: 800, color: '#f59e0b', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 }}>
+            {t('backlog.eyebrow')}
+          </div>
           <h1 style={{ fontSize: 'clamp(20px, 5vw, 28px)', fontWeight: 800, margin: 0, color: 'var(--ink-90)', lineHeight: 1.2 }}>
             ⏱ {t('backlog.title')}
           </h1>
-          <p style={{ fontSize: 'clamp(12px, 3.4vw, 14px)', color: 'var(--ink-58)', marginTop: 6, lineHeight: 1.5 }}>
-            {t('backlog.subtitle')}
+          <p style={{ fontSize: 'clamp(12px, 3.4vw, 14px)', color: 'var(--ink-58)', marginTop: 6, lineHeight: 1.55, maxWidth: 720 }}>
+            {t('backlog.longSubtitle')}
           </p>
         </div>
+
+        {/* Stat strip — corporate at-a-glance summary */}
+        {stats && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
+            <StatTile label={t('backlog.stat.total')} value={stats.total} accent='#6366f1' />
+            <StatTile label={t('backlog.stat.critical')} value={stats.critical} accent='#ef4444' />
+            <StatTile label={t('backlog.stat.warning')} value={stats.warning} accent='#f59e0b' />
+            <StatTile label={t('backlog.stat.avgAge')} value={`${stats.avgAge}h`} accent='#06b6d4' />
+            <StatTile label={t('backlog.stat.escalated')} value={stats.escalated} accent='#a855f7' />
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
             onClick={scanNow}
@@ -161,73 +183,90 @@ export default function ReviewBacklogPage() {
       </header>
 
       {showSettings && settings && (
-        <section style={{ padding: 18, borderRadius: 14, background: 'var(--panel)', border: '1px solid var(--panel-border)', display: 'grid', gap: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <strong style={{ fontSize: 13 }}>⚙ {t('backlog.settingsTitle')}</strong>
-            {savingSettings && <span style={{ fontSize: 11, color: 'var(--ink-58)' }}>{t('common.saving')}</span>}
-          </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
-            <input
-              type='checkbox'
-              checked={settings.backlog_enabled}
-              onChange={(e) => void saveSettings({ backlog_enabled: e.target.checked })}
+        <SettingsCard title={`${t('backlog.settingsTitle')}${savingSettings ? ' · ' + t('common.saving') : ''}`}>
+          <SettingsField label={t('backlog.set.enabled')} hint={t('backlog.set.enabledHint')}>
+            <SwitchToggle
+              value={settings.backlog_enabled}
+              onChange={(v) => void saveSettings({ backlog_enabled: v })}
+              accent='#f59e0b'
             />
-            {t('backlog.set.enabled')}
-          </label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-            <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
-              <span>{t('backlog.set.warnHours')}</span>
-              <input
-                type='number' min={1} max={720}
-                value={settings.backlog_warn_hours}
-                onChange={(e) => void saveSettings({ backlog_warn_hours: parseInt(e.target.value) || 24 })}
-                style={{ padding: 8, borderRadius: 8, border: '1px solid var(--panel-border)', background: 'var(--surface)', color: 'var(--ink)' }}
-              />
-            </label>
-            <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
-              <span>{t('backlog.set.critHours')}</span>
-              <input
-                type='number' min={1} max={720}
-                value={settings.backlog_critical_hours}
-                onChange={(e) => void saveSettings({ backlog_critical_hours: parseInt(e.target.value) || 48 })}
-                style={{ padding: 8, borderRadius: 8, border: '1px solid var(--panel-border)', background: 'var(--surface)', color: 'var(--ink)' }}
-              />
-            </label>
-            <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
-              <span>{t('backlog.set.nudgeInterval')}</span>
-              <input
-                type='number' min={1} max={168}
-                value={settings.backlog_nudge_interval_hours}
-                onChange={(e) => void saveSettings({ backlog_nudge_interval_hours: parseInt(e.target.value) || 6 })}
-                style={{ padding: 8, borderRadius: 8, border: '1px solid var(--panel-border)', background: 'var(--surface)', color: 'var(--ink)' }}
-              />
-            </label>
-          </div>
-          <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
-            <span>{t('backlog.set.channel')}</span>
-            <select
+          </SettingsField>
+          <SettingsField label={t('backlog.set.warnHours')} hint={t('backlog.set.warnHint')}>
+            <ChipSelect<number>
+              value={settings.backlog_warn_hours}
+              onChange={(v) => void saveSettings({ backlog_warn_hours: v })}
+              accent='#f59e0b'
+              options={[
+                { value: 6, label: t('duration.6h') },
+                { value: 12, label: t('duration.12h') },
+                { value: 24, label: t('duration.1d') },
+                { value: 48, label: t('duration.2d') },
+                { value: 72, label: t('duration.3d') },
+                { value: 168, label: t('duration.1w') },
+              ]}
+              allowCustom
+              customLabel={t('common.custom')}
+              customPlaceholder={t('duration.hoursPlaceholder')}
+            />
+          </SettingsField>
+          <SettingsField label={t('backlog.set.critHours')} hint={t('backlog.set.critHint')}>
+            <ChipSelect<number>
+              value={settings.backlog_critical_hours}
+              onChange={(v) => void saveSettings({ backlog_critical_hours: v })}
+              accent='#ef4444'
+              options={[
+                { value: 24, label: t('duration.1d') },
+                { value: 48, label: t('duration.2d') },
+                { value: 72, label: t('duration.3d') },
+                { value: 168, label: t('duration.1w') },
+                { value: 336, label: t('duration.2w') },
+              ]}
+              allowCustom
+              customLabel={t('common.custom')}
+              customPlaceholder={t('duration.hoursPlaceholder')}
+            />
+          </SettingsField>
+          <SettingsField label={t('backlog.set.nudgeInterval')} hint={t('backlog.set.nudgeIntervalHint')}>
+            <ChipSelect<number>
+              value={settings.backlog_nudge_interval_hours}
+              onChange={(v) => void saveSettings({ backlog_nudge_interval_hours: v })}
+              accent='#6366f1'
+              options={[
+                { value: 1, label: t('duration.1h') },
+                { value: 3, label: t('duration.3h') },
+                { value: 6, label: t('duration.6h') },
+                { value: 12, label: t('duration.12h') },
+                { value: 24, label: t('duration.1d') },
+              ]}
+              allowCustom
+              customLabel={t('common.custom')}
+              customPlaceholder={t('duration.hoursPlaceholder')}
+            />
+          </SettingsField>
+          <SettingsField label={t('backlog.set.channel')} hint={t('backlog.set.channelHint')}>
+            <ChipSelect<string>
               value={settings.backlog_channel}
-              onChange={(e) => void saveSettings({ backlog_channel: e.target.value })}
-              style={{ padding: 8, borderRadius: 8, border: '1px solid var(--panel-border)', background: 'var(--surface)', color: 'var(--ink)', maxWidth: 220 }}
-            >
-              <option value='slack_dm'>Slack DM</option>
-              <option value='slack_channel'>Slack Channel</option>
-              <option value='email'>Email</option>
-              <option value='manual'>{t('backlog.set.manual')}</option>
-            </select>
-          </label>
-          <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
-            <span>{t('backlog.set.exemptRepos')}</span>
+              onChange={(v) => void saveSettings({ backlog_channel: v })}
+              accent='#6366f1'
+              options={[
+                { value: 'pr_comment', label: t('backlog.set.channel.prComment') },
+                { value: 'slack_dm', label: '💬 Slack DM' },
+                { value: 'slack_channel', label: '#️⃣ Slack Channel' },
+                { value: 'email', label: '📧 Email' },
+                { value: 'manual', label: '✋ ' + t('backlog.set.manual') },
+              ]}
+            />
+          </SettingsField>
+          <SettingsField label={t('backlog.set.exemptRepos')} hint={t('backlog.set.exemptHint')}>
             <input
               type='text'
               value={settings.backlog_exempt_repos || ''}
               onChange={(e) => void saveSettings({ backlog_exempt_repos: e.target.value })}
-              style={{ padding: 8, borderRadius: 8, border: '1px solid var(--panel-border)', background: 'var(--surface)', color: 'var(--ink)' }}
-              placeholder='1,3,7'
+              style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--panel-border)', background: 'var(--surface)', color: 'var(--ink)', fontSize: 13, width: '100%', maxWidth: 320 }}
+              placeholder='1, 3, 7'
             />
-            <span style={{ fontSize: 11, color: 'var(--ink-58)' }}>{t('backlog.set.exemptHint')}</span>
-          </label>
-        </section>
+          </SettingsField>
+        </SettingsCard>
       )}
 
       {error && (
@@ -304,6 +343,24 @@ export default function ReviewBacklogPage() {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function StatTile({ label, value, accent }: { label: string; value: number | string; accent: string }) {
+  return (
+    <div style={{
+      padding: '12px 14px', borderRadius: 12,
+      background: 'var(--panel)', border: '1px solid var(--panel-border)',
+      borderLeft: `3px solid ${accent}`,
+      display: 'grid', gap: 4,
+    }}>
+      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, color: 'var(--ink-42)', textTransform: 'uppercase' }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink-90)', lineHeight: 1 }}>
+        {value}
+      </div>
     </div>
   );
 }

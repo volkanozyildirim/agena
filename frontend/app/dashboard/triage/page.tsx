@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
+import { ChipSelect, MultiChipSelect, SwitchToggle, SettingsField, SettingsCard } from '@/components/SettingsControls';
 
 type Decision = {
   id: number;
@@ -148,13 +149,25 @@ export default function TriagePage() {
     <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gap: 16 }}>
       <header style={{ display: 'grid', gap: 12 }}>
         <div>
+          <div style={{ fontSize: 10, fontWeight: 800, color: '#10b981', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 }}>
+            {t('triage.eyebrow')}
+          </div>
           <h1 style={{ fontSize: 'clamp(20px, 5vw, 28px)', fontWeight: 800, margin: 0, color: 'var(--ink-90)', lineHeight: 1.2 }}>
             🧹 {t('triage.title')}
           </h1>
-          <p style={{ fontSize: 'clamp(12px, 3.4vw, 14px)', color: 'var(--ink-58)', marginTop: 6, lineHeight: 1.5 }}>
-            {t('triage.subtitle')}
+          <p style={{ fontSize: 'clamp(12px, 3.4vw, 14px)', color: 'var(--ink-58)', marginTop: 6, lineHeight: 1.55, maxWidth: 720 }}>
+            {t('triage.longSubtitle')}
           </p>
         </div>
+
+        {decisions && decisions.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
+            <TriageStatTile label={t('triage.stat.total')} value={decisions.length} accent='#6366f1' />
+            <TriageStatTile label={t('triage.stat.suggestClose')} value={decisions.filter((d) => d.ai_verdict === 'close').length} accent='#10b981' />
+            <TriageStatTile label={t('triage.stat.suggestSnooze')} value={decisions.filter((d) => d.ai_verdict === 'snooze').length} accent='#f59e0b' />
+            <TriageStatTile label={t('triage.stat.suggestKeep')} value={decisions.filter((d) => d.ai_verdict === 'keep').length} accent='#818cf8' />
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
             onClick={scanNow}
@@ -198,50 +211,59 @@ export default function TriagePage() {
       </header>
 
       {showSettings && settings && (
-        <section style={{ padding: 18, borderRadius: 14, background: 'var(--panel)', border: '1px solid var(--panel-border)', display: 'grid', gap: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <strong style={{ fontSize: 13 }}>⚙ {t('triage.settingsTitle')}</strong>
-            {savingSettings && <span style={{ fontSize: 11, color: 'var(--ink-58)' }}>{t('common.saving')}</span>}
-          </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
-            <input
-              type='checkbox'
-              checked={settings.triage_enabled}
-              onChange={(e) => void saveSettings({ triage_enabled: e.target.checked })}
+        <SettingsCard title={`${t('triage.settingsTitle')}${savingSettings ? ' · ' + t('common.saving') : ''}`}>
+          <SettingsField label={t('triage.set.enabled')} hint={t('triage.set.enabledHint')}>
+            <SwitchToggle
+              value={settings.triage_enabled}
+              onChange={(v) => void saveSettings({ triage_enabled: v })}
+              accent='#10b981'
             />
-            {t('triage.set.enabled')}
-          </label>
-          <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
-            <span>{t('triage.set.idleDays')}</span>
-            <input
-              type='number' min={1} max={365}
+          </SettingsField>
+          <SettingsField label={t('triage.set.idleDays')} hint={t('triage.set.idleDaysHint')}>
+            <ChipSelect<number>
               value={settings.triage_idle_days}
-              onChange={(e) => void saveSettings({ triage_idle_days: parseInt(e.target.value) || 30 })}
-              style={{ padding: 8, borderRadius: 8, border: '1px solid var(--panel-border)', background: 'var(--surface)', color: 'var(--ink)', maxWidth: 120 }}
+              onChange={(v) => void saveSettings({ triage_idle_days: v })}
+              accent='#10b981'
+              options={[
+                { value: 7, label: t('duration.7d') },
+                { value: 14, label: t('duration.14d') },
+                { value: 30, label: t('duration.30d') },
+                { value: 60, label: t('duration.60d') },
+                { value: 90, label: t('duration.90d') },
+              ]}
+              allowCustom
+              customLabel={t('common.custom')}
+              customPlaceholder={t('duration.daysPlaceholder')}
             />
-          </label>
-          <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
-            <span>{t('triage.set.sources')}</span>
-            <input
-              type='text'
+          </SettingsField>
+          <SettingsField label={t('triage.set.sources')} hint={t('triage.set.sourcesHint')}>
+            <MultiChipSelect
               value={settings.triage_sources}
-              onChange={(e) => void saveSettings({ triage_sources: e.target.value })}
-              style={{ padding: 8, borderRadius: 8, border: '1px solid var(--panel-border)', background: 'var(--surface)', color: 'var(--ink)' }}
-              placeholder='jira,azure_devops'
+              onChange={(csv) => void saveSettings({ triage_sources: csv })}
+              accent='#6366f1'
+              options={[
+                { value: 'jira', label: 'Jira', icon: '🪐' },
+                { value: 'azure_devops', label: 'Azure DevOps', icon: '🟦' },
+                { value: 'github', label: 'GitHub Issues', icon: '🐙' },
+                { value: 'linear', label: 'Linear', icon: '📐' },
+              ]}
             />
-            <span style={{ fontSize: 11, color: 'var(--ink-58)' }}>{t('triage.set.sourcesHint')}</span>
-          </label>
-          <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
-            <span>{t('triage.set.cron')}</span>
-            <input
-              type='text'
+          </SettingsField>
+          <SettingsField label={t('triage.set.scheduleHint')} hint={t('triage.set.scheduleSubhint')}>
+            <ChipSelect<string>
               value={settings.triage_schedule_cron}
-              onChange={(e) => void saveSettings({ triage_schedule_cron: e.target.value })}
-              style={{ padding: 8, borderRadius: 8, border: '1px solid var(--panel-border)', background: 'var(--surface)', color: 'var(--ink)', maxWidth: 200, fontFamily: 'ui-monospace, monospace' }}
-              placeholder='0 18 * * 0'
+              onChange={(v) => void saveSettings({ triage_schedule_cron: v })}
+              accent='#10b981'
+              options={[
+                { value: '0 */6 * * *', label: t('schedule.every6h') },
+                { value: '0 */12 * * *', label: t('schedule.every12h') },
+                { value: '0 9 * * *', label: t('schedule.dailyMorning') },
+                { value: '0 18 * * 0', label: t('schedule.weeklySunday') },
+                { value: '0 9 1 * *', label: t('schedule.monthly') },
+              ]}
             />
-          </label>
-        </section>
+          </SettingsField>
+        </SettingsCard>
       )}
 
       {error && (
@@ -335,6 +357,24 @@ export default function TriagePage() {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function TriageStatTile({ label, value, accent }: { label: string; value: number | string; accent: string }) {
+  return (
+    <div style={{
+      padding: '12px 14px', borderRadius: 12,
+      background: 'var(--panel)', border: '1px solid var(--panel-border)',
+      borderLeft: `3px solid ${accent}`,
+      display: 'grid', gap: 4,
+    }}>
+      <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, color: 'var(--ink-42)', textTransform: 'uppercase' }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink-90)', lineHeight: 1 }}>
+        {value}
+      </div>
     </div>
   );
 }
