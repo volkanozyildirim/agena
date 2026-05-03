@@ -410,47 +410,150 @@ export default function AdminPanel() {
 }
 
 // ── SEO Tracking Tab ─────────────────────────────────────────────────
+
+type RankEntry = { position: number; date: string };
+type RankLog = Record<string, RankEntry[]>;
+
+const RANK_LS_KEY = 'agena_seo_ranks';
+
+function loadRanks(): RankLog {
+  if (typeof window === 'undefined') return {};
+  try { return JSON.parse(localStorage.getItem(RANK_LS_KEY) || '{}') as RankLog; } catch { return {}; }
+}
+
+function saveRanks(r: RankLog) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(RANK_LS_KEY, JSON.stringify(r));
+}
+
+function rankColor(position: number | undefined) {
+  if (position === undefined) return 'var(--ink-30)';
+  if (position <= 10) return '#22c55e';
+  if (position <= 30) return '#fbbf24';
+  return '#f87171';
+}
+
+function classifyUrl(url: string): string {
+  if (url.startsWith('/blog/')) return 'Blog posts';
+  if (url.startsWith('/vs/') || url.startsWith('/vs')) return 'Comparisons';
+  if (['/cross-source-insights', '/stale-ticket-triage', '/review-backlog-killer'].includes(url)) return 'Workflow modules';
+  if (['/sentry-ai-auto-fix', '/jira-ai-agent', '/azure-devops-ai-bot', '/newrelic-ai-agent'].includes(url)) return 'Integration landings';
+  if (['/ai-code-review', '/ai-sprint-refinement'].includes(url)) return 'Feature landings';
+  if (url === '' || url === '/') return 'Home';
+  return 'Other pages';
+}
+
 function SeoTab() {
   const SITE = 'https://agena.dev';
   const [statuses, setStatuses] = React.useState<Record<string, { code: number | null; ms: number | null; checkedAt: string | null }>>({});
   const [checking, setChecking] = React.useState(false);
   const [sitemapStatus, setSitemapStatus] = React.useState<{ code: number | null; urlCount: number | null }>({ code: null, urlCount: null });
+  const [allUrls, setAllUrls] = React.useState<string[]>([]);
+  const [ranks, setRanks] = React.useState<RankLog>({});
+  const [editingKw, setEditingKw] = React.useState<string | null>(null);
+  const [editValue, setEditValue] = React.useState('');
+
+  React.useEffect(() => { setRanks(loadRanks()); }, []);
+
+  // Build keyword index from SEO_LANDINGS so we can attach the same
+  // keyword chips to whichever URL the sitemap reports — no manual
+  // double-bookkeeping when sitemap and SEO_LANDINGS drift.
+  const keywordsByUrl = React.useMemo(() => {
+    const m: Record<string, string[]> = {};
+    for (const l of SEO_LANDINGS) m[l.url] = l.keywords;
+    return m;
+  }, []);
+
+  function recordRank(kw: string, position: number) {
+    const today = new Date().toISOString().split('T')[0];
+    setRanks((prev) => {
+      const next: RankLog = { ...prev };
+      const entries = (next[kw] || []).filter((e) => e.date !== today);  // dedupe today
+      entries.push({ position, date: today });
+      entries.sort((a, b) => a.date.localeCompare(b.date));
+      next[kw] = entries.slice(-10);  // keep last 10 entries per keyword
+      saveRanks(next);
+      return next;
+    });
+    setEditingKw(null);
+    setEditValue('');
+  }
+
+  function clearRank(kw: string) {
+    setRanks((prev) => {
+      const next: RankLog = { ...prev };
+      delete next[kw];
+      saveRanks(next);
+      return next;
+    });
+  }
+
+  async function loadSitemap() {
+    try {
+      const r = await fetch(`${SITE}/sitemap.xml`, { method: 'GET', mode: 'cors' });
+      const text = await r.text();
+      // Pull each <loc>..</loc>, dedupe (sitemap repeats canonical + alternates),
+      // strip query strings (?lang=tr alternates point at the same canonical), then
+      // make URLs site-relative so the rest of the UI stays consistent.
+      const matches = Array.from(text.matchAll(/<loc>([^<]+)<\/loc>/g)).map((m) => m[1]);
+      const unique = new Set<string>();
+      for (const full of matches) {
+        const path = full.replace(SITE, '').split('?')[0];
+        unique.add(path || '/');
+      }
+      const urls = Array.from(unique).sort();
+      setAllUrls(urls);
+      setSitemapStatus({ code: r.status, urlCount: urls.length });
+      return urls;
+    } catch {
+      setSitemapStatus({ code: null, urlCount: null });
+      return [];
+    }
+  }
 
   async function checkAll() {
     setChecking(true);
+    const urls = allUrls.length ? allUrls : await loadSitemap();
+    // To keep the page snappy on large sitemaps we cap the parallel
+    // fetches with a tiny semaphore — 6 in-flight is plenty for browser.
+    const SEMAPHORE = 6;
     const next: typeof statuses = {};
-    // Check sitemap first
-    try {
-      const t0 = performance.now();
-      const r = await fetch(`${SITE}/sitemap.xml`, { method: 'GET', mode: 'cors' });
-      const text = await r.text();
-      const urlCount = (text.match(/<loc>/g) || []).length;
-      setSitemapStatus({ code: r.status, urlCount });
-    } catch {
-      setSitemapStatus({ code: null, urlCount: null });
-    }
-    for (const landing of SEO_LANDINGS) {
-      try {
-        const t0 = performance.now();
-        const r = await fetch(`${SITE}${landing.url}`, { method: 'GET', mode: 'cors' });
-        next[landing.url] = {
-          code: r.status,
-          ms: Math.round(performance.now() - t0),
-          checkedAt: new Date().toISOString(),
-        };
-      } catch {
-        next[landing.url] = { code: null, ms: null, checkedAt: new Date().toISOString() };
+    let i = 0;
+    async function worker() {
+      while (i < urls.length) {
+        const idx = i++;
+        const u = urls[idx];
+        try {
+          const t0 = performance.now();
+          const r = await fetch(`${SITE}${u}`, { method: 'GET', mode: 'cors' });
+          next[u] = { code: r.status, ms: Math.round(performance.now() - t0), checkedAt: new Date().toISOString() };
+        } catch {
+          next[u] = { code: null, ms: null, checkedAt: new Date().toISOString() };
+        }
+        // Stream partial results so the user sees progress
+        if (idx % 6 === 0) setStatuses({ ...next });
       }
     }
+    await Promise.all(Array.from({ length: SEMAPHORE }, () => worker()));
     setStatuses(next);
     setChecking(false);
   }
 
-  React.useEffect(() => { void checkAll(); }, []);
+  React.useEffect(() => { void loadSitemap(); }, []);
 
-  const grouped = SEO_LANDINGS.reduce<Record<string, SeoLanding[]>>((acc, l) => {
-    (acc[l.group] = acc[l.group] || []).push(l); return acc;
-  }, {});
+  // Group every URL the sitemap reports — not just the curated SEO
+  // landings — so admins see the full surface (blog posts, glossary,
+  // legacy comparison pages, …).
+  const grouped = React.useMemo(() => {
+    const g: Record<string, string[]> = {};
+    for (const u of allUrls) {
+      const cls = classifyUrl(u);
+      (g[cls] = g[cls] || []).push(u);
+    }
+    return g;
+  }, [allUrls]);
+
+  const GROUP_ORDER = ['Home', 'Workflow modules', 'Integration landings', 'Feature landings', 'Comparisons', 'Other pages', 'Blog posts'];
 
   function statusColor(code: number | null) {
     if (code === null) return '#f87171';
@@ -509,37 +612,96 @@ function SeoTab() {
         </div>
       </div>
 
-      {/* Landings grouped */}
-      {Object.entries(grouped).map(([group, landings]) => (
+      {/* Every URL from the sitemap, grouped by intent */}
+      {GROUP_ORDER.filter((g) => grouped[g]?.length).map((group) => (
         <div key={group}>
-          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', marginBottom: 8 }}>{group}</div>
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+            <span>{group}</span>
+            <span style={{ color: 'var(--ink-25)' }}>{grouped[group].length}</span>
+          </div>
           <div style={{ display: 'grid', gap: 8 }}>
-            {landings.map((l) => {
-              const s = statuses[l.url];
+            {grouped[group].map((url) => {
+              const s = statuses[url];
               const color = statusColor(s?.code ?? null);
+              const keywords = keywordsByUrl[url] || [];
               return (
-                <div key={l.url} style={{ padding: 12, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--panel-border)', display: 'grid', gap: 8 }}>
+                <div key={url} style={{ padding: 12, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--panel-border)', display: 'grid', gap: keywords.length ? 8 : 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                     <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, flexShrink: 0 }} />
-                    <a href={`${SITE}${l.url}`} target='_blank' rel='noreferrer' style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-90)', textDecoration: 'none', fontFamily: 'ui-monospace, monospace' }}>{l.url}</a>
+                    <a href={`${SITE}${url}`} target='_blank' rel='noreferrer' style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-90)', textDecoration: 'none', fontFamily: 'ui-monospace, monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '60%' }}>{url}</a>
                     {s?.code !== undefined && s?.code !== null && (
                       <span style={{ fontSize: 10, fontWeight: 700, color }}>{s.code} · {s.ms}ms</span>
                     )}
-                    <a href={`https://www.google.com/search?q=site:agena.dev${encodeURIComponent(l.url)}`} target='_blank' rel='noreferrer' style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, color: '#0d9488', textDecoration: 'none' }}>Indexed?</a>
+                    <a href={`https://www.google.com/search?q=site:agena.dev${encodeURIComponent(url)}`} target='_blank' rel='noreferrer' style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, color: '#0d9488', textDecoration: 'none' }}>Indexed?</a>
                   </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                    {l.keywords.map((kw) => (
-                      <a
-                        key={kw}
-                        href={`https://www.google.com/search?q=${encodeURIComponent(kw)}`}
-                        target='_blank' rel='noreferrer'
-                        title='Search Google for this keyword'
-                        style={{ fontSize: 10, padding: '2px 7px', borderRadius: 999, background: 'rgba(99,102,241,0.1)', color: '#818cf8', fontWeight: 600, textDecoration: 'none' }}
-                      >
-                        {kw}
-                      </a>
-                    ))}
+                  {keywords.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {keywords.map((kw) => {
+                      const entries = ranks[kw] || [];
+                      const latest = entries[entries.length - 1];
+                      const previous = entries[entries.length - 2];
+                      const trend = latest && previous ? previous.position - latest.position : 0;  // positive = improved
+                      const color = rankColor(latest?.position);
+                      const isEditing = editingKw === kw;
+                      return (
+                        <span key={kw} style={{ display: 'inline-flex', alignItems: 'center', gap: 0, fontSize: 10, borderRadius: 999, overflow: 'hidden', border: `1px solid ${latest ? color + '55' : 'rgba(99,102,241,0.25)'}` }}>
+                          <a
+                            href={`https://www.google.com/search?q=${encodeURIComponent(kw)}`}
+                            target='_blank' rel='noreferrer'
+                            title='Google search'
+                            style={{ padding: '3px 8px', background: latest ? color + '18' : 'rgba(99,102,241,0.08)', color: latest ? color : '#818cf8', fontWeight: 600, textDecoration: 'none' }}
+                          >
+                            {kw}
+                          </a>
+                          {latest && !isEditing && (
+                            <span style={{ padding: '3px 7px', background: color + '28', color, fontWeight: 800, borderLeft: `1px solid ${color}55`, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                              #{latest.position}
+                              {trend > 0 && <span style={{ color: '#22c55e' }}>↑{trend}</span>}
+                              {trend < 0 && <span style={{ color: '#f87171' }}>↓{Math.abs(trend)}</span>}
+                            </span>
+                          )}
+                          {isEditing ? (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 6px', background: 'rgba(99,102,241,0.18)', borderLeft: '1px solid rgba(99,102,241,0.3)' }}>
+                              <input
+                                autoFocus
+                                type='number' min={1} max={100}
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    const n = parseInt(editValue, 10);
+                                    if (n >= 1 && n <= 100) recordRank(kw, n);
+                                  } else if (e.key === 'Escape') {
+                                    setEditingKw(null); setEditValue('');
+                                  }
+                                }}
+                                placeholder='1-100'
+                                style={{ width: 50, padding: '2px 4px', fontSize: 10, border: '1px solid var(--panel-border)', borderRadius: 4, background: 'var(--surface)', color: 'var(--ink)' }}
+                              />
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => { setEditingKw(kw); setEditValue(latest ? String(latest.position) : ''); }}
+                              title="Bu keyword için Google'da kaçıncı sırada gördüğünü gir"
+                              style={{ padding: '3px 7px', background: 'transparent', color: 'var(--ink-50)', border: 'none', borderLeft: '1px solid var(--panel-border)', cursor: 'pointer', fontSize: 10, fontWeight: 700 }}
+                            >
+                              {latest ? '✏️' : '📍'}
+                            </button>
+                          )}
+                          {latest && !isEditing && (
+                            <button
+                              onClick={() => clearRank(kw)}
+                              title='Geçmişi temizle'
+                              style={{ padding: '3px 6px', background: 'transparent', color: 'var(--ink-30)', border: 'none', borderLeft: '1px solid var(--panel-border)', cursor: 'pointer', fontSize: 10 }}
+                            >
+                              ×
+                            </button>
+                          )}
+                        </span>
+                      );
+                    })}
                   </div>
+                  )}
                 </div>
               );
             })}
