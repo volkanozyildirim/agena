@@ -1819,6 +1819,28 @@ export default function DashboardTasksPage() {
                     {reviewsEnabled && (() => {
                       const reviewing = reviewingTaskIds.has(task.id);
                       const latest = latestReviewByTask[task.id];
+                      // Latest review is still running anywhere in the
+                      // system → show "⏳ Reviewing…" so the row reflects
+                      // the same truth as /dashboard/reviews. Without
+                      // this the button would say "✓ Reviewed" against
+                      // the previous completed run while a fresh one is
+                      // still in flight.
+                      if (latest && latest.status === 'running') {
+                        return (
+                          <Link href={`/dashboard/reviews/${latest.id}`}
+                            data-review-trigger
+                            title={t('reviews.inProgress' as TranslationKey) || 'Review in progress…'}
+                            style={{
+                              padding: '6px 10px', fontSize: 11, fontWeight: 700, borderRadius: 8,
+                              border: '1px solid rgba(168,85,247,0.45)',
+                              background: 'rgba(168,85,247,0.18)',
+                              color: '#c084fc',
+                              textDecoration: 'none', whiteSpace: 'nowrap',
+                            }}>
+                            ⏳ {t('reviews.running' as TranslationKey) || 'Reviewing…'}
+                          </Link>
+                        );
+                      }
                       // Done review → swap to a colored "Reviewed" link
                       // pointing at the dedicated detail page, so the
                       // user can re-read findings instead of triggering

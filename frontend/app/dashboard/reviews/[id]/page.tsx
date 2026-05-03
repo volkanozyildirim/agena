@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
@@ -315,7 +316,12 @@ export default function ReviewDetailPage() {
         </>
       )}
 
-      {confirmingDelete && (
+      {confirmingDelete && typeof document !== 'undefined' && createPortal(
+        // Portal so the overlay attaches to <body> directly — otherwise
+        // a parent with `transform` / `filter` would scope the
+        // position:fixed coordinates to itself and the modal would land
+        // somewhere down the page instead of dead-center on the
+        // viewport.
         <div onClick={() => !deleting && setConfirmingDelete(false)}
           style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', display: 'grid', placeItems: 'center', padding: 16 }}>
           <div onClick={(e) => e.stopPropagation()}
@@ -338,7 +344,8 @@ export default function ReviewDetailPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

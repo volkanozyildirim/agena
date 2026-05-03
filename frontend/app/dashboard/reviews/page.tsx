@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
@@ -479,7 +480,11 @@ export default function ReviewsPage() {
         )}
       </div>
 
-      {confirmDelete && (
+      {confirmDelete && typeof document !== 'undefined' && createPortal(
+        // Portal so position:fixed lands on the viewport even when an
+        // ancestor uses transform/filter (which would otherwise scope
+        // fixed positioning to that ancestor and push the modal
+        // off-center).
         <div onClick={() => deletingId !== confirmDelete.id && setConfirmDelete(null)}
           style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', display: 'grid', placeItems: 'center', padding: 16 }}>
           <div onClick={(e) => e.stopPropagation()}
@@ -505,7 +510,8 @@ export default function ReviewsPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
