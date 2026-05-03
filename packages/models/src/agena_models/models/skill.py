@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, JSON, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from agena_core.db.base import Base
@@ -9,13 +9,18 @@ from agena_core.db.base import Base
 class Skill(Base):
     """A reusable pattern extracted from a completed task. Agents pull the
     most relevant skills into their system prompt when a new task comes in,
-    so previous solutions compound rather than getting lost."""
+    so previous solutions compound rather than getting lost.
+
+    A skill is either *org-scoped* (organization_id set, is_public=False —
+    pulled from a completed task or manually entered by the team) or
+    *public* (organization_id NULL, is_public=True — imported from the
+    awesome-agent-skills registry, available to every tenant)."""
 
     __tablename__ = 'skills'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    organization_id: Mapped[int] = mapped_column(
-        ForeignKey('organizations.id', ondelete='CASCADE'), index=True
+    organization_id: Mapped[int | None] = mapped_column(
+        ForeignKey('organizations.id', ondelete='CASCADE'), index=True, nullable=True,
     )
     # Null when the skill was created manually or extracted from an external
     # source. Set on ON DELETE to null so deleting a task doesn't lose the
@@ -54,6 +59,16 @@ class Skill(Base):
     # for a new task's context.
     usage_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # Public library + lifecycle
+    is_public: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # 'manual' | 'extracted' | 'public_import'
+    source: Mapped[str] = mapped_column(String(32), nullable=False, default='manual')
+    # Source SKILL.md URL when imported from a public registry (idempotency key)
+    external_url: Mapped[str | None] = mapped_column(String(512), nullable=True, unique=True)
+    # GitHub-style "owner/repo" — used for catalog grouping
+    publisher: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
     updated_at: Mapped[datetime] = mapped_column(

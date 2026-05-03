@@ -3,9 +3,13 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agena_api.api.dependencies import CurrentTenant, get_current_tenant
+from sqlalchemy import desc, func, or_, select
+
+from agena_api.api.dependencies import CurrentTenant, get_current_tenant, require_platform_admin
 from agena_core.database import get_db_session
+from agena_models.models.skill import Skill
 from agena_models.schemas.skill import SkillCreate, SkillHit, SkillResponse, SkillUpdate
+from agena_services.services.skill_import_service import import_default_set, import_repo
 from agena_services.services.skill_service import SkillService
 
 router = APIRouter(prefix='/skills', tags=['skills'])
@@ -162,3 +166,78 @@ async def search_skills(
         touched_files=touched_files,
         limit=max(1, min(limit, 10)),
     )
+
+
+# ── Public Library ───────────────────────────────────────────────────
+
+
+@router.get('/public/list')
+async def list_public_skills(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=500),
+    q: str | None = Query(default=None),
+    publisher: str | None = Query(default=None),
+    active_only: bool = Query(default=False),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> dict:
+    """Lists every public skill imported into AGENA's local mirror. Open to
+    every authenticated tenant — toggling active/inactive is admin-only.
+    Searchable by name/description text and filterable by publisher."""
+    stmt = select(Skill).where(Skill.is_public.is_(True))
+    cstmt = select(func.count(Skill.id)).where(Skill.is_public.is_(True))
+    if active_only:
+        stmt = stmt.where(Skill.is_active.is_(True))
+        cstmt = cstmt.where(Skill.is_active.is_(True))
+    if publisher:
+        stmt = stmt.where(Skill.publisher == publisher)
+        cstmt = cstmt.where(Skill.publisher == publisher)
+    if q:
+        like = f'%{q.lower()}%'
+        stmt = stmt.where(or_(func.lower(Skill.name).like(like), func.lower(Skill.description).like(like)))
+        cstmt = cstmt.where(or_(func.lower(Skill.name).like(like), func.lower(Skill.description).like(like)))
+    total = (await db.execute(cstmt)).scalar() or 0
+    rows = (await db.execute(
+        stmt.order_by(Skill.publisher, Skill.name).offset((page - 1) * page_size).limit(page_size)
+    )).scalars().all()
+    return {
+        'items': [{
+            'id': s.id, 'name': s.name, 'description': s.description or '',
+            'pattern_type': s.pattern_type, 'tags': list(s.tags or []),
+            'is_active': s.is_active, 'publisher': s.publisher,
+            'external_url': s.external_url,
+            'usage_count': s.usage_count or 0,
+        } for s in rows],
+        'total': total, 'page': page, 'page_size': page_size,
+        'total_pages': max(1, (total + page_size - 1) // page_size) if total else 0,
+    }
+
+
+@router.post('/public/{skill_id}/toggle')
+async def toggle_public_skill(
+    skill_id: int,
+    _admin: CurrentTenant = Depends(require_platform_admin),
+    db: AsyncSession = Depends(get_db_session),
+) -> dict:
+    s = (await db.execute(select(Skill).where(Skill.id == skill_id, Skill.is_public.is_(True)))).scalar_one_or_none()
+    if s is None:
+        raise HTTPException(status_code=404, detail='Public skill not found')
+    s.is_active = not s.is_active
+    await db.commit()
+    return {'id': s.id, 'is_active': s.is_active}
+
+
+@router.post('/public/import')
+async def import_public_library(
+    repo: str | None = Query(default=None, description='Specific GitHub owner/repo. Omit to run the default seed set.'),
+    _admin: CurrentTenant = Depends(require_platform_admin),
+    db: AsyncSession = Depends(get_db_session),
+) -> dict:
+    """Pulls SKILL.md from one repo (or the default seed list) into the
+    local public library. Idempotent — re-running updates existing rows
+    instead of duplicating them. Heavyweight (network + many DB writes),
+    so admin-only and a one-shot HTTP call rather than a background task
+    for now."""
+    if repo:
+        return {'results': {repo: await import_repo(db, repo)}}
+    return {'results': await import_default_set(db)}

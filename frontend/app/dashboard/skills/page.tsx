@@ -56,6 +56,7 @@ export default function SkillsPage() {
   const [page, setPage] = useState(1);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [view, setView] = useState<'team' | 'public'>('team');
   // Import-defaults flow state. Two stages: confirm → result. We keep
   // it modal-based instead of window.confirm + alert so the rest of
   // the dashboard's portal-modal style stays consistent.
@@ -130,8 +131,8 @@ export default function SkillsPage() {
 
   return (
     <div style={{ display: 'grid', gap: 16, maxWidth: 1200, paddingBottom: 40 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 240px', minWidth: 0 }}>
           <div className='section-label'>{tr('skills.sectionLabel')}</div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink-90)', marginTop: 6, marginBottom: 2 }}>
             {tr('skills.title')}
@@ -139,6 +140,22 @@ export default function SkillsPage() {
           <p style={{ fontSize: 12, color: 'var(--ink-30)', margin: 0 }}>
             {tr('skills.subtitle')}
           </p>
+          <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
+            {[{ id: 'team' as const, label: tr('skills.tab.team' as Parameters<typeof tr>[0]) || 'Team Skills' }, { id: 'public' as const, label: tr('skills.tab.public' as Parameters<typeof tr>[0]) || 'Public Library' }].map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setView(t.id)}
+                style={{
+                  padding: '6px 12px', borderRadius: 999, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  border: `1px solid ${view === t.id ? 'rgba(13,148,136,0.5)' : 'var(--panel-border)'}`,
+                  background: view === t.id ? 'rgba(13,148,136,0.12)' : 'var(--surface)',
+                  color: view === t.id ? '#0d9488' : 'var(--ink-78)',
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
         <button
           onClick={() => { setImportError(''); setImportResult(null); setImportStage('confirm'); }}
@@ -205,7 +222,9 @@ export default function SkillsPage() {
         </div>
       )}
 
-      {!loading && data && data.items.length === 0 && (
+      {view === 'public' && <PublicSkillsLibrary />}
+
+      {view === 'team' && !loading && data && data.items.length === 0 && (
         <div style={{
           padding: 24, borderRadius: 14, border: '1px solid var(--panel-border-2)', background: 'var(--panel)',
           textAlign: 'center', color: 'var(--ink-45)',
@@ -216,8 +235,26 @@ export default function SkillsPage() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gap: 10 }}>
-        {(data?.items || []).map((s) => {
+      <div style={{ display: 'grid', gap: 16 }}>
+        {view === 'team' && (() => {
+          const teamItems = data?.items || [];
+          // Group team skills by pattern_type so similar patterns surface
+          // together — much easier to scan a 50-skill catalog at a glance.
+          const groups: Record<string, typeof teamItems> = {};
+          for (const s of teamItems) {
+            const k = s.pattern_type || 'other';
+            (groups[k] = groups[k] || []).push(s);
+          }
+          // Stable order: most populated buckets first, then alphabetical.
+          const sortedKeys = Object.keys(groups).sort((a, b) => groups[b].length - groups[a].length || a.localeCompare(b));
+          return sortedKeys.map((groupKey) => (
+            <div key={groupKey}>
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+                <span>{groupKey}</span>
+                <span style={{ color: 'var(--ink-25)' }}>{groups[groupKey].length}</span>
+              </div>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {groups[groupKey].map((s) => {
           const isOpen = expanded === s.id;
           const color = PATTERN_COLOURS[s.pattern_type] || PATTERN_COLOURS['other'];
           return (
@@ -324,11 +361,15 @@ export default function SkillsPage() {
               )}
             </div>
           );
-        })}
+                })}
+              </div>
+            </div>
+          ));
+        })()}
       </div>
 
       {/* Pagination */}
-      {data && data.total_pages > 1 && (
+      {view === 'team' && data && data.total_pages > 1 && (
         <div style={{ display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center', marginTop: 10 }}>
           <button onClick={() => setPage(1)} disabled={page <= 1} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', color: 'var(--ink-78)', cursor: page <= 1 ? 'default' : 'pointer', opacity: page <= 1 ? 0.4 : 1 }}>« {tr('skills.pager.first')}</button>
           <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', color: 'var(--ink-78)', cursor: page <= 1 ? 'default' : 'pointer', opacity: page <= 1 ? 0.4 : 1 }}>‹ {tr('skills.pager.prev')}</button>
@@ -528,6 +569,141 @@ export default function SkillsPage() {
             )}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── Public Skills Library ─────────────────────────────────────────────
+type PublicSkill = {
+  id: number;
+  name: string;
+  description: string;
+  pattern_type: string;
+  tags: string[];
+  is_active: boolean;
+  publisher: string | null;
+  external_url: string | null;
+  usage_count: number;
+};
+
+function PublicSkillsLibrary() {
+  const [items, setItems] = useState<PublicSkill[] | null>(null);
+  const [search, setSearch] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [error, setError] = useState('');
+
+  async function load() {
+    try {
+      const params = new URLSearchParams({ page: '1', page_size: '500' });
+      if (search.trim()) params.set('q', search.trim());
+      const r = await apiFetch<{ items: PublicSkill[]; total: number }>(`/skills/public/list?${params.toString()}`);
+      setItems(r.items);
+      setError('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    const t = setTimeout(() => { void load(); }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  async function toggle(id: number) {
+    try {
+      const r = await apiFetch<{ id: number; is_active: boolean }>(`/skills/public/${id}/toggle`, { method: 'POST' });
+      setItems((prev) => prev?.map((it) => it.id === id ? { ...it, is_active: r.is_active } : it) ?? null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function runImport() {
+    setImporting(true); setMsg(''); setError('');
+    try {
+      const r = await apiFetch<{ results: Record<string, { found: number; inserted: number; updated: number; skipped: number }> }>(
+        '/skills/public/import', { method: 'POST' }
+      );
+      const total = Object.values(r.results).reduce((s, v) => s + (v.inserted || 0) + (v.updated || 0), 0);
+      setMsg(`${total} skill imported / updated. Refreshing…`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  // Group by publisher for an at-a-glance catalog feel.
+  const grouped = (items || []).reduce<Record<string, PublicSkill[]>>((acc, s) => {
+    const k = s.publisher || 'Unknown';
+    (acc[k] = acc[k] || []).push(s);
+    return acc;
+  }, {});
+
+  return (
+    <div style={{ display: 'grid', gap: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <input
+          placeholder='Search public skills…'
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ flex: 1, minWidth: 220, fontSize: 13, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--ink-90)' }}
+        />
+        <button
+          onClick={() => void runImport()}
+          disabled={importing}
+          style={{ fontSize: 12, fontWeight: 700, padding: '8px 14px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #6366f1, #06b6d4)', color: '#fff', cursor: importing ? 'wait' : 'pointer' }}
+        >
+          {importing ? 'Importing…' : '📥 Import / refresh public library'}
+        </button>
+        {items !== null && (
+          <span style={{ fontSize: 12, color: 'var(--ink-45)' }}>
+            {items.filter((s) => s.is_active).length} active / {items.length} total
+          </span>
+        )}
+      </div>
+      {msg && <div style={{ fontSize: 12, color: '#86efac', padding: '8px 12px', borderRadius: 8, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)' }}>{msg}</div>}
+      {error && <div style={{ fontSize: 12, color: '#fca5a5', padding: '8px 12px', borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.35)' }}>{error}</div>}
+
+      {items === null ? (
+        <div style={{ padding: 24, color: 'var(--ink-45)', fontSize: 13 }}>Loading…</div>
+      ) : items.length === 0 ? (
+        <div style={{ padding: 24, borderRadius: 12, border: '1px solid var(--panel-border)', background: 'var(--panel)', textAlign: 'center' }}>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>📚</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink-90)' }}>Public library is empty</div>
+          <div style={{ fontSize: 12, color: 'var(--ink-45)', marginTop: 4 }}>Click <em>Import / refresh public library</em> above to pull skills from awesome-agent-skills.</div>
+        </div>
+      ) : (
+        Object.entries(grouped).map(([publisher, list]) => (
+          <div key={publisher}>
+            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, color: 'var(--ink-35)', textTransform: 'uppercase', marginBottom: 6 }}>
+              {publisher} <span style={{ color: 'var(--ink-25)' }}>· {list.length}</span>
+            </div>
+            <div style={{ display: 'grid', gap: 6 }}>
+              {list.map((s) => (
+                <div key={s.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10,
+                  border: `1px solid ${s.is_active ? 'rgba(34,197,94,0.25)' : 'var(--panel-border)'}`,
+                  background: s.is_active ? 'rgba(34,197,94,0.04)' : 'var(--panel)',
+                }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-90)', minWidth: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
+                  <span style={{ fontSize: 11, color: 'var(--ink-50)', flex: 2, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.description}</span>
+                  {s.external_url && (
+                    <a href={s.external_url} target='_blank' rel='noreferrer' style={{ fontSize: 10, color: '#0d9488', textDecoration: 'none' }}>↗</a>
+                  )}
+                  <div onClick={() => void toggle(s.id)}
+                    style={{ width: 36, height: 20, borderRadius: 999, background: s.is_active ? '#22c55e' : 'var(--panel-border-3)', position: 'relative', cursor: 'pointer', transition: 'background 0.18s', flexShrink: 0 }}>
+                    <div style={{ position: 'absolute', top: 2, left: s.is_active ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.18s' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))
       )}
     </div>
   );

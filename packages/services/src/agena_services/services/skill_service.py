@@ -13,7 +13,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import delete, select
+from sqlalchemy import and_, delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agena_agents.memory.qdrant import QdrantMemoryStore
@@ -196,9 +196,15 @@ class SkillService:
                 skill_ids.append(sid)
         skills_by_id: dict[int, Skill] = {}
         if skill_ids:
+            # Include both the org's own skills and active public skills —
+            # public ones live with organization_id NULL so the OR clause
+            # is the cleanest way to merge the two surfaces.
             stmt = select(Skill).where(
-                Skill.organization_id == organization_id,
                 Skill.id.in_(skill_ids),
+                or_(
+                    Skill.organization_id == organization_id,
+                    and_(Skill.organization_id.is_(None), Skill.is_public.is_(True), Skill.is_active.is_(True)),
+                ),
             )
             for s in (await self.db.execute(stmt)).scalars().all():
                 skills_by_id[s.id] = s

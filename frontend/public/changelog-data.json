@@ -1,5 +1,13 @@
 [
   {
+    "hash": "5155d91",
+    "short": "5155d91",
+    "message": "Landing: tighter mobile pre-wrap on /ai-code-review sample box",
+    "date": "2026-05-03",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "5ecaaff",
     "short": "5ecaaff",
     "message": "SEO: per-landing OpenGraph images via next/og",
