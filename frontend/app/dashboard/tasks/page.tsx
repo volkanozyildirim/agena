@@ -45,6 +45,27 @@ function statusLabel(s: string, t: (key: TranslationKey, vars?: Record<string, s
   return t(`tasks.status.${s}` as TranslationKey);
 }
 
+// Task description preview is rendered inside a -webkit-line-clamp box,
+// so any HTML in the body shows up as raw `<div><br></div>...` instead of
+// formatted text. Strip tags + decode the common HTML entities so the
+// preview reads like the rendered view does in the detail page.
+function stripHtmlForPreview(raw: string | null | undefined): string {
+  if (!raw) return '';
+  let s = String(raw);
+  s = s.replace(/<\s*br\s*\/?>/gi, '\n');
+  s = s.replace(/<\/(p|div|li|h[1-6]|tr)>/gi, '\n');
+  s = s.replace(/<[^>]+>/g, ' ');
+  s = s
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+  s = s.replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n');
+  return s.trim();
+}
+
 function sourceLabel(s: string, t: (key: TranslationKey, vars?: Record<string, string | number>) => string): string {
   const normalized = (s || '').toLowerCase();
   const key = `tasks.source.${normalized}` as TranslationKey;
@@ -71,9 +92,9 @@ function RowActionsKebab({
   }>;
   ariaLabel: string;
 }) {
-  const [open, setOpen] = React.useState(false);
-  const ref = React.useRef<HTMLDivElement | null>(null);
-  React.useEffect(() => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
     if (!open) return;
     function handleClickOutside(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
@@ -1616,7 +1637,7 @@ export default function DashboardTasksPage() {
                   WebkitBoxOrient: 'vertical',
                   lineHeight: 1.35,
                   maxHeight: 32,
-                }}>{task.description}</div>
+                }}>{stripHtmlForPreview(task.description)}</div>
                 {task.source === 'sentry' && (task.is_unhandled || task.substatus || task.fixability_score != null) && (
                   <div style={{ display: 'flex', gap: 4, marginTop: 3, flexWrap: 'wrap' }}>
                     {task.is_unhandled && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>unhandled</span>}

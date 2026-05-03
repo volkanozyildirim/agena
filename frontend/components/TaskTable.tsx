@@ -1,6 +1,17 @@
 import Link from 'next/link';
 import StatusBadge from './StatusBadge';
 
+function stripHtmlForPreview(raw: string | null | undefined): string {
+  if (!raw) return '';
+  let s = String(raw);
+  s = s.replace(/<\s*br\s*\/?>/gi, '\n');
+  s = s.replace(/<\/(p|div|li|h[1-6]|tr)>/gi, '\n');
+  s = s.replace(/<[^>]+>/g, ' ');
+  s = s.replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+  return s.replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 export type RepoAssignment = {
   id: number;
   repo_mapping_id: number;
@@ -75,7 +86,7 @@ export default function TaskTable({ tasks, onAssign }: Props) {
               <tr key={task.id} style={{ borderTop: '1px solid #dde9e6' }}>
                 <td>
                   <div style={{ fontWeight: 700 }}>{task.title}</div>
-                  <div style={{ color: '#587376', fontSize: 13 }}>{task.description}</div>
+                  <div style={{ color: '#587376', fontSize: 13 }}>{stripHtmlForPreview(task.description)}</div>
                 </td>
                 <td>
                   <span className='chip' style={{ textTransform: 'capitalize' }}>

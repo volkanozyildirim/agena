@@ -1,18 +1,24 @@
 'use client';
 
+import { usePathname, useRouter } from 'next/navigation';
 import { useLocale } from '@/lib/i18n';
 
 export default function LangToggle({ style }: { style?: React.CSSProperties }) {
   const { lang, setLang, t } = useLocale();
+  const pathname = usePathname();
+  const router = useRouter();
 
   function onChangeLang(next: 'tr' | 'en' | 'es' | 'zh' | 'it' | 'de' | 'ja') {
     setLang(next);
-    // Hard reload so server-rendered pages (landings, OG metadata,
-    // anything reading the agena_lang cookie) repaint immediately. We
-    // tried router.refresh() but Next.js's RSC cache sometimes serves
-    // the previous payload — full reload is the only reliable way to
-    // make "click TR → see TR" feel instant.
-    if (typeof window !== 'undefined') window.location.reload();
+    // Dashboard is fully client-rendered — useLocale's listener
+    // mechanism already triggers a React re-render on every component
+    // that subscribed via useLocale(), so we don't need a page reload.
+    // For server-rendered pages (landings, /docs, OG metadata) the RSC
+    // payload depends on the agena_lang cookie, so router.refresh()
+    // re-pulls the payload without a full page reload.
+    if (typeof window === 'undefined') return;
+    if (pathname && pathname.startsWith('/dashboard')) return;
+    router.refresh();
   }
 
   return (
