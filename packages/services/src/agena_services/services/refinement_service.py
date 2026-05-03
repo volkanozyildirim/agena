@@ -399,28 +399,60 @@ class RefinementService:
                         similar_past_block=similar_past_prompt,
                     )
 
-                    # Pull image attachments from the work item description so
-                    # screenshots / mockups land in the LLM context. Both
-                    # API providers (data URLs) and CLI providers (file path
-                    # @-references) work — the model just needs the bytes.
+                    # Pull discussion comments and append them to the
+                    # description so the LLM sees clarifications, follow-up
+                    # questions and acceptance-criteria tweaks made AFTER
+                    # the original ticket body. Without this the model only
+                    # sees the description text and misses every "ah but
+                    # actually it should also..." comment that comes later.
+                    raw_comments: list[dict[str, Any]] = []
+                    try:
+                        raw_comments = await self._fetch_comments_raw(
+                            organization_id=organization_id,
+                            provider=request.provider,
+                            project=request.project,
+                            external_id=item.id,
+                        )
+                        discussion_block = self._format_discussion_block(raw_comments)
+                        if discussion_block:
+                            prompt_vars['description'] = (
+                                f"{prompt_vars.get('description') or ''}\n\n{discussion_block}".strip()
+                            )
+                    except Exception as exc:
+                        logger.info('Discussion fetch skipped for item %s: %s', item.id, exc)
+
+                    # Pull image attachments. Description first; then walk
+                    # comment HTML too — Azure work-item comments are HTML
+                    # so a screenshot dropped into a comment lands here as
+                    # well. Both API providers (data URLs) and CLI providers
+                    # (file path @-references) work — the model just needs
+                    # the bytes.
                     item_images_data_urls: list[str] = []
                     item_image_paths: list[str] = []
-                    if request.provider == 'azure' and (item.description or '').strip():
+                    if request.provider == 'azure':
                         try:
                             azure_cfg_for_img = await self.integration_service.get_config(organization_id, 'azure')
                             if azure_cfg_for_img and azure_cfg_for_img.secret:
-                                fetched = await self.azure_client.fetch_description_images(
-                                    item.description or '',
-                                    cfg={
-                                        'org_url': azure_cfg_for_img.base_url or '',
-                                        'pat': azure_cfg_for_img.secret,
-                                    },
-                                    max_images=4,
-                                )
-                                if fetched:
-                                    item_images_data_urls, item_image_paths = self._materialize_images_for_llm(
-                                        fetched, item.id,
+                                # Concat description + each comment body so
+                                # one regex pass picks up <img> tags from
+                                # both surfaces.
+                                comment_html_chunks = [
+                                    str(c.get('text') or '') for c in raw_comments if c.get('text')
+                                ]
+                                combined_html = (item.description or '') + '\n\n' + '\n\n'.join(comment_html_chunks)
+                                if combined_html.strip():
+                                    fetched = await self.azure_client.fetch_description_images(
+                                        combined_html,
+                                        cfg={
+                                            'org_url': azure_cfg_for_img.base_url or '',
+                                            'pat': azure_cfg_for_img.secret,
+                                        },
+                                        max_images=6,
                                     )
+                                    if fetched:
+                                        item_images_data_urls, item_image_paths = self._materialize_images_for_llm(
+                                            fetched, item.id,
+                                        )
                         except Exception as exc:
                             logger.info('Image fetch skipped for item %s: %s', item.id, exc)
 
@@ -1239,6 +1271,65 @@ class RefinementService:
                 except Exception as exc:
                     logger.info('Failed to write image %s: %s', fpath, exc)
         return data_urls, paths
+
+    async def _fetch_comments_raw(
+        self,
+        *,
+        organization_id: int,
+        provider: str,
+        project: str | None,
+        external_id: str,
+    ) -> list[dict[str, Any]]:
+        """Fetch comments for a work item, newest-first, with raw text
+        (HTML for Azure, plain text for Jira). Returns [] on missing config
+        or network error so callers can no-op."""
+        prov = (provider or '').strip().lower()
+        try:
+            if prov == 'azure' and (project or '').strip():
+                cfg = await self.integration_service.get_config(organization_id, 'azure')
+                if cfg and cfg.secret:
+                    return await self.azure_client.fetch_work_item_comments(
+                        cfg={'org_url': cfg.base_url or '', 'pat': cfg.secret},
+                        project=project or '',
+                        work_item_id=str(external_id),
+                    )
+            elif prov == 'jira':
+                cfg = await self.integration_service.get_config(organization_id, 'jira')
+                if cfg and cfg.secret:
+                    return await self.jira_client.fetch_issue_comments(
+                        cfg={
+                            'base_url': cfg.base_url or '',
+                            'email': (cfg.extra_config or {}).get('email') or '',
+                            'api_token': cfg.secret,
+                        },
+                        issue_key=str(external_id),
+                    )
+        except Exception as exc:
+            logger.info('Comment fetch failed (provider=%s id=%s): %s', prov, external_id, exc)
+        return []
+
+    def _format_discussion_block(self, comments: list[dict[str, Any]]) -> str:
+        """Render a fetched comments list into a chronological Discussion
+        markdown block. Newest-first input is flipped so the LLM reads the
+        conversation in order. Empty string when no usable text remains."""
+        if not comments:
+            return ''
+        ordered = list(reversed(comments))
+        lines: list[str] = []
+        for idx, c in enumerate(ordered, start=1):
+            text = self._normalize_description(str(c.get('text') or ''))
+            if not text:
+                continue
+            who = (c.get('created_by') or 'unknown').strip()
+            when = str(c.get('created_at') or '')
+            when_short = when[:19].replace('T', ' ') if when else ''
+            header = f'### Comment {idx} — {who}'
+            if when_short:
+                header += f' ({when_short})'
+            lines.append(f'{header}\n{text}')
+        if not lines:
+            return ''
+        return f'---\n## Discussion ({len(lines)} comment{"" if len(lines) == 1 else "s"})\n' + '\n\n'.join(lines)
 
     def _normalize_description(self, value: str | None) -> str:
         raw = str(value or '').strip()
