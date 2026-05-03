@@ -455,6 +455,32 @@ class RefinementService:
                                         )
                         except Exception as exc:
                             logger.info('Image fetch skipped for item %s: %s', item.id, exc)
+                    elif request.provider == 'jira':
+                        # Jira stores screenshots as ADF media nodes, not
+                        # <img> tags, so the description string we hold
+                        # has no image markers. fetch_issue_images asks
+                        # Jira for the *rendered* HTML (description +
+                        # comments), pulls every <img src=...> and Basic-
+                        # auths the binary back so the multimodal model
+                        # gets the same screenshots a human reviewer sees.
+                        try:
+                            jira_cfg_for_img = await self.integration_service.get_config(organization_id, 'jira')
+                            if jira_cfg_for_img and jira_cfg_for_img.secret:
+                                fetched = await self.jira_client.fetch_issue_images(
+                                    item.id,
+                                    cfg={
+                                        'base_url': jira_cfg_for_img.base_url or '',
+                                        'email': (jira_cfg_for_img.extra_config or {}).get('email') or '',
+                                        'api_token': jira_cfg_for_img.secret,
+                                    },
+                                    max_images=6,
+                                )
+                                if fetched:
+                                    item_images_data_urls, item_image_paths = self._materialize_images_for_llm(
+                                        fetched, item.id,
+                                    )
+                        except Exception as exc:
+                            logger.info('Jira image fetch skipped for item %s: %s', item.id, exc)
 
                     if use_cli:
                         # Run via CLI bridge instead of LLM API

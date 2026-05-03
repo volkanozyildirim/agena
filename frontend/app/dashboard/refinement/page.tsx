@@ -637,8 +637,8 @@ export default function RefinementPage() {
     try {
       type SearchRow = { id: number; source: string; external_id?: string | null; title?: string; status: string };
       type SearchResp = { items: SearchRow[]; total: number };
-      const providerQs = new URLSearchParams({ source: provider, page: '1', page_size: '200' });
-      const internalQs = new URLSearchParams({ source: 'internal', page: '1', page_size: '200' });
+      const providerQs = new URLSearchParams({ source: provider, page: '1', page_size: '100' });
+      const internalQs = new URLSearchParams({ source: 'internal', page: '1', page_size: '100' });
       const [tagged, internal] = await Promise.all([
         apiFetch<SearchResp>(`/tasks/search?${providerQs.toString()}`).catch(() => ({ items: [], total: 0 })),
         apiFetch<SearchResp>(`/tasks/search?${internalQs.toString()}`).catch(() => ({ items: [], total: 0 })),
@@ -2154,43 +2154,54 @@ export default function RefinementPage() {
                           {(() => {
                             const importedTaskId = taskMapByExternalId[item.id];
                             const importedStatus = taskStatusByExternalId[item.id];
-                            if (importedTaskId) {
-                              return (
-                                <a
-                                  href={`/dashboard/tasks/${importedTaskId}`}
-                                  onClick={(e) => e.stopPropagation()}
-                                  style={{
-                                    fontSize: 11, fontWeight: 700,
-                                    padding: '4px 10px', borderRadius: 8,
-                                    border: '1px solid rgba(34,197,94,0.35)',
-                                    background: 'rgba(34,197,94,0.08)',
-                                    color: '#22c55e',
-                                    textDecoration: 'none',
-                                    whiteSpace: 'nowrap',
-                                  }}
-                                  title={`#${importedTaskId} · ${importedStatus || ''}`}
-                                >
-                                  ✓ {t('refinement.imported' as Parameters<typeof t>[0]) || 'Imported'}
-                                </a>
-                              );
-                            }
                             const isImporting = importingId === item.id;
+                            const isImported = !!importedTaskId;
+                            // Single-shape button: layout never reflows
+                            // between Import → ⏳ → ✓ Imported. When the
+                            // row is already imported the button is
+                            // disabled, painted green, and clicking the
+                            // wrapper still jumps to the task detail.
+                            const handleClick = (e: React.MouseEvent) => {
+                              e.stopPropagation();
+                              if (isImported && importedTaskId) {
+                                window.location.href = `/dashboard/tasks/${importedTaskId}`;
+                                return;
+                              }
+                              requestImportSingleItem(item);
+                            };
                             return (
                               <button
-                                onClick={(e) => { e.stopPropagation(); requestImportSingleItem(item); }}
+                                onClick={handleClick}
                                 disabled={isImporting}
+                                title={
+                                  isImported
+                                    ? `#${importedTaskId}${importedStatus ? ` · ${importedStatus}` : ''}`
+                                    : (t('refinement.importToTasks' as Parameters<typeof t>[0]) || 'Import to Tasks')
+                                }
                                 style={{
                                   fontSize: 11, fontWeight: 700,
                                   padding: '4px 10px', borderRadius: 8,
-                                  border: '1px solid rgba(13,148,136,0.45)',
-                                  background: isImporting ? 'rgba(13,148,136,0.20)' : 'rgba(13,148,136,0.10)',
-                                  color: '#0d9488',
-                                  cursor: isImporting ? 'wait' : 'pointer',
                                   whiteSpace: 'nowrap',
+                                  cursor: isImporting ? 'wait' : (isImported ? 'pointer' : 'pointer'),
+                                  opacity: isImported ? 0.85 : 1,
+                                  ...(isImported
+                                    ? {
+                                      border: '1px solid rgba(34,197,94,0.45)',
+                                      background: 'rgba(34,197,94,0.10)',
+                                      color: '#22c55e',
+                                    }
+                                    : {
+                                      border: '1px solid rgba(13,148,136,0.45)',
+                                      background: isImporting ? 'rgba(13,148,136,0.20)' : 'rgba(13,148,136,0.10)',
+                                      color: '#0d9488',
+                                    }),
                                 }}
-                                title={t('refinement.importToTasks' as Parameters<typeof t>[0]) || 'Import to Tasks'}
                               >
-                                {isImporting ? `⏳` : `📥 ${t('refinement.import' as Parameters<typeof t>[0]) || 'Import'}`}
+                                {isImported
+                                  ? `✓ ${t('refinement.imported' as Parameters<typeof t>[0]) || 'Imported'}`
+                                  : isImporting
+                                    ? '⏳'
+                                    : `📥 ${t('refinement.import' as Parameters<typeof t>[0]) || 'Import'}`}
                               </button>
                             );
                           })()}

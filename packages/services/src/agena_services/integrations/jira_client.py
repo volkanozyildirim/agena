@@ -334,6 +334,133 @@ class JiraClient:
                     break
         return items
 
+    async def fetch_issue_images(
+        self,
+        issue_key: str,
+        *,
+        cfg: dict[str, str] | None = None,
+        max_images: int = 6,
+    ) -> list[tuple[str, bytes, str]]:
+        """Pull image attachments referenced from a Jira issue's description
+        and comments. Returns up to `max_images` tuples of
+        (filename, raw_bytes, mime_type) so the caller can decide whether
+        to send them as base64 data URLs (API providers) or write to disk
+        and reference by path (CLI bridge).
+
+        Strategy: ask Jira for the *rendered* description + comment HTML
+        (`expand=renderedFields,renderedBody`). That HTML embeds inline
+        attachments as `<img src="...">` pointing at
+        `/rest/api/3/attachment/content/{id}`, exactly like Azure's
+        in-description image flow. Walking ADF media nodes directly would
+        require an extra hop to convert the media UUID → attachment id, so
+        we lean on Jira's own renderer instead.
+        """
+        import re as _re
+        base_url, email, api_token = self._resolve_config(cfg)
+        key = str(issue_key or '').strip()
+        if not base_url or not key:
+            return []
+        host = base_url.rstrip('/')
+        auth = (email, api_token)
+
+        html_chunks: list[str] = []
+        async with httpx.AsyncClient(timeout=20) as client:
+            # Description, rendered as HTML
+            try:
+                resp = await client.get(
+                    f"{host}/rest/api/3/issue/{key}",
+                    params={'expand': 'renderedFields', 'fields': 'description'},
+                    auth=auth,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    rendered = (data.get('renderedFields') or {}).get('description')
+                    if isinstance(rendered, str) and rendered:
+                        html_chunks.append(rendered)
+            except Exception as exc:
+                logger.info('Jira description render fetch failed for %s: %s', key, exc)
+            # Comments, rendered as HTML
+            try:
+                resp = await client.get(
+                    f"{host}/rest/api/3/issue/{key}/comment",
+                    params={'expand': 'renderedBody', 'maxResults': 50, 'orderBy': '-created'},
+                    auth=auth,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    for c in data.get('comments', []) or []:
+                        rb = c.get('renderedBody')
+                        if isinstance(rb, str) and rb:
+                            html_chunks.append(rb)
+            except Exception as exc:
+                logger.info('Jira comment render fetch failed for %s: %s', key, exc)
+
+        if not html_chunks:
+            return []
+
+        # Pull every <img src=...>. Jira may emit the URL as absolute
+        # (https://your-domain.atlassian.net/...) or as a path-relative
+        # reference (/rest/api/3/attachment/...). Normalise to absolute.
+        urls: list[str] = []
+        seen: set[str] = set()
+        for chunk in html_chunks:
+            for match in _re.finditer(r'<img[^>]+src=["\']([^"\']+)["\']', chunk, flags=_re.IGNORECASE):
+                raw = match.group(1).strip()
+                if not raw or raw.startswith('data:'):
+                    continue
+                if raw.startswith('//'):
+                    abs_url = 'https:' + raw
+                elif raw.startswith('/'):
+                    abs_url = host + raw
+                else:
+                    abs_url = raw
+                # Only pull URLs that look like Jira-hosted attachments —
+                # Basic auth scope we have only works there. Public CDN
+                # links would 401 noisily and pollute logs.
+                lower = abs_url.lower()
+                host_ok = (
+                    lower.startswith(host.lower())
+                    or '/rest/api/3/attachment/' in lower
+                    or '/secure/attachment/' in lower
+                )
+                if not host_ok:
+                    continue
+                if abs_url in seen:
+                    continue
+                seen.add(abs_url)
+                urls.append(abs_url)
+                if len(urls) >= max_images:
+                    break
+            if len(urls) >= max_images:
+                break
+        if not urls:
+            return []
+
+        results: list[tuple[str, bytes, str]] = []
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+            for idx, url in enumerate(urls):
+                try:
+                    resp = await client.get(url, auth=auth)
+                    if resp.status_code != 200:
+                        logger.info('Skip Jira image %s — HTTP %s', url, resp.status_code)
+                        continue
+                    mime = (resp.headers.get('content-type') or '').split(';')[0].strip().lower()
+                    if not mime.startswith('image/'):
+                        continue
+                    name = ''
+                    cd = resp.headers.get('content-disposition') or ''
+                    fn_match = _re.search(r'filename="?([^";]+)"?', cd)
+                    if fn_match:
+                        name = fn_match.group(1).strip()
+                    if not name:
+                        # Last-resort: last path segment, or seq number
+                        tail = url.rsplit('/', 1)[-1].split('?')[0]
+                        name = tail or f'jira-{idx + 1}'
+                    results.append((name, resp.content, mime))
+                except Exception as exc:
+                    logger.info('Jira image fetch failed for %s: %s', url, exc)
+        return results
+
     async def fetch_issue_comments(
         self, *, cfg: dict[str, str] | None, issue_key: str,
     ) -> list[dict[str, Any]]:
