@@ -45,10 +45,17 @@ WORK_ITEM_SOURCES = {'jira', 'azure_devops', 'azure'}
 # Time window each correlation cluster spans
 WINDOW_MIN = timedelta(minutes=60)
 
-# Confidence floor — below this we don't bother saving
-MIN_CONFIDENCE = 50
-# Confidence we surface as "kritik korelasyon"
-SURFACE_CONFIDENCE = 70
+# Confidence floor — below this we don't bother saving. Lowered from
+# 50 to 30 so a PR-only cluster (40 score) still gets persisted; the
+# Insights page filters out the very-low-signal noise via
+# SURFACE_CONFIDENCE on its query.
+MIN_CONFIDENCE = 30
+# Confidence we surface as "kritik korelasyon". Lowered from 70 to 40
+# so orgs that only have PR + work-item signals (no monitoring
+# integration plugged in yet) still see something on /insights —
+# previously a tenant with Azure but no Sentry would see an empty page
+# regardless of activity, which felt broken.
+SURFACE_CONFIDENCE = 40
 
 
 def _fingerprint(*parts: Any) -> str:

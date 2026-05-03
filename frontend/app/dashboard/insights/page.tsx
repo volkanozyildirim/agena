@@ -59,7 +59,14 @@ export default function InsightsPage() {
 
   async function load() {
     try {
-      const rows = await apiFetch<Correlation[]>('/insights/correlations?min_confidence=70&limit=200');
+      // Match SURFACE_CONFIDENCE on the backend (40). Anything below
+      // is in the noise floor and stays hidden — but PR-only / PR +
+      // workitem clusters (which used to score 60-80 only when a
+      // monitoring integration was plugged in) now show up here even
+      // for orgs that haven't connected Sentry / NewRelic / Datadog
+      // yet. Previously this page was perpetually empty for those
+      // tenants, which felt broken even though the engine was fine.
+      const rows = await apiFetch<Correlation[]>('/insights/correlations?min_confidence=40&limit=200');
       setItems(rows);
       setError(null);
     } catch (e) {
