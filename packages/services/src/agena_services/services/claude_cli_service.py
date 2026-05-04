@@ -33,8 +33,21 @@ class ClaudeCLIService:
 
     # ── Worktree helpers ─────────────────────────────────────────────────
     @staticmethod
-    def _create_worktree(repo_path: str, task_id: str = '') -> str | None:
-        """Create a git worktree from main so each task works on a clean copy."""
+    def _create_worktree(
+        repo_path: str,
+        task_id: str = '',
+        *,
+        base_ref: str | None = None,
+    ) -> str | None:
+        """Create a git worktree so each task works on a clean copy.
+
+        `base_ref` controls which ref the worktree branches from:
+          - None   → origin/HEAD (main / master). Default for fresh runs.
+          - <name> → origin/<name>. Used by the /tasks/{id}/revise flow
+                     so the worker re-checks-out the existing feature
+                     branch and pushes an additional commit, instead of
+                     starting from main and producing a NEW branch.
+        """
         repo = Path(repo_path).expanduser().resolve()
         if not (repo / '.git').exists():
             return None
@@ -44,16 +57,29 @@ class ClaudeCLIService:
             # Reuse existing worktree
             return str(wt_path)
         try:
-            # Determine base branch
-            base = subprocess.run(
-                ['git', 'symbolic-ref', 'refs/remotes/origin/HEAD'],
-                cwd=str(repo), capture_output=True, text=True, timeout=10,
-            ).stdout.strip().replace('refs/remotes/origin/', '') or 'main'
-            subprocess.run(
-                ['git', 'worktree', 'add', str(wt_path), base],
-                cwd=str(repo), capture_output=True, text=True, timeout=30,
-                check=True,
-            )
+            if base_ref:
+                # Revision flow: pull the latest copy of the existing
+                # feature branch before basing the worktree on it so we
+                # don't push stale tips and trigger force-push surprises.
+                subprocess.run(
+                    ['git', 'fetch', 'origin', base_ref],
+                    cwd=str(repo), capture_output=True, text=True, timeout=30,
+                )
+                subprocess.run(
+                    ['git', 'worktree', 'add', str(wt_path), f'origin/{base_ref}'],
+                    cwd=str(repo), capture_output=True, text=True, timeout=30,
+                    check=True,
+                )
+            else:
+                base = subprocess.run(
+                    ['git', 'symbolic-ref', 'refs/remotes/origin/HEAD'],
+                    cwd=str(repo), capture_output=True, text=True, timeout=10,
+                ).stdout.strip().replace('refs/remotes/origin/', '') or 'main'
+                subprocess.run(
+                    ['git', 'worktree', 'add', str(wt_path), base],
+                    cwd=str(repo), capture_output=True, text=True, timeout=30,
+                    check=True,
+                )
             return str(wt_path)
         except Exception:
             return None
@@ -78,6 +104,7 @@ class ClaudeCLIService:
         model: str | None = None,
         log_callback: LogCallback | None = None,
         task_id: str = '',
+        base_ref: str | None = None,
     ) -> str:
         prompt = (
             'Implement the following task in the CURRENT repository.\n\n'
@@ -107,8 +134,11 @@ class ClaudeCLIService:
             f'Task description:\n{task_description}\n'
         )
 
-        # Create worktree so each task works on a clean main copy
-        wt_path = self._create_worktree(repo_path, task_id)
+        # Create worktree so each task works on a clean copy. For
+        # revision runs `base_ref` is the existing feature branch so
+        # we land an additional commit on the same PR instead of
+        # branching from main again.
+        wt_path = self._create_worktree(repo_path, task_id, base_ref=base_ref)
         effective_path = wt_path or repo_path
         if wt_path and log_callback:
             await log_callback(f'Worktree created: {wt_path}')

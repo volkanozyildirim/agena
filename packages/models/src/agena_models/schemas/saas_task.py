@@ -100,6 +100,53 @@ class RepoAssignmentResponse(BaseModel):
     pr_url: str | None = None
     branch_name: str | None = None
     failure_reason: str | None = None
+    # Filled in by /tasks/{id}/revisions and the task detail load so
+    # the UI knows whether to show the "Revize iste" button (hidden
+    # once the PR is merged — that's a fresh-task situation).
+    revision_count: int = 0
+    pr_merged: bool = False
+
+
+class ReviseTaskRequest(BaseModel):
+    """Body of POST /tasks/{id}/revise — the user-facing follow-up
+    request that lands an extra commit on the existing branch instead
+    of opening a brand-new PR."""
+    instruction: str  # required, non-empty after .strip()
+    # Subset of assignments to revise. None = "every completed,
+    # non-merged assignment on this task" (the common case for
+    # single-repo tasks where the user doesn't even see a picker).
+    repo_assignment_ids: list[int] | None = None
+    agent_model: str | None = None
+    agent_provider: str | None = None
+
+
+class RevisionItem(BaseModel):
+    """One element of ReviseTaskResponse — describes the outcome of
+    queueing a single (revision, assignment) pair so the frontend can
+    show per-row status (some queued, some skipped because PR
+    already merged, etc.)."""
+    id: int
+    assignment_id: int | None
+    repo_display_name: str = ''
+    status: str  # queued | skipped_merged | skipped_running
+
+
+class ReviseTaskResponse(BaseModel):
+    queued: bool
+    revisions: list[RevisionItem]
+
+
+class TaskRevisionRecord(BaseModel):
+    """Used by GET /tasks/{id}/revisions to render the revision
+    history strip on the task detail page."""
+    id: int
+    assignment_id: int | None
+    instruction: str
+    status: str
+    failure_reason: str | None = None
+    requested_by_user_id: int | None = None
+    run_record_id: int | None = None
+    created_at: datetime
 
 
 class AssignTaskRequest(BaseModel):
