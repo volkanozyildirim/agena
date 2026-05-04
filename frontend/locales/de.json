@@ -3573,5 +3573,7 @@
   "taskDetail.revise.repoPick": "Welche Repos",
   "taskDetail.revise.allMerged": "Alle PRs bereits gemerged — für kleine Fixes besser eine neue Aufgabe öffnen.",
   "tasks.status.revising": "Wird überarbeitet",
-  "taskDetail.pr": "PR"
+  "taskDetail.pr": "PR",
+  "profile.prTitlePattern": "PR-Titel-Muster",
+  "profile.prTitlePatternHint": "Platzhalter: {ab} (AB#id bei Azure, Key bei Jira), {title}, {ext_id}, {id}, {source}. Leer = default `[AI] {ab} {title}`."
 }

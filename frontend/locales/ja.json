@@ -3573,5 +3573,7 @@
   "taskDetail.revise.repoPick": "対象リポジトリ",
   "taskDetail.revise.allMerged": "すべてのPRがマージ済み — 小さな修正は新しいタスクを開いてください。",
   "tasks.status.revising": "修正中",
-  "taskDetail.pr": "PR"
+  "taskDetail.pr": "PR",
+  "profile.prTitlePattern": "PRタイトルパターン",
+  "profile.prTitlePatternHint": "プレースホルダ: {ab}（Azure は AB#id、Jira はキー）、{title}、{ext_id}、{id}、{source}。空 = デフォルト `[AI] {ab} {title}`。"
 }

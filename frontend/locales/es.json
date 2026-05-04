@@ -3573,5 +3573,7 @@
   "taskDetail.revise.repoPick": "Qué repos",
   "taskDetail.revise.allMerged": "Todos los PR ya están fusionados — abre una tarea nueva para correcciones pequeñas.",
   "tasks.status.revising": "Revisando",
-  "taskDetail.pr": "PR"
+  "taskDetail.pr": "PR",
+  "profile.prTitlePattern": "Patrón del título de PR",
+  "profile.prTitlePatternHint": "Marcadores: {ab} (AB#id para Azure, clave para Jira), {title}, {ext_id}, {id}, {source}. Vacío = default `[AI] {ab} {title}`."
 }

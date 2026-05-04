@@ -21,24 +21,66 @@ def _is_valid_file_path(path: str) -> bool:
 
 # Pre-compiled prefix patterns for PR-title rewriting. Sprints /
 # refinement imports stamp `[Azure #N]` or `[Jira #KEY]` on the title at
-# ingest time so they show up in the dashboard task list. Those forms
-# don't trigger Azure DevOps's auto-linker (which wants `AB#<id>`) or
-# Jira's smart-commit syntax (which wants the bare key), so a PR opened
-# with the raw title misses the work-item linkage every time.
+# ingest time so they show up in the dashboard task list. The bare
+# `[Azure #N]` form doesn't trigger Azure DevOps's auto-linker (which
+# wants `AB#<id>`) or Jira's smart-commit syntax (which wants the bare
+# key), so we strip the dashboard prefix before applying the user's
+# chosen template.
 _AZURE_TITLE_PREFIX_RE = re.compile(r'^\[\s*Azure\s*#\s*(\d+)\s*\]\s*', re.IGNORECASE)
 _JIRA_TITLE_PREFIX_RE = re.compile(r'^\[\s*Jira\s*#\s*([A-Z][A-Z0-9_]*-\d+)\s*\]\s*', re.IGNORECASE)
 
+DEFAULT_PR_TITLE_TEMPLATE = '[AI] {ab} {title}'
 
-def _format_pr_title(*, raw_title: str, source: str, external_id: str) -> str:
-    """Build a PR title that links the work item back to its source.
 
-    - Azure work item: `[AI] AB#<id> <title>` (Azure auto-link convention)
-    - Jira issue:     `[AI] <KEY> <title>`     (Jira smart-commit convention)
-    - Anything else:  `[AI] <title>`           (no transformation needed)
+async def _resolve_user_pr_title_template(db, user_id: int) -> str | None:
+    """Read profile_settings.pr_title_template for a user. Returns None
+    when the user hasn't saved one (or row missing) so the formatter
+    falls back to its default. Tolerates a stale / closed session by
+    swallowing exceptions — PR creation is more important than fancy
+    title rendering."""
+    if not user_id or user_id <= 0:
+        return None
+    try:
+        from agena_models.models.user_preference import UserPreference
+        row = (await db.execute(
+            select(UserPreference).where(UserPreference.user_id == user_id)
+        )).scalar_one_or_none()
+        if not row or not row.profile_settings_json:
+            return None
+        ps = json.loads(row.profile_settings_json)
+        if not isinstance(ps, dict):
+            return None
+        val = ps.get('pr_title_template')
+        return str(val).strip() if isinstance(val, str) and val.strip() else None
+    except Exception:  # noqa: BLE001 — graceful fallback
+        return None
 
-    The raw title from the dashboard usually starts with `[Azure #N]` /
-    `[Jira #KEY]`. We strip that prefix before re-wrapping so the
-    output isn't `[AI] AB#1 [Azure #1] ...` (double-prefix)."""
+
+def _format_pr_title(
+    *,
+    raw_title: str,
+    source: str,
+    external_id: str,
+    task_id: int | str = '',
+    template: str | None = None,
+) -> str:
+    """Build a PR title from a user-configurable template.
+
+    Placeholders supported:
+      {title}    — task title with the `[Azure #N]` / `[Jira #KEY]`
+                   dashboard prefix stripped, capped at 200 chars
+      {ext_id}   — Azure work-item id or Jira issue key (e.g. PROJ-123)
+      {ab}       — `AB#<id>` for Azure (so the Azure DevOps auto-linker
+                   picks it up), the bare key for Jira (so smart commits
+                   pick it up), '' for everything else
+      {id}       — Agena's internal task id
+      {source}   — `azure` / `jira` / `internal` / …
+
+    The default template `[AI] {ab} {title}` keeps the existing
+    behaviour (Azure auto-link + [AI] marker). Empty / None template
+    falls back to the default. Multiple consecutive spaces are
+    collapsed so a missing placeholder ({ab} on internal tasks) doesn't
+    leave a double-space scar."""
     title = (raw_title or 'Generated Task').strip()
     src = (source or '').strip().lower()
     ext = (external_id or '').strip()
@@ -54,13 +96,28 @@ def _format_pr_title(*, raw_title: str, source: str, external_id: str) -> str:
         title = title[jr_m.end():].strip()
         src = src or 'jira'
 
-    # PR title length sanity — Azure rejects very long titles
     body = title[:200].rstrip()
+
     if src in ('azure', 'azure_devops') and ext:
-        return f'[AI] AB#{ext} {body}'
-    if src == 'jira' and ext:
-        return f'[AI] {ext} {body}'
-    return f'[AI] {body}'
+        ab = f'AB#{ext}'
+    elif src == 'jira' and ext:
+        ab = ext
+    else:
+        ab = ''
+
+    tpl = (template or '').strip() or DEFAULT_PR_TITLE_TEMPLATE
+    rendered = (
+        tpl
+        .replace('{title}', body)
+        .replace('{ext_id}', ext)
+        .replace('{ab}', ab)
+        .replace('{id}', str(task_id))
+        .replace('{source}', src)
+    )
+    # Collapse double spaces left behind by missing placeholders so
+    # "[AI]  Foo" doesn't ship to Azure / GitHub.
+    rendered = re.sub(r'\s{2,}', ' ', rendered).strip()
+    return rendered
 
 
 import shutil
@@ -1170,10 +1227,15 @@ class OrchestrationService:
             # markdown file blocks in final_code, not structured file_changes.
             _used_cli_provider = routing.preferred_agent_provider in ('claude_cli', 'codex_cli')
             mcp_file_changes = state.get('file_changes') if mode == 'mcp_agent' and not _used_cli_provider else None
+            _pr_tpl = await _resolve_user_pr_title_template(
+                self.db_session, int(getattr(task, 'created_by_user_id', 0) or 0),
+            )
             _formatted_pr_title = _format_pr_title(
                 raw_title=task.title or 'Generated Task',
                 source=(task.source or '').strip().lower(),
                 external_id=(task.external_id or '').strip(),
+                task_id=task.id,
+                template=_pr_tpl,
             )[:120]
             if mode == 'mcp_agent' and not mcp_file_changes and not _used_cli_provider and not final_code:
                 # MCP agent ran but produced no file changes — log and continue
@@ -1981,12 +2043,20 @@ class OrchestrationService:
                 'Task cannot be applied safely to repository files.'
             )
 
+        # Pull the user's saved PR title template from profile_settings
+        # so they can override the default `[AI] {ab} {title}` shape
+        # without us redeploying. _resolve_user_pr_title_template returns
+        # None on missing / blank → _format_pr_title uses its default.
+        _user_id_for_tpl = int(task.get('created_by_user_id') or 0)
+        _pr_tpl = await _resolve_user_pr_title_template(self.db_session, _user_id_for_tpl)
         return CreatePRRequest(
             branch_name=branch_name,
             title=_format_pr_title(
                 raw_title=task.get('title') or 'Generated Task',
                 source=str(task.get('source') or '').strip().lower(),
                 external_id=str(task.get('external_id') or '').strip(),
+                task_id=task.get('id') or '',
+                template=_pr_tpl,
             ),
             body=(
                 'Automated PR generated by AI orchestration pipeline.\n\n'

@@ -16,6 +16,7 @@ type ProfileSettings = {
   preferred_model: string;
   agent_output_language: string;
   branch_prefix: string;
+  pr_title_template: string;
   queue_warn_threshold: number;
   notification_preferences: Record<string, { in_app: boolean; email: boolean; web_push: boolean }>;
 };
@@ -84,6 +85,7 @@ export default function ProfilePage() {
     preferred_model: 'gpt-5',
     agent_output_language: 'auto',
     branch_prefix: 'ai/task',
+    pr_title_template: '',
     queue_warn_threshold: 5,
     notification_preferences: EVENT_PREF_DEFAULTS,
   });
@@ -108,6 +110,7 @@ export default function ProfilePage() {
         preferred_provider: typeof rawSettings.preferred_provider === 'string' ? rawSettings.preferred_provider : prev.preferred_provider,
         preferred_model: typeof rawSettings.preferred_model === 'string' ? rawSettings.preferred_model : prev.preferred_model,
         agent_output_language: typeof rawSettings.agent_output_language === 'string' ? rawSettings.agent_output_language : prev.agent_output_language,
+        pr_title_template: typeof rawSettings.pr_title_template === 'string' ? rawSettings.pr_title_template : prev.pr_title_template,
         branch_prefix: typeof rawSettings.branch_prefix === 'string' ? rawSettings.branch_prefix : prev.branch_prefix,
         queue_warn_threshold: typeof rawSettings.queue_warn_threshold === 'number' ? Math.max(1, Math.floor(rawSettings.queue_warn_threshold)) : prev.queue_warn_threshold,
         notification_preferences: (typeof rawSettings.notification_preferences === 'object' && rawSettings.notification_preferences)
@@ -327,6 +330,57 @@ export default function ProfilePage() {
                 .replace('{title_slug}', 'merchant-status')
                 .replace('{id}', '47')
                 .replace('{timestamp}', '20260327')}
+            </div>
+          </div>
+
+          {/* PR title template — same chip-list + input + preview shape
+              as branch_prefix above. Default (empty) falls back on the
+              backend to `[AI] {ab} {title}` so PRs still auto-link to
+              Azure / Jira. {ab} resolves per source: AB#<id> for Azure,
+              the bare key for Jira, '' otherwise. */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-50)', marginBottom: 6 }}>
+              {t('profile.prTitlePattern' as Parameters<typeof t>[0]) || 'PR title pattern'}
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+              {[
+                { label: '[AI] {ab} {title}', desc: '[AI] AB#61717 merchant status' },
+                { label: '[AI] AB#{ext_id} {title}', desc: '[AI] AB#61717 merchant status (Azure)' },
+                { label: '{ab}: {title}', desc: 'AB#61717: merchant status' },
+                { label: '[AI] {title} (#{ext_id})', desc: '[AI] merchant status (#61717)' },
+                { label: 'feat: {title}', desc: 'feat: merchant status' },
+                { label: '[AI] {title}', desc: '[AI] merchant status' },
+              ].map((p) => (
+                <button key={p.label} onClick={() => patch('pr_title_template', p.label)}
+                  style={{
+                    padding: '6px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer',
+                    border: profileSettings.pr_title_template === p.label ? '1px solid rgba(94,234,212,0.5)' : '1px solid var(--panel-border-3)',
+                    background: profileSettings.pr_title_template === p.label ? 'rgba(94,234,212,0.12)' : 'var(--panel)',
+                    color: profileSettings.pr_title_template === p.label ? '#5eead4' : 'var(--ink-50)',
+                    fontFamily: 'monospace', fontWeight: 600,
+                  }}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <input
+              value={profileSettings.pr_title_template}
+              onChange={(e) => patch('pr_title_template', e.target.value)}
+              placeholder='[AI] {ab} {title}'
+              style={{ width: '100%', padding: '9px 11px', borderRadius: 10, border: '1px solid var(--panel-border-3)', background: 'var(--glass)', color: 'var(--ink-90)', fontSize: 12, fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' }}
+            />
+            <div style={{ fontSize: 10, color: 'var(--ink-25)', marginTop: 6, fontFamily: 'monospace' }}>
+              {t('profile.preview')}: {(profileSettings.pr_title_template || '[AI] {ab} {title}')
+                .replace('{ab}', 'AB#61717')
+                .replace('{ext_id}', '61717')
+                .replace('{title}', 'Markalara Ana Sayfaya İçerik Eklenmesi')
+                .replace('{id}', '47')
+                .replace('{source}', 'azure')
+                .replace(/\s{2,}/g, ' ')
+                .trim()}
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--ink-35)', marginTop: 4 }}>
+              {t('profile.prTitlePatternHint' as Parameters<typeof t>[0]) || 'Placeholders: {ab} (AB#id for Azure, key for Jira), {title}, {ext_id}, {id}, {source}. Empty = default `[AI] {ab} {title}`.'}
             </div>
           </div>
 

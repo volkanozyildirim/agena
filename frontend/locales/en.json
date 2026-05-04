@@ -3573,5 +3573,7 @@
   "taskDetail.revise.repoPick": "Which repos",
   "taskDetail.revise.allMerged": "All PRs already merged — open a fresh task for tiny fixes.",
   "tasks.status.revising": "Revising",
-  "taskDetail.pr": "PR"
+  "taskDetail.pr": "PR",
+  "profile.prTitlePattern": "PR title pattern",
+  "profile.prTitlePatternHint": "Placeholders: {ab} (AB#id for Azure, key for Jira), {title}, {ext_id}, {id}, {source}. Empty = default `[AI] {ab} {title}`."
 }

@@ -3573,5 +3573,7 @@
   "taskDetail.revise.repoPick": "Quali repo",
   "taskDetail.revise.allMerged": "Tutti i PR sono già stati uniti — apri un nuovo task per piccole correzioni.",
   "tasks.status.revising": "In revisione",
-  "taskDetail.pr": "PR"
+  "taskDetail.pr": "PR",
+  "profile.prTitlePattern": "Pattern del titolo PR",
+  "profile.prTitlePatternHint": "Placeholder: {ab} (AB#id per Azure, key per Jira), {title}, {ext_id}, {id}, {source}. Vuoto = default `[AI] {ab} {title}`."
 }

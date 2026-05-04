@@ -3573,5 +3573,7 @@
   "taskDetail.revise.repoPick": "Hangi repolar",
   "taskDetail.revise.allMerged": "Tüm PR'lar merge olmuş — küçük düzeltme için yeni bir task açmak daha temiz.",
   "tasks.status.revising": "Revize ediliyor",
-  "taskDetail.pr": "PR"
+  "taskDetail.pr": "PR",
+  "profile.prTitlePattern": "PR başlık şablonu",
+  "profile.prTitlePatternHint": "Placeholder: {ab} (Azure için AB#id, Jira için key), {title}, {ext_id}, {id}, {source}. Boş = default `[AI] {ab} {title}`."
 }
