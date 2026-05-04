@@ -363,11 +363,15 @@ async def _run_single_task(payload: dict) -> None:
             if not assignment or assignment.task_id != task_id:
                 logger.warning('Assignment %s not found for task %s', assignment_id, task_id)
                 return
-            if assignment.status in {'completed', 'failed'}:
+            # Revision payloads target a completed assignment on
+            # purpose — that's the whole point of "revise the existing
+            # PR with one more commit". Only skip terminal assignments
+            # for normal (non-revision) runs.
+            if not revision_id and assignment.status in {'completed', 'failed'}:
                 logger.info('Skipping terminal assignment id=%s', assignment_id)
                 return
             assignment_mapping = await session.get(RepoMapping, assignment.repo_mapping_id)
-            assignment.status = 'running'
+            assignment.status = 'running' if not revision_id else 'revising'
             await session.commit()
 
         # Check dependencies before running (skip for multi-repo assignments)
