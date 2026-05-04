@@ -27,6 +27,19 @@ class QueueService:
         _, raw_payload = result
         return json.loads(raw_payload)
 
+    async def try_dequeue(self, queue_name: str | None = None) -> dict[str, Any] | None:
+        """Non-blocking variant: pop the next item if one is already
+        sitting in the queue, otherwise return None immediately. The
+        worker uses this to drain the secondary review queue without
+        blocking the main task-queue loop on an idle review queue
+        (BRPOP with timeout=0 blocks forever, which is the wrong
+        behaviour for a 'drain whatever's there' poll)."""
+        key = queue_name or self.settings.redis_queue_name
+        raw_payload = await self.client.rpop(key)
+        if not raw_payload:
+            return None
+        return json.loads(raw_payload)
+
     async def queue_size(self, queue_name: str | None = None) -> int:
         key = queue_name or self.settings.redis_queue_name
         return int(await self.client.llen(key))

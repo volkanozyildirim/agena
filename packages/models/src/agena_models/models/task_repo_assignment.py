@@ -26,5 +26,12 @@ class TaskRepoAssignment(Base):
     branch_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     failure_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     run_record_id: Mapped[int | None] = mapped_column(ForeignKey('run_records.id', ondelete='SET NULL'), nullable=True)
+    # How many revision (follow-up) runs have completed on this
+    # assignment's existing branch / PR. Bumps when the worker
+    # finishes a kind='revision' run successfully.
+    revision_count: Mapped[int] = mapped_column(Integer, default=0, server_default='0')
+    # Soft pointer to the latest task_revisions row — kept as a plain
+    # int (no FK) to dodge the circular table-creation order.
+    last_revision_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())

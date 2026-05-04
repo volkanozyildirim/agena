@@ -3562,5 +3562,15 @@
   "reviews.delete": "Delete",
   "reviews.deleteConfirm": "Delete this review?",
   "reviews.deleteDesc": "This permanently removes the review and its findings. The task itself is not affected.",
-  "reviews.details": "Detail"
+  "reviews.details": "Detail",
+  "taskDetail.revise.button": "↺ Request revision",
+  "taskDetail.revise.label": "REVISION REQUEST",
+  "taskDetail.revise.hint": "Adds an extra commit to the same branch — the open PR auto-updates, no new PR.",
+  "taskDetail.revise.placeholder": "Don't touch the migration file, just append.",
+  "taskDetail.revise.submit": "↺ Request revision",
+  "taskDetail.revise.submitting": "Submitting…",
+  "taskDetail.revise.history": "Revision history",
+  "taskDetail.revise.repoPick": "Which repos",
+  "taskDetail.revise.allMerged": "All PRs already merged — open a fresh task for tiny fixes.",
+  "tasks.status.revising": "Revising"
 }

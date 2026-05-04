@@ -86,7 +86,18 @@ class OrchestrationService:
         self.local_repo_service = LocalRepoService()
         self.cost_tracker = CostTracker()
 
-    async def run_task_record(self, organization_id: int, task_id: int, create_pr: bool = True, mode: str = 'flow', agent_model: str | None = None, agent_provider: str | None = None, assignment_id: int | None = None) -> AgentRunResult:
+    async def run_task_record(
+        self,
+        organization_id: int,
+        task_id: int,
+        create_pr: bool = True,
+        mode: str = 'flow',
+        agent_model: str | None = None,
+        agent_provider: str | None = None,
+        assignment_id: int | None = None,
+        revision_id: int | None = None,
+        revision_instruction: str | None = None,
+    ) -> AgentRunResult:
         task = await self.db_session.get(TaskRecord, task_id)
         if task is None or task.organization_id != organization_id:
             raise ValueError('Task not found for organization')
@@ -107,6 +118,20 @@ class OrchestrationService:
 
         repo_mapping = await self._resolve_repo_mapping(task, assignment_id=assignment_id)
         routing = self._extract_task_routing(task, repo_mapping)
+
+        # When this is a /tasks/{id}/revise follow-up, hold a reference
+        # to the assignment row so we can re-use its branch_name (skip
+        # creating a new PR — the existing one auto-updates) and stamp
+        # revision_count once the run lands successfully.
+        revision_assignment: 'TaskRepoAssignment | None' = None
+        if revision_id and assignment_id:
+            from agena_models.models.task_repo_assignment import TaskRepoAssignment
+            revision_assignment = (await self.db_session.execute(
+                select(TaskRepoAssignment).where(
+                    TaskRepoAssignment.id == assignment_id,
+                    TaskRepoAssignment.organization_id == organization_id,
+                )
+            )).scalar_one_or_none()
 
         # Construct azure_repo_url from integration config when repo mapping is Azure
         # but no explicit Azure Repo URL exists in task metadata
@@ -206,6 +231,29 @@ class OrchestrationService:
                 )
         except Exception as _att_exc:
             logger.info('Attachment injection skipped for task %s: %s', task.id, _att_exc)
+
+        # Revision prompt — wrap the description so the LLM understands
+        # this is a small follow-up on top of an existing PR, NOT a
+        # fresh implementation. We feed it the original task brief, a
+        # short summary of what the prior run already shipped, and the
+        # user's new delta. The agent should make the smallest change
+        # that satisfies the instruction.
+        if revision_id and revision_instruction:
+            try:
+                effective_description = await self._build_revision_description(
+                    task=task,
+                    assignment=revision_assignment,
+                    instruction=revision_instruction,
+                    base_description=effective_description,
+                )
+                await task_service.add_log(
+                    task.id, organization_id, 'agent',
+                    'Revision prompt prepared — running on existing branch '
+                    f'{revision_assignment.branch_name if revision_assignment else "?"}'
+                )
+            except Exception as _rev_exc:
+                logger.warning('Revision prompt build failed for task %s: %s', task.id, _rev_exc)
+
         payload = {
             'id': str(task.id),
             'title': task.title,
@@ -343,6 +391,12 @@ class OrchestrationService:
                     await task_service.add_log(task.id, organization_id, 'agent', msg)
 
                 try:
+                    # Revision flow: branch the worktree off the
+                    # existing feature branch so the PR auto-updates
+                    # with the new commit instead of opening a new PR.
+                    _cli_base_ref: str | None = None
+                    if revision_id and revision_assignment and revision_assignment.branch_name:
+                        _cli_base_ref = revision_assignment.branch_name
                     final_code = await self.claude_cli_service.generate_file_markdown(
                         repo_path=routing.local_repo_path,
                         task_title=task.title,
@@ -350,6 +404,7 @@ class OrchestrationService:
                         model=routing.preferred_agent_model,
                         log_callback=_cli_log,
                         task_id=str(task.id),
+                        base_ref=_cli_base_ref,
                     )
                     parsed_blocks = self._parse_reviewed_output_to_files(final_code, local_repo_path=routing.local_repo_path)
                     if not parsed_blocks:
@@ -1151,19 +1206,51 @@ class OrchestrationService:
                     'local_exec',
                     f'Applying changes in mapped local repo: {routing.local_repo_mapping or routing.local_repo_path}',
                 )
+                # Revision: re-use the existing feature branch so the
+                # open PR picks up the new commit instead of us opening
+                # a brand-new PR.
+                _branch_for_push = pr_payload.branch_name
+                _commit_msg = pr_payload.commit_message
+                if revision_id and revision_assignment and revision_assignment.branch_name:
+                    _branch_for_push = revision_assignment.branch_name
+                    _commit_msg = (
+                        f'fix(revision): {revision_instruction[:120].strip()}'
+                        if revision_instruction else 'fix(revision): follow-up commit'
+                    )
+                # Decide whether to push to the remote. Normal runs only
+                # push when create_pr=True. Revision runs ALWAYS push,
+                # even with create_pr=False, because the whole point is
+                # to land an extra commit on the existing branch so the
+                # open PR auto-updates — without the push the new
+                # commit just sits in the local worktree.
+                _should_push = create_pr or bool(revision_id)
+                _remote_url = (
+                    (routing.azure_repo_url if routing.effective_source == 'azure' else None)
+                    if _should_push else None
+                )
+                _remote_pat = azure_remote_pat if _should_push else None
                 has_changes, branch_name = await self.local_repo_service.apply_changes_and_push(
                     repo_path=routing.local_repo_path,
-                    branch_name=pr_payload.branch_name,
+                    branch_name=_branch_for_push,
                     base_branch=pr_payload.base_branch,
-                    commit_message=pr_payload.commit_message,
+                    commit_message=_commit_msg,
                     files=pr_payload.files,
-                    remote_url=(routing.azure_repo_url if routing.effective_source == 'azure' else None) if create_pr else None,
-                    remote_pat=azure_remote_pat if create_pr else None,
+                    remote_url=_remote_url,
+                    remote_pat=_remote_pat,
                 )
                 if not has_changes:
                     await task_service.add_log(task.id, organization_id, 'local_exec', 'No file changes detected, skipping PR')
 
-                if create_pr and has_changes:
+                # Revision push lands on the existing branch — the open
+                # PR auto-updates. Skip the create-PR call so we don't
+                # try to open a duplicate.
+                if revision_id and has_changes:
+                    pr_url = revision_assignment.pr_url if revision_assignment else None
+                    await task_service.add_log(
+                        task.id, organization_id, 'pr',
+                        f'Revision commit pushed to {branch_name} — PR auto-updated: {pr_url or "(unknown)"}'
+                    )
+                elif create_pr and has_changes:
                     if routing.effective_source == 'azure' and routing.azure_project and routing.azure_repo_url:
                         try:
                             pr_url = await self.azure_pr_service.create_pr(
@@ -1362,8 +1449,27 @@ class OrchestrationService:
                 usage_total_tokens=usage.get('total_tokens', 0),
                 estimated_cost_usd=estimated_cost,
                 pr_url=pr_url,
+                kind='revision' if revision_id else 'initial',
             )
             self.db_session.add(run)
+            await self.db_session.flush()  # need run.id for the revision row link
+
+            # Link the revision row + bump assignment counter so the UI
+            # can render "Revize edildi (3 kez)" without an extra COUNT.
+            if revision_id:
+                from agena_models.models.task_revision import TaskRevision
+                rev_row = (await self.db_session.execute(
+                    select(TaskRevision).where(
+                        TaskRevision.id == revision_id,
+                        TaskRevision.organization_id == organization_id,
+                    )
+                )).scalar_one_or_none()
+                if rev_row is not None:
+                    rev_row.run_record_id = run.id
+                    rev_row.status = 'completed'
+                if revision_assignment is not None:
+                    revision_assignment.revision_count = (revision_assignment.revision_count or 0) + 1
+                    revision_assignment.last_revision_id = revision_id
 
             task.status = 'completed'
             task.pr_url = pr_url
@@ -1626,6 +1732,114 @@ class OrchestrationService:
             if notified:
                 await task_service.add_log(task.id, organization_id, 'notify', 'Failure email sent')
             raise
+
+    async def _build_revision_description(
+        self,
+        *,
+        task: 'TaskRecord',
+        assignment: 'TaskRepoAssignment | None',
+        instruction: str,
+        base_description: str,
+    ) -> str:
+        """Wrap the normal effective_description into a "small follow-up
+        on top of an existing PR" prompt. The agent should NOT redo the
+        original task — it should only address the new instruction with
+        the smallest possible additional change.
+
+        We feed three things on top of the original brief:
+          1. The file list the prior run already shipped (so the agent
+             doesn't re-touch unrelated code).
+          2. The PR's open review comments (so when the user says
+             "fix the comments", the agent can see what each comment
+             says and on which line).
+          3. The user's free-form revision instruction.
+        """
+        prior_files: list[str] = []
+        prior_pr_url = (assignment.pr_url if assignment else None) or task.pr_url or ''
+        prior_branch = (assignment.branch_name if assignment else None) or task.branch_name or ''
+        try:
+            prior_run = (await self.db_session.execute(
+                select(RunRecord).where(
+                    RunRecord.task_id == task.id,
+                    RunRecord.organization_id == task.organization_id,
+                ).order_by(RunRecord.id.desc()).limit(1)
+            )).scalar_one_or_none()
+            if prior_run and prior_run.reviewed_code:
+                blocks = self._parse_reviewed_output_to_files(
+                    prior_run.reviewed_code, local_repo_path=None,
+                ) or []
+                for block in blocks:
+                    p = block.get('path') if isinstance(block, dict) else getattr(block, 'path', None)
+                    if p:
+                        prior_files.append(str(p))
+        except Exception as exc:
+            logger.info('Revision: prior run lookup failed for task %s: %s', task.id, exc)
+
+        # PR review comments — the user often types "fix the comments"
+        # and the actual feedback lives on the open PR threads, NOT on
+        # the work item. Pull those so the agent can see "line 142:
+        # missing null-check" and act on it.
+        pr_comments_block = ''
+        if prior_pr_url:
+            try:
+                if 'dev.azure.com' in prior_pr_url or '/_git/' in prior_pr_url:
+                    cmts = await self.azure_pr_service.list_pr_comments(
+                        task.organization_id, pr_url=prior_pr_url,
+                    )
+                    if cmts:
+                        # Keep only active (non-resolved) threads — the
+                        # ones the user is asking us to address. Each
+                        # entry is { id, author, content, thread_status }.
+                        active = [c for c in cmts if (c.get('thread_status') or '').lower() in ('active', 'pending', '')]
+                        if active:
+                            lines = []
+                            for c in active[:25]:
+                                author = c.get('author') or 'reviewer'
+                                content = (c.get('content') or '').strip()
+                                if not content:
+                                    continue
+                                # Strip Azure HTML wrappers a bit.
+                                content = content.replace('&nbsp;', ' ').replace('&amp;', '&')
+                                lines.append(f'- @{author}: {content}')
+                            if lines:
+                                pr_comments_block = (
+                                    '\n=== OPEN PR REVIEW COMMENTS (from reviewers — '
+                                    'address each one) ===\n' + '\n'.join(lines) + '\n'
+                                )
+                # GitHub branch could be added with a similar block via
+                # GitHubService when needed; for now Azure covers our
+                # usage.
+            except Exception as exc:
+                logger.info('Revision: PR comment fetch failed for task %s: %s', task.id, exc)
+
+        prior_files_block = (
+            '\n'.join(f'- {p}' for p in prior_files[:30])
+            if prior_files else '(prior file list unavailable — read git log on the existing branch)'
+        )
+        revision_header = (
+            '=== REVISION REQUEST — DO NOT RE-DO THE TASK FROM SCRATCH ===\n\n'
+            f'This task ALREADY shipped a commit on branch `{prior_branch or "(unknown)"}`'
+            f' with PR `{prior_pr_url or "(unknown)"}`. You are landing an ADDITIONAL '
+            'commit on the same branch — the open PR will auto-update.\n\n'
+            'Files the prior run already changed (touch them again ONLY if the '
+            'instruction below explicitly says so — otherwise leave them as-is):\n'
+            f'{prior_files_block}\n'
+            f'{pr_comments_block}\n'
+            '=== USER FOLLOW-UP INSTRUCTION (apply EXACTLY this, nothing more) ===\n'
+            f'{instruction.strip()}\n\n'
+            'Rules:\n'
+            '- Make the smallest possible additional change to satisfy the instruction.\n'
+            '- If the user instruction references "the comments" / "yorumlar", '
+            'address each open PR comment listed above — the line numbers + '
+            'feedback are right there.\n'
+            '- Do NOT revert or rewrite the prior commit.\n'
+            '- Do NOT delete files unless the instruction explicitly tells you to.\n'
+            '- For migration / list-style files (Upgrade.php, schema dumps, route '
+            'registries, enum lists, changelogs): append, never replace.\n'
+            '- After editing, output a short summary listing only the NEW changes.\n\n'
+            '=== ORIGINAL TASK BRIEF (for context — already implemented) ===\n'
+        )
+        return f'{revision_header}{base_description or ""}'
 
     async def _build_pr_payload(self, task: dict[str, Any], reviewed_code: str, local_repo_path: str | None = None) -> CreatePRRequest:
         # Build branch name from pattern (user configurable via profile settings)

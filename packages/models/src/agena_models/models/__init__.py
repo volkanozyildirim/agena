@@ -28,6 +28,7 @@ from agena_models.models.run_record import RunRecord
 from agena_models.models.subscription import Subscription
 from agena_models.models.task_dependency import TaskDependency
 from agena_models.models.task_repo_assignment import TaskRepoAssignment
+from agena_models.models.task_revision import TaskRevision
 from agena_models.models.task_record import TaskRecord
 from agena_models.models.task_share_token import TaskShareToken
 from agena_models.models.task_attachment import TaskAttachment

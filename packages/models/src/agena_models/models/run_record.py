@@ -22,4 +22,9 @@ class RunRecord(Base):
     usage_total_tokens: Mapped[float] = mapped_column(Float, default=0)
     estimated_cost_usd: Mapped[float] = mapped_column(Float, default=0)
     pr_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    # 'initial' for the first time the agent runs the task end-to-end,
+    # 'revision' for follow-up runs that add a commit on top of the
+    # existing branch instead of opening a new PR. Used by the UI to
+    # label run tabs differently.
+    kind: Mapped[str] = mapped_column(String(16), default='initial', server_default='initial')
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

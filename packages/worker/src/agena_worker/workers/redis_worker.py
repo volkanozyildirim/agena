@@ -325,6 +325,17 @@ async def _run_single_task(payload: dict) -> None:
     agent_provider = payload.get('agent_provider') or None
     lock_retries = int(payload.get('lock_retries', 0) or 0)
     assignment_id = int(payload.get('assignment_id', 0) or 0) or None
+    # Revision payloads land here too — the worker logic is the same
+    # except (a) we never open a fresh PR (the open one auto-updates),
+    # (b) the orchestrator switches to revision-prompt mode, and
+    # (c) the lock owner is `revision:<id>` so two revisions on the
+    # same assignment serialize naturally on the existing repo lock.
+    revision_id = int(payload.get('revision_id', 0) or 0) or None
+    revision_instruction = payload.get('revision_instruction') or None
+    if revision_id:
+        # PR already exists; the push updates it. Skip create_pr to
+        # avoid a duplicate open PR call.
+        create_pr = False
 
     if organization_id <= 0 or task_id <= 0:
         logger.error('Invalid queue payload: %s', payload)
@@ -336,7 +347,9 @@ async def _run_single_task(payload: dict) -> None:
         if task is None:
             logger.warning('Task not found, skipping payload=%s', payload)
             return
-        if not assignment_id and task.status in {'completed', 'failed', 'cancelled'}:
+        # Revision payloads target completed/failed tasks on purpose.
+        # Only skip terminal tasks for normal (non-revision, non-multi-repo) runs.
+        if not assignment_id and not revision_id and task.status in {'completed', 'failed', 'cancelled'}:
             logger.info('Skipping terminal task id=%s status=%s', task.id, task.status)
             return
 
@@ -472,6 +485,17 @@ async def _run_single_task(payload: dict) -> None:
             await queue_service.client.delete(f'flow_def:{task_id}')
             return
 
+        # Flip the revision row to 'running' AS SOON AS we pick the
+        # payload — without this the UI sticks on 'queued' for the
+        # entire run because orchestration only stamps 'completed' /
+        # 'failed' at the end.
+        if revision_id:
+            from agena_models.models.task_revision import TaskRevision
+            _rev_row = await session.get(TaskRevision, revision_id)
+            if _rev_row is not None and _rev_row.status == 'queued':
+                _rev_row.status = 'running'
+                await session.commit()
+
         service = OrchestrationService(db_session=session)
         try:
             result = await service.run_task_record(
@@ -482,16 +506,46 @@ async def _run_single_task(payload: dict) -> None:
                 agent_model=agent_model,
                 agent_provider=agent_provider,
                 assignment_id=assignment_id,
+                revision_id=revision_id,
+                revision_instruction=revision_instruction,
             )
-            # Update assignment with results
-            if assignment:
+            if revision_id:
+                # Don't trash the assignment status on success — leave it
+                # at 'completed' since the original PR is still good.
+                # The orchestration layer already flipped the
+                # TaskRevision row to 'completed' and bumped the
+                # revision_count; we just unwind the macro statuses.
+                if assignment:
+                    assignment.status = 'completed'
+                    await session.commit()
+                    await _update_multi_repo_task_status(session, task_id, organization_id)
+                else:
+                    # Single-repo legacy task — flip parent task status back.
+                    task.status = 'completed'
+                    await session.commit()
+            elif assignment:
                 assignment.status = 'completed'
                 assignment.pr_url = task.pr_url
                 assignment.branch_name = task.branch_name
                 await session.commit()
                 await _update_multi_repo_task_status(session, task_id, organization_id)
         except Exception:
-            if assignment:
+            if revision_id:
+                # Failed revision — keep the original PR pointer intact,
+                # mark just the revision row as failed for the UI.
+                from agena_models.models.task_revision import TaskRevision
+                rev = await session.get(TaskRevision, revision_id)
+                if rev is not None:
+                    rev.status = 'failed'
+                    rev.failure_reason = (task.failure_reason or 'Unknown error')[:500]
+                if assignment:
+                    assignment.status = 'completed'
+                    await session.commit()
+                    await _update_multi_repo_task_status(session, task_id, organization_id)
+                else:
+                    task.status = 'completed'
+                    await session.commit()
+            elif assignment:
                 assignment.status = 'failed'
                 assignment.failure_reason = (task.failure_reason or 'Unknown error')[:500]
                 await session.commit()
@@ -513,6 +567,22 @@ async def process_queue() -> None:
     last_triage_poll = 0.0
     last_backlog_poll = 0.0
 
+    # Background-poll wrappers — fire-and-forget so a slow Azure WIQL
+    # query inside triage / sentry / NR doesn't block the main loop
+    # from picking up a queued task. Each wrapper logs its own
+    # exceptions and the task drops out of `bg_tasks` when it's done.
+    bg_tasks: set[asyncio.Task] = set()
+
+    def _bg(coro_factory, name: str) -> None:
+        async def _runner():
+            try:
+                await coro_factory()
+            except Exception:
+                logger.exception('%s poll failed', name)
+        t = asyncio.create_task(_runner())
+        bg_tasks.add(t)
+        t.add_done_callback(bg_tasks.discard)
+
     while True:
         now = asyncio.get_running_loop().time()
         if now - last_health_check >= 30:
@@ -521,42 +591,24 @@ async def process_queue() -> None:
             last_health_check = now
 
         if now - last_nr_poll >= 300:  # 5 minutes
-            try:
-                await _poll_newrelic_auto_imports()
-            except Exception:
-                logger.exception('NR auto-import poll failed')
+            _bg(_poll_newrelic_auto_imports, 'NR auto-import')
             last_nr_poll = now
 
         if now - last_sentry_poll >= 300:  # 5 minutes
-            try:
-                await _poll_sentry_auto_imports()
-            except Exception:
-                logger.exception('Sentry auto-import poll failed')
+            _bg(_poll_sentry_auto_imports, 'Sentry auto-import')
             last_sentry_poll = now
 
         if now - last_correlation_poll >= 300:  # 5 minutes
-            try:
-                await _poll_correlations()
-            except Exception:
-                logger.exception('Correlation poll failed')
+            _bg(_poll_correlations, 'Correlation')
             last_correlation_poll = now
 
         if now - last_backlog_poll >= 1800:  # 30 minutes
-            try:
-                await _poll_review_backlog()
-            except Exception:
-                logger.exception('Review-backlog poll failed')
-            try:
-                await _poll_auto_nudge()
-            except Exception:
-                logger.exception('Auto-nudge poll failed')
+            _bg(_poll_review_backlog, 'Review-backlog')
+            _bg(_poll_auto_nudge, 'Auto-nudge')
             last_backlog_poll = now
 
         if now - last_triage_poll >= 21600:  # 6 hours
-            try:
-                await _poll_triage()
-            except Exception:
-                logger.exception('Triage poll failed')
+            _bg(_poll_triage, 'Triage')
             last_triage_poll = now
 
         queue_size = await queue_service.queue_size()
@@ -577,8 +629,12 @@ async def process_queue() -> None:
         # poll responsive without spawning a second loop / process.
         review_queue_name = settings.redis_review_queue_name
         while len(active_tasks) < max_workers:
-            review_payload = await queue_service.dequeue(
-                queue_name=review_queue_name, timeout=0,
+            # try_dequeue is non-blocking — returns None immediately
+            # when the review queue is empty. The previous BRPOP with
+            # timeout=0 blocked here forever (Redis treats 0 as
+            # "wait forever"), starving the main agent_tasks loop.
+            review_payload = await queue_service.try_dequeue(
+                queue_name=review_queue_name,
             )
             if not review_payload:
                 break

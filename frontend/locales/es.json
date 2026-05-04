@@ -3562,5 +3562,15 @@
   "reviews.delete": "Borrar",
   "reviews.deleteConfirm": "¿Borrar esta revisión?",
   "reviews.deleteDesc": "Elimina permanentemente la revisión y sus hallazgos. La tarea en sí no se ve afectada.",
-  "reviews.details": "Detalle"
+  "reviews.details": "Detalle",
+  "taskDetail.revise.button": "↺ Solicitar revisión",
+  "taskDetail.revise.label": "SOLICITUD DE REVISIÓN",
+  "taskDetail.revise.hint": "Añade un commit adicional a la misma rama — el PR abierto se actualiza automáticamente.",
+  "taskDetail.revise.placeholder": "No toques el archivo de migración, solo añade al final.",
+  "taskDetail.revise.submit": "↺ Solicitar revisión",
+  "taskDetail.revise.submitting": "Enviando…",
+  "taskDetail.revise.history": "Historial de revisiones",
+  "taskDetail.revise.repoPick": "Qué repos",
+  "taskDetail.revise.allMerged": "Todos los PR ya están fusionados — abre una tarea nueva para correcciones pequeñas.",
+  "tasks.status.revising": "Revisando"
 }

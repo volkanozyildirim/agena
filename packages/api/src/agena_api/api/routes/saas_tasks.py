@@ -17,6 +17,10 @@ from agena_core.database import get_db_session
 from agena_models.schemas.saas_task import (
     AssignTaskRequest,
     AssignTaskResponse,
+    ReviseTaskRequest,
+    ReviseTaskResponse,
+    RevisionItem,
+    TaskRevisionRecord,
     TaskUpdateRequest,
     AzureImportRequest,
     JiraImportRequest,
@@ -946,6 +950,85 @@ async def delete_task(
     await db.delete(task)
     await db.commit()
     return {'status': 'deleted', 'task_id': str(task_id)}
+
+
+# ─── Task revisions (follow-up commits on the existing branch / PR) ────────
+
+@router.post('/{task_id}/revise', response_model=ReviseTaskResponse)
+async def revise_task(
+    task_id: int,
+    payload: ReviseTaskRequest,
+    tenant: CurrentTenant = Depends(require_permission('tasks:write')),
+    db: AsyncSession = Depends(get_db_session),
+) -> ReviseTaskResponse:
+    """Queue a follow-up "fix this small thing" run on the same branch
+    as the original task. The agent picks up the existing feature
+    branch, lands an additional commit, pushes — the open PR
+    auto-updates. Used for tiny corrections that don't justify either
+    a new task or a hand-edit."""
+    from agena_services.services.revision_service import RevisionService
+    svc = RevisionService(db)
+    try:
+        revisions = await svc.request_revision(
+            organization_id=tenant.organization_id,
+            task_id=task_id,
+            user_id=tenant.user_id,
+            instruction=payload.instruction,
+            repo_assignment_ids=payload.repo_assignment_ids,
+            agent_model=payload.agent_model,
+            agent_provider=payload.agent_provider,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Resolve repo display name once for the response payload — the UI
+    # uses it to label the per-row status chip in the Revise modal's
+    # success toast.
+    from agena_models.models.repo_mapping import RepoMapping
+    from agena_models.models.task_repo_assignment import TaskRepoAssignment
+    items: list[RevisionItem] = []
+    for rev in revisions:
+        display = ''
+        if rev.assignment_id:
+            assn = await db.get(TaskRepoAssignment, rev.assignment_id)
+            if assn and assn.repo_mapping_id:
+                rm = await db.get(RepoMapping, assn.repo_mapping_id)
+                if rm:
+                    display = f'{(rm.provider or "").lower()}:{rm.owner}/{rm.repo_name}'
+        items.append(RevisionItem(
+            id=rev.id,
+            assignment_id=rev.assignment_id,
+            repo_display_name=display,
+            status=rev.status,
+        ))
+    queued = any(it.status == 'queued' for it in items)
+    return ReviseTaskResponse(queued=queued, revisions=items)
+
+
+@router.get('/{task_id}/revisions', response_model=list[TaskRevisionRecord])
+async def list_task_revisions(
+    task_id: int,
+    tenant: CurrentTenant = Depends(require_permission('tasks:read')),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[TaskRevisionRecord]:
+    from agena_services.services.revision_service import RevisionService
+    svc = RevisionService(db)
+    rows = await svc.list_revisions(
+        organization_id=tenant.organization_id, task_id=task_id,
+    )
+    return [
+        TaskRevisionRecord(
+            id=r.id,
+            assignment_id=r.assignment_id,
+            instruction=r.instruction,
+            status=r.status,
+            failure_reason=r.failure_reason,
+            requested_by_user_id=r.requested_by_user_id,
+            run_record_id=r.run_record_id,
+            created_at=r.created_at,
+        )
+        for r in rows
+    ]
 
 
 # ─── Task repo assignments ──────────────────────────────────────────────────
