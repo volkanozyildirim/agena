@@ -3562,5 +3562,15 @@
   "reviews.delete": "削除",
   "reviews.deleteConfirm": "このレビューを削除しますか？",
   "reviews.deleteDesc": "レビューと検出事項を完全に削除します。タスク自体は影響を受けません。",
-  "reviews.details": "詳細"
+  "reviews.details": "詳細",
+  "taskDetail.revise.button": "↺ 修正を依頼",
+  "taskDetail.revise.label": "修正リクエスト",
+  "taskDetail.revise.hint": "同じブランチに追加コミットを行い、開いているPRが自動更新されます。",
+  "taskDetail.revise.placeholder": "マイグレーションファイルは触らず、末尾に追記してください。",
+  "taskDetail.revise.submit": "↺ 修正を依頼",
+  "taskDetail.revise.submitting": "送信中…",
+  "taskDetail.revise.history": "修正履歴",
+  "taskDetail.revise.repoPick": "対象リポジトリ",
+  "taskDetail.revise.allMerged": "すべてのPRがマージ済み — 小さな修正は新しいタスクを開いてください。",
+  "tasks.status.revising": "修正中"
 }

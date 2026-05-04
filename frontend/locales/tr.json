@@ -3562,5 +3562,15 @@
   "reviews.delete": "Sil",
   "reviews.deleteConfirm": "Bu incelemeyi sil?",
   "reviews.deleteDesc": "İnceleme ve bulgular kalıcı olarak silinir. Görevin kendisi etkilenmez.",
-  "reviews.details": "Detay"
+  "reviews.details": "Detay",
+  "taskDetail.revise.button": "↺ Revize iste",
+  "taskDetail.revise.label": "REVİZE İSTE",
+  "taskDetail.revise.hint": "Aynı branch üzerinde ek bir commit atılır, açık PR otomatik güncellenir. Yeni PR açılmaz.",
+  "taskDetail.revise.placeholder": "Sadece migration dosyasını dokunmadan üzerine ek yap.",
+  "taskDetail.revise.submit": "↺ Revizyon iste",
+  "taskDetail.revise.submitting": "Gönderiliyor…",
+  "taskDetail.revise.history": "Revizyon geçmişi",
+  "taskDetail.revise.repoPick": "Hangi repolar",
+  "taskDetail.revise.allMerged": "Tüm PR'lar merge olmuş — küçük düzeltme için yeni bir task açmak daha temiz.",
+  "tasks.status.revising": "Revize ediliyor"
 }

@@ -3562,5 +3562,15 @@
   "reviews.delete": "Löschen",
   "reviews.deleteConfirm": "Diese Review löschen?",
   "reviews.deleteDesc": "Die Review und ihre Befunde werden dauerhaft entfernt. Die Aufgabe selbst bleibt unberührt.",
-  "reviews.details": "Detail"
+  "reviews.details": "Detail",
+  "taskDetail.revise.button": "↺ Überarbeitung anfordern",
+  "taskDetail.revise.label": "ÜBERARBEITUNGSANFRAGE",
+  "taskDetail.revise.hint": "Fügt einen zusätzlichen Commit zum gleichen Branch hinzu — der offene PR wird automatisch aktualisiert.",
+  "taskDetail.revise.placeholder": "Migrationsdatei nicht anfassen, nur anhängen.",
+  "taskDetail.revise.submit": "↺ Überarbeitung anfordern",
+  "taskDetail.revise.submitting": "Wird gesendet…",
+  "taskDetail.revise.history": "Überarbeitungsverlauf",
+  "taskDetail.revise.repoPick": "Welche Repos",
+  "taskDetail.revise.allMerged": "Alle PRs bereits gemerged — für kleine Fixes besser eine neue Aufgabe öffnen.",
+  "tasks.status.revising": "Wird überarbeitet"
 }

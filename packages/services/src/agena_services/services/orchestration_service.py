@@ -1217,14 +1217,26 @@ class OrchestrationService:
                         f'fix(revision): {revision_instruction[:120].strip()}'
                         if revision_instruction else 'fix(revision): follow-up commit'
                     )
+                # Decide whether to push to the remote. Normal runs only
+                # push when create_pr=True. Revision runs ALWAYS push,
+                # even with create_pr=False, because the whole point is
+                # to land an extra commit on the existing branch so the
+                # open PR auto-updates — without the push the new
+                # commit just sits in the local worktree.
+                _should_push = create_pr or bool(revision_id)
+                _remote_url = (
+                    (routing.azure_repo_url if routing.effective_source == 'azure' else None)
+                    if _should_push else None
+                )
+                _remote_pat = azure_remote_pat if _should_push else None
                 has_changes, branch_name = await self.local_repo_service.apply_changes_and_push(
                     repo_path=routing.local_repo_path,
                     branch_name=_branch_for_push,
                     base_branch=pr_payload.base_branch,
                     commit_message=_commit_msg,
                     files=pr_payload.files,
-                    remote_url=(routing.azure_repo_url if routing.effective_source == 'azure' else None) if create_pr else None,
-                    remote_pat=azure_remote_pat if create_pr else None,
+                    remote_url=_remote_url,
+                    remote_pat=_remote_pat,
                 )
                 if not has_changes:
                     await task_service.add_log(task.id, organization_id, 'local_exec', 'No file changes detected, skipping PR')
@@ -1734,9 +1746,13 @@ class OrchestrationService:
         original task — it should only address the new instruction with
         the smallest possible additional change.
 
-        We pull the prior run's reviewed_code summary (file paths it
-        touched) so the LLM sees what's already on the branch and can
-        avoid re-touching unrelated code.
+        We feed three things on top of the original brief:
+          1. The file list the prior run already shipped (so the agent
+             doesn't re-touch unrelated code).
+          2. The PR's open review comments (so when the user says
+             "fix the comments", the agent can see what each comment
+             says and on which line).
+          3. The user's free-form revision instruction.
         """
         prior_files: list[str] = []
         prior_pr_url = (assignment.pr_url if assignment else None) or task.pr_url or ''
@@ -1759,6 +1775,43 @@ class OrchestrationService:
         except Exception as exc:
             logger.info('Revision: prior run lookup failed for task %s: %s', task.id, exc)
 
+        # PR review comments — the user often types "fix the comments"
+        # and the actual feedback lives on the open PR threads, NOT on
+        # the work item. Pull those so the agent can see "line 142:
+        # missing null-check" and act on it.
+        pr_comments_block = ''
+        if prior_pr_url:
+            try:
+                if 'dev.azure.com' in prior_pr_url or '/_git/' in prior_pr_url:
+                    cmts = await self.azure_pr_service.list_pr_comments(
+                        task.organization_id, pr_url=prior_pr_url,
+                    )
+                    if cmts:
+                        # Keep only active (non-resolved) threads — the
+                        # ones the user is asking us to address. Each
+                        # entry is { id, author, content, thread_status }.
+                        active = [c for c in cmts if (c.get('thread_status') or '').lower() in ('active', 'pending', '')]
+                        if active:
+                            lines = []
+                            for c in active[:25]:
+                                author = c.get('author') or 'reviewer'
+                                content = (c.get('content') or '').strip()
+                                if not content:
+                                    continue
+                                # Strip Azure HTML wrappers a bit.
+                                content = content.replace('&nbsp;', ' ').replace('&amp;', '&')
+                                lines.append(f'- @{author}: {content}')
+                            if lines:
+                                pr_comments_block = (
+                                    '\n=== OPEN PR REVIEW COMMENTS (from reviewers — '
+                                    'address each one) ===\n' + '\n'.join(lines) + '\n'
+                                )
+                # GitHub branch could be added with a similar block via
+                # GitHubService when needed; for now Azure covers our
+                # usage.
+            except Exception as exc:
+                logger.info('Revision: PR comment fetch failed for task %s: %s', task.id, exc)
+
         prior_files_block = (
             '\n'.join(f'- {p}' for p in prior_files[:30])
             if prior_files else '(prior file list unavailable — read git log on the existing branch)'
@@ -1770,11 +1823,15 @@ class OrchestrationService:
             'commit on the same branch — the open PR will auto-update.\n\n'
             'Files the prior run already changed (touch them again ONLY if the '
             'instruction below explicitly says so — otherwise leave them as-is):\n'
-            f'{prior_files_block}\n\n'
+            f'{prior_files_block}\n'
+            f'{pr_comments_block}\n'
             '=== USER FOLLOW-UP INSTRUCTION (apply EXACTLY this, nothing more) ===\n'
             f'{instruction.strip()}\n\n'
             'Rules:\n'
             '- Make the smallest possible additional change to satisfy the instruction.\n'
+            '- If the user instruction references "the comments" / "yorumlar", '
+            'address each open PR comment listed above — the line numbers + '
+            'feedback are right there.\n'
             '- Do NOT revert or rewrite the prior commit.\n'
             '- Do NOT delete files unless the instruction explicitly tells you to.\n'
             '- For migration / list-style files (Upgrade.php, schema dumps, route '

@@ -3562,5 +3562,15 @@
   "reviews.delete": "删除",
   "reviews.deleteConfirm": "删除这次审查？",
   "reviews.deleteDesc": "将永久删除审查及其发现。任务本身不受影响。",
-  "reviews.details": "详情"
+  "reviews.details": "详情",
+  "taskDetail.revise.button": "↺ 请求修订",
+  "taskDetail.revise.label": "修订请求",
+  "taskDetail.revise.hint": "在同一分支上追加一次提交，已打开的 PR 会自动更新。",
+  "taskDetail.revise.placeholder": "不要改动迁移文件，仅在末尾追加即可。",
+  "taskDetail.revise.submit": "↺ 请求修订",
+  "taskDetail.revise.submitting": "提交中…",
+  "taskDetail.revise.history": "修订历史",
+  "taskDetail.revise.repoPick": "哪些仓库",
+  "taskDetail.revise.allMerged": "所有 PR 已合并 — 小改动建议新建任务。",
+  "tasks.status.revising": "修订中"
 }

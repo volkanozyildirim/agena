@@ -31,11 +31,14 @@ from agena_services.services.queue_service import QueueService
 logger = logging.getLogger(__name__)
 
 
-# Statuses we accept as "completed enough to revise". A failed run can
-# also be revised — the user may want to nudge the agent toward what
-# went wrong without re-doing everything from scratch.
-REVISE_ELIGIBLE_TASK_STATUSES = {'completed', 'failed'}
-REVISE_ELIGIBLE_ASSIGNMENT_STATUSES = {'completed', 'failed'}
+# What COUNTS as "currently in flight" — the only states we refuse to
+# stack a revision on top of, because doing so would race the worker.
+# Everything else (completed, failed, cancelled, even a fresh-after-
+# error 'new') is fine: the only real prerequisite is that there is a
+# branch on the remote we can land an additional commit onto, and that
+# is checked per-assignment via branch_name below.
+REVISE_BLOCKING_TASK_STATUSES = {'queued', 'running', 'revising'}
+REVISE_BLOCKING_ASSIGNMENT_STATUSES = {'queued', 'running', 'revising'}
 
 
 class RevisionService:
@@ -65,10 +68,10 @@ class RevisionService:
         task = await self.db_session.get(TaskRecord, task_id)
         if task is None or task.organization_id != organization_id:
             raise ValueError('Task not found')
-        if (task.status or '') not in REVISE_ELIGIBLE_TASK_STATUSES:
+        if (task.status or '') in REVISE_BLOCKING_TASK_STATUSES:
             raise ValueError(
-                f"Task #{task_id} is in '{task.status}' state — wait for it to "
-                "finish before requesting a revision."
+                f"Task #{task_id} is currently '{task.status}' — wait for it "
+                "to finish before requesting a revision."
             )
 
         # Resolve target assignments. Multi-repo tasks may have several;
@@ -90,10 +93,14 @@ class RevisionService:
             if missing:
                 raise ValueError(f'assignments not found on this task: {sorted(missing)}')
         else:
-            # Default: all completed-or-failed, non-merged assignments.
+            # Default: every assignment that has a branch on the remote
+            # (branch_name set), is not currently in flight, and is not
+            # already merged. Branch_name is the real prerequisite —
+            # no branch means there's nothing to amend.
             target_assignments = [
                 a for a in all_assignments
-                if (a.status or '').lower() in REVISE_ELIGIBLE_ASSIGNMENT_STATUSES
+                if a.branch_name
+                and (a.status or '').lower() not in REVISE_BLOCKING_ASSIGNMENT_STATUSES
                 and (a.status or '').lower() != 'merged'
             ]
 
@@ -140,7 +147,7 @@ class RevisionService:
         # — at that point the user wants a fresh task, not a hot-fix
         # commit on a closed PR.
         for assignment in target_assignments:
-            if (assignment.status or '').lower() in {'queued', 'running', 'revising'}:
+            if (assignment.status or '').lower() in REVISE_BLOCKING_ASSIGNMENT_STATUSES:
                 rev = self._make_revision_row(
                     task_id, organization_id, assignment.id, user_id, instruction,
                     status='skipped_running',

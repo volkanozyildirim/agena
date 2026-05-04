@@ -8,6 +8,7 @@ import { useEnabledModules } from '@/lib/useEnabledModules';
 import { renderMarkdown } from '@/lib/markdown';
 import RichDescription from '@/components/RichDescription';
 import ShareTaskModal from '@/components/ShareTaskModal';
+import ReviseTaskModal from '@/components/ReviseTaskModal';
 import AgentTimeline from '@/components/AgentTimeline';
 import StatusBadge from '@/components/StatusBadge';
 import RemoteRepoSelector, { type RemoteRepoSelection, type RepoDefault } from '@/components/RemoteRepoSelector';
@@ -59,7 +60,20 @@ type TaskDetail = {
     pr_url?: string | null;
     branch_name?: string | null;
     failure_reason?: string | null;
+    revision_count?: number;
+    pr_merged?: boolean;
   }[];
+};
+
+type TaskRevisionRecord = {
+  id: number;
+  assignment_id: number | null;
+  instruction: string;
+  status: string;
+  failure_reason?: string | null;
+  requested_by_user_id?: number | null;
+  run_record_id?: number | null;
+  created_at: string;
 };
 
 type TaskLog = {
@@ -301,6 +315,10 @@ export default function TaskDetailPage() {
   const [attachmentPreviews, setAttachmentPreviews] = useState<Record<number, string>>({});
   const [logs, setLogs] = useState<TaskLog[]>([]);
   const [runs, setRuns] = useState<RunInfo[]>([]);
+  // Follow-up "Revize iste" state — modal visibility + fetched
+  // history strip. Loaded lazily when the user opens the task.
+  const [revisionModalOpen, setRevisionModalOpen] = useState(false);
+  const [revisions, setRevisions] = useState<TaskRevisionRecord[]>([]);
   const [error, setError] = useState('');
   const [repoConflict, setRepoConflict] = useState<{ info: string; body: Record<string, unknown> } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -350,7 +368,7 @@ export default function TaskDetailPage() {
 
   async function loadData(isInitial = false) {
     try {
-      const [taskData, logsData, runsData, taskList, prefs, integrations, attachmentsData] = await Promise.all([
+      const [taskData, logsData, runsData, taskList, prefs, integrations, attachmentsData, revisionsData] = await Promise.all([
         apiFetch<TaskDetail>('/tasks/' + taskId),
         apiFetch<TaskLog[]>('/tasks/' + taskId + '/logs'),
         apiFetch<RunInfo[]>('/tasks/' + taskId + '/runs').catch(() => [] as RunInfo[]),
@@ -358,6 +376,7 @@ export default function TaskDetailPage() {
         apiFetch<{ azure_project?: string | null; azure_sprint_path?: string | null }>('/preferences').catch(() => null),
         apiFetch<Array<{ provider: string; base_url: string }>>('/integrations').catch(() => [] as Array<{ provider: string; base_url: string }>),
         apiFetch<Array<{ id: number; filename: string; content_type: string; size_bytes: number; created_at: string }>>('/tasks/' + taskId + '/attachments').catch(() => []),
+        apiFetch<TaskRevisionRecord[]>('/tasks/' + taskId + '/revisions').catch(() => [] as TaskRevisionRecord[]),
       ]);
       if (prefs) {
         setAzureProject(prefs.azure_project || '');
@@ -371,6 +390,7 @@ export default function TaskDetailPage() {
       setAttachments(attachmentsData || []);
       setLogs(logsData);
       setRuns(runsData);
+      setRevisions(revisionsData || []);
       const currentTaskId = Number(taskId);
       setDependencyCandidates(taskList.filter((item) => item.id !== currentTaskId));
       const d = await apiFetch<TaskDeps>('/tasks/' + taskId + '/dependencies');
@@ -831,6 +851,35 @@ export default function TaskDetailPage() {
             {isRerunBusy ? t('taskDetail.rerunning') : t('taskDetail.rerunTask')}
           </button>
           {(() => {
+            // "Revize iste" — visible whenever there's a branch the
+            // agent can amend (i.e. an assignment with branch_name OR
+            // a legacy single-repo task whose top-level branch is set).
+            // Hidden during in-flight states and once everything is
+            // merged (fresh-task is the right move at that point).
+            if (!task) return null;
+            const status = String(task.status || '').toLowerCase();
+            if (['queued', 'running', 'revising'].includes(status)) return null;
+            const eligibles = (task.repo_assignments || []).filter((a) => !a.pr_merged && (a.branch_name || a.pr_url));
+            const hasLegacyBranch = (!task.repo_assignments || task.repo_assignments.length === 0)
+              && Boolean((task as { branch_name?: string | null }).branch_name);
+            if (eligibles.length === 0 && !hasLegacyBranch) return null;
+            return (
+              <button
+                className='button'
+                onClick={() => setRevisionModalOpen(true)}
+                style={{
+                  padding: '8px 14px', fontSize: 13, fontWeight: 700,
+                  border: '1px solid rgba(167,139,250,0.5)',
+                  background: 'rgba(167,139,250,0.1)',
+                  color: '#a78bfa', borderRadius: 10,
+                }}
+                title={t('taskDetail.revise.hint' as never) || ''}
+              >
+                ↺ {t('taskDetail.revise.button' as never) || 'Revize iste'}
+              </button>
+            );
+          })()}
+          {(() => {
             const canStop = task?.status === 'queued' || task?.status === 'running';
             const stopDisabled = isCancelBusy || !canStop;
             return (
@@ -864,6 +913,64 @@ export default function TaskDetailPage() {
       </section>
 
       {/* Run selector tabs — flat, no outer wrapper */}
+      {revisions.length > 0 && (
+        <section style={{
+          marginBottom: 12, padding: '10px 14px',
+          borderRadius: 10, background: 'var(--panel)',
+          border: '1px solid var(--panel-border-2)',
+        }}>
+          <div style={{
+            fontSize: 10, fontWeight: 700, letterSpacing: 0.6,
+            textTransform: 'uppercase', color: '#a78bfa',
+            marginBottom: 8,
+          }}>
+            ↺ {t('taskDetail.revise.history' as never) || 'Revizyon geçmişi'} ({revisions.length})
+          </div>
+          <div style={{ display: 'grid', gap: 6 }}>
+            {revisions.slice(0, 5).map((rev) => {
+              const palette: Record<string, { bg: string; fg: string; border: string }> = {
+                queued:           { bg: 'rgba(245,158,11,0.12)',   fg: '#f59e0b', border: 'rgba(245,158,11,0.35)' },
+                running:          { bg: 'rgba(56,189,248,0.12)',   fg: '#38bdf8', border: 'rgba(56,189,248,0.35)' },
+                completed:        { bg: 'rgba(34,197,94,0.12)',    fg: '#22c55e', border: 'rgba(34,197,94,0.35)' },
+                failed:           { bg: 'rgba(248,113,113,0.12)',  fg: '#f87171', border: 'rgba(248,113,113,0.35)' },
+                skipped_merged:   { bg: 'rgba(148,163,184,0.12)',  fg: '#94a3b8', border: 'rgba(148,163,184,0.35)' },
+                skipped_running:  { bg: 'rgba(148,163,184,0.12)',  fg: '#94a3b8', border: 'rgba(148,163,184,0.35)' },
+              };
+              const c = palette[rev.status] || palette.completed;
+              return (
+                <div key={rev.id} style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 10,
+                  padding: '8px 10px', borderRadius: 8,
+                  background: c.bg, border: `1px solid ${c.border}`,
+                  fontSize: 12, lineHeight: 1.45,
+                }}>
+                  <span style={{
+                    fontSize: 9, fontWeight: 800, padding: '2px 6px',
+                    borderRadius: 999, color: c.fg, background: 'rgba(0,0,0,0.2)',
+                    textTransform: 'uppercase', letterSpacing: 0.4, flexShrink: 0,
+                  }}>
+                    {rev.status}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: 'var(--ink-90)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                      {rev.instruction}
+                    </div>
+                    {rev.failure_reason && (
+                      <div style={{ marginTop: 4, fontSize: 11, color: '#f87171' }}>
+                        {rev.failure_reason}
+                      </div>
+                    )}
+                    <div style={{ marginTop: 4, fontSize: 10, color: 'var(--ink-35)' }}>
+                      {new Date(rev.created_at).toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {logRuns.length > 1 && (
         <section
           style={{
@@ -1932,6 +2039,27 @@ export default function TaskDetailPage() {
         taskTitle={task?.title ?? ''}
         open={shareModalOpen}
         onClose={() => setShareModalOpen(false)}
+      />
+
+      <ReviseTaskModal
+        open={revisionModalOpen}
+        taskId={task?.id ?? 0}
+        taskTitle={task?.title ?? ''}
+        assignments={(task?.repo_assignments || []).map((a) => ({
+          id: a.id,
+          repo_display_name: a.repo_display_name,
+          status: a.status,
+          pr_url: a.pr_url ?? null,
+          pr_merged: a.pr_merged,
+          revision_count: a.revision_count,
+        }))}
+        onClose={() => setRevisionModalOpen(false)}
+        onSubmitted={() => {
+          // Pull fresh state so the new revision shows up in the
+          // history strip and the Revize button reflects new
+          // 'revising' assignment statuses.
+          void loadData();
+        }}
       />
 
       {repoConflict && typeof document !== 'undefined' && createPortal(
