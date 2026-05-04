@@ -3572,5 +3572,6 @@
   "taskDetail.revise.history": "Historial de revisiones",
   "taskDetail.revise.repoPick": "Qué repos",
   "taskDetail.revise.allMerged": "Todos los PR ya están fusionados — abre una tarea nueva para correcciones pequeñas.",
-  "tasks.status.revising": "Revisando"
+  "tasks.status.revising": "Revisando",
+  "taskDetail.pr": "PR"
 }

@@ -1035,7 +1035,7 @@ export default function TaskDetailPage() {
 
       {/* Top stats strip — status-aware, shows only meaningful values */}
       {(() => {
-        const items: { label: string; value: string }[] = [];
+        const items: { label: string; value: string; href?: string }[] = [];
         const durationSec = task?.run_duration_sec ?? (metrics?.durationSec ? Number(metrics.durationSec) : null);
         if (durationSec != null) items.push({ label: t('taskDetail.duration'), value: fmtEta(durationSec) });
 
@@ -1064,6 +1064,30 @@ export default function TaskDetailPage() {
           items.push({ label: t('taskDetail.lastUpdate'), value: new Date(latestLog.created_at).toLocaleTimeString() });
         }
 
+        // PR / Azure links — one chip per assignment with a PR URL,
+        // or task.pr_url for legacy single-repo tasks. Stats strip is
+        // the first thing the user looks at, so this is the right
+        // place for the "open PR" jump-link.
+        const prAssignments = (task?.repo_assignments || []).filter((a) => a.pr_url);
+        if (prAssignments.length > 0) {
+          for (const a of prAssignments) {
+            const m = /\/pullrequest\/(\d+)|\/pull\/(\d+)/.exec(a.pr_url || '');
+            const num = m?.[1] || m?.[2];
+            const label = num
+              ? `#${num}${prAssignments.length > 1 && a.repo_display_name ? ` · ${a.repo_display_name}` : ''}`
+              : 'PR';
+            items.push({ label: t('taskDetail.pr' as never) || 'PR', value: label, href: a.pr_url || undefined });
+          }
+        } else if (task?.pr_url) {
+          const m = /\/pullrequest\/(\d+)|\/pull\/(\d+)/.exec(task.pr_url);
+          const num = m?.[1] || m?.[2];
+          items.push({
+            label: t('taskDetail.pr' as never) || 'PR',
+            value: num ? `#${num}` : 'PR',
+            href: task.pr_url,
+          });
+        }
+
         if (items.length === 0) return null;
 
         return (
@@ -1081,11 +1105,26 @@ export default function TaskDetailPage() {
             }}
           >
             {items.map((it, i) => (
-              <div key={it.label} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6 }}>
+              <div key={`${it.label}-${i}`} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6 }}>
                 <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--ink-50)', textTransform: 'uppercase', letterSpacing: 0.6 }}>
                   {it.label}
                 </span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-90)' }}>{it.value}</span>
+                {it.href ? (
+                  <a
+                    href={it.href}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    style={{
+                      fontSize: 13, fontWeight: 700,
+                      color: '#5eead4', textDecoration: 'none',
+                      borderBottom: '1px dotted rgba(94,234,212,0.5)',
+                    }}
+                  >
+                    {it.value} ↗
+                  </a>
+                ) : (
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-90)' }}>{it.value}</span>
+                )}
                 {i < items.length - 1 && !isMobile && (
                   <span aria-hidden style={{ marginLeft: 12, color: 'var(--ink-22)' }}>·</span>
                 )}

@@ -3572,5 +3572,6 @@
   "taskDetail.revise.history": "Revision history",
   "taskDetail.revise.repoPick": "Which repos",
   "taskDetail.revise.allMerged": "All PRs already merged — open a fresh task for tiny fixes.",
-  "tasks.status.revising": "Revising"
+  "tasks.status.revising": "Revising",
+  "taskDetail.pr": "PR"
 }

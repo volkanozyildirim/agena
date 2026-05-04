@@ -3572,5 +3572,6 @@
   "taskDetail.revise.history": "修订历史",
   "taskDetail.revise.repoPick": "哪些仓库",
   "taskDetail.revise.allMerged": "所有 PR 已合并 — 小改动建议新建任务。",
-  "tasks.status.revising": "修订中"
+  "tasks.status.revising": "修订中",
+  "taskDetail.pr": "PR"
 }

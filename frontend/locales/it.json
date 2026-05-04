@@ -3572,5 +3572,6 @@
   "taskDetail.revise.history": "Cronologia revisioni",
   "taskDetail.revise.repoPick": "Quali repo",
   "taskDetail.revise.allMerged": "Tutti i PR sono già stati uniti — apri un nuovo task per piccole correzioni.",
-  "tasks.status.revising": "In revisione"
+  "tasks.status.revising": "In revisione",
+  "taskDetail.pr": "PR"
 }

@@ -3572,5 +3572,6 @@
   "taskDetail.revise.history": "修正履歴",
   "taskDetail.revise.repoPick": "対象リポジトリ",
   "taskDetail.revise.allMerged": "すべてのPRがマージ済み — 小さな修正は新しいタスクを開いてください。",
-  "tasks.status.revising": "修正中"
+  "tasks.status.revising": "修正中",
+  "taskDetail.pr": "PR"
 }

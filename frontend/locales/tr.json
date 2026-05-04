@@ -3572,5 +3572,6 @@
   "taskDetail.revise.history": "Revizyon geçmişi",
   "taskDetail.revise.repoPick": "Hangi repolar",
   "taskDetail.revise.allMerged": "Tüm PR'lar merge olmuş — küçük düzeltme için yeni bir task açmak daha temiz.",
-  "tasks.status.revising": "Revize ediliyor"
+  "tasks.status.revising": "Revize ediliyor",
+  "taskDetail.pr": "PR"
 }
