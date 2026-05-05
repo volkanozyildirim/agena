@@ -840,6 +840,7 @@
   "sprints.noDescription": "Açıklama yok",
   "sprints.current": "Aktif",
   "sprints.currentSelected": "Aktif sprint seçildi",
+  "sprints.activeSelected": "AKTİF",
   "sprints.openExternal": "Azure/Jira içinde aç",
   "sprints.assignee": "Atanan",
   "sprints.opened": "Açılış",

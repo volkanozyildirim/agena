@@ -840,6 +840,7 @@
   "sprints.noDescription": "Nessuna descrizione",
   "sprints.current": "Corrente",
   "sprints.currentSelected": "Sprint corrente selezionato automaticamente.",
+  "sprints.activeSelected": "ATTIVO",
   "sprints.openExternal": "Apri in Azure/Jira",
   "sprints.assignee": "Assegnatario",
   "sprints.opened": "Apertura",

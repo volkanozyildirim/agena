@@ -1190,28 +1190,61 @@ export default function SprintsPage() {
         </Link>
       </div>
 
-      {/* Selectors */}
-      <div style={{ position: 'sticky', top: 72, zIndex: 40, borderRadius: 16, border: '1px solid var(--panel-border-2)', background: 'var(--surface)', backdropFilter: 'blur(24px)', padding: '16px 20px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
-        <Sel step={1} t={t} label={t('sprints.projectLabel')} value={project} onChange={setProject}
+      {/* Selectors — compact one-row bar. The previous 3-card grid was
+          burning ~140px of vertical space on every board view; the
+          board itself is the point, the picker just needs to be
+          reachable. Native <select>s shrink the chrome without
+          sacrificing usability, and a chevron divider keeps the
+          breadcrumb feel between project › team › sprint. */}
+      <div style={{
+        position: 'sticky', top: 72, zIndex: 40,
+        borderRadius: 12, border: '1px solid var(--panel-border-2)',
+        background: 'var(--surface)', backdropFilter: 'blur(24px)',
+        padding: '8px 12px',
+        display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+        fontSize: 12,
+      }}>
+        <CompactSelect
+          label={t('sprints.projectLabel')}
+          value={project}
+          onChange={setProject}
           options={projects.map((p: Opt) => ({ id: provider === 'jira' ? (p.id ?? p.name) : p.name, name: p.name }))}
-          loading={lpj} placeholder={t('sprints.selectProject')} active={true} />
-        <Sel step={2} t={t} label={provider === 'jira' ? t('sprints.boardLabel') : t('sprints.teamLabel')} value={team} onChange={setTeam}
+          loading={lpj}
+          placeholder={t('sprints.selectProject')}
+          minWidth={180}
+        />
+        <span style={{ color: 'var(--ink-25)', fontSize: 12 }}>›</span>
+        <CompactSelect
+          label={provider === 'jira' ? t('sprints.boardLabel') : t('sprints.teamLabel')}
+          value={team}
+          onChange={setTeam}
           options={teams.map((item: Opt) => ({ id: provider === 'jira' ? item.id : item.name, name: item.name }))}
           loading={ltm}
           placeholder={provider === 'jira'
-            ? (project ? t('sprints.selectBoard') : t('sprints.selectBoard'))
+            ? t('sprints.selectBoard')
             : (project ? t('sprints.selectTeam') : t('sprints.selectTeamFirst'))}
-          active={provider === 'jira' ? true : !!project} />
-        <Sel step={3} t={t} label={t('sprints.sprintLabel')} value={sprint} onChange={setSprint}
+          disabled={provider !== 'jira' && !project}
+          minWidth={200}
+        />
+        <span style={{ color: 'var(--ink-25)', fontSize: 12 }}>›</span>
+        <CompactSelect
+          label={t('sprints.sprintLabel')}
+          value={sprint}
+          onChange={setSprint}
           options={sprints.map((s: Opt) => ({
             id: s.path ?? s.name,
-            name: s.name,
-            is_current: s.is_current,
-            timeframe: s.timeframe,
-            start_date: s.start_date,
-            finish_date: s.finish_date,
+            name: (s.is_current ? '● ' : '') + s.name,
           }))}
-          loading={lsp} placeholder={team ? t('sprints.selectSprint') : t('sprints.selectSprintFirst')} active={!!team} />
+          loading={lsp}
+          placeholder={team ? t('sprints.selectSprint') : t('sprints.selectSprintFirst')}
+          disabled={!team}
+          minWidth={220}
+        />
+        {sprints.find((s) => (s.path ?? s.name) === sprint)?.is_current && (
+          <span style={{ fontSize: 10, fontWeight: 700, color: '#22c55e', padding: '2px 8px', borderRadius: 999, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.35)' }}>
+            {t('sprints.activeSelected') || 'AKTİF'}
+          </span>
+        )}
       </div>
 
       {(msg || err) ? (
@@ -2076,5 +2109,57 @@ function Sel({ step, t, label, value, onChange, options, loading, placeholder, a
         <div style={{ marginTop: 6, fontSize: 10, color: '#5eead4', fontWeight: 700 }}>{t('sprints.currentSelected')}</div>
       ) : null}
     </div>
+  );
+}
+
+function CompactSelect({ label, value, onChange, options, loading, placeholder, disabled, minWidth }: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { id: string; name: string }[];
+  loading?: boolean;
+  placeholder?: string;
+  disabled?: boolean;
+  minWidth?: number;
+}) {
+  const isDisabled = !!disabled || !!loading;
+  return (
+    <label style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      minWidth: minWidth ?? 160,
+      opacity: isDisabled ? 0.55 : 1,
+    }}>
+      <span style={{
+        fontSize: 9, fontWeight: 800, letterSpacing: 1.1,
+        textTransform: 'uppercase', color: 'var(--ink-35)', whiteSpace: 'nowrap',
+      }}>{label}</span>
+      <select
+        value={value}
+        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onChange(e.target.value)}
+        disabled={isDisabled}
+        style={{
+          flex: 1,
+          minWidth: 0,
+          fontSize: 12,
+          padding: '5px 8px',
+          borderRadius: 8,
+          border: '1px solid ' + (value ? 'rgba(13,148,136,0.45)' : 'var(--panel-border-3)'),
+          background: value ? 'rgba(13,148,136,0.08)' : 'var(--glass)',
+          color: value ? 'var(--ink-90)' : 'var(--ink-50)',
+          font: 'inherit',
+          outline: 'none',
+          cursor: isDisabled ? 'not-allowed' : 'pointer',
+        }}
+      >
+        <option value="" style={{ background: 'var(--surface)' }}>
+          {loading ? '…' : (placeholder ?? '—')}
+        </option>
+        {options.map((o) => (
+          <option key={o.id} value={o.id} style={{ background: 'var(--surface)' }}>
+            {o.name}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

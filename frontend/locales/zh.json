@@ -840,6 +840,7 @@
   "sprints.noDescription": "无描述",
   "sprints.current": "当前",
   "sprints.currentSelected": "已自动选择当前 Sprint。",
+  "sprints.activeSelected": "活动中",
   "sprints.openExternal": "在 Azure/Jira 打开",
   "sprints.assignee": "负责人",
   "sprints.opened": "创建于",

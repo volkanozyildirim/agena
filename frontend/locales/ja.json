@@ -840,6 +840,7 @@
   "sprints.noDescription": "説明なし",
   "sprints.current": "現在",
   "sprints.currentSelected": "現在の Sprint が自動選択されました。",
+  "sprints.activeSelected": "アクティブ",
   "sprints.openExternal": "Azure/Jira で開く",
   "sprints.assignee": "担当者",
   "sprints.opened": "作成日",
