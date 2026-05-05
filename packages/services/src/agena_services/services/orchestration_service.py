@@ -533,18 +533,39 @@ class OrchestrationService:
                         f'Claude CLI failed: {str(claude_exc)[:280]}',
                     )
                     raise
-                prompt_estimate = self._estimate_tokens(f'{task.title}\n{task.description or ""}')
-                completion_estimate = self._estimate_tokens(final_code)
+                # Prefer Claude's real usage — the stream bridge captures
+                # the result event's `usage` object (input + cache_read +
+                # cache_creation + output) which is the only honest
+                # number for an agentic run with N tool round-trips.
+                # Fall back to the old char/4 estimate when the bridge
+                # didn't surface usage (e.g. older bridge build).
+                _real_usage = getattr(self.claude_cli_service, 'last_usage', None)
+                if _real_usage:
+                    _prompt_tokens = int(
+                        (_real_usage.get('input_tokens') or 0)
+                        + (_real_usage.get('cache_creation_input_tokens') or 0)
+                        + (_real_usage.get('cache_read_input_tokens') or 0)
+                    )
+                    _completion_tokens = int(_real_usage.get('output_tokens') or 0)
+                    usage_payload = {
+                        'prompt_tokens': _prompt_tokens,
+                        'completion_tokens': _completion_tokens,
+                        'total_tokens': _prompt_tokens + _completion_tokens,
+                    }
+                else:
+                    prompt_estimate = self._estimate_tokens(f'{task.title}\n{task.description or ""}')
+                    completion_estimate = self._estimate_tokens(final_code)
+                    usage_payload = {
+                        'prompt_tokens': prompt_estimate,
+                        'completion_tokens': completion_estimate,
+                        'total_tokens': prompt_estimate + completion_estimate,
+                    }
                 state = {
                     'spec': {'goal': 'claude_cli execution'},
                     'generated_code': final_code,
                     'reviewed_code': final_code,
                     'final_code': final_code,
-                    'usage': {
-                        'prompt_tokens': prompt_estimate,
-                        'completion_tokens': completion_estimate,
-                        'total_tokens': prompt_estimate + completion_estimate,
-                    },
+                    'usage': usage_payload,
                     'model_usage': [f"claude-cli:{routing.preferred_agent_model or 'default'}"],
                 }
                 await task_service.add_log(task.id, organization_id, 'agent', 'Using claude_cli preferred agent')

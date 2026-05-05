@@ -246,6 +246,15 @@ class ClaudeCLIService:
         try:
             collected_text: list[str] = []
             log_line_count = 0
+            # Bridge forwards Claude's final result event with real
+            # input/output/cache token counts. We stash it on `self`
+            # so the orchestration layer can pull it off after
+            # generate_file_markdown returns and store accurate
+            # usage on the run record (instead of the old len/4 estimate).
+            self.last_usage: dict | None = None
+            self.last_cost_usd: float | None = None
+            self.last_num_turns: int | None = None
+            self.last_duration_ms: int | None = None
             async with httpx.AsyncClient(timeout=httpx.Timeout(self.EXEC_TIMEOUT_SEC + 10, connect=10)) as client:
                 async with client.stream(
                     'POST',
@@ -296,6 +305,21 @@ class ClaudeCLIService:
                                 if not collected_text or sum(len(t) for t in collected_text) < len(text):
                                     collected_text.clear()
                                     collected_text.append(text)
+                            # Capture real usage / cost / turns from
+                            # Claude's final result event (bridge
+                            # forwards them since the JSON-output patch).
+                            usage_blob = event.get('usage')
+                            if isinstance(usage_blob, dict):
+                                self.last_usage = usage_blob
+                            cost = event.get('cost_usd')
+                            if isinstance(cost, (int, float)):
+                                self.last_cost_usd = float(cost)
+                            num_turns = event.get('num_turns')
+                            if isinstance(num_turns, int):
+                                self.last_num_turns = num_turns
+                            dur_ms = event.get('duration_ms')
+                            if isinstance(dur_ms, int):
+                                self.last_duration_ms = dur_ms
                             if log_callback and text:
                                 await log_callback(f'CLI result: {text[:200]}')
                         elif etype == 'event':

@@ -289,12 +289,20 @@ async function runCLIStream(bin, name, data, res) {
             }
           }
         } else if (eventType === 'result') {
-          // Final result
+          // Final result. claude --output-format stream-json emits this
+          // last with the assembled text, real token usage, cost, and
+          // num_turns — forward usage/cost too so the backend can
+          // record them instead of estimating from prompt+output chars.
           const resultText = event.result || '';
           if (resultText && !fullText.includes(resultText.slice(0, 100))) {
             fullText += resultText;
           }
-          res.write(`data: ${JSON.stringify({ type: 'result', text: resultText.slice(0, 500) })}\n\n`);
+          const summary = { type: 'result', text: resultText.slice(0, 500) };
+          if (event.usage && typeof event.usage === 'object') summary.usage = event.usage;
+          if (typeof event.total_cost_usd === 'number') summary.cost_usd = event.total_cost_usd;
+          if (typeof event.duration_ms === 'number') summary.duration_ms = event.duration_ms;
+          if (typeof event.num_turns === 'number') summary.num_turns = event.num_turns;
+          res.write(`data: ${JSON.stringify(summary)}\n\n`);
         } else {
           // Forward other events (system, tool_result, etc.) as-is for visibility
           res.write(`data: ${JSON.stringify({ type: 'event', event_type: eventType })}\n\n`);

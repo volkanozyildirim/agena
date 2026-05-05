@@ -416,11 +416,38 @@ class MCPAgentEngine:
                     executor._completion_summary = f'LLM call failed: {type(exc).__name__}: {exc}'
                 break
 
-            # Accumulate usage
+            # Accumulate usage. OpenAI's response model exposes
+            # prompt_tokens / completion_tokens / total_tokens, but
+            # the *Anthropic compat* endpoint returns input_tokens /
+            # output_tokens / cache_read_input_tokens /
+            # cache_creation_input_tokens via model_extra. When the
+            # backing provider is Anthropic, prompt_tokens often comes
+            # back as 0 and the standard fields miss the cached
+            # context entirely — that's why a 6-min run logged ~900
+            # tokens instead of ~50–500k. Fall back to the Anthropic
+            # field names + cache totals so the run record reflects
+            # what actually got billed.
             if response.usage:
-                total_usage['prompt_tokens'] += response.usage.prompt_tokens or 0
-                total_usage['completion_tokens'] += response.usage.completion_tokens or 0
-                total_usage['total_tokens'] += response.usage.total_tokens or 0
+                u = response.usage
+                _prompt = u.prompt_tokens or 0
+                _completion = u.completion_tokens or 0
+                _total = u.total_tokens or 0
+                _extra = getattr(u, 'model_extra', None) or {}
+                if not _prompt and (_extra.get('input_tokens') is not None):
+                    _prompt = int(_extra.get('input_tokens') or 0)
+                if not _completion and (_extra.get('output_tokens') is not None):
+                    _completion = int(_extra.get('output_tokens') or 0)
+                # Fold cache_read + cache_creation into the prompt
+                # bucket — they're real tokens the provider charged
+                # for, even if discounted, and most cost dashboards
+                # group them with input.
+                _prompt += int(_extra.get('cache_read_input_tokens') or 0)
+                _prompt += int(_extra.get('cache_creation_input_tokens') or 0)
+                if not _total:
+                    _total = _prompt + _completion
+                total_usage['prompt_tokens'] += _prompt
+                total_usage['completion_tokens'] += _completion
+                total_usage['total_tokens'] += _total
 
             choice = response.choices[0]
             msg = choice.message
