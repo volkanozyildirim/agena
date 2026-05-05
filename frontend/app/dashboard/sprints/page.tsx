@@ -1047,39 +1047,32 @@ export default function SprintsPage() {
     return Array.from(set).sort();
   }, [items]);
 
-  // Persist hidden-state / hidden-type sets in localStorage so the
-  // user's "I never want to see UAT" choice survives reload. Keyed by
-  // provider + project + sprint so different boards keep their own
-  // preferences.
-  const _filterKey = `agena_sprint_filters:${provider}:${project}:${team}:${sprint}`;
+  // Persist hidden-state / hidden-type sets in localStorage. Single
+  // GLOBAL key so the user's "I never want to see UAT or Bug" choice
+  // applies on every board they switch to — they're hiding the same
+  // categories everywhere, not configuring per-sprint policies.
+  const _filterKey = 'agena_sprint_filters_global';
+  // Load once on mount.
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (!provider || !project || !team || !sprint) return;
     try {
       const raw = window.localStorage.getItem(_filterKey);
-      if (!raw) {
-        setHiddenStates(new Set());
-        setHiddenTypes(new Set());
-        return;
-      }
+      if (!raw) return;
       const parsed = JSON.parse(raw);
-      setHiddenStates(new Set(Array.isArray(parsed.states) ? parsed.states : []));
-      setHiddenTypes(new Set(Array.isArray(parsed.types) ? parsed.types : []));
-    } catch {
-      setHiddenStates(new Set());
-      setHiddenTypes(new Set());
-    }
-  }, [_filterKey, provider, project, team, sprint]);
+      if (Array.isArray(parsed.states)) setHiddenStates(new Set(parsed.states));
+      if (Array.isArray(parsed.types)) setHiddenTypes(new Set(parsed.types));
+    } catch { /* malformed — keep defaults */ }
+  }, []);
+  // Persist on change.
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (!provider || !project || !team || !sprint) return;
     try {
       window.localStorage.setItem(_filterKey, JSON.stringify({
         states: Array.from(hiddenStates),
         types: Array.from(hiddenTypes),
       }));
     } catch { /* quota / disabled — non-fatal */ }
-  }, [_filterKey, hiddenStates, hiddenTypes, provider, project, team, sprint]);
+  }, [hiddenStates, hiddenTypes]);
 
   // Sadece içi dolu sütunları göster (yükleme sırasında hepsini göster).
   // Hide-list is layered on top: a state present in `hiddenStates`
