@@ -56,6 +56,12 @@ class ExternalTask(BaseModel):
     issue_type: str | None = None  # Jira: issuetype.name. Falls back to work_item_type for Azure.
     project_key: str | None = None
     labels: list[str] = Field(default_factory=list)
+    # Sprint-board drag-drop ordering as the source platform reports it.
+    # Azure: Microsoft.VSTS.Common.BacklogPriority (or StackRank fallback).
+    # Jira: rank custom field. Lower value = higher in the column.
+    # ``None`` means the platform didn't surface an order — UI keeps the
+    # backend's natural order in that case.
+    board_order: float | None = None
 
 
 class TaskListResponse(BaseModel):
