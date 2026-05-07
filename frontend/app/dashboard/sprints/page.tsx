@@ -23,6 +23,10 @@ type WorkItem = {
   id: string; title: string; description: string; source: string; state?: string;
   assigned_to?: string; created_date?: string; activated_date?: string;
   work_item_type?: string | null;
+  // Sprint-board drag-drop ordering as the source platform reports it.
+  // Lower = higher in the column. `null`/missing means the platform
+  // didn't supply an order, fall back to insertion order.
+  board_order?: number | null;
 };
 type FlowRunOptions = {
   project?: string;
@@ -1374,7 +1378,22 @@ export default function SprintsPage() {
               </div>
             ) : (lbd ? states : visibleStates).map((state, idx) => {
               const s = sc(state, idx);
-              const col = filteredItems.filter((i) => normalizeState(i.state) === normalizeState(state));
+              // Match Azure/Jira's drag-drop order. Lower board_order
+              // means higher in the column; items without an order
+              // (legacy rows, providers that don't surface one) sink
+              // to the bottom but keep their relative order.
+              const col = filteredItems
+                .filter((i) => normalizeState(i.state) === normalizeState(state))
+                .map((item, idx) => ({ item, idx }))
+                .sort((a, b) => {
+                  const ao = a.item.board_order;
+                  const bo = b.item.board_order;
+                  if (ao == null && bo == null) return a.idx - b.idx;
+                  if (ao == null) return 1;
+                  if (bo == null) return -1;
+                  return ao - bo;
+                })
+                .map(({ item }) => item);
               return (
                 <div key={state} style={{ borderRadius: 14, border: '1px solid ' + s.border, background: s.bg, overflow: 'hidden', minWidth: 200, width: 220, flexShrink: 0 }}>
                   <div style={{ padding: '10px 12px', borderBottom: '1px solid ' + s.border, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

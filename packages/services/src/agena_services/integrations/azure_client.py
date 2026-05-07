@@ -105,7 +105,12 @@ class AzureDevOpsClient:
                     'System.WorkItemType,System.IterationPath,'
                     'Microsoft.VSTS.Scheduling.StoryPoints,Microsoft.VSTS.Scheduling.Effort,'
                     'Microsoft.VSTS.Scheduling.Size,'
-                    'Microsoft.VSTS.Common.AcceptanceCriteria,Microsoft.VSTS.TCM.ReproSteps'
+                    'Microsoft.VSTS.Common.AcceptanceCriteria,Microsoft.VSTS.TCM.ReproSteps,'
+                    # Backlog ordering — used by the sprint board so cards
+                    # appear in the same drag-drop order users see in
+                    # Azure Boards. Different process templates expose it
+                    # under different field ids, so we ask for both.
+                    'Microsoft.VSTS.Common.BacklogPriority,Microsoft.VSTS.Common.StackRank'
                 ),
             )
         return [self._to_external_task(item, org_url=org_url, project=project) for item in details_payload]
@@ -1304,6 +1309,15 @@ class AzureDevOpsClient:
         labels = [t.strip() for t in tags_raw.split(';') if t.strip()] if tags_raw else []
         project_key = str(fields.get('System.TeamProject') or project or '').strip() or None
 
+        # Sprint-board ordering. Process templates differ: Agile uses
+        # Microsoft.VSTS.Common.BacklogPriority; Scrum / older templates
+        # use Microsoft.VSTS.Common.StackRank. We requested both and
+        # fall back to whichever is populated.
+        board_order = self._coerce_float(
+            fields.get('Microsoft.VSTS.Common.BacklogPriority'),
+            fields.get('Microsoft.VSTS.Common.StackRank'),
+        )
+
         return ExternalTask(
             id=item_id,
             title=fields.get('System.Title', ''),
@@ -1327,6 +1341,7 @@ class AzureDevOpsClient:
             issue_type=fields.get('System.WorkItemType'),
             project_key=project_key,
             labels=labels,
+            board_order=board_order,
         )
 
     def _build_work_item_web_url(self, *, org_url: str, project: str, item_id: str) -> str:
