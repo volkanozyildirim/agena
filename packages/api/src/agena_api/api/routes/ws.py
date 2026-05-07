@@ -98,10 +98,15 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)) -> N
     except Exception:
         logger.debug('WebSocket error user=%s org=%s', user_id, org_id, exc_info=True)
     finally:
-        if subscriber_task and not subscriber_task.done():
-            subscriber_task.cancel()
-        if ping_task and not ping_task.done():
-            ping_task.cancel()
-        # Close the async generator
-        await subscriber.aclose()
+        for task in (subscriber_task, ping_task):
+            if task and not task.done():
+                task.cancel()
+                try:
+                    await task
+                except (asyncio.CancelledError, Exception):
+                    pass
+        try:
+            await subscriber.aclose()
+        except Exception:
+            logger.debug('subscriber.aclose() failed', exc_info=True)
         logger.info('WebSocket disconnected user=%s org=%s', user_id, org_id)
