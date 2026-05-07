@@ -2,7 +2,11 @@ import asyncio
 import base64
 import hashlib
 import json
+import logging
 from typing import Any
+from urllib.parse import quote
+
+logger = logging.getLogger(__name__)
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -670,6 +674,69 @@ async def list_github_repos(
     ]
 
 
+async def _fetch_azure_workflow_state_order(
+    client: httpx.AsyncClient,
+    *,
+    base_url: str,
+    project: str,
+    work_item_types: list[str],
+    headers: dict[str, str],
+) -> list[str]:
+    """Return states in workflow order for the dominant work item types
+    of a sprint. The /_apis/wit/workitemtypes/{type}/states endpoint
+    returns states in their workflow sequence — this matches what users
+    see in Azure's Sprint Taskboard view (which is the page Agena's
+    sprint board mirrors), unlike the team Kanban Stories board which
+    can have a different column layout.
+
+    `work_item_types` is consulted in priority order; the first type's
+    workflow drives the canonical sequence and any extra states from
+    later types get appended at the end so a sprint mixing Tasks +
+    Bugs + Stories still renders every column. Returns [] when no
+    type's workflow could be fetched (caller can fall back).
+    """
+    base = base_url.rstrip('/')
+    proj = quote(project, safe='')
+    ordered: list[str] = []
+    seen: set[str] = set()
+    primary: str | None = None
+
+    for wit in work_item_types:
+        if not wit:
+            continue
+        url = (
+            f'{base}/{proj}/_apis/wit/workitemtypes/'
+            f'{quote(wit, safe="")}/states?api-version=7.1'
+        )
+        try:
+            r = await client.get(url, headers=headers)
+            if r.status_code != 200:
+                logger.info(
+                    'azure workflow states for type=%s in project=%s returned %s',
+                    wit, project, r.status_code,
+                )
+                continue
+            states = r.json().get('value', []) or []
+        except Exception as exc:
+            logger.info('azure workflow states failed for type=%s: %s', wit, exc)
+            continue
+        added = 0
+        for state in states:
+            name = (state.get('name') or '').strip() if isinstance(state, dict) else ''
+            if name and name not in seen:
+                seen.add(name)
+                ordered.append(name)
+                added += 1
+        if primary is None and added:
+            primary = wit
+    if ordered:
+        logger.info(
+            'azure workflow states resolved (primary=%s, total=%d states from %d type(s))',
+            primary, len(ordered), len(work_item_types),
+        )
+    return ordered
+
+
 @router.get('/azure/states')
 async def list_azure_states(    project: str = Query(...),
     team: str = Query(...),
@@ -677,62 +744,75 @@ async def list_azure_states(    project: str = Query(...),
     tenant: CurrentTenant = Depends(get_current_tenant),
     db: AsyncSession = Depends(get_db_session),
 ) -> list[str]:
-    """Sprint'teki work item'lardan gerçek state listesini çeker — hardcode yok."""
+    """Sprint'teki state'leri Azure workflow sırasında döndürür."""
     service = IntegrationConfigService(db)
     config = await service.get_config(tenant.organization_id, 'azure')
     if config is None or not config.secret:
         raise HTTPException(status_code=400, detail='Azure integration not configured')
 
-    wiql_url = (
-        f"{config.base_url.rstrip('/')}/{project}"
-        '/_apis/wit/wiql?api-version=7.1-preview.2'
-    )
-    # Sprint'teki tüm work item'ları çek, sadece state alanı yeterli
+    base = config.base_url.rstrip('/')
+    headers = _azure_headers(config.secret)
+    wiql_url = f'{base}/{project}/_apis/wit/wiql?api-version=7.1-preview.2'
     wiql_payload = {
         'query': (
-            "Select [System.Id], [System.State] From WorkItems "
+            "Select [System.Id], [System.State], [System.WorkItemType] "
+            "From WorkItems "
             f"Where [System.IterationPath] UNDER '{sprint_path}' "
             "Order By [System.State] Asc"
         )
     }
+
     async with httpx.AsyncClient(timeout=20) as client:
-        r = await client.post(wiql_url, headers=_azure_headers(config.secret), json=wiql_payload)
-        r.raise_for_status()
-        refs = r.json().get('workItems', [])
+        wiql_resp = await client.post(wiql_url, headers=headers, json=wiql_payload)
+        wiql_resp.raise_for_status()
+        refs = wiql_resp.json().get('workItems', [])
 
-        if not refs:
-            # Sprint boşsa process'in tüm state'lerini çek
-            proc_url = (
-                f"{config.base_url.rstrip('/')}/{project}"
-                '/_apis/work/processconfiguration?api-version=7.1-preview.1'
+        # Hangi work item type'lar bu sprint'te var, sayılarına göre sırala —
+        # en yaygın type Sprint Taskboard kolonlarını şekillendiriyor.
+        present_states: list[str] = []
+        type_counts: dict[str, int] = {}
+        if refs:
+            ids = ','.join(str(item['id']) for item in refs[:200])
+            details_url = (
+                f'{base}/_apis/wit/workitems?ids={ids}'
+                '&fields=System.State,System.WorkItemType&api-version=7.1-preview.3'
             )
-            pr = await client.get(proc_url, headers=_azure_headers(config.secret))
-            if pr.status_code == 200:
-                data = pr.json()
-                states: list[str] = []
-                for col in data.get('bugWorkItems', {}).get('states', []) or data.get('requirementBacklog', {}).get('states', []):
-                    if col.get('name') and col['name'] not in states:
-                        states.append(col['name'])
-                if states:
-                    return states
-            return ['Backlog', 'To Do', 'In Progress', 'Code Review', 'Done']
+            dr = await client.get(details_url, headers=headers)
+            dr.raise_for_status()
+            for item in dr.json().get('value', []):
+                fields = item.get('fields', {})
+                st = (fields.get('System.State') or '').strip()
+                tp = (fields.get('System.WorkItemType') or '').strip()
+                if st and st not in present_states:
+                    present_states.append(st)
+                if tp:
+                    type_counts[tp] = type_counts.get(tp, 0) + 1
 
-        # Work item'ların state'lerini batch olarak çek
-        ids = ','.join(str(item['id']) for item in refs[:200])
-        details_url = (
-            f"{config.base_url.rstrip('/')}/_apis/wit/workitems"
-            f'?ids={ids}&fields=System.State&api-version=7.1-preview.3'
+        # Type listesi: sprint'te bulunanlar count desc, sonra yaygın
+        # default'lar (sprint boşsa veya types yetmezse).
+        ranked_types = [t for t, _ in sorted(type_counts.items(), key=lambda kv: -kv[1])]
+        for fallback in ('Task', 'User Story', 'Bug', 'Feature', 'Epic', 'Issue'):
+            if fallback not in ranked_types:
+                ranked_types.append(fallback)
+
+        ordered_states = await _fetch_azure_workflow_state_order(
+            client, base_url=base, project=project,
+            work_item_types=ranked_types, headers=headers,
         )
-        dr = await client.get(details_url, headers=_azure_headers(config.secret))
-        dr.raise_for_status()
 
-    # Unique state'leri sıralı döndür (Azure'daki sırayı koru)
-    seen: list[str] = []
-    for item in dr.json().get('value', []):
-        st = item.get('fields', {}).get('System.State', '')
-        if st and st not in seen:
-            seen.append(st)
-    return seen if seen else ['Backlog', 'To Do', 'In Progress', 'Done']
+    # Sprint boş — workflow state listesinin tamamını döndür.
+    if not present_states:
+        return ordered_states or ['Backlog', 'To Do', 'In Progress', 'Done']
+
+    # Workflow sırasını koru, ama sprint'te VAR olan state'lere indir.
+    # Workflow'da olmayan custom state'ler (Azure'ın bilmediği durumlar)
+    # discovery sırasında sona eklenir.
+    if not ordered_states:
+        return present_states
+    present_set = set(present_states)
+    sorted_present = [s for s in ordered_states if s in present_set]
+    sorted_present.extend(s for s in present_states if s not in ordered_states)
+    return sorted_present
 
 
 @router.get('/jira', response_model=TaskListResponse)
