@@ -1314,8 +1314,18 @@ class OrchestrationService:
                 or (state.get('reviewed_code') or '').strip()
                 or (state.get('generated_code') or '').strip()
             )
-            pr_url = None
-            branch_name = None
+            if revision_id:
+                # A revision lands an extra commit on the EXISTING branch /
+                # PR, so seed pr_url + branch_name from the prior values.
+                # Without this, a revision that produces no file changes
+                # (has_changes == False) or runs on a legacy task with no
+                # assignment row leaves pr_url=None and the writeback below
+                # (task.pr_url = pr_url) silently wipes the live PR link.
+                pr_url = (revision_assignment.pr_url if revision_assignment else None) or task.pr_url
+                branch_name = (revision_assignment.branch_name if revision_assignment else None) or task.branch_name
+            else:
+                pr_url = None
+                branch_name = None
 
             # MCP agent mode: build PR payload directly from file_changes
             # instead of parsing final_code string (which may not have **File:** blocks)
@@ -1453,7 +1463,9 @@ class OrchestrationService:
                 # PR auto-updates. Skip the create-PR call so we don't
                 # try to open a duplicate.
                 if revision_id and has_changes:
-                    pr_url = revision_assignment.pr_url if revision_assignment else None
+                    # pr_url + branch_name were already seeded from the
+                    # existing PR above — don't reassign (the legacy
+                    # no-assignment path would re-blank it to None).
                     await task_service.add_log(
                         task.id, organization_id, 'pr',
                         f'Revision commit pushed to {branch_name} — PR auto-updated: {pr_url or "(unknown)"}'

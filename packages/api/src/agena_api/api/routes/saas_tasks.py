@@ -204,6 +204,8 @@ async def _to_task_response(service: TaskService, organization_id: int, task) ->
             pr_url=a.pr_url,
             branch_name=a.branch_name,
             failure_reason=a.failure_reason,
+            revision_count=a.revision_count or 0,
+            pr_merged=(a.status or '').lower() == 'merged',
         )
         for a, m in assign_rows
     ]
