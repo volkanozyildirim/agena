@@ -8,6 +8,10 @@
   --brand: #0d9488;
   --brand-2: #22c55e;
   --accent: #14b8a6;
+  /* Enterprise accent — also defined globally (not just under .agena-app) so
+     dashboard modals rendered via createPortal to <body> still resolve it. */
+  --acc: #5b9bd5;
+  --acc-soft: rgba(91,155,213,0.14);
   --purple: #8b5cf6;
   --pink: #ec4899;
   --blue: #3b82f6;
@@ -64,6 +68,8 @@ html.light {
   --brand: #0d9488;
   --brand-2: #16a34a;
   --accent: #0891b2;
+  --acc: #2f6db5;
+  --acc-soft: rgba(47,109,181,0.10);
   --purple: #7c3aed;
   --pink: #db2777;
   --blue: #2563eb;
