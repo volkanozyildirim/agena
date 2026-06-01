@@ -578,16 +578,24 @@ class OrchestrationService:
                 # didn't surface usage (e.g. older bridge build).
                 _real_usage = getattr(self.claude_cli_service, 'last_usage', None)
                 if _real_usage:
+                    # cache_read is re-read context billed at ~10% of the
+                    # input rate. Surface it separately as cached_input_tokens
+                    # so the cost estimate (fresh = prompt - cached) credits
+                    # the cache discount instead of charging list price on the
+                    # whole prompt. cache_creation stays folded into the
+                    # prompt (closest the price table has to its write rate).
+                    _cache_read = int(_real_usage.get('cache_read_input_tokens') or 0)
                     _prompt_tokens = int(
                         (_real_usage.get('input_tokens') or 0)
                         + (_real_usage.get('cache_creation_input_tokens') or 0)
-                        + (_real_usage.get('cache_read_input_tokens') or 0)
+                        + _cache_read
                     )
                     _completion_tokens = int(_real_usage.get('output_tokens') or 0)
                     usage_payload = {
                         'prompt_tokens': _prompt_tokens,
                         'completion_tokens': _completion_tokens,
                         'total_tokens': _prompt_tokens + _completion_tokens,
+                        'cached_input_tokens': _cache_read,
                     }
                 else:
                     prompt_estimate = self._estimate_tokens(f'{task.title}\n{task.description or ""}')
@@ -604,6 +612,10 @@ class OrchestrationService:
                     'final_code': final_code,
                     'usage': usage_payload,
                     'model_usage': [f"claude-cli:{routing.preferred_agent_model or 'default'}"],
+                    # Claude's own cache-aware cost from the result event —
+                    # the authoritative number (knows the exact cache split +
+                    # creation pricing). Preferred over our estimate below.
+                    'cli_cost_usd': getattr(self.claude_cli_service, 'last_cost_usd', None),
                 }
                 await task_service.add_log(task.id, organization_id, 'agent', 'Using claude_cli preferred agent')
             elif mode == 'mcp_agent':
@@ -1293,12 +1305,19 @@ class OrchestrationService:
                 )
             usage = state.get('usage', {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0})
             model_for_cost = (state.get('model_usage') or ['gpt-4o-mini'])[-1]
-            estimated_cost = self.cost_tracker.estimate_cost_usd(
-                prompt_tokens=int(usage.get('prompt_tokens', 0)),
-                completion_tokens=int(usage.get('completion_tokens', 0)),
-                cached_input_tokens=int(usage.get('cached_input_tokens', 0)),
-                model=model_for_cost,
-            )
+            _cache_hit = int(usage.get('cached_input_tokens', 0) or 0) > 0
+            _cli_cost = state.get('cli_cost_usd')
+            if isinstance(_cli_cost, (int, float)) and _cli_cost > 0:
+                # Claude CLI already priced the run with cache + creation
+                # discounts — trust it over a list-price re-derivation.
+                estimated_cost = round(float(_cli_cost), 6)
+            else:
+                estimated_cost = self.cost_tracker.estimate_cost_usd(
+                    prompt_tokens=int(usage.get('prompt_tokens', 0)),
+                    completion_tokens=int(usage.get('completion_tokens', 0)),
+                    cached_input_tokens=int(usage.get('cached_input_tokens', 0)),
+                    model=model_for_cost,
+                )
             guardrail_error = self._validate_cost_guardrails(
                 max_tokens=task.max_tokens,
                 max_cost_usd=task.max_cost_usd,
@@ -1830,6 +1849,7 @@ class OrchestrationService:
                 completion_tokens=int(usage.get('completion_tokens', 0)),
                 total_tokens=int(usage.get('total_tokens', 0)),
                 cost_usd=float(estimated_cost),
+                cache_hit=_cache_hit,
                 started_at=run_started_at,
                 ended_at=run_finished_at,
                 duration_ms=int(duration_sec * 1000),
@@ -1840,6 +1860,7 @@ class OrchestrationService:
                     'create_pr': create_pr,
                     'pr_url': pr_url,
                     'branch_name': branch_name,
+                    'cached_input_tokens': int(usage.get('cached_input_tokens', 0)),
                     'model_usage': state.get('model_usage', []),
                     'spec_goal': str(state.get('spec', {}).get('goal', ''))[:200],
                     'generated_code_len': len(state.get('generated_code', '')),
@@ -1930,6 +1951,7 @@ class OrchestrationService:
                 completion_tokens=int(usage.get('completion_tokens', 0)),
                 total_tokens=int(usage.get('total_tokens', 0)),
                 cost_usd=float(estimated_cost),
+                cache_hit=int(usage.get('cached_input_tokens', 0) or 0) > 0,
                 started_at=run_started_at,
                 ended_at=run_finished_at,
                 duration_ms=int(duration_sec * 1000),
