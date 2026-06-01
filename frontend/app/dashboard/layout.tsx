@@ -537,7 +537,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
 
   return (
     <RoleContext.Provider value={{ role: effectiveRole }}>
-    <div className='agena-app' style={{ display: 'flex', minHeight: '100vh', paddingTop: 56 }}>
+    <div className='agena-app' style={{ display: 'flex', height: '100vh', overflow: 'hidden', paddingTop: 56 }}>
       {/* Mobile sidebar toggle — fixed in top-left, below navbar */}
       <button
         className='dashboard-sidebar-toggle'
@@ -1023,7 +1023,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
       </div>
 
       {/* Main */}
-      <main className='dashboard-main' style={{ flex: 1, marginLeft: sidebarWidth, padding: '32px 40px', minWidth: 0, transition: 'margin-left 0.2s ease' }}>
+      <main className='dashboard-main' style={{ flex: 1, marginLeft: sidebarWidth, padding: '32px 40px', minWidth: 0, height: 'calc(100vh - 56px)', overflowY: 'auto', overflowX: 'hidden', transition: 'margin-left 0.2s ease' }}>
         {(() => {
           // Page-level guard — applied for any path declared in NAV_GROUPS.
           // Platform admins bypass entirely; otherwise the path's module /
