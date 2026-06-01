@@ -36,7 +36,6 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/dashboard/office', key: 'nav.office', icon: 'home', module: 'boss_mode', wsPerm: 'pages:office' },
       { href: '/dashboard/tasks', key: 'nav.tasks', icon: 'tasks', permission: 'tasks:read' as const, module: 'core' },
-      { href: '/dashboard/sprints', key: 'nav.sprints', icon: 'sprints', permission: 'tasks:read' as const, module: 'sprints' },
       { href: '/dashboard/reviews', key: 'nav.reviews', icon: 'search', permission: 'tasks:read' as const, module: 'reviews', wsPerm: 'pages:reviews' },
     ],
   },
@@ -56,6 +55,7 @@ const NAV_GROUPS: NavGroup[] = [
     module: 'core',
     items: [
       { href: '/dashboard/agents', key: 'nav.agents', icon: 'agents', module: 'core', wsPerm: 'agents:manage' },
+      { href: '/dashboard/insights', key: 'nav.insights', icon: 'insights', module: 'insights', wsPerm: 'pages:insights' },
       { href: '/dashboard/flows', key: 'nav.flows', icon: 'flows', module: 'flows', wsPerm: 'flows:manage' },
       { href: '/dashboard/prompt-studio', key: 'nav.promptStudio', icon: 'pencil', module: 'prompt_studio', wsPerm: 'prompts:edit' },
       { href: '/dashboard/templates', key: 'nav.templates', icon: 'box', module: 'flows', wsPerm: 'pages:templates' },
@@ -64,11 +64,12 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    labelKey: 'nav.group.analytics',
+    labelKey: 'nav.group.delivery',
     defaultOpen: false,
     items: [
-      { href: '/dashboard/insights', key: 'nav.insights', icon: 'insights', module: 'insights', wsPerm: 'pages:insights' },
+      { href: '/dashboard/sprints', key: 'nav.sprints', icon: 'sprints', permission: 'tasks:read' as const, module: 'sprints' },
       { href: '/dashboard/sprint-performance', key: 'nav.sprintPerformance', icon: 'trending', permission: 'tasks:read' as const, module: 'sprints', wsPerm: 'analytics:read' },
+      { href: '/dashboard/team', key: 'nav.team', icon: 'users', permission: 'team:manage' as const, module: 'sprints', wsPerm: 'members:add' },
       { href: '/dashboard/dora', key: 'nav.dora', icon: 'chart', module: 'dora', wsPerm: 'analytics:read', children: [
         { href: '/dashboard/dora', key: 'nav.doraOverview', icon: 'chart' },
         { href: '/dashboard/dora/project', key: 'nav.doraProject', icon: 'clipboard' },
@@ -94,7 +95,6 @@ const NAV_GROUPS: NavGroup[] = [
       ]},
       { href: '/dashboard/mappings', key: 'nav.mappings', icon: 'map', module: 'core', wsPerm: 'repo:manage' },
       { href: '/dashboard/workspaces', key: 'nav.workspaces', icon: 'layers', module: 'core', wsPerm: 'workspace:manage' },
-      { href: '/dashboard/team', key: 'nav.team', icon: 'users', permission: 'team:manage' as const, module: 'sprints', wsPerm: 'members:add' },
       { href: '/dashboard/permissions', key: 'nav.permissions', icon: 'lock', permission: 'roles:manage' as const, module: 'core' },
       { href: '/dashboard/workspace-roles', key: 'nav.workspaceRoles', icon: 'user-check', permission: 'roles:manage' as const, module: 'core' },
       { href: '/dashboard/modules', key: 'nav.modules', icon: 'grid', permission: 'integrations:manage' as const, module: 'core', wsPerm: 'modules:configure' },

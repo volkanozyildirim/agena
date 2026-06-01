@@ -303,6 +303,27 @@ export default function IntegrationRulesPage() {
         </div>
       </div>
 
+      {/* How it works — explainer */}
+      <div style={{ borderRadius: 10, border: '1px solid var(--panel-border)', background: 'var(--panel)', padding: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <span style={{ color: 'var(--acc)', display: 'inline-flex' }}><NavIcon name='alert' size={16} /></span>
+          <span style={{ fontWeight: 600, color: 'var(--ink-90)', fontSize: 13 }}>{t('integrationRules.howTitle')}</span>
+        </div>
+        <div style={{ fontSize: 12.5, color: 'var(--ink-65)', lineHeight: 1.55, marginBottom: 12 }}>{t('integrationRules.howBody')}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 8 }}>
+          {[
+            { icon: 'sliders', text: t('integrationRules.howMatch') },
+            { icon: 'zap', text: t('integrationRules.howAction') },
+            { icon: 'activity', text: t('integrationRules.howExample') },
+          ].map((b, i) => (
+            <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '10px 12px', borderRadius: 8, background: 'var(--panel-alt)', border: '1px solid var(--panel-border)' }}>
+              <span style={{ color: 'var(--acc)', flexShrink: 0, marginTop: 1, display: 'inline-flex' }}><NavIcon name={b.icon} size={14} /></span>
+              <span style={{ fontSize: 11.5, color: 'var(--ink-72)', lineHeight: 1.5 }}>{b.text}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Floating toast */}
       {(msg || error) && typeof document !== 'undefined' && createPortal(
         <div style={{
