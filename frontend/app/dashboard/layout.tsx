@@ -37,11 +37,17 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/dashboard/office', key: 'nav.office', icon: 'home', module: 'boss_mode', wsPerm: 'pages:office' },
       { href: '/dashboard/tasks', key: 'nav.tasks', icon: 'tasks', permission: 'tasks:read' as const, module: 'core' },
       { href: '/dashboard/sprints', key: 'nav.sprints', icon: 'sprints', permission: 'tasks:read' as const, module: 'sprints' },
+      { href: '/dashboard/reviews', key: 'nav.reviews', icon: 'search', permission: 'tasks:read' as const, module: 'reviews', wsPerm: 'pages:reviews' },
+    ],
+  },
+  {
+    labelKey: 'nav.group.backlog',
+    defaultOpen: false,
+    module: 'core',
+    items: [
       { href: '/dashboard/refinement', key: 'nav.refinement', icon: 'refinement', permission: 'tasks:read' as const, module: 'refinement', wsPerm: 'refinement:run' },
       { href: '/dashboard/triage', key: 'nav.triage', icon: 'triage', permission: 'tasks:read' as const, module: 'triage', wsPerm: 'pages:triage' },
       { href: '/dashboard/review-backlog', key: 'nav.reviewBacklog', icon: 'clock', permission: 'tasks:read' as const, module: 'review_backlog', wsPerm: 'pages:review-backlog' },
-      { href: '/dashboard/skills', key: 'nav.skills', icon: 'book', permission: 'tasks:read' as const, module: 'skills', wsPerm: 'pages:skills' },
-      { href: '/dashboard/runtimes', key: 'nav.runtimes', icon: 'terminal', permission: 'tasks:read' as const, module: 'runtimes', wsPerm: 'pages:runtimes' },
     ],
   },
   {
@@ -50,17 +56,18 @@ const NAV_GROUPS: NavGroup[] = [
     module: 'core',
     items: [
       { href: '/dashboard/agents', key: 'nav.agents', icon: 'agents', module: 'core', wsPerm: 'agents:manage' },
-      { href: '/dashboard/reviews', key: 'nav.reviews', icon: 'search', permission: 'tasks:read' as const, module: 'reviews', wsPerm: 'pages:reviews' },
-      { href: '/dashboard/insights', key: 'nav.insights', icon: 'insights', module: 'insights', wsPerm: 'pages:insights' },
       { href: '/dashboard/flows', key: 'nav.flows', icon: 'flows', module: 'flows', wsPerm: 'flows:manage' },
       { href: '/dashboard/prompt-studio', key: 'nav.promptStudio', icon: 'pencil', module: 'prompt_studio', wsPerm: 'prompts:edit' },
       { href: '/dashboard/templates', key: 'nav.templates', icon: 'box', module: 'flows', wsPerm: 'pages:templates' },
+      { href: '/dashboard/skills', key: 'nav.skills', icon: 'book', permission: 'tasks:read' as const, module: 'skills', wsPerm: 'pages:skills' },
+      { href: '/dashboard/runtimes', key: 'nav.runtimes', icon: 'terminal', permission: 'tasks:read' as const, module: 'runtimes', wsPerm: 'pages:runtimes' },
     ],
   },
   {
     labelKey: 'nav.group.analytics',
     defaultOpen: false,
     items: [
+      { href: '/dashboard/insights', key: 'nav.insights', icon: 'insights', module: 'insights', wsPerm: 'pages:insights' },
       { href: '/dashboard/sprint-performance', key: 'nav.sprintPerformance', icon: 'trending', permission: 'tasks:read' as const, module: 'sprints', wsPerm: 'analytics:read' },
       { href: '/dashboard/dora', key: 'nav.dora', icon: 'chart', module: 'dora', wsPerm: 'analytics:read', children: [
         { href: '/dashboard/dora', key: 'nav.doraOverview', icon: 'chart' },
