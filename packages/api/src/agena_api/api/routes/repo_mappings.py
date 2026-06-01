@@ -215,28 +215,31 @@ async def get_repo_index_status(
             local_repo_path=path, current_head_sha=None, is_fresh=False,
         )
 
-    current_sha = indexer._head_sha(path)
+    import time
+    current_sha = indexer._anchor_sha(path)
     stored_sha: str | None = None
     points_count = 0
+    is_fresh = False
     try:
         await indexer.ensure_collection()
         from qdrant_client.models import FieldCondition, Filter, MatchValue
-        flt = Filter(must=[
-            FieldCondition(key='organization_id', match=MatchValue(value=int(tenant.organization_id))),
-            FieldCondition(key='repo_root', match=MatchValue(value=indexer._normalize_path(path))),
-        ])
+        root_norm = indexer._normalize_path(path)
+        # Count only file points (exclude the bookkeeping meta point).
+        flt = Filter(
+            must=[
+                FieldCondition(key='organization_id', match=MatchValue(value=int(tenant.organization_id))),
+                FieldCondition(key='repo_root', match=MatchValue(value=root_norm)),
+            ],
+            must_not=[FieldCondition(key='kind', match=MatchValue(value='meta'))],
+        )
         count_resp = await indexer.client.count(
             collection_name='repo_files', count_filter=flt, exact=True,
         )
         points_count = int(getattr(count_resp, 'count', 0) or 0)
-        if points_count > 0:
-            batch, _ = await indexer.client.scroll(
-                collection_name='repo_files',
-                scroll_filter=flt,
-                limit=1, with_payload=True, with_vectors=False,
-            )
-            if batch:
-                stored_sha = (batch[0].payload or {}).get('head_sha')
+        meta = await indexer._load_meta(root_norm=root_norm, organization_id=tenant.organization_id)
+        if meta:
+            stored_sha = meta.get('head_sha') or None
+            is_fresh = indexer._is_fresh(meta=meta, anchor=current_sha, now=int(time.time()))
     except Exception:
         pass
 
@@ -246,7 +249,7 @@ async def get_repo_index_status(
         head_sha=stored_sha,
         local_repo_path=path,
         current_head_sha=current_sha or None,
-        is_fresh=bool(stored_sha and current_sha and stored_sha == current_sha),
+        is_fresh=is_fresh,
     )
 
 
