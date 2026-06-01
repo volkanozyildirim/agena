@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { apiFetch } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
 import NavIcon from '@/components/NavIcon';
+import MappingHub from '@/components/integrations/MappingHub';
 
 interface SentryProject {
   slug: string;
@@ -337,6 +338,26 @@ export default function SentryPage() {
     }
   }
 
+  // One-step map: create the mapping already linked to a repo (the backend
+  // accepts repo_mapping_id on create), so the user picks a repo directly on
+  // an unmapped project instead of "Map" then "select repo".
+  async function mapProjectToRepo(project: SentryProject, repoId: number) {
+    try {
+      await apiFetch('/sentry/mappings', {
+        method: 'POST',
+        body: JSON.stringify({
+          project_slug: project.slug,
+          project_name: project.name,
+          repo_mapping_id: repoId,
+        }),
+      });
+      setMsg((t('integrations.sentry.mapped') || '"{name}" mapped').replace('{name}', project.name));
+      await loadMappings();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to add mapping');
+    }
+  }
+
   async function updateMapping(id: number, updates: Record<string, unknown>) {
     try {
       await apiFetch(`/sentry/mappings/${id}`, { method: 'PUT', body: JSON.stringify(updates) });
@@ -648,91 +669,53 @@ export default function SentryPage() {
         </div>
       </div>
 
-      {projects.length > 0 && (
-        <div style={cardStyle}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <h3 style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', margin: 0 }}>
-              {t('integrations.sentry.projectsCount').replace('{n}', String(projects.length))}
-            </h3>
-          </div>
-          <div style={{ display: 'grid', gap: 6 }}>
-            {projects.map((p) => {
-              const mapping = mappings.find((m) => m.project_slug === p.slug);
-              const isSelected = selectedProject === p.slug;
-              return (
-                <div key={p.slug} className='sentry-row-card' style={{
-                  padding: '10px 12px', borderRadius: 8,
-                  background: isSelected ? 'var(--acc-soft)' : 'var(--panel-alt)',
-                  border: `1px solid ${isSelected ? 'var(--acc)' : 'var(--panel-border)'}`,
-                  transition: 'background 0.15s, border 0.15s',
-                }}>
-                  <div className='sentry-row-icon' style={{
-                    width: 30, height: 30, borderRadius: 8,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: mapping ? 'var(--acc-soft)' : 'var(--panel-alt)',
-                    border: `1px solid ${mapping ? 'var(--acc)' : 'var(--panel-border)'}`,
-                    color: mapping ? 'var(--acc)' : 'var(--ink-35)',
-                  }}>
-                    <NavIcon name={mapping ? 'plug' : 'dot'} size={14} />
-                  </div>
-                  <div className='sentry-row-title'>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-90)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {p.name}
-                    </div>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 2 }}>
-                      <span style={{ fontSize: 10, color: 'var(--ink-35)', fontFamily: 'monospace' }}>{p.slug}</span>
-                      {mapping && mapping.repo_display_name && (
-                        <span style={{ fontSize: 10, color: 'var(--acc)', fontWeight: 600 }}>→ {mapping.repo_display_name}</span>
-                      )}
-                      {mapping && mapping.auto_import && (
-                        <Pill color='var(--acc)'>AUTO</Pill>
-                      )}
-                    </div>
-                  </div>
-                  <div className='sentry-row-actions'>
-                    <button onClick={() => void fetchIssues(p.slug)} title={t('integrations.sentry.issuesBtn')}
-                      className='sentry-icon-btn' style={{ ...btnSmall }}><NavIcon name="clipboard" size={14} /></button>
-                    {!mapping ? (
-                      <button onClick={() => void addMapping(p)}
-                        style={{ ...btnSmall, color: 'var(--acc)', borderColor: 'var(--acc)', height: 30, padding: '0 12px' }}>
-                        + {t('integrations.common.map')}
-                      </button>
-                    ) : (
-                      <>
-                        <select
-                          value={mapping.repo_mapping_id ?? ''}
-                          onChange={(ev) => void updateMapping(mapping.id, { repo_mapping_id: ev.target.value ? parseInt(ev.target.value) : null })}
-                          style={{ ...inputStyle, width: 140, fontSize: 11, padding: '4px 8px', height: 30 }}
-                        >
-                          <option value="">{t('integrations.common.selectRepo')}</option>
-                          {repos.map((r) => (
-                            <option key={r.id} value={r.id}>{r.owner}/{r.repo_name}</option>
-                          ))}
-                        </select>
-                        <button onClick={() => void importIssues(mapping.project_slug)} title={t('integrations.common.import')}
-                          disabled={runningSlug === mapping.project_slug}
-                          className='sentry-icon-btn' style={{ ...btnSmall, opacity: runningSlug === mapping.project_slug ? 0.6 : 1 }}>
-                          {runningSlug === mapping.project_slug ? '…' : <NavIcon name="send" size={14} />}
-                        </button>
-                        {rowResult[mapping.project_slug] && (
-                          <span style={{
-                            fontSize: 10, fontWeight: 700, padding: '4px 8px', borderRadius: 6,
-                            color: rowResult[mapping.project_slug].kind === 'ok' ? '#3f9d6a' : '#cf5b57',
-                            background: 'var(--panel-alt)',
-                            whiteSpace: 'nowrap',
-                          }}>{rowResult[mapping.project_slug].text}</span>
-                        )}
-                        <button onClick={() => void deleteMapping(mapping.id)} title={t('integrations.common.unmap') || 'Unmap'}
-                          className='sentry-icon-btn' style={{ ...btnSmall, color: '#cf5b57', borderColor: 'var(--panel-border)' }}>×</button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* Project → repo mapping (shared guided MappingHub) */}
+      <MappingHub
+        title='Sentry'
+        logo={<NavIcon name='shield' size={15} />}
+        loading={loading}
+        hint={t('integrations.sentry.heroSubtitle') || 'Map a project to a repo so AI can auto-fix its production errors and ship the patch.'}
+        searchPlaceholder={`Filter ${projects.length} projects…`}
+        repos={repos.map((r) => ({ id: r.id, label: `${r.owner}/${r.repo_name}` }))}
+        items={projects.map((p) => {
+          const m = mappings.find((mm) => mm.project_slug === p.slug);
+          return {
+            id: p.slug,
+            name: p.name,
+            sublabel: p.slug,
+            live: true,
+            mappedRepoId: m?.repo_mapping_id ?? null,
+            autoImport: m?.auto_import,
+          };
+        })}
+        onMapRepo={(item, repoId) => {
+          const p = projects.find((x) => x.slug === item.id);
+          const m = mappings.find((mm) => mm.project_slug === item.id);
+          if (m) void updateMapping(m.id, { repo_mapping_id: repoId });
+          else if (p && repoId != null) void mapProjectToRepo(p, repoId);
+        }}
+        onToggleAuto={(item) => {
+          const m = mappings.find((mm) => mm.project_slug === item.id);
+          if (m) void updateMapping(m.id, { auto_import: !m.auto_import });
+        }}
+        renderActions={(item) => {
+          const m = mappings.find((mm) => mm.project_slug === item.id);
+          return (
+            <>
+              <button onClick={() => void fetchIssues(item.id)} title={t('integrations.sentry.issuesBtn')} style={{ ...btnSmall, height: 32, width: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><NavIcon name='clipboard' size={13} /></button>
+              {m && (
+                <button onClick={() => void importIssues(m.project_slug)} disabled={runningSlug === m.project_slug} title={t('integrations.common.import')} style={{ ...btnSmall, height: 32, width: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: runningSlug === m.project_slug ? 0.6 : 1 }}>{runningSlug === m.project_slug ? '…' : <NavIcon name='send' size={13} />}</button>
+              )}
+              {m && (
+                <button onClick={() => void deleteMapping(m.id)} title={t('integrations.common.unmap') || 'Unmap'} style={{ ...btnSmall, height: 32, width: 32, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cf5b57', borderColor: 'var(--panel-border)' }}><NavIcon name='close' size={13} /></button>
+              )}
+              {rowResult[item.id] && (
+                <span style={{ fontSize: 10, fontWeight: 700, color: rowResult[item.id].kind === 'ok' ? '#3f9d6a' : '#cf5b57', whiteSpace: 'nowrap' }}>{rowResult[item.id].text}</span>
+              )}
+            </>
+          );
+        }}
+      />
 
       {selectedProject && (
         <div style={cardStyle}>
