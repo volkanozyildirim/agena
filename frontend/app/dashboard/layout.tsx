@@ -860,12 +860,16 @@ function DashboardInner({ children }: { children: ReactNode }) {
           <span className='topbar-sprint-switcher'><SprintSwitcher /></span>
         )}
 
+        <span className='topbar-divider' style={{ width: 1, height: 22, background: 'var(--panel-border)', margin: '0 4px', flexShrink: 0 }} />
+
         {/* Theme + Lang — moved here from the marketing nav so the dashboard
             isn't missing those controls now that the marketing nav is hidden. */}
         <span className='topbar-toggles'>
           <ThemeToggle />
           <LangToggle />
         </span>
+
+        <span className='topbar-divider' style={{ width: 1, height: 22, background: 'var(--panel-border)', margin: '0 4px', flexShrink: 0 }} />
 
         {/* Quick integration shortcuts — visible on mobile + desktop */}
         {enabledModules?.has('sentry') && (
@@ -876,7 +880,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
             color: pathname.startsWith('/dashboard/integrations/sentry') ? 'var(--nav-active)' : 'var(--muted)',
             textDecoration: 'none', cursor: 'pointer', transition: 'all 0.2s',
           }}>
-            <NavIcon name='alert' size={17} />
+            <NavIcon name='alert' size={16} />
           </Link>
         )}
         {enabledModules?.has('newrelic') && (
@@ -887,7 +891,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
             color: pathname.startsWith('/dashboard/integrations/newrelic') ? 'var(--nav-active)' : 'var(--muted)',
             textDecoration: 'none', cursor: 'pointer', transition: 'all 0.2s',
           }}>
-            <NavIcon name='signal' size={17} />
+            <NavIcon name='signal' size={16} />
           </Link>
         )}
 
@@ -899,7 +903,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
           color: pathname.startsWith('/dashboard/usage') ? 'var(--nav-active)' : 'var(--muted)',
           textDecoration: 'none', cursor: 'pointer', transition: 'all 0.2s',
         }}>
-          <NavIcon name='chart' size={17} />
+          <NavIcon name='chart' size={16} />
         </Link>
 
         {/* Notification bell */}
@@ -916,7 +920,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
             color: 'var(--muted)', cursor: 'pointer', transition: 'all 0.2s',
           }}
         >
-          <NavIcon name='bell' size={17} />
+          <NavIcon name='bell' size={16} />
           {unreadCount > 0 && (
             <span style={{
               position: 'absolute', right: -4, top: -4,
@@ -1002,6 +1006,8 @@ function DashboardInner({ children }: { children: ReactNode }) {
             </Link>
           </div>
         )}
+
+        <span className='topbar-divider' style={{ width: 1, height: 22, background: 'var(--panel-border)', margin: '0 4px', flexShrink: 0 }} />
 
         {/* Profile avatar */}
         {userName && (
