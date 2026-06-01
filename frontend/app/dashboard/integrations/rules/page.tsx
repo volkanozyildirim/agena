@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { apiFetch, loadPrefs } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
+import NavIcon from '@/components/NavIcon';
 
 const FALLBACK_AGENT_ROLES = ['manager', 'pm', 'analyzer', 'planner', 'developer', 'lead_developer', 'reviewer', 'qa', 'security_developer'];
 
@@ -79,21 +80,21 @@ function ChipInput({
     <div style={{
       display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center',
       padding: '4px 6px', minHeight: 36,
-      borderRadius: 8, border: '1px solid var(--panel-border)', background: 'var(--glass)',
+      borderRadius: 8, border: '1px solid var(--panel-border)', background: 'var(--surface)',
     }}>
       {values.map((v) => (
         <span key={v} style={{
           display: 'inline-flex', alignItems: 'center', gap: 4,
           padding: '3px 8px', borderRadius: 6,
-          background: 'rgba(34,197,94,0.18)', border: '1px solid rgba(34,197,94,0.55)',
-          color: '#15803d', fontSize: 12, fontWeight: 700,
+          background: 'var(--acc-soft)', border: '1px solid var(--panel-border)',
+          color: 'var(--acc)', fontSize: 12, fontWeight: 700,
         }}>
           {v}
           <button
             type='button'
             onClick={() => remove(v)}
-            style={{ background: 'transparent', border: 'none', color: '#15803d', cursor: 'pointer', fontSize: 14, padding: 0, lineHeight: 1, opacity: 0.75 }}
-          >×</button>
+            style={{ background: 'transparent', border: 'none', color: 'var(--acc)', cursor: 'pointer', padding: 0, lineHeight: 1, opacity: 0.75, display: 'inline-flex' }}
+          ><NavIcon name="close" size={12} /></button>
         </span>
       ))}
       <input
@@ -128,7 +129,7 @@ function ChipInput({
 }
 
 
-function Pill({ children, color = '#94a3b8' }: { children: React.ReactNode; color?: string }) {
+function Pill({ children, color = '#5b9bd5' }: { children: React.ReactNode; color?: string }) {
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -141,8 +142,8 @@ function Pill({ children, color = '#94a3b8' }: { children: React.ReactNode; colo
 }
 
 const PROVIDER_BRAND: Record<Provider, { icon: string; color: string; gradient: string }> = {
-  jira: { icon: '📋', color: '#0052cc', gradient: 'linear-gradient(135deg, rgba(0,82,204,0.20), rgba(38,132,255,0.12) 60%, rgba(56,189,248,0.08))' },
-  azure: { icon: '☁️', color: '#0078d4', gradient: 'linear-gradient(135deg, rgba(0,120,212,0.20), rgba(56,189,248,0.12) 60%, rgba(28,231,131,0.06))' },
+  jira: { icon: 'clipboard', color: '#5b9bd5', gradient: 'var(--panel-alt)' },
+  azure: { icon: 'box', color: '#5b9bd5', gradient: 'var(--panel-alt)' },
 };
 
 export default function IntegrationRulesPage() {
@@ -263,15 +264,15 @@ export default function IntegrationRulesPage() {
   const brand = PROVIDER_BRAND[provider];
 
   const cardStyle: React.CSSProperties = {
-    background: 'var(--panel)', border: '1px solid var(--panel-border)', borderRadius: 12, padding: 16,
+    background: 'var(--panel)', border: '1px solid var(--panel-border)', borderRadius: 10, padding: 16,
   };
   const btnSmall: React.CSSProperties = {
     padding: '5px 10px', borderRadius: 6, border: '1px solid var(--panel-border)',
     background: 'transparent', color: 'var(--ink-58)', fontSize: 11, cursor: 'pointer',
   };
   const btnPrimary: React.CSSProperties = {
-    padding: '8px 16px', borderRadius: 8, border: 'none', background: brand.color, color: '#fff',
-    fontSize: 12, fontWeight: 700, cursor: 'pointer',
+    padding: '8px 16px', borderRadius: 8, border: 'none', background: 'var(--acc)', color: '#fff',
+    fontSize: 12, fontWeight: 600, cursor: 'pointer',
   };
 
   return (
@@ -280,19 +281,19 @@ export default function IntegrationRulesPage() {
 
       {/* Hero */}
       <div style={{
-        position: 'relative', overflow: 'hidden', borderRadius: 16,
-        border: '1px solid var(--panel-border)', background: 'var(--panel)',
-        backgroundImage: brand.gradient, padding: '20px 22px',
+        position: 'relative', overflow: 'hidden', borderRadius: 10,
+        border: '1px solid var(--panel-border)', background: 'var(--surface)',
+        padding: '20px 22px',
       }}>
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${brand.color}, ${brand.color}99, #1CE783)` }} />
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'var(--panel-border)' }} />
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, flexWrap: 'wrap' }}>
           <div style={{
             width: 44, height: 44, borderRadius: 10,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: `${brand.color}29`, border: `1px solid ${brand.color}66`, fontSize: 22,
-          }}>{brand.icon}</div>
+            background: 'var(--acc-soft)', border: '1px solid var(--panel-border)', color: 'var(--acc)',
+          }}><NavIcon name={brand.icon} size={22} /></div>
           <div style={{ flex: 1, minWidth: 200 }}>
-            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--ink)', letterSpacing: -0.3 }}>
+            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--ink-90)', letterSpacing: -0.3 }}>
               {t('integrationRules.title') || 'Integration Rules'}
             </div>
             <div style={{ fontSize: 12, color: 'var(--ink-58)', marginTop: 3, lineHeight: 1.5 }}>
@@ -307,18 +308,17 @@ export default function IntegrationRulesPage() {
         <div style={{
           position: 'fixed', left: '50%', bottom: 28, transform: 'translateX(-50%)',
           zIndex: 9999, maxWidth: 'min(94vw, 460px)',
-          padding: '12px 18px', borderRadius: 12,
+          padding: '12px 18px', borderRadius: 10,
           display: 'flex', alignItems: 'center', gap: 10,
           fontSize: 13, fontWeight: 700,
-          color: error ? '#fecaca' : '#bbf7d0',
-          background: error ? 'rgba(127,29,29,0.95)' : 'rgba(20,83,45,0.95)',
-          border: `1px solid ${error ? 'rgba(248,113,113,0.4)' : 'rgba(34,197,94,0.4)'}`,
-          boxShadow: '0 12px 32px rgba(0,0,0,0.45)',
-          backdropFilter: 'blur(8px)',
+          color: error ? '#cf5b57' : '#3f9d6a',
+          background: 'var(--surface)',
+          border: `1px solid var(--panel-border)`,
+          boxShadow: '0 12px 32px rgba(0,0,0,0.18)',
         }}>
-          <span>{error ? '✗' : '✓'}</span>
+          <span style={{ display: 'inline-flex' }}><NavIcon name={error ? 'alert' : 'activity'} size={16} /></span>
           <span style={{ flex: 1 }}>{error || msg}</span>
-          <button onClick={() => { setError(''); setMsg(''); }} style={{ background: 'transparent', border: 'none', color: error ? '#fca5a5' : '#86efac', cursor: 'pointer', fontSize: 16, padding: 0 }}>×</button>
+          <button onClick={() => { setError(''); setMsg(''); }} style={{ background: 'transparent', border: 'none', color: error ? '#cf5b57' : '#3f9d6a', cursor: 'pointer', padding: 0, display: 'inline-flex' }}><NavIcon name="close" size={16} /></button>
         </div>,
         document.body
       )}
@@ -329,12 +329,12 @@ export default function IntegrationRulesPage() {
           <button key={p} onClick={() => setProvider(p)}
             style={{
               flex: 1, padding: '10px 14px', borderRadius: 8, border: 'none',
-              background: provider === p ? PROVIDER_BRAND[p].color : 'transparent',
-              color: provider === p ? '#fff' : 'var(--ink-58)',
-              fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              background: provider === p ? 'var(--acc)' : 'transparent',
+              color: provider === p ? '#fff' : 'var(--ink-65)',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}>
-            <span>{PROVIDER_BRAND[p].icon}</span>
+            <span style={{ display: 'inline-flex' }}><NavIcon name={PROVIDER_BRAND[p].icon} size={14} /></span>
             <span>{p === 'jira' ? 'Jira' : 'Azure DevOps'}</span>
             <span style={{ fontSize: 10, opacity: 0.7 }}>({rules.filter((r) => r.provider === p).length})</span>
           </button>
@@ -347,17 +347,17 @@ export default function IntegrationRulesPage() {
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)' }}>
             {(t('integrationRules.rulesCount') || '{n} Rules').replace('{n}', String(filtered.length))}
           </div>
-          <button onClick={() => setShowAdd(true)} style={btnPrimary}>
-            + {t('integrationRules.addRule') || 'Add rule'}
+          <button onClick={() => setShowAdd(true)} style={{ ...btnPrimary, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <NavIcon name="plus" size={14} /> {t('integrationRules.addRule') || 'Add rule'}
           </button>
         </div>
 
         {loading ? (
           <div style={{ fontSize: 12, color: 'var(--ink-35)', padding: 16, textAlign: 'center' }}>{t('integrations.common.loading') || 'Loading...'}</div>
         ) : filtered.length === 0 ? (
-          <div style={{ padding: '32px 18px', textAlign: 'center', borderRadius: 12, background: 'var(--glass)', border: '1px dashed var(--panel-border)' }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>📐</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>
+          <div style={{ padding: '32px 18px', textAlign: 'center', borderRadius: 10, background: 'var(--surface)', border: '1px dashed var(--panel-border)' }}>
+            <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'center', color: 'var(--ink-42)' }}><NavIcon name="sliders" size={32} /></div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-90)' }}>
               {t('integrationRules.emptyTitle') || 'No rules yet'}
             </div>
             <div style={{ fontSize: 11, color: 'var(--ink-50)', marginTop: 4, lineHeight: 1.5, maxWidth: 420, margin: '4px auto 0' }}>
@@ -368,14 +368,14 @@ export default function IntegrationRulesPage() {
           <div style={{ display: 'grid', gap: 8 }}>
             {filtered.map((rule) => {
               const matchPills: { label: string; value: string; color: string }[] = [];
-              if (rule.match.reporter) matchPills.push({ label: 'reporter', value: rule.match.reporter, color: '#a78bfa' });
-              if (rule.match.issue_type) matchPills.push({ label: 'type', value: rule.match.issue_type, color: '#60a5fa' });
-              if (rule.match.project) matchPills.push({ label: 'project', value: rule.match.project, color: '#22c55e' });
-              if (rule.match.labels && rule.match.labels.length) matchPills.push({ label: 'labels', value: rule.match.labels.join(','), color: '#f59e0b' });
+              if (rule.match.reporter) matchPills.push({ label: 'reporter', value: rule.match.reporter, color: '#5b9bd5' });
+              if (rule.match.issue_type) matchPills.push({ label: 'type', value: rule.match.issue_type, color: '#5b9bd5' });
+              if (rule.match.project) matchPills.push({ label: 'project', value: rule.match.project, color: '#3f9d6a' });
+              if (rule.match.labels && rule.match.labels.length) matchPills.push({ label: 'labels', value: rule.match.labels.join(','), color: '#c98a2b' });
               return (
                 <div key={rule.id} style={{
-                  padding: '12px 14px', borderRadius: 12,
-                  background: 'var(--glass)',
+                  padding: '12px 14px', borderRadius: 10,
+                  background: 'var(--surface)',
                   border: `1px solid ${rule.is_active ? 'var(--panel-border)' : 'var(--panel-border)'}`,
                   opacity: rule.is_active ? 1 : 0.55,
                 }}>
@@ -383,12 +383,12 @@ export default function IntegrationRulesPage() {
                     <div style={{
                       width: 32, height: 32, borderRadius: 8,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: rule.is_active ? 'rgba(28,231,131,0.12)' : 'rgba(148,163,184,0.10)',
-                      border: `1px solid ${rule.is_active ? 'rgba(28,231,131,0.30)' : 'var(--panel-border)'}`,
-                      fontSize: 14,
-                    }}>{rule.is_active ? '⚡' : '⏸'}</div>
+                      background: rule.is_active ? 'var(--acc-soft)' : 'var(--panel-alt)',
+                      border: `1px solid var(--panel-border)`,
+                      color: rule.is_active ? 'var(--acc)' : 'var(--ink-42)',
+                    }}><NavIcon name={rule.is_active ? 'zap' : 'dot'} size={14} /></div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{rule.name}</div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-90)' }}>{rule.name}</div>
                       <div style={{ fontSize: 11, color: 'var(--ink-50)', marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
                         <span style={{ color: 'var(--ink-35)' }}>{t('integrationRules.matches') || 'when'}</span>
                         {matchPills.map((p) => (
@@ -396,26 +396,26 @@ export default function IntegrationRulesPage() {
                         ))}
                         <span style={{ color: 'var(--ink-35)', marginLeft: 4 }}>{t('integrationRules.then') || '→'}</span>
                         {rule.action.tags && rule.action.tags.map((tg) => (
-                          <Pill key={tg} color='#22c55e'>tag:{tg}</Pill>
+                          <Pill key={tg} color='#3f9d6a'>tag:{tg}</Pill>
                         ))}
-                        {rule.action.priority && <Pill color='#ef4444'>priority:{rule.action.priority}</Pill>}
+                        {rule.action.priority && <Pill color='#cf5b57'>priority:{rule.action.priority}</Pill>}
                         {rule.action.repo_mapping_id != null && (() => {
                           const r = repos.find((x) => x.id === rule.action.repo_mapping_id);
-                          return <Pill color='#60a5fa'>repo:{r ? `${r.owner}/${r.repo_name}` : `#${rule.action.repo_mapping_id}`}</Pill>;
+                          return <Pill color='#5b9bd5'>repo:{r ? `${r.owner}/${r.repo_name}` : `#${rule.action.repo_mapping_id}`}</Pill>;
                         })()}
-                        {rule.action.flow_id && <Pill color='#8b5cf6'>flow:{rule.action.flow_id}</Pill>}
-                        {rule.action.agent_role && <Pill color='#f59e0b'>agent:{rule.action.agent_role}</Pill>}
+                        {rule.action.flow_id && <Pill color='#5b9bd5'>flow:{rule.action.flow_id}</Pill>}
+                        {rule.action.agent_role && <Pill color='#c98a2b'>agent:{rule.action.agent_role}</Pill>}
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 4 }}>
                       <button onClick={() => void toggleActive(rule)} style={btnSmall}>
                         {rule.is_active ? (t('integrationRules.disable') || 'Disable') : (t('integrationRules.enable') || 'Enable')}
                       </button>
-                      <button onClick={() => setEditingRule(rule)} style={btnSmall}>
-                        ✏️
+                      <button onClick={() => setEditingRule(rule)} style={{ ...btnSmall, display: 'inline-flex', alignItems: 'center' }}>
+                        <NavIcon name="pencil" size={14} />
                       </button>
-                      <button onClick={() => void deleteRule(rule.id)} style={{ ...btnSmall, color: '#f87171', borderColor: 'rgba(248,113,113,0.2)' }}>
-                        ×
+                      <button onClick={() => void deleteRule(rule.id)} style={{ ...btnSmall, color: '#cf5b57', borderColor: 'var(--panel-border)', display: 'inline-flex', alignItems: 'center' }}>
+                        <NavIcon name="close" size={14} />
                       </button>
                     </div>
                   </div>
@@ -523,7 +523,7 @@ function RuleEditor({ provider, existing, repos, jiraReporters, jiraIssueTypes, 
 
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--panel-border)',
-    background: 'var(--glass)', color: 'var(--ink)', fontSize: 13,
+    background: 'var(--surface)', color: 'var(--ink-90)', fontSize: 13,
   };
   const labelStyle: React.CSSProperties = {
     fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', marginBottom: 4, display: 'block',
@@ -533,21 +533,21 @@ function RuleEditor({ provider, existing, repos, jiraReporters, jiraIssueTypes, 
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)' }}>
       <div onClick={(ev) => ev.stopPropagation()} style={{
         position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-        background: 'var(--surface)', border: '1px solid var(--panel-border)', borderRadius: 14,
+        background: 'var(--surface)', border: '1px solid var(--panel-border)', borderRadius: 10,
         width: 'min(640px, calc(100vw - 32px))', maxHeight: '88vh',
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
-        boxShadow: '0 24px 60px rgba(0,0,0,0.45)',
+        boxShadow: '0 24px 60px rgba(0,0,0,0.22)',
       }}>
         <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--panel-border)', display: 'flex', alignItems: 'center' }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)' }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-90)' }}>
               {existing ? (t('integrationRules.editRule') || 'Edit rule') : (t('integrationRules.addRule') || 'Add rule')}
             </div>
             <div style={{ fontSize: 11, color: 'var(--ink-45)', marginTop: 2 }}>
               {provider === 'jira' ? 'Jira' : 'Azure DevOps'}
             </div>
           </div>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--ink-58)' }}>×</button>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--ink-58)', display: 'inline-flex', alignItems: 'center' }}><NavIcon name="close" size={18} /></button>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: 18, display: 'grid', gap: 14 }}>
           <div>
@@ -662,7 +662,7 @@ function RuleEditor({ provider, existing, repos, jiraReporters, jiraIssueTypes, 
             {t('integrations.common.cancel') || 'Cancel'}
           </button>
           <button onClick={() => void save()} disabled={saving || !name.trim()}
-            style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: PROVIDER_BRAND[provider].color, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', opacity: saving || !name.trim() ? 0.5 : 1 }}>
+            style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'var(--acc)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', opacity: saving || !name.trim() ? 0.5 : 1 }}>
             {saving ? '…' : (t('integrationRules.save') || 'Save')}
           </button>
         </div>
