@@ -483,6 +483,28 @@ class RefinementDeleteCommentRequest(BaseModel):
     project: str | None = None  # required for Azure
 
 
+@router.delete('/records/{record_id}', dependencies=[Depends(require_workspace_perm('refinement:run'))])
+async def delete_refinement_record(
+    record_id: int,
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> dict:
+    """Delete a single refinement record (analysis/writeback row) from history.
+    Does NOT touch the Azure/Jira comment — use /delete-comment for that.
+    Org-scoped; lets the team re-run a fresh refinement on the item."""
+    row = (await db.execute(
+        select(RefinementRecord).where(
+            RefinementRecord.id == record_id,
+            RefinementRecord.organization_id == tenant.organization_id,
+        )
+    )).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail='Refinement record not found')
+    await db.delete(row)
+    await db.commit()
+    return {'deleted': 1}
+
+
 @router.post('/delete-comment')
 async def delete_refinement_comment(
     payload: RefinementDeleteCommentRequest,

@@ -449,7 +449,7 @@ export default function WorkspacesPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ fontWeight: 600, color: 'var(--ink-90)', fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.name}</span>
                     {w.is_default ? <span style={defaultPill}>default</span> : null}
-                    {w.is_active === false ? <span style={inactivePill}>inactive</span> : null}
+                    {w.is_active === false ? <span style={inactivePill}>{t('workspaces.inactivePill')}</span> : null}
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2, fontFamily: 'monospace' }}>{w.slug}</div>
                 </div>
@@ -468,7 +468,7 @@ export default function WorkspacesPage() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--ink-90)' }}>{active.name}</h2>
-                  {active.is_active === false ? <span style={inactivePill}>inactive</span> : null}
+                  {active.is_active === false ? <span style={inactivePill}>{t('workspaces.inactivePill')}</span> : null}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>{active.description || ''}</div>
               </div>
@@ -528,7 +528,7 @@ export default function WorkspacesPage() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, marginBottom: 24 }}>
                 {/* Responsible repos */}
                 <div style={settingCard}>
-                  <div style={statLabel}>Responsible repos</div>
+                  <div style={statLabel}>{t('workspaces.responsibleRepos')}</div>
                   {(active.repo_mapping_ids?.length || 0) > 0 ? (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
                       {repoOptions
@@ -538,10 +538,10 @@ export default function WorkspacesPage() {
                         ))}
                     </div>
                   ) : (
-                    <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>No repos selected</div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>{t('workspaces.noReposSelected')}</div>
                   )}
                   {repoOptions.length === 0 ? (
-                    <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 10 }}>No repo mappings configured.</div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 10 }}>{t('workspaces.noRepoMappings')}</div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10, maxHeight: 240, overflowY: 'auto', paddingRight: 2 }}>
                       {repoOptions.map((r) => {
@@ -571,13 +571,13 @@ export default function WorkspacesPage() {
 
                 {/* Active sprint — full Azure/Jira cascade like the global switcher */}
                 <div style={settingCard}>
-                  <div style={statLabel}>Active sprint</div>
+                  <div style={statLabel}>{t('workspaces.activeSprint')}</div>
                   {active.sprint_path ? (
                     <div style={{ fontSize: 12, color: 'var(--ink-78)', margin: '6px 0 10px', wordBreak: 'break-all' }}>
-                      <span style={{ color: 'var(--ink-35)' }}>Current: </span>{active.sprint_path.split('\\').pop()}
+                      <span style={{ color: 'var(--ink-35)' }}>{t('workspaces.currentPrefix')}</span>{active.sprint_path.split('\\').pop()}
                     </div>
                   ) : (
-                    <div style={{ fontSize: 12, color: 'var(--ink-42)', margin: '6px 0 10px' }}>No sprint set yet.</div>
+                    <div style={{ fontSize: 12, color: 'var(--ink-42)', margin: '6px 0 10px' }}>{t('workspaces.noSprintYet')}</div>
                   )}
                   <WorkspaceSprintPicker
                     key={active.id}

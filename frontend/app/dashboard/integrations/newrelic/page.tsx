@@ -479,11 +479,11 @@ export default function NewRelicPage() {
         logo={<NavIcon name='signal' size={15} />}
         loading={loading}
         hint={t('integrations.newrelic.heroSubtitle') || 'Map an entity to a repo so AI can auto-fix its production errors and ship the patch.'}
-        searchPlaceholder={`Filter ${entities.length} entities…`}
+        searchPlaceholder={t('integrations.newrelic.searchPlaceholderN').replace('{n}', String(entities.length))}
         onboardingSteps={[
-          'Connect New Relic with your API key in Integrations.',
-          'Search for the APM/Browser entities you run above.',
-          'Pick a repo on each entity to map it, then turn on auto-import.',
+          t('integrations.newrelic.onboardingStep1'),
+          t('integrations.newrelic.onboardingStep2'),
+          t('integrations.newrelic.onboardingStep3'),
         ]}
         repos={repos.map((r) => ({ id: r.id, label: `${r.owner}/${r.repo_name}` }))}
         items={entities.map((e) => {

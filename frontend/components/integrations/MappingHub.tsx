@@ -19,6 +19,7 @@
 
 import { useState } from 'react';
 import NavIcon from '@/components/NavIcon';
+import { useLocale } from '@/lib/i18n';
 
 export interface MappingHubItem {
   /** stable unique key — entity guid / project slug / service name */
@@ -75,6 +76,7 @@ export default function MappingHub({
   searchPlaceholder, onboardingSteps, emptyCta,
   onMapRepo, onToggleAuto, renderActions,
 }: MappingHubProps) {
+  const { t } = useLocale();
   const [filter, setFilter] = useState('');
   const [mapFilter, setMapFilter] = useState<'all' | 'mapped' | 'unmapped'>('all');
 
@@ -91,9 +93,9 @@ export default function MappingHub({
   });
 
   const segs: Array<{ k: typeof mapFilter; label: string }> = [
-    { k: 'all', label: `All · ${items.length}` },
-    { k: 'unmapped', label: `Unmapped · ${items.length - mappedCount}` },
-    { k: 'mapped', label: `Mapped · ${mappedCount}` },
+    { k: 'all', label: `${t('mappingHub.all')} · ${items.length}` },
+    { k: 'unmapped', label: `${t('mappingHub.unmapped')} · ${items.length - mappedCount}` },
+    { k: 'mapped', label: `${t('mappingHub.mapped')} · ${mappedCount}` },
   ];
 
   const card: React.CSSProperties = {
@@ -179,9 +181,9 @@ export default function MappingHub({
       {/* Rows */}
       <div style={{ display: 'grid', gap: 4 }}>
         {loading && items.length === 0 ? (
-          <div style={{ padding: 14, textAlign: 'center', fontSize: 12.5, color: 'var(--ink-42)' }}>Loading…</div>
+          <div style={{ padding: 14, textAlign: 'center', fontSize: 12.5, color: 'var(--ink-42)' }}>{t('mappingHub.loading')}</div>
         ) : visible.length === 0 ? (
-          <div style={{ padding: 14, textAlign: 'center', fontSize: 12.5, color: 'var(--ink-42)' }}>No items match your filter.</div>
+          <div style={{ padding: 14, textAlign: 'center', fontSize: 12.5, color: 'var(--ink-42)' }}>{t('mappingHub.noMatch')}</div>
         ) : visible.map((it) => (
           <div key={it.id} style={{
             display: 'flex', alignItems: 'center', gap: 10,
@@ -203,19 +205,19 @@ export default function MappingHub({
               onChange={(ev) => onMapRepo(it, ev.target.value ? parseInt(ev.target.value) : null)}
               style={{ ...inputStyle, width: 190, height: 32, borderColor: isMapped(it) ? 'var(--acc)' : 'var(--panel-border)' }}
             >
-              <option value=''>{isMapped(it) ? 'Select repo…' : '+ Map to repo…'}</option>
+              <option value=''>{isMapped(it) ? t('mappingHub.selectRepo') : t('mappingHub.mapToRepo')}</option>
               {repos.map((r) => (
                 <option key={r.id} value={r.id}>{r.label}</option>
               ))}
             </select>
             {isMapped(it) && onToggleAuto && (
-              <button onClick={() => onToggleAuto(it)} title='Auto-import' style={{
+              <button onClick={() => onToggleAuto(it)} title={t('mappingHub.autoImportTitle')} style={{
                 height: 32, padding: '0 10px', borderRadius: 6, cursor: 'pointer',
                 display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600,
                 color: it.autoImport ? 'var(--acc)' : 'var(--ink-50)',
                 border: `1px solid ${it.autoImport ? 'var(--acc)' : 'var(--panel-border)'}`,
                 background: it.autoImport ? 'var(--acc-soft)' : 'transparent',
-              }}><NavIcon name='zap' size={13} /> Auto</button>
+              }}><NavIcon name='zap' size={13} /> {t('mappingHub.auto')}</button>
             )}
             {renderActions && renderActions(it)}
           </div>
