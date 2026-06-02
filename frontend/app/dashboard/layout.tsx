@@ -44,7 +44,7 @@ const NAV_GROUPS: NavGroup[] = [
     defaultOpen: false,
     module: 'core',
     items: [
-      { href: '/dashboard/refinement', key: 'nav.refinement', icon: 'refinement', permission: 'tasks:read' as const, module: 'refinement', wsPerm: 'refinement:run' },
+      { href: '/dashboard/refinement', key: 'nav.refinement', icon: 'refinement', permission: 'tasks:read' as const, module: 'refinement', wsPerm: 'pages:refinement' },
       { href: '/dashboard/triage', key: 'nav.triage', icon: 'triage', permission: 'tasks:read' as const, module: 'triage', wsPerm: 'pages:triage' },
       { href: '/dashboard/review-backlog', key: 'nav.reviewBacklog', icon: 'clock', permission: 'tasks:read' as const, module: 'review_backlog', wsPerm: 'pages:review-backlog' },
     ],

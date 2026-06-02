@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiFetch, loadPrefs, savePrefs } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
 import { useCanDo } from '@/lib/permissions';
 
@@ -114,22 +114,9 @@ export default function SprintSwitcher() {
         setJiraSprints(jsps);
       }
     }
-    // Mirror the workspace sprint into this user's prefs so downstream
-    // readers (New Task picker, etc.) stay consistent — important for members
-    // who can't edit but still need the right sprint everywhere.
-    try {
-      const prefs = await loadPrefs();
-      const existing = (prefs.profile_settings || {}) as Record<string, unknown>;
-      if (prov === 'azure') {
-        if (prefs.azure_sprint_path !== ws.sprint_path) {
-          await savePrefs({ azure_project: ws.sprint_project || '', azure_team: ws.sprint_team || '', azure_sprint_path: ws.sprint_path || '', profile_settings: { ...existing, preferred_sprint_provider: 'azure' } });
-        }
-      } else {
-        if (existing.jira_sprint_id !== ws.sprint_path) {
-          await savePrefs({ profile_settings: { ...existing, jira_project: ws.sprint_project || '', jira_board: ws.sprint_board || '', jira_sprint_id: ws.sprint_path || '', preferred_sprint_provider: 'jira' } });
-        }
-      }
-    } catch { /* best-effort */ }
+    // NOTE: we deliberately do NOT write the workspace sprint into the user's
+    // personal prefs — the workspace owns its sprint, and a user's own sprint
+    // preference must stay untouched.
   }
 
   useEffect(() => {
@@ -208,21 +195,8 @@ export default function SprintSwitcher() {
           : { sprint_provider: 'jira', sprint_path: jiraSprint, sprint_project: jiraProject, sprint_team: '', sprint_board: jiraBoard };
         await apiFetch(`/workspaces/${wsId}`, { method: 'PUT', body: JSON.stringify(body) }).catch(() => {});
       }
-      // Mirror into the user's prefs so downstream readers stay consistent.
-      const existingRaw = (typeof window !== 'undefined' && localStorage.getItem('agena_profile_settings')) || '{}';
-      const existing = JSON.parse(existingRaw) as Record<string, unknown>;
-      await savePrefs({
-        azure_project: azProject,
-        azure_team: azTeam,
-        azure_sprint_path: azSprint,
-        profile_settings: {
-          ...existing,
-          jira_project: jiraProject,
-          jira_board: jiraBoard,
-          jira_sprint_id: jiraSprint,
-          preferred_sprint_provider: provider,
-        },
-      });
+      // Workspace owns the sprint — we intentionally do NOT touch the user's
+      // personal prefs here.
       setSavedFlash(true);
       window.setTimeout(() => setSavedFlash(false), 1500);
       if (typeof window !== 'undefined') {
