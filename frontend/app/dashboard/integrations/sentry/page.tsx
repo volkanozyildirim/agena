@@ -675,7 +675,12 @@ export default function SentryPage() {
         logo={<NavIcon name='shield' size={15} />}
         loading={loading}
         hint={t('integrations.sentry.heroSubtitle') || 'Map a project to a repo so AI can auto-fix its production errors and ship the patch.'}
-        searchPlaceholder={`Filter ${projects.length} projects…`}
+        searchPlaceholder={t('integrations.sentry.searchPlaceholderN').replace('{n}', String(projects.length))}
+        onboardingSteps={[
+          t('integrations.sentry.onboardingStep1'),
+          t('integrations.sentry.onboardingStep2'),
+          t('integrations.sentry.onboardingStep3'),
+        ]}
         repos={repos.map((r) => ({ id: r.id, label: `${r.owner}/${r.repo_name}` }))}
         items={projects.map((p) => {
           const m = mappings.find((mm) => mm.project_slug === p.slug);

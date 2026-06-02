@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
+import { useLocale } from '@/lib/i18n';
 
 type Opt = { id: string; name: string; path?: string; is_current?: boolean };
 type Provider = 'azure' | 'jira';
@@ -61,6 +62,7 @@ export default function WorkspaceSprintPicker({ initial, onApply, saving }: {
   onApply: (patch: WorkspaceSprintPatch) => void | Promise<void>;
   saving?: boolean;
 }) {
+  const { t } = useLocale();
   const [provider, setProvider] = useState<Provider>((initial.provider === 'jira' ? 'jira' : 'azure'));
   const [jiraConnected, setJiraConnected] = useState(false);
 
@@ -169,24 +171,24 @@ export default function WorkspaceSprintPicker({ initial, onApply, saving }: {
 
       {provider === 'azure' ? (
         <div style={{ display: 'grid', gap: 8 }}>
-          <Sel label='Azure Project' value={azProject} onChange={onAzProject} options={azProjects.map((p) => ({ id: p.name, name: p.name }))} placeholder='Select project' />
-          <Sel label='Azure Team' value={azTeam} onChange={onAzTeam} options={azTeams.map((tm) => ({ id: tm.name, name: tm.name }))} placeholder={azProject ? 'Select team' : 'Select a project first'} loading={loadingTeams} disabled={!azProject} />
-          <Sel label='Azure Sprint' value={azSprint} onChange={setAzSprint} options={azSprints.map((s) => ({ id: s.path ?? s.name, name: s.name }))} placeholder={azTeam ? 'Select sprint' : 'Select a team first'} loading={loadingSprints} disabled={!azTeam} />
+          <Sel label={t('sprintPicker.azureProject')} value={azProject} onChange={onAzProject} options={azProjects.map((p) => ({ id: p.name, name: p.name }))} placeholder={t('sprintPicker.selectProject')} />
+          <Sel label={t('sprintPicker.azureTeam')} value={azTeam} onChange={onAzTeam} options={azTeams.map((tm) => ({ id: tm.name, name: tm.name }))} placeholder={azProject ? t('sprintPicker.selectTeam') : t('sprintPicker.selectProjectFirst')} loading={loadingTeams} disabled={!azProject} />
+          <Sel label={t('sprintPicker.azureSprint')} value={azSprint} onChange={setAzSprint} options={azSprints.map((s) => ({ id: s.path ?? s.name, name: s.name }))} placeholder={azTeam ? t('sprintPicker.selectSprint') : t('sprintPicker.selectTeamFirst')} loading={loadingSprints} disabled={!azTeam} />
         </div>
       ) : !jiraConnected ? (
-        <div style={{ fontSize: 12, color: 'var(--muted)', padding: '10px 4px' }}>Jira is not connected.</div>
+        <div style={{ fontSize: 12, color: 'var(--muted)', padding: '10px 4px' }}>{t('sprintPicker.jiraNotConnected')}</div>
       ) : (
         <div style={{ display: 'grid', gap: 8 }}>
-          <Sel label='Jira Project' value={jiraProject} onChange={onJiraProject} options={jiraProjects.map((p) => ({ id: p.id ?? p.name, name: p.name }))} placeholder='Select project' />
-          <Sel label='Jira Board' value={jiraBoard} onChange={onJiraBoard} options={jiraBoards.map((b) => ({ id: b.id ?? b.name, name: b.name }))} placeholder={jiraProject ? 'Select board' : 'Select a project first'} loading={loadingBoards} disabled={!jiraProject} />
-          <Sel label='Jira Sprint' value={jiraSprint} onChange={setJiraSprint} options={jiraSprints.map((s) => ({ id: s.path ?? s.name, name: s.name }))} placeholder={jiraBoard ? 'Select sprint' : 'Select a board first'} loading={loadingJiraSprints} disabled={!jiraBoard} />
+          <Sel label={t('sprintPicker.jiraProject')} value={jiraProject} onChange={onJiraProject} options={jiraProjects.map((p) => ({ id: p.id ?? p.name, name: p.name }))} placeholder={t('sprintPicker.selectProject')} />
+          <Sel label={t('sprintPicker.jiraBoard')} value={jiraBoard} onChange={onJiraBoard} options={jiraBoards.map((b) => ({ id: b.id ?? b.name, name: b.name }))} placeholder={jiraProject ? t('sprintPicker.selectBoard') : t('sprintPicker.selectProjectFirst')} loading={loadingBoards} disabled={!jiraProject} />
+          <Sel label={t('sprintPicker.jiraSprint')} value={jiraSprint} onChange={setJiraSprint} options={jiraSprints.map((s) => ({ id: s.path ?? s.name, name: s.name }))} placeholder={jiraBoard ? t('sprintPicker.selectSprint') : t('sprintPicker.selectBoardFirst')} loading={loadingJiraSprints} disabled={!jiraBoard} />
         </div>
       )}
 
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <button type='button' onClick={apply} disabled={!canApply || saving}
           style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'var(--acc)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: !canApply || saving ? 'not-allowed' : 'pointer', opacity: !canApply || saving ? 0.5 : 1 }}>
-          {saving ? '…' : 'Apply sprint'}
+          {saving ? '…' : t('sprintPicker.apply')}
         </button>
       </div>
     </div>

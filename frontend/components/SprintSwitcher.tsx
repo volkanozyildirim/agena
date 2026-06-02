@@ -261,7 +261,7 @@ export default function SprintSwitcher() {
       <button
         className='sprint-switcher-trigger'
         onClick={() => setOpen((v) => !v)}
-        title={canEdit ? t('sprintSwitcher.tooltip') : 'Active sprint (set by your workspace)'}
+        title={canEdit ? t('sprintSwitcher.tooltip') : t('sprintSwitcher.activeSprintRO')}
         style={{
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '6px 10px', height: 32, borderRadius: 8,
@@ -286,19 +286,19 @@ export default function SprintSwitcher() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)' }}>
-              {canEdit ? t('sprintSwitcher.title') : 'Active sprint'}
+              {canEdit ? t('sprintSwitcher.title') : t('sprintSwitcher.activeSprint')}
             </div>
-            {!canEdit && <span style={{ fontSize: 10, color: 'var(--ink-45)', fontWeight: 600 }}>Set by workspace</span>}
+            {!canEdit && <span style={{ fontSize: 10, color: 'var(--ink-45)', fontWeight: 600 }}>{t('sprintSwitcher.setByWorkspace')}</span>}
           </div>
 
           {!canEdit ? (
             <div style={{ display: 'grid', gap: 8 }}>
               <div style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--panel-border-2)', background: 'var(--panel-alt)' }}>
-                <div style={{ fontSize: 10, color: 'var(--ink-35)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>{provider === 'jira' ? 'Jira' : 'Azure'} · Active sprint</div>
+                <div style={{ fontSize: 10, color: 'var(--ink-35)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>{provider === 'jira' ? 'Jira' : 'Azure'} · {t('sprintSwitcher.activeSprint')}</div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: hasActiveSprint ? 'var(--ink-90)' : 'var(--ink-45)' }}>{activeLabel}</div>
               </div>
               <div style={{ fontSize: 11, color: 'var(--ink-45)', lineHeight: 1.45 }}>
-                The active sprint is managed by your workspace admin and applies to everyone in this workspace.
+                {t('sprintSwitcher.managedByAdmin')}
               </div>
               <button
                 onClick={() => { setOpen(false); router.push('/dashboard/sprints'); }}
