@@ -1276,19 +1276,28 @@ export default function RefinementPage() {
     setError('');
     setRunMessage(null);
 
-    // Build rich comment: comment + rationale + questions
-    let richComment = (row.comment || '').trim();
+    // Build a readable comment: the note (with any inline "(1) … (2) …"
+    // exploded onto separate lines) → ambiguities → questions → and the score
+    // rationale / suggested points LAST so they sit at the bottom.
+    const explodeInline = (s: string): string => {
+      const t = (s || '').trim();
+      // Only reformat when it's clearly an inline numbered list (≥2 markers),
+      // so a lone "(1)" in prose is left alone.
+      const markers = (t.match(/\((\d{1,2})\)/g) || []).length;
+      return markers >= 2 ? t.replace(/\s*\((\d{1,2})\)\s*/g, '\n$1. ').trim() : t;
+    };
+    let richComment = explodeInline(row.comment || '');
+    if (row.ambiguities && row.ambiguities.length > 0) {
+      richComment += '\n\n⚠️ Belirsizlikler:\n' + row.ambiguities.map((a: string, i: number) => `${i + 1}. ${a}`).join('\n');
+    }
+    if (row.questions && row.questions.length > 0) {
+      richComment += '\n\n❓ Sorular:\n' + row.questions.map((q: string, i: number) => `${i + 1}. ${q}`).join('\n');
+    }
     if (row.estimation_rationale) {
       richComment += `\n\n📊 Puan Gerekçesi: ${row.estimation_rationale}`;
     }
     if (row.suggested_story_points) {
       richComment += `\n🎯 Önerilen Puan: ${row.suggested_story_points}`;
-    }
-    if (row.questions && row.questions.length > 0) {
-      richComment += '\n\n❓ Sorular:\n' + row.questions.map((q: string, i: number) => `${i + 1}. ${q}`).join('\n');
-    }
-    if (row.ambiguities && row.ambiguities.length > 0) {
-      richComment += '\n\n⚠️ Belirsizlikler:\n' + row.ambiguities.map((a: string) => `• ${a}`).join('\n');
     }
 
     // Top recommended_author with a matched team member id is the auto-
