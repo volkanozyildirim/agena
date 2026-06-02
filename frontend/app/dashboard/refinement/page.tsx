@@ -2961,6 +2961,20 @@ export default function RefinementPage() {
                       <ListSection title={copy.questions} items={item.questions} />
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
+                      <button
+                        type='button'
+                        disabled={runningItemId === item.item_id || !canRefine || !!item.error}
+                        title={!canRefine ? t('permissions.deniedRefine' as Parameters<typeof t>[0]) : undefined}
+                        onClick={() => { void runRefinement([item.item_id]); }}
+                        style={{
+                          padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700,
+                          border: '1px solid var(--panel-border-3)', background: 'transparent',
+                          color: 'var(--ink-65)', cursor: (runningItemId === item.item_id || !canRefine) ? 'not-allowed' : 'pointer',
+                          opacity: !canRefine ? 0.6 : 1,
+                        }}
+                      >
+                        {runningItemId === item.item_id ? copy.writebackRunning : `↻ ${copy.analyze}`}
+                      </button>
                       {isItemWritten ? (
                         <>
                           <span style={writtenButtonDone}>{copy.writtenBack}</span>
@@ -3151,6 +3165,20 @@ export default function RefinementPage() {
                         <ListSection title={copy.questions} items={item.questions} />
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
+                        <button
+                          type='button'
+                          disabled={runningItemId === item.item_id || !canRefine || !!item.error}
+                          title={!canRefine ? t('permissions.deniedRefine' as Parameters<typeof t>[0]) : undefined}
+                          onClick={() => { void runRefinement([item.item_id]); }}
+                          style={{
+                            padding: '8px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                            border: '1px solid var(--panel-border-3)', background: 'transparent',
+                            color: 'var(--ink-65)', cursor: (runningItemId === item.item_id || !canRefine) ? 'not-allowed' : 'pointer',
+                            opacity: (!canRefine) ? 0.6 : 1,
+                          }}
+                        >
+                          {runningItemId === item.item_id ? copy.writebackRunning : `↻ ${copy.analyze}`}
+                        </button>
                         {isItemWritten ? (
                           <span style={writtenButtonDone}>{copy.writtenBack}</span>
                         ) : (
