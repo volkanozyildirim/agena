@@ -17,6 +17,7 @@ than throwing into the request.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -107,7 +108,10 @@ def _changed_new_lines(old_content: str, new_content: str) -> set[int]:
     old_lines = (old_content or '').splitlines()
     new_lines = (new_content or '').splitlines()
     changed: set[int] = set()
-    sm = difflib.SequenceMatcher(a=old_lines, b=new_lines, autojunk=False)
+    # autojunk=True keeps SequenceMatcher's speed heuristic on (without it,
+    # large files blow up to O(n²) and can wedge the event loop). Callers
+    # also bound the input size and run this off the loop via to_thread.
+    sm = difflib.SequenceMatcher(a=old_lines, b=new_lines, autojunk=True)
     for tag, _i1, _i2, j1, j2 in sm.get_opcodes():
         if tag in ('replace', 'insert'):
             for j in range(j1, j2):
@@ -356,7 +360,13 @@ async def review_pr(
                 if target_branch:
                     base = await client.fetch_file_content(cfg=cfg, project=rm.owner, repo=rm.repo_name, path=c['path'], branch=target_branch)
                     if base is not None:
-                        commentable[c['path']] = _changed_new_lines(base, content)
+                        # Diff only the slice the model actually sees (the
+                        # numbered listing is truncated to _MAX_FILE_CHARS), and
+                        # run it off the event loop. Big i18n/JSON files were
+                        # wedging the whole API on difflib's O(n²) otherwise.
+                        commentable[c['path']] = await asyncio.to_thread(
+                            _changed_new_lines, base[:_MAX_FILE_CHARS], content[:_MAX_FILE_CHARS],
+                        )
                 total += len(numbered)
         if not files:
             raise RuntimeError('No reviewable changed files found on the PR')
