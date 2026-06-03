@@ -134,6 +134,26 @@ def _compact_ranges(nums: set[int]) -> str:
 
 _LANG_NAMES = {'tr': 'Turkish', 'en': 'English', 'es': 'Spanish', 'de': 'German', 'it': 'Italian', 'ja': 'Japanese', 'zh': 'Chinese'}
 
+# Localized labels for the PR-level summary comment so it matches the review
+# language (the findings themselves are already localized via the prompt).
+# Keys: heading(n, sev), score(s), notes, clean. Falls back to English.
+_SUMMARY_I18N = {
+    'en': {'heading': lambda n, s: f'**🤖 AGENA code review** — {n} finding(s), top severity: {s}',
+           'score': lambda s: f'Readiness score: {s}/100', 'notes': 'Notes:', 'clean': 'clean'},
+    'tr': {'heading': lambda n, s: f'**🤖 AGENA kod incelemesi** — {n} bulgu, en yüksek önem: {s}',
+           'score': lambda s: f'Hazırlık skoru: {s}/100', 'notes': 'Notlar:', 'clean': 'temiz'},
+    'es': {'heading': lambda n, s: f'**🤖 AGENA revisión de código** — {n} hallazgo(s), severidad máxima: {s}',
+           'score': lambda s: f'Puntuación de preparación: {s}/100', 'notes': 'Notas:', 'clean': 'limpio'},
+    'de': {'heading': lambda n, s: f'**🤖 AGENA Code-Review** — {n} Befund(e), höchste Schwere: {s}',
+           'score': lambda s: f'Bereitschaftswert: {s}/100', 'notes': 'Hinweise:', 'clean': 'sauber'},
+    'it': {'heading': lambda n, s: f'**🤖 AGENA revisione del codice** — {n} risultato/i, gravità massima: {s}',
+           'score': lambda s: f'Punteggio di idoneità: {s}/100', 'notes': 'Note:', 'clean': 'pulito'},
+    'ja': {'heading': lambda n, s: f'**🤖 AGENA コードレビュー** — 指摘 {n} 件、最高重大度: {s}',
+           'score': lambda s: f'マージ準備スコア: {s}/100', 'notes': 'メモ:', 'clean': '問題なし'},
+    'zh': {'heading': lambda n, s: f'**🤖 AGENA 代码审查** — {n} 个问题，最高严重级别: {s}',
+           'score': lambda s: f'就绪评分: {s}/100', 'notes': '备注:', 'clean': '无问题'},
+}
+
 
 def _build_review_prompt(
     title: str,
@@ -367,6 +387,11 @@ async def review_pr(
 
         # 2) review -> 3) verify.
         await _stage('reviewing')
+        logger.info(
+            'PR review diff scope (pr=%s, provider=%s): %s',
+            pr_id, repo_provider,
+            {p: _compact_ranges(commentable.get(p) or set()) or '(none/full-file)' for p, _ in files},
+        )
         review_raw = await run(_build_review_prompt(title or '', files, language=language, changed_lines=commentable))
         logger.info('PR review raw output (pr=%s, %d chars): %s', pr_id, len(review_raw), review_raw[:600])
         parsed = _extract_json(review_raw)
@@ -438,14 +463,17 @@ async def review_pr(
                 if tid:
                     posted += 1
 
-        # summary (verdict + score + rolled-up low/deferred findings).
-        top_sev = clean[0]['severity'] if clean else 'clean'
-        summary_lines = [f"**🤖 AGENA code review** — {len(clean)} finding(s), top severity: {top_sev}"]
+        # summary (verdict + score + rolled-up low/deferred findings),
+        # localized to the review language so it doesn't read English on a
+        # Turkish review.
+        lbl = _SUMMARY_I18N.get((language or '').lower(), _SUMMARY_I18N['en'])
+        top_sev = clean[0]['severity'] if clean else lbl['clean']
+        summary_lines = [lbl['heading'](len(clean), top_sev)]
         if score is not None:
-            summary_lines.append(f"Readiness score: {score}/100")
+            summary_lines.append(lbl['score'](score))
         rolled = low + deferred
         if rolled:
-            summary_lines.append('\nNotes:')
+            summary_lines.append('\n' + lbl['notes'])
             for f in rolled[:20]:
                 summary_lines.append(f"- `{f['file']}`:{f['line']} ({f['severity']}) — {f['comment']}")
         summary_text = '\n'.join(summary_lines)
@@ -455,8 +483,10 @@ async def review_pr(
             except Exception:
                 pass
         else:
-            # Azure threads need a file/line anchor; line 1 of the first file.
-            await client.post_pr_inline_thread(cfg=cfg, project=rm.owner, repo=rm.repo_name, pr_id=str(pr_id), file_path=files[0][0], line=1, content=summary_text)
+            # PR-level discussion (no file/line anchor) — the summary is about
+            # the whole PR, so don't glue it to line 1 of some file (which is
+            # almost always unchanged code like the file header).
+            await client.post_pr_comment(cfg=cfg, project=rm.owner, repo=rm.repo_name, pr_id=str(pr_id), content=summary_text)
 
         # 6) persist + usage.
         record.status = 'completed'

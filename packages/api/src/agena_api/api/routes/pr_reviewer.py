@@ -38,6 +38,7 @@ class ReviewRequest(BaseModel):
     repo_mapping_id: int
     pr_id: str
     source_branch: str
+    target_branch: str = ''  # base branch — needed to diff Azure PRs locally
     pr_url: str | None = None
     title: str | None = None
     provider: str | None = None
