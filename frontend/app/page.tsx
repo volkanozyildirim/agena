@@ -337,15 +337,21 @@ export default function HomePage() {
           </div>
 
           {/* Product tour — muted autoplay loop (lighter + crisper than a gif) */}
-          <div className='mock-panel' style={{ position: 'relative', zIndex: 2, padding: 0, overflow: 'hidden', alignSelf: 'flex-start', height: 'auto' }}>
+          <div style={{
+            position: 'relative', zIndex: 2, alignSelf: 'center', width: '100%',
+            borderRadius: 16, overflow: 'hidden', lineHeight: 0,
+            border: '1px solid var(--panel-border)',
+            boxShadow: '0 30px 80px rgba(13,148,136,0.12), 0 18px 50px rgba(0,0,0,0.18)',
+          }}>
             <video
               src='/readmeimg/demo-hero.mp4'
+              poster='/readmeimg/demo-hero-poster.jpg'
               autoPlay
               loop
               muted
               playsInline
               aria-label={t('landing.tourTitle')}
-              style={{ width: '100%', display: 'block', borderRadius: 'inherit' }}
+              style={{ width: '100%', height: 'auto', display: 'block', aspectRatio: '1100 / 688' }}
             />
             <span className='chip' style={{ position: 'absolute', top: 12, left: 12, fontSize: 11, zIndex: 2 }}>
               ● {t('landing.live')}
