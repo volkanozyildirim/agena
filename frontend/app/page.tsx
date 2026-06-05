@@ -320,6 +320,9 @@ export default function HomePage() {
               <Link href='/tasks' className='button button-outline' style={{ fontSize: 15, padding: '13px 28px' }}>
                 {t('landing.heroExploreDashboard')}
               </Link>
+              <a href='/readmeimg/demo-tour.mp4' target='_blank' rel='noopener noreferrer' className='button button-outline' style={{ fontSize: 15, padding: '13px 28px' }}>
+                ▶ {t('landing.tourCta')}
+              </a>
             </div>
 
             {/* Trust badges */}
@@ -333,91 +336,26 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* AI Terminal Panel */}
-          <div className='mock-panel' style={{ position: 'relative', zIndex: 2 }}>
-            <div className='terminal-dots'>
-              <span /><span /><span />
-            </div>
-
-            <div style={{ marginBottom: 16 }}>
-              <span className='chip' style={{ fontSize: 11 }}>● {t('landing.live')}</span>
-              <span style={{ marginLeft: 10, fontSize: 13, color: 'var(--ink-50)' }}>{t('landing.pulse')}</span>
-            </div>
-
-            {/* Fake chart with bars */}
-            <div className='mock-chart' style={{ display: 'flex', alignItems: 'flex-end', gap: 4, padding: '12px 12px 0' }}>
-              {[40, 65, 45, 80, 55, 90, 70, 85, 60, 95, 75, 88].map((h, i) => (
-                <div
-                  key={i}
-                  className='mock-chart-bar'
-                  style={{
-                    flex: 1,
-                    height: `${h}%`,
-                    borderRadius: '4px 4px 0 0',
-                    background: i === 11
-                      ? 'linear-gradient(180deg, #22c55e, #0d9488)'
-                      : `rgba(13, 148, 136, ${0.2 + (i / 11) * 0.4})`,
-                    transition: 'height 0.3s',
-                    animationDelay: `${(i * 0.14).toFixed(2)}s`,
-                    animationDuration: `${(2.4 + (i % 4) * 0.2).toFixed(2)}s`,
-                  }}
-                />
-              ))}
-            </div>
-
-            <div className='timeline-mini'>
-              {timelineItems.map((item) => (
-                <span key={item.text}>
-                  <SeatedPixel palette={item.palette} facing={item.facing} />
-                  <em style={{ fontStyle: 'normal' }}>{item.text}</em>
-                </span>
-              ))}
-            </div>
-
-            {/* Glow line at bottom */}
+          {/* Product tour — muted autoplay loop (lighter + crisper than a gif) */}
+          <div className='mock-panel' style={{ position: 'relative', zIndex: 2, padding: 0, overflow: 'hidden', alignSelf: 'flex-start', height: 'auto' }}>
+            <video
+              src='/readmeimg/demo-hero.mp4'
+              autoPlay
+              loop
+              muted
+              playsInline
+              aria-label={t('landing.tourTitle')}
+              style={{ width: '100%', display: 'block', borderRadius: 'inherit' }}
+            />
+            <span className='chip' style={{ position: 'absolute', top: 12, left: 12, fontSize: 11, zIndex: 2 }}>
+              ● {t('landing.live')}
+            </span>
             <div style={{
               position: 'absolute',
               bottom: 0, left: 0, right: 0,
               height: 1,
               background: 'linear-gradient(90deg, transparent, rgba(13,148,136,0.6), rgba(139,92,246,0.4), transparent)',
             }} />
-          </div>
-        </section>
-
-        {/* ── PRODUCT TOUR (gif left, copy right) ── */}
-        <section style={{ padding: '8px 0 30px' }}>
-          <div style={{
-            display: 'flex', gap: 30, alignItems: 'center', flexWrap: 'wrap',
-            padding: 22, borderRadius: 18,
-            border: '1px solid var(--panel-border)',
-            background: 'linear-gradient(135deg, rgba(13,148,136,0.07), rgba(139,92,246,0.06))',
-          }}>
-            <div style={{ flex: '1 1 440px', minWidth: 300 }}>
-              <img
-                src='/readmeimg/demo-tour.gif'
-                alt={t('landing.tourTitle')}
-                loading='lazy'
-                style={{ width: '100%', borderRadius: 12, border: '1px solid var(--panel-border-2)', display: 'block', boxShadow: '0 18px 50px rgba(0,0,0,0.35)' }}
-              />
-            </div>
-            <div style={{ flex: '1 1 300px', minWidth: 260 }}>
-              <div className='section-label'>{t('landing.tourLabel')}</div>
-              <h2 style={{ fontSize: 25, fontWeight: 800, color: 'var(--ink-90)', margin: '8px 0 12px', lineHeight: 1.2 }}>
-                {t('landing.tourTitle')}
-              </h2>
-              <p style={{ fontSize: 14, lineHeight: 1.75, color: 'var(--ink-55)', margin: 0 }}>
-                {t('landing.tourDesc')}
-              </p>
-              <a
-                href='/readmeimg/demo-tour.mp4'
-                target='_blank'
-                rel='noopener noreferrer'
-                className='button button-outline'
-                style={{ marginTop: 18, fontSize: 14, padding: '11px 22px', display: 'inline-flex' }}
-              >
-                ▶ {t('landing.tourCta')}
-              </a>
-            </div>
           </div>
         </section>
 
