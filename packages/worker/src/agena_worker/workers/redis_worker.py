@@ -81,6 +81,7 @@ async def _poll_metric_snapshots() -> None:
             try:
                 written = await svc.snapshot_org(org_id, since='5 minutes ago')
                 raised = await svc.evaluate_org(org_id)            # rolling-baseline detection
+                await svc.ingest_nr_deployments(org_id)            # pull real NR deploy markers
                 deploy_raised = await svc.evaluate_recent_deploys(org_id)  # deploy before/after
                 if written or raised or deploy_raised:
                     logger.info('Sentinel org=%s snapshots=%s rolling=%s deploy=%s',

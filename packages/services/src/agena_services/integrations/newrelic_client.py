@@ -255,6 +255,35 @@ class NewRelicClient:
             })
         return out
 
+    async def fetch_deployments(
+        self,
+        cfg: dict[str, str],
+        *,
+        account_id: int,
+        entity_guid: str,
+        since: str = '2 days ago',
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Real deployment markers New Relic tracks for an APM entity (change
+        tracking). Anchors deploy-before/after regression detection."""
+        g = (entity_guid or '').replace("'", "")
+        if not g:
+            return []
+        nrql = (
+            f"SELECT version, commit, changelog, user, timestamp FROM Deployment "
+            f"WHERE entity.guid = '{g}' SINCE {since} LIMIT {limit}"
+        )
+        rows = await self._run_nrql(cfg, account_id, nrql)
+        out: list[dict[str, Any]] = []
+        for r in rows:
+            ts = r.get('timestamp')
+            out.append({
+                'version': r.get('version'), 'commit': r.get('commit'),
+                'changelog': r.get('changelog'), 'user': r.get('user'),
+                'timestamp_ms': int(ts) if ts else None,
+            })
+        return out
+
     async def fetch_error_group_links(
         self,
         cfg: dict[str, str],

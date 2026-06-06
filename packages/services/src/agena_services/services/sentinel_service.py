@@ -531,6 +531,51 @@ class SentinelService:
                 await self.notify_opened(a)
         return raised
 
+    async def ingest_nr_deployments(self, org_id: int) -> int:
+        """Pull real New Relic deployment markers for each mapped APM entity and
+        record them as git_deployments (deduped). evaluate_recent_deploys then
+        does the before/after comparison once their after-window matures."""
+        from agena_models.models.git_deployment import GitDeployment
+        resolved = await self._nr_cfg(org_id)
+        if not resolved:
+            return 0
+        cfg, default_acct = resolved
+        mappings = list((await self.db.execute(select(NewRelicEntityMapping).where(
+            NewRelicEntityMapping.organization_id == org_id,
+            NewRelicEntityMapping.is_active.is_(True),
+        ))).scalars().all())
+        added = 0
+        for m in mappings:
+            if not m.repo_mapping_id or not m.entity_guid:
+                continue
+            try:
+                deps = await self.nr.fetch_deployments(
+                    cfg, account_id=m.account_id or default_acct,
+                    entity_guid=m.entity_guid, since='2 days ago',
+                )
+            except Exception:
+                logger.exception('sentinel: fetch_deployments failed org=%s entity=%s', org_id, m.entity_name)
+                continue
+            for d in deps:
+                ts = d.get('timestamp_ms')
+                if not ts:
+                    continue
+                ext = f'nr-{m.entity_guid[:16]}-{ts}'
+                if (await self.db.execute(select(GitDeployment).where(
+                    GitDeployment.organization_id == org_id, GitDeployment.external_id == ext,
+                ))).scalar_one_or_none():
+                    continue
+                self.db.add(GitDeployment(
+                    organization_id=org_id, repo_mapping_id=str(m.repo_mapping_id),
+                    provider='newrelic', external_id=ext, environment='production',
+                    status='success', sha=d.get('commit'),
+                    deployed_at=datetime.utcfromtimestamp(ts / 1000),
+                ))
+                added += 1
+        if added:
+            await self.db.commit()
+        return added
+
     async def evaluate_recent_deploys(self, org_id: int) -> list[Alert]:
         """Evaluate deploys whose after-window has just matured (~30 min old)."""
         from agena_models.models.git_deployment import GitDeployment
