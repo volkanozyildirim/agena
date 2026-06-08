@@ -937,6 +937,40 @@ class AzureDevOpsClient:
             patch_resp = await client.patch(url_patch, headers=patch_headers, json=patch_ops)
             patch_resp.raise_for_status()
 
+    async def fetch_work_item_assignee(
+        self, *, cfg: dict[str, str], work_item_id: str,
+    ) -> dict[str, str] | None:
+        """Assignee identity straight from the work item. System.AssignedTo
+        already carries displayName + uniqueName (the UPN/email), which is the
+        reliable source for a notifying @mention — far better than the flaky
+        /_apis/identities display-name lookup, which returns nothing for AAD
+        users. Returns {id, descriptor, display_name, unique_name} or None."""
+        org_url = (cfg.get('org_url') or self.settings.azure_org_url or '').strip().rstrip('/')
+        pat = (cfg.get('pat') or self.settings.azure_pat or '').strip()
+        if not org_url or not pat or not work_item_id:
+            return None
+        url = (
+            f"{org_url}/_apis/wit/workitems/{work_item_id}"
+            f"?fields=System.AssignedTo&api-version=7.1-preview.3"
+        )
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(url, headers=self._headers(pat))
+            if resp.status_code != 200:
+                return None
+            a = ((resp.json() or {}).get('fields') or {}).get('System.AssignedTo') or {}
+        except Exception:
+            return None
+        upn = str(a.get('uniqueName') or '').strip()
+        if not upn:
+            return None
+        return {
+            'id': str(a.get('id') or ''),
+            'descriptor': str(a.get('descriptor') or ''),
+            'display_name': str(a.get('displayName') or '').strip(),
+            'unique_name': upn,
+        }
+
     async def resolve_identity(
         self, *, cfg: dict[str, str], display_name: str,
     ) -> dict[str, str] | None:
