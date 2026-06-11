@@ -784,7 +784,7 @@ export default function IntegrationsPage() {
   const providerModule: Record<string, string> = {
     openai: 'openai', gemini: 'gemini', hal: 'hal', playbook: 'playbook',
     azure: 'azure', github: 'github', gitlab: 'gitlab', bitbucket: 'bitbucket',
-    jira: 'jira', newrelic: 'newrelic', sentry: 'sentry', datadog: 'datadog', appdynamics: 'appdynamics',
+    jira: 'jira', youtrack: 'youtrack', newrelic: 'newrelic', sentry: 'sentry', datadog: 'datadog', appdynamics: 'appdynamics',
     slack: 'slack', teams: 'teams', telegram: 'telegram',
   };
   const isProviderEnabled = (p: string) => !providerModule[p] || enabledModules.has(providerModule[p]);
