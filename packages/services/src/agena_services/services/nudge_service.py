@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from agena_models.models.nudge_history import NudgeHistory
 from agena_services.integrations.azure_client import AzureDevOpsClient
 from agena_services.integrations.jira_client import JiraClient
+from agena_services.integrations.youtrack_client import YouTrackClient
 from agena_services.services.integration_config_service import IntegrationConfigService
 from agena_services.services.llm.provider import LLMProvider
 
@@ -62,6 +63,7 @@ class NudgeService:
         self.integration_service = IntegrationConfigService(db)
         self.azure_client = AzureDevOpsClient()
         self.jira_client = JiraClient()
+        self.youtrack_client = YouTrackClient()
 
     async def list_recent_nudges(
         self,
@@ -119,8 +121,8 @@ class NudgeService:
         user_id: int | None = None,
     ) -> dict[str, Any]:
         src = (provider or '').strip().lower()
-        if src not in {'azure', 'jira'}:
-            raise ValueError("provider must be 'azure' or 'jira'")
+        if src not in {'azure', 'jira', 'youtrack'}:
+            raise ValueError("provider must be 'azure', 'jira' or 'youtrack'")
         config = await self.integration_service.get_config(organization_id, src)
         if config is None or not config.secret:
             raise ValueError(f'{src.capitalize()} integration not configured')
@@ -497,6 +499,10 @@ class NudgeService:
                     cfg=self._build_cfg(src, config), work_item_id=item_id,
                     html_body=html_body,
                 )
+            elif src == 'youtrack':
+                await self.youtrack_client.add_comment(
+                    cfg=self._build_cfg(src, config), issue_key=item_id, text=comment_text,
+                )
             else:
                 await self.jira_client.writeback_refinement(
                     cfg=self._build_cfg(src, config), issue_key=item_id,
@@ -562,6 +568,10 @@ class NudgeService:
             comments = await self.azure_client.fetch_work_item_comments(
                 cfg=cfg, project=project, work_item_id=item_id,
             )
+        elif src == 'youtrack':
+            comments = await self.youtrack_client.fetch_issue_comments(
+                cfg=cfg, issue_key=item_id,
+            )
         else:
             comments = await self.jira_client.fetch_issue_comments(
                 cfg=cfg, issue_key=item_id,
@@ -613,6 +623,8 @@ class NudgeService:
     def _build_cfg(src: str, config: Any) -> dict[str, str]:
         if src == 'azure':
             return {'org_url': config.base_url or '', 'pat': config.secret or ''}
+        if src == 'youtrack':
+            return {'base_url': config.base_url or '', 'token': config.secret or ''}
         return {
             'base_url': config.base_url or '',
             'email': config.username or '',

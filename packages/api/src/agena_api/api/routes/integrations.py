@@ -575,6 +575,68 @@ async def list_jira_projects(
     return out
 
 
+# ── YouTrack metadata for IntegrationRule UI ────────────────────────────────
+
+@router.get('/youtrack/projects', response_model=list[JiraProjectItem])
+async def list_youtrack_projects(
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[JiraProjectItem]:
+    from agena_services.integrations.youtrack_client import YouTrackClient
+    service = IntegrationConfigService(db)
+    cfg = await service.get_config(tenant.organization_id, 'youtrack')
+    if cfg is None or not cfg.secret:
+        return []
+    try:
+        rows = await YouTrackClient().fetch_projects({'base_url': cfg.base_url or '', 'token': cfg.secret})
+    except Exception:
+        return []
+    out = [JiraProjectItem(key=str(p.get('key') or ''), name=str(p.get('name') or p.get('key') or '')) for p in rows if p.get('key')]
+    out.sort(key=lambda p: p.key.lower())
+    return out
+
+
+@router.get('/youtrack/reporters', response_model=list[JiraReporterItem])
+async def list_youtrack_reporters(
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[JiraReporterItem]:
+    """Distinct users on the org's YouTrack instance, for the rule editor's
+    reporter dropdown. Backed by /api/users."""
+    service = IntegrationConfigService(db)
+    cfg = await service.get_config(tenant.organization_id, 'youtrack')
+    if cfg is None or not cfg.secret:
+        return []
+    base = (cfg.base_url or '').rstrip('/')
+    if base.endswith('/api'):
+        base = base[: -len('/api')]
+    if not base:
+        return []
+    headers = {'Authorization': f'Bearer {cfg.secret}', 'Accept': 'application/json'}
+    out: list[JiraReporterItem] = []
+    seen: set[str] = set()
+    async with httpx.AsyncClient(timeout=20) as client:
+        resp = await client.get(
+            f'{base}/api/users',
+            params={'fields': 'login,fullName,email,banned', '$top': 500},
+            headers=headers,
+        )
+        if resp.status_code != 200:
+            return []
+        for u in resp.json() or []:
+            if not isinstance(u, dict) or u.get('banned'):
+                continue
+            mail = str(u.get('email') or '').strip()
+            display = str(u.get('fullName') or u.get('login') or mail).strip()
+            key = mail or display
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            out.append(JiraReporterItem(email=mail, display_name=display))
+    out.sort(key=lambda i: i.display_name.lower())
+    return out
+
+
 # ── Azure DevOps metadata for IntegrationRule UI ────────────────────────────
 
 class AzureUserItem(BaseModel):

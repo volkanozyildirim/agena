@@ -320,7 +320,7 @@ function AssignTaskModal({
   const [selectedMapping, setSelectedMapping] = useState<string>('');
   const [repoMode, setRepoMode] = useState<'mapping' | 'remote'>('mapping');
   const [remoteRepoMeta, setRemoteRepoMeta] = useState('');
-  const [sprintProvider, setSprintProvider] = useState<'azure' | 'jira'>('azure');
+  const [sprintProvider, setSprintProvider] = useState<'azure' | 'jira' | 'youtrack'>('azure');
   const assignable = tasks.filter((tk) => tk.status === 'queued' || tk.status === 'failed');
   const availModels = modelsForProvider(selProvider);
 
@@ -349,13 +349,16 @@ function AssignTaskModal({
       if (!mappings.length) setRepoMode('remote');
       const prefs = await loadPrefs();
       const settings = (prefs.profile_settings || {}) as Record<string, unknown>;
-      let preferredProvider: 'azure' | 'jira' = localStorage.getItem('agena_sprint_provider') === 'jira' ? 'jira' : 'azure';
-      const hasJiraPref = Boolean(
-        localStorage.getItem('agena_jira_board')
-        || localStorage.getItem('agena_jira_sprint')
-        || (typeof settings.jira_board === 'string' && settings.jira_board)
-        || (typeof settings.jira_sprint_id === 'string' && settings.jira_sprint_id),
+      const lsProvRaw = localStorage.getItem('agena_sprint_provider');
+      let preferredProvider: 'azure' | 'jira' | 'youtrack' = lsProvRaw === 'jira' ? 'jira' : lsProvRaw === 'youtrack' ? 'youtrack' : 'azure';
+      const trackerHasPref = (src: 'jira' | 'youtrack') => Boolean(
+        localStorage.getItem(`agena_${src}_board`)
+        || localStorage.getItem(`agena_${src}_sprint`)
+        || (typeof settings[`${src}_board`] === 'string' && settings[`${src}_board`])
+        || (typeof settings[`${src}_sprint_id`] === 'string' && settings[`${src}_sprint_id`]),
       );
+      const hasJiraPref = trackerHasPref('jira');
+      const hasYoutrackPref = trackerHasPref('youtrack');
       const hasAzurePref = Boolean(
         localStorage.getItem('agena_sprint_project')
         || localStorage.getItem('agena_sprint_team')
@@ -364,24 +367,27 @@ function AssignTaskModal({
         || prefs.azure_team
         || prefs.azure_sprint_path,
       );
-      if (preferredProvider === 'azure' && !hasAzurePref && hasJiraPref) preferredProvider = 'jira';
-      if (preferredProvider === 'jira' && !hasJiraPref && hasAzurePref) preferredProvider = 'azure';
+      const prefByProvider = { azure: hasAzurePref, jira: hasJiraPref, youtrack: hasYoutrackPref };
+      if (!prefByProvider[preferredProvider]) {
+        preferredProvider = hasAzurePref ? 'azure' : hasJiraPref ? 'jira' : hasYoutrackPref ? 'youtrack' : preferredProvider;
+      }
 
-      if (preferredProvider === 'jira') {
-        setSprintProvider('jira');
-        const boardId = localStorage.getItem('agena_jira_board') || (typeof settings.jira_board === 'string' ? settings.jira_board : '');
-        let sprintId = localStorage.getItem('agena_jira_sprint') || (typeof settings.jira_sprint_id === 'string' ? settings.jira_sprint_id : '');
+      if (preferredProvider !== 'azure') {
+        const src = preferredProvider; // 'jira' | 'youtrack'
+        setSprintProvider(src);
+        const boardId = localStorage.getItem(`agena_${src}_board`) || (typeof settings[`${src}_board`] === 'string' ? settings[`${src}_board`] as string : '');
+        let sprintId = localStorage.getItem(`agena_${src}_sprint`) || (typeof settings[`${src}_sprint_id`] === 'string' ? settings[`${src}_sprint_id`] as string : '');
         if (!boardId) { setSprintItems([]); return; }
         if (!sprintId) {
-          const sprints = await apiFetch<SprintOption[]>('/tasks/jira/sprints?board_id=' + encodeURIComponent(boardId)).catch(() => [] as SprintOption[]);
+          const sprints = await apiFetch<SprintOption[]>('/tasks/' + src + '/sprints?board_id=' + encodeURIComponent(boardId)).catch(() => [] as SprintOption[]);
           const current = pickCurrentSprint(sprints);
           sprintId = current?.id || current?.path || '';
-          if (sprintId) localStorage.setItem('agena_jira_sprint', sprintId);
+          if (sprintId) localStorage.setItem(`agena_${src}_sprint`, sprintId);
         }
         if (!sprintId) { setSprintItems([]); return; }
         const q = new URLSearchParams({ board_id: boardId, sprint_id: sprintId });
-        const r = await apiFetch<{ items: SprintWorkItem[] }>('/tasks/jira?' + q.toString());
-        setSprintItems((r.items || []).map((item) => ({ ...item, source: 'jira' })));
+        const r = await apiFetch<{ items: SprintWorkItem[] }>('/tasks/' + src + '?' + q.toString());
+        setSprintItems((r.items || []).map((item) => ({ ...item, source: src })));
         return;
       }
 
@@ -422,7 +428,7 @@ function AssignTaskModal({
       const project = localStorage.getItem('agena_sprint_project') || '';
       const mapping = repoMappings.find((m) => m.id === selectedMapping) || repoMappings[0];
       const ctxParts = [
-        `External Source: ${sprintProvider === 'jira' ? 'Jira' : 'Azure'} #${item.id}`,
+        `External Source: ${sprintProvider === 'youtrack' ? 'YouTrack' : sprintProvider === 'jira' ? 'Jira' : 'Azure'} #${item.id}`,
         project ? `Project: ${project}` : '',
         repoMode === 'remote' && remoteRepoMeta ? `Remote Repo: ${remoteRepoMeta}` : '',
         repoMode !== 'remote' && mapping?.azure_repo_url ? `Azure Repo: ${mapping.azure_repo_url}` : '',
@@ -432,7 +438,7 @@ function AssignTaskModal({
       const fullDesc = (sprintDesc || item.title) + '\n\n---\n' + ctxParts.join('\n');
       const created = await apiFetch<{ id: number }>('/tasks', {
         method: 'POST',
-        body: JSON.stringify({ title: `[${sprintProvider === 'jira' ? 'Jira' : 'Azure'} #${item.id}] ${item.title}`, description: fullDesc }),
+        body: JSON.stringify({ title: `[${sprintProvider === 'youtrack' ? 'YouTrack' : sprintProvider === 'jira' ? 'Jira' : 'Azure'} #${item.id}] ${item.title}`, description: fullDesc }),
       });
       await apiFetch(`/tasks/${created.id}/assign`, { method: 'POST', body: JSON.stringify(assignBody()) });
       onClose();
@@ -707,7 +713,7 @@ function AssignTaskModal({
                     try {
                       const item = selectedSprintItem;
                       const ctxParts = [
-                        `External Source: ${sprintProvider === 'jira' ? `Jira #${item.id}` : `Azure #${item.id}`}`,
+                        `External Source: ${sprintProvider === 'youtrack' ? `YouTrack #${item.id}` : sprintProvider === 'jira' ? `Jira #${item.id}` : `Azure #${item.id}`}`,
                         sprintProject ? `Project: ${sprintProject}` : '',
                         repoMode !== 'remote' && mapping?.azure_repo_url ? `Azure Repo: ${mapping.azure_repo_url}` : '',
                         repoMode !== 'remote' && mapping?.name ? `Local Repo Mapping: ${mapping.name}` : '',
@@ -717,7 +723,7 @@ function AssignTaskModal({
                       const fullDesc = (sprintDesc || item.title) + '\n\n---\n' + ctxParts.join('\n');
                       const created = await apiFetch<{ id: number }>('/tasks', {
                         method: 'POST',
-                        body: JSON.stringify({ title: `[${sprintProvider === 'jira' ? 'Jira' : 'Azure'} #${item.id}] ${item.title}`, description: fullDesc }),
+                        body: JSON.stringify({ title: `[${sprintProvider === 'youtrack' ? 'YouTrack' : sprintProvider === 'jira' ? 'Jira' : 'Azure'} #${item.id}] ${item.title}`, description: fullDesc }),
                       });
                       await apiFetch(`/tasks/${created.id}/assign`, { method: 'POST', body: JSON.stringify({ create_pr: true, mode: 'mcp_agent' }) });
                       onClose();

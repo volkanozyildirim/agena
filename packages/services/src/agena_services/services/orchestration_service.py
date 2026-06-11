@@ -101,7 +101,7 @@ def _format_pr_title(
 
     if src in ('azure', 'azure_devops') and ext:
         ab = f'AB#{ext}'
-    elif src == 'jira' and ext:
+    elif src in ('jira', 'youtrack') and ext:
         ab = ext
     else:
         ab = ''
@@ -1827,9 +1827,9 @@ class OrchestrationService:
                     logger.warning('Failed to post Sentry comment for task #%s: %s', task.id, exc)
 
             # Apply configurable AI tag/label on source work item (Azure) or issue (Jira)
-            if task.source in ('azure', 'jira') and task.external_id:
+            if task.source in ('azure', 'jira', 'youtrack') and task.external_id:
                 try:
-                    provider = 'azure' if task.source == 'azure' else 'jira'
+                    provider = task.source
                     source_config = await IntegrationConfigService(self.db_session).get_config(organization_id, provider)
                     if source_config:
                         extra = source_config.extra_config or {}
@@ -1841,6 +1841,12 @@ class OrchestrationService:
                                     az_cfg = {'org_url': source_config.base_url or '', 'pat': source_config.secret or ''}
                                     await AzureDevOpsClient().add_tag_to_work_item(
                                         cfg=az_cfg, work_item_id=task.external_id, tag=tag_name,
+                                    )
+                                elif task.source == 'youtrack':
+                                    from agena_services.integrations.youtrack_client import YouTrackClient
+                                    yt_cfg = {'base_url': source_config.base_url or '', 'token': source_config.secret or ''}
+                                    await YouTrackClient().add_label_to_issue(
+                                        cfg=yt_cfg, issue_key=task.external_id, label=tag_name,
                                     )
                                 else:
                                     from agena_services.integrations.jira_client import JiraClient
@@ -2988,6 +2994,8 @@ class OrchestrationService:
             effective_source = 'azure'
         elif external_source and external_source.lower().startswith('jira'):
             effective_source = 'jira'
+        elif external_source and external_source.lower().startswith('youtrack'):
+            effective_source = 'youtrack'
         # If Azure repository metadata exists, route PR flow to Azure even for Jira-imported tasks.
         if meta.get('azure repo'):
             effective_source = 'azure'

@@ -10,7 +10,7 @@ import { SPRINT_CHANGED_EVENT } from '@/components/SprintSwitcher';
 import { useLocale } from '@/lib/i18n';
 import NavIcon from '@/components/NavIcon';
 
-type Provider = 'azure' | 'jira';
+type Provider = 'azure' | 'jira' | 'youtrack';
 type AgentProvider = 'openai' | 'gemini' | 'hal' | 'codex_cli' | 'claude_cli';
 
 type Opt = {
@@ -454,7 +454,7 @@ function displaySuggestionEstimate(value: number | null | undefined, options?: {
 
 function defaultSprint(list: Opt[], provider: Provider): string {
   if (!list.length) return '';
-  if (provider === 'jira') {
+  if (provider !== 'azure') {
     return (
       list.find((item) => (item.state || '').toLowerCase() === 'active')?.id
       || list.find((item) => (item.state || '').toLowerCase() === 'future')?.id
@@ -672,7 +672,7 @@ export default function RefinementPage() {
           stMap[row.external_id] = row.status;
         }
       }
-      const titlePrefix = provider === 'jira' ? 'Jira' : 'Azure';
+      const titlePrefix = provider === 'youtrack' ? 'YouTrack' : provider === 'jira' ? 'Jira' : 'Azure';
       const titleRe = new RegExp(`^\\[${titlePrefix}\\s*#([^\\]\\s]+)\\]`);
       for (const row of internal.items || []) {
         const m = row.title ? titleRe.exec(row.title) : null;
@@ -718,13 +718,13 @@ export default function RefinementPage() {
     try {
       const desc = String(item.description || '').trim();
       const ctxParts = [
-        `External Source: ${provider === 'jira' ? `Jira #${item.id}` : `Azure #${item.id}`}`,
+        `External Source: ${provider === 'youtrack' ? `YouTrack #${item.id}` : provider === 'jira' ? `Jira #${item.id}` : `Azure #${item.id}`}`,
         'Prompt Instruction: Read any images in the task description and include their context in your analysis.',
         `Local Repo Mapping: ${mapping.display_name || `${mapping.owner}/${mapping.repo_name}`}`,
       ].filter(Boolean);
       type TaskRecord = { id: number; status: string };
       type AiFill = { story_context: string; acceptance_criteria: string; edge_cases: string };
-      const fullTitle = `[${provider === 'jira' ? 'Jira' : 'Azure'} #${item.id}] ${item.title}`;
+      const fullTitle = `[${provider === 'youtrack' ? 'YouTrack' : provider === 'jira' ? 'Jira' : 'Azure'} #${item.id}] ${item.title}`;
       const fullDescription = `${desc || '(no description)'}\n\n---\n${ctxParts.join('\n')}`;
       let aiFields: Partial<AiFill> = {};
       if (importAiFill) {
@@ -949,9 +949,10 @@ export default function RefinementPage() {
     setItemsData(null);
     setResults(null);
     if (!nextProject) return;
-    const rows = await cachedApiFetch<Opt[]>('/tasks/jira/boards?project_key=' + encodeURIComponent(nextProject));
+    const tp = provider === 'youtrack' ? 'youtrack' : 'jira';
+    const rows = await cachedApiFetch<Opt[]>('/tasks/' + tp + '/boards?project_key=' + encodeURIComponent(nextProject));
     setJiraBoards(rows);
-  }, []);
+  }, [provider]);
 
   const loadJiraSprints = useCallback(async (nextBoard: string) => {
     setJiraBoard(nextBoard);
@@ -960,10 +961,21 @@ export default function RefinementPage() {
     setItemsData(null);
     setResults(null);
     if (!nextBoard) return;
-    const rows = await cachedApiFetch<Opt[]>('/tasks/jira/sprints?board_id=' + encodeURIComponent(nextBoard));
+    const tp = provider === 'youtrack' ? 'youtrack' : 'jira';
+    const rows = await cachedApiFetch<Opt[]>('/tasks/' + tp + '/sprints?board_id=' + encodeURIComponent(nextBoard));
     setJiraSprints(rows);
-    setJiraSprint(defaultSprint(rows, 'jira'));
-  }, []);
+    setJiraSprint(defaultSprint(rows, provider));
+  }, [provider]);
+
+  // Jira & YouTrack share the jira* cascade state. When the active tracker
+  // switches, reload that tracker's projects so each shows its own list.
+  useEffect(() => {
+    if (provider === 'azure') return;
+    const tp = provider === 'youtrack' ? 'youtrack' : 'jira';
+    let active = true;
+    void cachedApiFetch<Opt[]>('/tasks/' + tp + '/projects').then((rows) => { if (active) setJiraProjects(rows); }).catch(() => {});
+    return () => { active = false; };
+  }, [provider]);
 
   // Wipe the estimate (Story Points / Effort / Size) a previous writeback
   // stamped on an Azure work item. The value often lands in Effort — a
@@ -1014,7 +1026,7 @@ export default function RefinementPage() {
       } else {
         const sprintName = selectedJiraSprint?.name || jiraSprint;
         data = await apiFetch<RefinementItemsResponse>(
-          '/refinement/items?provider=jira'
+          '/refinement/items?provider=' + provider
           + '&board_id=' + encodeURIComponent(jiraBoard)
           + '&sprint_id=' + encodeURIComponent(jiraSprint)
           + '&sprint_name=' + encodeURIComponent(sprintName),
@@ -1086,7 +1098,7 @@ export default function RefinementPage() {
         setBackfillJob({ status: 'failed', error: tt('refinement.backfill.needAzureTeam') });
         return;
       }
-    } else if (provider === 'jira') {
+    } else {
       if (!jiraProject) {
         setBackfillJob({ status: 'failed', error: tt('refinement.backfill.needJiraProject') });
         return;
@@ -1097,7 +1109,7 @@ export default function RefinementPage() {
       const body: Record<string, unknown> =
         provider === 'azure'
           ? { source: 'azure', project: azureProject, team: azureTeam, since_days: 730, max_items: 5000 }
-          : { source: 'jira', project: jiraProject, board_id: jiraBoard || undefined, since_days: 730, max_items: 5000 };
+          : { source: provider, project: jiraProject, board_id: jiraBoard || undefined, since_days: 730, max_items: 5000 };
       await apiFetch<{ status: string }>(
         '/refinement/history/backfill',
         { method: 'POST', body: JSON.stringify(body) },
@@ -1464,7 +1476,7 @@ export default function RefinementPage() {
     }).catch(() => {});
   }, []);
 
-  const providerLabel = provider === 'azure' ? 'Azure DevOps' : 'Jira';
+  const providerLabel = provider === 'azure' ? 'Azure DevOps' : provider === 'youtrack' ? 'YouTrack' : 'Jira';
 
   const resultByItemId = useMemo(() => {
     const map = new Map<string, RefinementSuggestion>();
@@ -1895,6 +1907,7 @@ export default function RefinementPage() {
               <select value={provider} onChange={(e) => { setProvider(e.target.value as Provider); setItemsData(null); setResults(null); setWrittenBackIds(new Set()); setExpandedItemId(''); }} style={inputStyle}>
                 <option value='azure'>Azure DevOps</option>
                 <option value='jira'>Jira</option>
+                <option value='youtrack'>YouTrack</option>
               </select>
             </Field>
             <Field label={copy.language}>
@@ -1981,13 +1994,13 @@ export default function RefinementPage() {
                     try {
                       const desc = r.summary || r.item_id;
                       const ctxParts = [
-                        `External Source: ${provider === 'jira' ? `Jira #${r.item_id}` : `Azure #${r.item_id}`}`,
+                        `External Source: ${provider === 'youtrack' ? `YouTrack #${r.item_id}` : provider === 'jira' ? `Jira #${r.item_id}` : `Azure #${r.item_id}`}`,
                         provider === 'azure' && azureProject ? `Project: ${azureProject}` : '',
                       ].filter(Boolean);
                       const created = await apiFetch<{ id: number }>('/tasks', {
                         method: 'POST',
                         body: JSON.stringify({
-                          title: `[${provider === 'jira' ? 'Jira' : 'Azure'} #${r.item_id}] ${r.title || r.item_id}`,
+                          title: `[${provider === 'youtrack' ? 'YouTrack' : provider === 'jira' ? 'Jira' : 'Azure'} #${r.item_id}] ${r.title || r.item_id}`,
                           description: `${desc}\n\n---\n${ctxParts.join('\n')}`,
                         }),
                       });
@@ -2021,7 +2034,7 @@ export default function RefinementPage() {
             const jobActive = backfillJob && (backfillJob.status === 'queued' || backfillJob.status === 'fetching' || backfillJob.status === 'indexing');
             const disabled = !!jobActive
               || (provider === 'azure' && (!azureProject || !azureTeam))
-              || (provider === 'jira' && !jiraProject);
+              || (provider !== 'azure' && !jiraProject);
             const label = jobActive
               ? `${t('refinement.backfill.buttonActive' as Parameters<typeof t>[0])}${backfillJob?.total ? ` (${backfillJob.processed || 0}/${backfillJob.total})` : '...'}`
               : t('refinement.backfill.buttonIdle' as Parameters<typeof t>[0]);
@@ -3335,7 +3348,7 @@ export default function RefinementPage() {
               {t('refinement.importRepoPicker.label' as Parameters<typeof t>[0]) || 'Pick a repo'}
             </div>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink-90)', marginBottom: 2, lineHeight: 1.35 }}>
-              {`[${provider === 'jira' ? 'Jira' : 'Azure'} #${importPickerItem.id}] ${importPickerItem.title}`}
+              {`[${provider === 'youtrack' ? 'YouTrack' : provider === 'jira' ? 'Jira' : 'Azure'} #${importPickerItem.id}] ${importPickerItem.title}`}
             </div>
             <div style={{ fontSize: 11, color: 'var(--ink-55)', marginBottom: 14 }}>
               {t('refinement.importRepoPicker.hint' as Parameters<typeof t>[0]) || 'The imported task will be wired to this repo for code-aware planning.'}

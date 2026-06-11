@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from agena_models.models.task_record import TaskRecord
 from agena_services.integrations.azure_client import AzureDevOpsClient
 from agena_services.integrations.jira_client import JiraClient
+from agena_services.integrations.youtrack_client import YouTrackClient
 from agena_services.services.integration_config_service import IntegrationConfigService
 
 logger = logging.getLogger(__name__)
@@ -58,6 +59,19 @@ _DEFAULTS: dict[str, dict[str, list[str]]] = {
         'in_progress': ['Active', 'Doing', 'In Progress', 'Committed'],
         'in_review': ['Resolved', 'In Review', 'Code Review', 'Review'],
         'done': ['Closed', 'Done', 'Completed', 'Removed'],
+    },
+    'youtrack': {
+        'in_progress': [
+            'In Progress', 'In-Progress', 'Doing', 'Devam Ediyor',
+            'Yapılıyor', 'In dev',
+        ],
+        'in_review': [
+            'Code Review', 'In Review', 'Review', 'İncelemede',
+            'PR Review', 'Awaiting Review', 'To Verify',
+        ],
+        'done': [
+            'Done', 'Fixed', 'Resolved', 'Closed', 'Tamam', 'Bitti', 'Completed',
+        ],
     },
 }
 
@@ -134,6 +148,25 @@ class WorkflowSyncService:
                         return
                 logger.info(
                     'WorkflowSync %s task=%s jira=%s — no transition matched any of %s',
+                    logical, task.id, external_id, candidates,
+                )
+            elif source == 'youtrack':
+                yt_cfg = {'base_url': config.base_url or '', 'token': config.secret}
+                client = YouTrackClient()
+                for cand in candidates:
+                    applied = await client.transition_issue(
+                        cfg=yt_cfg,
+                        issue_key=external_id,
+                        target_status=cand,
+                    )
+                    if applied:
+                        logger.info(
+                            'WorkflowSync %s task=%s youtrack=%s → %r',
+                            logical, task.id, external_id, cand,
+                        )
+                        return
+                logger.info(
+                    'WorkflowSync %s task=%s youtrack=%s — no state command matched any of %s',
                     logical, task.id, external_id, candidates,
                 )
             else:  # azure

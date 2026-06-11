@@ -322,7 +322,7 @@ async def get_preferences(
     if pref is None:
         return PreferenceResponse(
             azure_project=None, azure_team=None, azure_sprint_path=None,
-            my_team=[], my_team_source='azure', my_team_by_source={'azure': [], 'jira': []},
+            my_team=[], my_team_source='azure', my_team_by_source={'azure': [], 'jira': [], 'youtrack': []},
             agents=[], flows=[], repo_mappings=[], profile_settings={},
         )
     profile_settings = _parse_json_obj(pref.profile_settings_json)
@@ -330,12 +330,12 @@ async def get_preferences(
 
     legacy_team = _parse_json(pref.my_team_json)
     my_team_source = str(profile_settings.get('my_team_source') or 'azure').strip().lower()
-    if my_team_source not in {'azure', 'jira'}:
+    if my_team_source not in {'azure', 'jira', 'youtrack'}:
         my_team_source = 'azure'
     raw_by_source = profile_settings.get('my_team_by_source')
-    my_team_by_source: dict[str, list[dict[str, Any]]] = {'azure': [], 'jira': []}
+    my_team_by_source: dict[str, list[dict[str, Any]]] = {'azure': [], 'jira': [], 'youtrack': []}
     if isinstance(raw_by_source, dict):
-        for src in ('azure', 'jira'):
+        for src in ('azure', 'jira', 'youtrack'):
             value = raw_by_source.get(src)
             if isinstance(value, list):
                 my_team_by_source[src] = value
@@ -373,12 +373,12 @@ async def save_preferences(
         pref.azure_sprint_path = payload.azure_sprint_path
     current_settings = _parse_json_obj(pref.profile_settings_json)
     next_source = str(payload.my_team_source or current_settings.get('my_team_source') or 'azure').strip().lower()
-    if next_source not in {'azure', 'jira'}:
+    if next_source not in {'azure', 'jira', 'youtrack'}:
         next_source = 'azure'
     raw_by_source = current_settings.get('my_team_by_source')
-    by_source: dict[str, list[dict[str, Any]]] = {'azure': [], 'jira': []}
+    by_source: dict[str, list[dict[str, Any]]] = {'azure': [], 'jira': [], 'youtrack': []}
     if isinstance(raw_by_source, dict):
-        for src in ('azure', 'jira'):
+        for src in ('azure', 'jira', 'youtrack'):
             value = raw_by_source.get(src)
             if isinstance(value, list):
                 by_source[src] = value
@@ -445,12 +445,12 @@ async def save_preferences(
 
     final_settings = _parse_json_obj(pref.profile_settings_json)
     final_source = str(final_settings.get('my_team_source') or 'azure').strip().lower()
-    if final_source not in {'azure', 'jira'}:
+    if final_source not in {'azure', 'jira', 'youtrack'}:
         final_source = 'azure'
-    final_by_source: dict[str, list[dict[str, Any]]] = {'azure': [], 'jira': []}
+    final_by_source: dict[str, list[dict[str, Any]]] = {'azure': [], 'jira': [], 'youtrack': []}
     raw_final_by_source = final_settings.get('my_team_by_source')
     if isinstance(raw_final_by_source, dict):
-        for src in ('azure', 'jira'):
+        for src in ('azure', 'jira', 'youtrack'):
             value = raw_final_by_source.get(src)
             if isinstance(value, list):
                 final_by_source[src] = value

@@ -24,6 +24,7 @@ from agena_models.schemas.saas_task import (
     TaskUpdateRequest,
     AzureImportRequest,
     JiraImportRequest,
+    YouTrackImportRequest,
     NewRelicImportRequest,
     SentryImportRequest,
     DatadogImportRequest,
@@ -170,6 +171,18 @@ async def _import_external_attachments_for_task(
             'api_token': config.secret,
         }
         client = JiraClient()
+        try:
+            items.extend(await client.fetch_issue_attachments(external_id, cfg=cfg))
+        except Exception:
+            pass
+        try:
+            items.extend(await client.fetch_issue_images(issue_key=external_id, cfg=cfg))
+        except Exception:
+            pass
+    elif src == 'youtrack':
+        from agena_services.integrations.youtrack_client import YouTrackClient
+        cfg = {'base_url': config.base_url or '', 'token': config.secret}
+        client = YouTrackClient()
         try:
             items.extend(await client.fetch_issue_attachments(external_id, cfg=cfg))
         except Exception:
@@ -351,7 +364,7 @@ async def create_task(
     # Runs after repo_mapping_ids above so a user's explicit repo pick wins
     # over a rule's repo mapping. Best-effort, never blocks the import.
     if (
-        request.source in ('azure', 'jira')
+        request.source in ('azure', 'jira', 'youtrack')
         and request.external_id
         and not getattr(task, '_was_existing', False)
     ):
@@ -365,7 +378,7 @@ async def create_task(
     # Best-effort and only on first import (skip if the task already
     # existed and was just returned).
     if (
-        request.source in ('azure', 'jira')
+        request.source in ('azure', 'jira', 'youtrack')
         and request.external_id
         and not getattr(task, '_was_existing', False)
     ):
@@ -563,6 +576,40 @@ async def import_jira_tasks(
             )
             raise HTTPException(status_code=401, detail='Jira API token is invalid or expired') from exc
         raise HTTPException(status_code=502, detail=f'Jira request failed ({exc.response.status_code})') from exc
+    return ImportTasksResponse(imported=imported, skipped=skipped)
+
+
+@router.post('/import/youtrack', response_model=ImportTasksResponse)
+async def import_youtrack_tasks(
+    request: YouTrackImportRequest = Body(default_factory=YouTrackImportRequest),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> ImportTasksResponse:
+    service = TaskService(db)
+    try:
+        imported, skipped = await service.import_from_youtrack(
+            tenant.organization_id,
+            tenant.user_id,
+            project_key=request.project_key,
+            board_id=request.board_id,
+            sprint_id=request.sprint_id,
+            state=request.state,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 401:
+            notifier = NotificationService(db)
+            await notifier.notify_event(
+                organization_id=tenant.organization_id,
+                user_id=tenant.user_id,
+                event_type='integration_auth_expired',
+                title='YouTrack authorization expired',
+                message='Please update your YouTrack token in Integrations.',
+                severity='error',
+            )
+            raise HTTPException(status_code=401, detail='YouTrack token is invalid or expired') from exc
+        raise HTTPException(status_code=502, detail=f'YouTrack request failed ({exc.response.status_code})') from exc
     return ImportTasksResponse(imported=imported, skipped=skipped)
 
 
@@ -1421,7 +1468,7 @@ async def refresh_task_from_source(
     description ARE replaced when upstream has changed since import."""
     task = await _load_task_for_org(db, tenant.organization_id, task_id)
     src = (task.source or '').lower()
-    if src not in ('azure', 'jira') or not task.external_id:
+    if src not in ('azure', 'jira', 'youtrack') or not task.external_id:
         raise HTTPException(status_code=400, detail='Task has no Azure/Jira source to refresh from')
 
     description_updated = False
@@ -1516,6 +1563,30 @@ async def refresh_task_from_source(
                 if task.description and marker in task.description:
                     footer = task.description[task.description.index(marker):]
                 new_desc = f'{enriched}{footer}' if footer else enriched
+                if new_desc and new_desc != (task.description or ''):
+                    task.description = new_desc
+                    description_updated = True
+
+                if title_updated or description_updated:
+                    db.add(task)
+                    await db.commit()
+        elif config and config.secret and src == 'youtrack':
+            from agena_services.integrations.youtrack_client import YouTrackClient
+            yt_cfg = {'base_url': config.base_url or '', 'token': config.secret}
+            client = YouTrackClient()
+            fields = await client.fetch_issue_fields(cfg=yt_cfg, issue_key=task.external_id)
+            if fields:
+                upstream_title = (fields.get('title') or '').strip()
+                if upstream_title and upstream_title != (task.title or '').strip():
+                    task.title = upstream_title
+                    title_updated = True
+
+                upstream_desc = fields.get('description') or ''
+                footer = ''
+                marker = '\n\n---\nExternal Source:'
+                if task.description and marker in task.description:
+                    footer = task.description[task.description.index(marker):]
+                new_desc = f'{upstream_desc}{footer}' if footer else upstream_desc
                 if new_desc and new_desc != (task.description or ''):
                     task.description = new_desc
                     description_updated = True

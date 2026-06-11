@@ -12,6 +12,7 @@ from agena_core.settings import get_settings
 from agena_services.services.event_bus import publish_fire_and_forget
 from agena_services.integrations.azure_client import AzureDevOpsClient
 from agena_services.integrations.jira_client import JiraClient
+from agena_services.integrations.youtrack_client import YouTrackClient
 from agena_services.integrations.newrelic_client import NewRelicClient
 from agena_services.integrations.sentry_client import SentryClient
 from agena_models.models.agent_log import AgentLog
@@ -33,6 +34,7 @@ class TaskService:
         self.db = db
         self.settings = get_settings()
         self.jira_client = JiraClient()
+        self.youtrack_client = YouTrackClient()
         self.azure_client = AzureDevOpsClient()
         self.newrelic_client = NewRelicClient()
         self.sentry_client = SentryClient()
@@ -215,7 +217,7 @@ class TaskService:
         if self.db is None:
             return
         provider = (provider or '').strip().lower()
-        if provider not in ('jira', 'azure'):
+        if provider not in ('jira', 'youtrack', 'azure'):
             return
         ext = str(external_id or '').strip()
         if not ext:
@@ -227,6 +229,9 @@ class TaskService:
             if provider == 'azure':
                 cfg = {'org_url': config.base_url, 'pat': config.secret, 'project': config.project or ''}
                 fields = await self.azure_client.fetch_work_item_match_fields(ext, cfg)
+            elif provider == 'youtrack':
+                cfg = {'base_url': config.base_url, 'token': config.secret}
+                fields = await self.youtrack_client.fetch_issue_match_fields(cfg=cfg, issue_key=ext)
             else:
                 cfg = {'base_url': config.base_url, 'email': config.username or '', 'api_token': config.secret}
                 fields = await self.jira_client.fetch_issue_match_fields(cfg=cfg, issue_key=ext)
@@ -267,8 +272,8 @@ class TaskService:
         if self.db is None:
             raise ValueError('DB session required')
         provider = (provider or '').strip().lower()
-        if provider not in ('jira', 'azure'):
-            raise ValueError('provider must be jira or azure')
+        if provider not in ('jira', 'youtrack', 'azure'):
+            raise ValueError('provider must be jira, youtrack or azure')
         ext = str(external_id or '').strip()
         if not ext:
             raise ValueError('work item id / issue key is required')
@@ -281,6 +286,9 @@ class TaskService:
         if provider == 'azure':
             cfg = {'org_url': config.base_url, 'pat': config.secret, 'project': config.project or ''}
             fields = await self.azure_client.fetch_work_item_match_fields(ext, cfg)
+        elif provider == 'youtrack':
+            cfg = {'base_url': config.base_url, 'token': config.secret}
+            fields = await self.youtrack_client.fetch_issue_match_fields(cfg=cfg, issue_key=ext)
         else:
             cfg = {'base_url': config.base_url, 'email': config.username or '', 'api_token': config.secret}
             fields = await self.jira_client.fetch_issue_match_fields(cfg=cfg, issue_key=ext)
@@ -693,6 +701,74 @@ class TaskService:
                     branch_name=getattr(item, 'branch_name', None),
                 )
                 await self._apply_integration_rules(task, provider='jira', payload={
+                    'reporter_email': getattr(item, 'reporter_email', None),
+                    'reporter_name': getattr(item, 'reporter_name', None),
+                    'issue_type': getattr(item, 'issue_type', None),
+                    'project_key': getattr(item, 'project_key', None),
+                    'project': getattr(item, 'project_key', None),
+                    'labels': getattr(item, 'labels', []) or [],
+                })
+                imported += 1
+            except PermissionError as pe:
+                raise ValueError(f'Task quota exceeded: {pe}') from pe
+
+        return imported, skipped
+
+    async def import_from_youtrack(
+        self,
+        organization_id: int,
+        user_id: int,
+        *,
+        project_key: str | None = None,
+        board_id: str | None = None,
+        sprint_id: str | None = None,
+        state: str | None = None,
+    ) -> tuple[int, int]:
+        if self.db is None:
+            raise ValueError('DB session required')
+
+        config_service = IntegrationConfigService(self.db)
+        config = await config_service.get_config(organization_id, 'youtrack')
+        if config is None:
+            raise ValueError('YouTrack integration not configured for this organization')
+
+        yt_cfg = {'base_url': config.base_url, 'token': config.secret}
+        if board_id:
+            external_items = await self.youtrack_client.fetch_board_issues(
+                yt_cfg,
+                board_id=board_id,
+                sprint_id=sprint_id,
+                state=state,
+            )
+        else:
+            external_items = await self.youtrack_client.fetch_todo_issues(yt_cfg)
+
+        imported = 0
+        skipped = 0
+
+        for item in external_items:
+            try:
+                before = await self.db.execute(
+                    select(TaskRecord.id).where(
+                        TaskRecord.organization_id == organization_id,
+                        TaskRecord.source == 'youtrack',
+                        TaskRecord.external_id == item.id,
+                    )
+                )
+                if before.scalar_one_or_none() is not None:
+                    skipped += 1
+                    continue
+
+                task = await self.create_task_from_external(
+                    organization_id=organization_id,
+                    user_id=user_id,
+                    source='youtrack',
+                    external_id=item.id,
+                    title=item.title,
+                    description=item.description,
+                    assigned_to=getattr(item, 'assigned_to', None),
+                )
+                await self._apply_integration_rules(task, provider='youtrack', payload={
                     'reporter_email': getattr(item, 'reporter_email', None),
                     'reporter_name': getattr(item, 'reporter_name', None),
                     'issue_type': getattr(item, 'issue_type', None),
@@ -2344,8 +2420,8 @@ class TaskService:
                     if provider == 'azure':
                         score_source += 3
                     score_source += has_azure_meta * 2
-                elif source == 'jira':
-                    # Jira taskleri genelde Azure repo'ya merge edilir; Azure metadata öncelikli.
+                elif source in ('jira', 'youtrack'):
+                    # Jira/YouTrack taskleri genelde Azure/GitHub repo'ya merge edilir; repo metadata öncelikli.
                     score_source += has_azure_meta * 3
                     if provider == 'azure':
                         score_source += 2
@@ -2371,6 +2447,8 @@ class TaskService:
                 lines.append(f'External Source: Azure #{task.external_id}')
             elif source == 'jira':
                 lines.append(f'External Source: Jira #{task.external_id}')
+            elif source == 'youtrack':
+                lines.append(f'External Source: YouTrack #{task.external_id}')
             elif source == 'github':
                 lines.append(f'External Source: GitHub #{task.external_id}')
 

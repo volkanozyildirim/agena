@@ -8,7 +8,7 @@ from agena_models.schemas.task import ExternalTask
 
 
 class RefinementItemsResponse(BaseModel):
-    provider: Literal['azure', 'jira']
+    provider: Literal['azure', 'jira', 'youtrack']
     sprint_name: str
     sprint_ref: str
     items: list[ExternalTask] = Field(default_factory=list)
@@ -17,7 +17,7 @@ class RefinementItemsResponse(BaseModel):
 
 
 class RefinementAnalyzeRequest(BaseModel):
-    provider: Literal['azure', 'jira']
+    provider: Literal['azure', 'jira', 'youtrack']
     language: str = 'Turkish'
     project: str | None = None
     team: str | None = None
@@ -110,7 +110,7 @@ class RefinementSuggestion(BaseModel):
 
 
 class RefinementAnalyzeResponse(BaseModel):
-    provider: Literal['azure', 'jira']
+    provider: Literal['azure', 'jira', 'youtrack']
     sprint_name: str
     sprint_ref: str
     language: str
@@ -135,7 +135,7 @@ class RefinementWritebackItem(BaseModel):
 
 
 class RefinementWritebackRequest(BaseModel):
-    provider: Literal['azure', 'jira']
+    provider: Literal['azure', 'jira', 'youtrack']
     project: str | None = None
     team: str | None = None
     sprint_path: str | None = None
@@ -153,7 +153,7 @@ class RefinementWritebackResult(BaseModel):
 
 
 class RefinementWritebackResponse(BaseModel):
-    provider: Literal['azure', 'jira']
+    provider: Literal['azure', 'jira', 'youtrack']
     total: int
     success_count: int
     failure_count: int

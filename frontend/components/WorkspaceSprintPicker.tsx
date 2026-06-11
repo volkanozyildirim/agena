@@ -15,7 +15,7 @@ import { apiFetch } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
 
 type Opt = { id: string; name: string; path?: string; is_current?: boolean };
-type Provider = 'azure' | 'jira';
+type Provider = 'azure' | 'jira' | 'youtrack';
 
 export interface WorkspaceSprintInitial {
   provider?: string | null;
@@ -63,8 +63,9 @@ export default function WorkspaceSprintPicker({ initial, onApply, saving }: {
   saving?: boolean;
 }) {
   const { t } = useLocale();
-  const [provider, setProvider] = useState<Provider>((initial.provider === 'jira' ? 'jira' : 'azure'));
+  const [provider, setProvider] = useState<Provider>((initial.provider === 'jira' ? 'jira' : initial.provider === 'youtrack' ? 'youtrack' : 'azure'));
   const [jiraConnected, setJiraConnected] = useState(false);
+  const [youtrackConnected, setYoutrackConnected] = useState(false);
 
   const [azProjects, setAzProjects] = useState<Opt[]>([]);
   const [azTeams, setAzTeams] = useState<Opt[]>([]);
@@ -84,6 +85,15 @@ export default function WorkspaceSprintPicker({ initial, onApply, saving }: {
   const [loadingBoards, setLoadingBoards] = useState(false);
   const [loadingJiraSprints, setLoadingJiraSprints] = useState(false);
 
+  const [ytProjects, setYtProjects] = useState<Opt[]>([]);
+  const [ytBoards, setYtBoards] = useState<Opt[]>([]);
+  const [ytSprints, setYtSprints] = useState<Opt[]>([]);
+  const [ytProject, setYtProject] = useState(initial.provider === 'youtrack' ? (initial.project || '') : '');
+  const [ytBoard, setYtBoard] = useState(initial.provider === 'youtrack' ? (initial.board || '') : '');
+  const [ytSprint, setYtSprint] = useState(initial.provider === 'youtrack' ? (initial.sprintPath || '') : '');
+  const [loadingYtBoards, setLoadingYtBoards] = useState(false);
+  const [loadingYtSprints, setLoadingYtSprints] = useState(false);
+
   // Load top-level options + restore the saved cascade.
   useEffect(() => {
     apiFetch<Opt[]>('/tasks/azure/projects').then(setAzProjects).catch(() => {});
@@ -93,6 +103,10 @@ export default function WorkspaceSprintPicker({ initial, onApply, saving }: {
         const connected = Boolean(j && (j.has_secret || (j.base_url || '').trim() || (j.username || '').trim()));
         setJiraConnected(connected);
         if (connected) apiFetch<Opt[]>('/tasks/jira/projects').then(setJiraProjects).catch(() => {});
+        const yt = ints.find((c) => c.provider === 'youtrack');
+        const ytConn = Boolean(yt && (yt.has_secret || (yt.base_url || '').trim()));
+        setYoutrackConnected(ytConn);
+        if (ytConn) apiFetch<Opt[]>('/tasks/youtrack/projects').then(setYtProjects).catch(() => {});
       }).catch(() => {});
 
     (async () => {
@@ -109,6 +123,13 @@ export default function WorkspaceSprintPicker({ initial, onApply, saving }: {
           setJiraBoards(boards);
           const jsps = await apiFetch<Opt[]>('/tasks/jira/sprints?board_id=' + encodeURIComponent(initial.board)).catch(() => [] as Opt[]);
           setJiraSprints(jsps);
+        }
+      } else if (initial.provider === 'youtrack' && initial.project) {
+        if (initial.board) {
+          const boards = await apiFetch<Opt[]>('/tasks/youtrack/boards?project_key=' + encodeURIComponent(initial.project)).catch(() => [] as Opt[]);
+          setYtBoards(boards);
+          const ysps = await apiFetch<Opt[]>('/tasks/youtrack/sprints?board_id=' + encodeURIComponent(initial.board)).catch(() => [] as Opt[]);
+          setYtSprints(ysps);
         }
       }
     })();
@@ -145,28 +166,49 @@ export default function WorkspaceSprintPicker({ initial, onApply, saving }: {
       .catch(() => {}).finally(() => setLoadingJiraSprints(false));
   }, []);
 
+  const onYtProject = useCallback((v: string) => {
+    setYtProject(v); setYtBoard(''); setYtBoards([]); setYtSprint(''); setYtSprints([]);
+    if (!v) return;
+    setLoadingYtBoards(true);
+    apiFetch<Opt[]>('/tasks/youtrack/boards?project_key=' + encodeURIComponent(v)).then(setYtBoards).catch(() => {}).finally(() => setLoadingYtBoards(false));
+  }, []);
+  const onYtBoard = useCallback((v: string) => {
+    setYtBoard(v); setYtSprint(''); setYtSprints([]);
+    if (!v) return;
+    setLoadingYtSprints(true);
+    apiFetch<Opt[]>('/tasks/youtrack/sprints?board_id=' + encodeURIComponent(v))
+      .then((ysps) => { setYtSprints(ysps); const cur = ysps.find((s) => s.is_current); if (cur) setYtSprint(cur.path ?? cur.name); })
+      .catch(() => {}).finally(() => setLoadingYtSprints(false));
+  }, []);
+
   const apply = () => {
     if (provider === 'azure') {
       onApply({ sprint_provider: 'azure', sprint_path: azSprint, sprint_project: azProject, sprint_team: azTeam, sprint_board: '' });
+    } else if (provider === 'youtrack') {
+      onApply({ sprint_provider: 'youtrack', sprint_path: ytSprint, sprint_project: ytProject, sprint_team: '', sprint_board: ytBoard });
     } else {
       onApply({ sprint_provider: 'jira', sprint_path: jiraSprint, sprint_project: jiraProject, sprint_team: '', sprint_board: jiraBoard });
     }
   };
 
-  const canApply = provider === 'azure' ? !!azSprint : !!jiraSprint;
+  const canApply = provider === 'azure' ? !!azSprint : provider === 'youtrack' ? !!ytSprint : !!jiraSprint;
 
   return (
     <div style={{ display: 'grid', gap: 10 }}>
       <div style={{ display: 'flex', gap: 4, padding: 3, borderRadius: 8, background: 'var(--panel)', border: '1px solid var(--panel-border-3)' }}>
-        {(['azure', 'jira'] as const).map((p) => (
-          <button key={p} type='button' onClick={() => setProvider(p)} disabled={p === 'jira' && !jiraConnected}
-            style={{
-              flex: 1, padding: '7px 8px', borderRadius: 6, border: 'none',
-              background: provider === p ? 'var(--acc-soft)' : 'transparent',
-              color: provider === p ? 'var(--acc)' : (p === 'jira' && !jiraConnected ? 'var(--ink-25)' : 'var(--muted)'),
-              fontSize: 12, fontWeight: 700, cursor: p === 'jira' && !jiraConnected ? 'not-allowed' : 'pointer',
-            }}>{p === 'azure' ? 'Azure' : 'Jira'}</button>
-        ))}
+        {(['azure', 'jira', 'youtrack'] as const).map((p) => {
+          const disabled = (p === 'jira' && !jiraConnected) || (p === 'youtrack' && !youtrackConnected);
+          const label = p === 'azure' ? 'Azure' : p === 'jira' ? 'Jira' : 'YouTrack';
+          return (
+            <button key={p} type='button' onClick={() => setProvider(p)} disabled={disabled}
+              style={{
+                flex: 1, padding: '7px 8px', borderRadius: 6, border: 'none',
+                background: provider === p ? 'var(--acc-soft)' : 'transparent',
+                color: provider === p ? 'var(--acc)' : (disabled ? 'var(--ink-25)' : 'var(--muted)'),
+                fontSize: 12, fontWeight: 700, cursor: disabled ? 'not-allowed' : 'pointer',
+              }}>{label}</button>
+          );
+        })}
       </div>
 
       {provider === 'azure' ? (
@@ -175,6 +217,16 @@ export default function WorkspaceSprintPicker({ initial, onApply, saving }: {
           <Sel label={t('sprintPicker.azureTeam')} value={azTeam} onChange={onAzTeam} options={azTeams.map((tm) => ({ id: tm.name, name: tm.name }))} placeholder={azProject ? t('sprintPicker.selectTeam') : t('sprintPicker.selectProjectFirst')} loading={loadingTeams} disabled={!azProject} />
           <Sel label={t('sprintPicker.azureSprint')} value={azSprint} onChange={setAzSprint} options={azSprints.map((s) => ({ id: s.path ?? s.name, name: s.name }))} placeholder={azTeam ? t('sprintPicker.selectSprint') : t('sprintPicker.selectTeamFirst')} loading={loadingSprints} disabled={!azTeam} />
         </div>
+      ) : provider === 'youtrack' ? (
+        !youtrackConnected ? (
+          <div style={{ fontSize: 12, color: 'var(--muted)', padding: '10px 4px' }}>{t('sprintPicker.youtrackNotConnected')}</div>
+        ) : (
+          <div style={{ display: 'grid', gap: 8 }}>
+            <Sel label={t('sprintPicker.youtrackProject')} value={ytProject} onChange={onYtProject} options={ytProjects.map((p) => ({ id: p.id ?? p.name, name: p.name }))} placeholder={t('sprintPicker.selectProject')} />
+            <Sel label={t('sprintPicker.youtrackBoard')} value={ytBoard} onChange={onYtBoard} options={ytBoards.map((b) => ({ id: b.id ?? b.name, name: b.name }))} placeholder={ytProject ? t('sprintPicker.selectBoard') : t('sprintPicker.selectProjectFirst')} loading={loadingYtBoards} disabled={!ytProject} />
+            <Sel label={t('sprintPicker.youtrackSprint')} value={ytSprint} onChange={setYtSprint} options={ytSprints.map((s) => ({ id: s.path ?? s.name, name: s.name }))} placeholder={ytBoard ? t('sprintPicker.selectSprint') : t('sprintPicker.selectBoardFirst')} loading={loadingYtSprints} disabled={!ytBoard} />
+          </div>
+        )
       ) : !jiraConnected ? (
         <div style={{ fontSize: 12, color: 'var(--muted)', padding: '10px 4px' }}>{t('sprintPicker.jiraNotConnected')}</div>
       ) : (

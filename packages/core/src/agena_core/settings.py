@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     jira_api_token: str = Field(default='', alias='JIRA_API_TOKEN')
     jira_project_key: str = Field(default='', alias='JIRA_PROJECT_KEY')
 
+    youtrack_base_url: str = Field(default='', alias='YOUTRACK_BASE_URL')
+    youtrack_token: str = Field(default='', alias='YOUTRACK_TOKEN')
+
     azure_org_url: str = Field(default='', alias='AZURE_ORG_URL')
     azure_project: str = Field(default='', alias='AZURE_PROJECT')
     azure_pat: str = Field(default='', alias='AZURE_PAT')

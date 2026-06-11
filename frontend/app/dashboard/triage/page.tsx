@@ -54,6 +54,7 @@ const VERDICT_ICON: Record<string, string> = {
 
 const SOURCE_ICON: Record<string, string> = {
   jira: 'clipboard',
+  youtrack: 'clipboard',
   azure_devops: 'box',
   azure: 'box',
 };
@@ -72,7 +73,7 @@ export default function TriagePage() {
   const [statusFilter, setStatusFilter] = useState<'pending' | 'applied' | 'skipped'>('pending');
   // Source tab — separates Jira / Azure queues so the user can triage
   // one platform at a time.
-  const [sourceFilter, setSourceFilter] = useState<'all' | 'jira' | 'azure'>('all');
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'jira' | 'youtrack' | 'azure'>('all');
   // Project / board filter (Jira project key or Azure project name).
   // Populated from /triage/projects so the dropdown only shows what
   // exists in the queue.
@@ -410,6 +411,7 @@ export default function TriagePage() {
           const visible = projectsList.filter((p) => {
             if (sourceFilter === 'all') return true;
             if (sourceFilter === 'jira') return p.source === 'jira';
+            if (sourceFilter === 'youtrack') return p.source === 'youtrack';
             return p.source === 'azure' || p.source === 'azure_devops';
           });
           if (visible.length === 0) return null;
@@ -440,7 +442,7 @@ export default function TriagePage() {
                       display: 'inline-flex', alignItems: 'center', gap: 4,
                     }}
                   >
-                    <NavIcon name={p.source === 'jira' ? 'clipboard' : 'box'} size={13} /> {p.project_key}
+                    <NavIcon name={(p.source === 'jira' || p.source === 'youtrack') ? 'clipboard' : 'box'} size={13} /> {p.project_key}
                     <span style={{ opacity: 0.6, marginLeft: 4 }}>({p.count})</span>
                   </button>
                 );
@@ -457,6 +459,7 @@ export default function TriagePage() {
           const visible = statesList.filter((s) => {
             if (sourceFilter === 'all') return true;
             if (sourceFilter === 'jira') return s.source === 'jira';
+            if (sourceFilter === 'youtrack') return s.source === 'youtrack';
             return s.source === 'azure' || s.source === 'azure_devops';
           });
           if (visible.length === 0) return null;
@@ -504,6 +507,7 @@ export default function TriagePage() {
           {([
             { key: 'all', label: t('triage.source.all' as TranslationKey), icon: 'grid', accent: '#5b9bd5' },
             { key: 'jira', label: 'Jira', icon: 'clipboard', accent: '#5b9bd5' },
+            { key: 'youtrack', label: 'YouTrack', icon: 'clipboard', accent: '#5b9bd5' },
             { key: 'azure', label: 'Azure DevOps', icon: 'box', accent: '#5b9bd5' },
           ] as const).map((tab) => {
             const isActive = sourceFilter === tab.key;
@@ -591,6 +595,7 @@ export default function TriagePage() {
               accent='#5b9bd5'
               options={[
                 { value: 'jira', label: 'Jira', icon: '🪐' },
+                { value: 'youtrack', label: 'YouTrack', icon: '🟪' },
                 { value: 'azure_devops', label: 'Azure DevOps', icon: '🟦' },
                 { value: 'github', label: 'GitHub Issues', icon: '🐙' },
                 { value: 'linear', label: 'Linear', icon: '📐' },

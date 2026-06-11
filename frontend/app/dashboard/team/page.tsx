@@ -44,18 +44,21 @@ const initials = (name: string) =>
 export default function TeamPage() {
   const { t } = useLocale();
   const [tab, setTab] = useState<'sprint' | 'org'>('sprint');
-  const [provider,   setProvider]   = useState<'azure' | 'jira'>('azure');
+  const [provider,   setProvider]   = useState<'azure' | 'jira' | 'youtrack'>('azure');
   const [hasAzure,   setHasAzure]   = useState(false);
   const [hasJira,    setHasJira]    = useState(false);
+  const [hasYoutrack, setHasYoutrack] = useState(false);
   const [project,    setProject]    = useState('');
   const [team,       setTeam]       = useState('');
   const [sprintPath, setSprintPath] = useState('');
   const [providerDefaults, setProviderDefaults] = useState<{
     azure: { project: string; team: string; sprint: string };
     jira: { project: string; team: string; sprint: string };
+    youtrack: { project: string; team: string; sprint: string };
   }>({
     azure: { project: '', team: '', sprint: '' },
     jira: { project: '', team: '', sprint: '' },
+    youtrack: { project: '', team: '', sprint: '' },
   });
 
   // Tüm Azure üyeleri (arama için)
@@ -64,7 +67,7 @@ export default function TeamPage() {
 
   // Benim seçtiğim takım
   const [myTeam, setMyTeam] = useState<AzureMember[]>([]);
-  const [myTeamBySource, setMyTeamBySource] = useState<Record<'azure' | 'jira', AzureMember[]>>({ azure: [], jira: [] });
+  const [myTeamBySource, setMyTeamBySource] = useState<Record<'azure' | 'jira' | 'youtrack', AzureMember[]>>({ azure: [], jira: [], youtrack: [] });
 
   // Arama & panel
   const [search, setSearch] = useState('');
@@ -106,10 +109,13 @@ export default function TeamPage() {
 
         const azureCfg = integrations.find((c) => c.provider === 'azure');
         const jiraCfg = integrations.find((c) => c.provider === 'jira');
+        const youtrackCfg = integrations.find((c) => c.provider === 'youtrack');
         const azureConnected = Boolean(azureCfg && (azureCfg.has_secret || (azureCfg.base_url || '').trim().length > 0));
         const jiraConnected = Boolean(jiraCfg && (jiraCfg.has_secret || (jiraCfg.base_url || '').trim().length > 0 || (jiraCfg.username || '').trim().length > 0));
+        const youtrackConnected = Boolean(youtrackCfg && (youtrackCfg.has_secret || (youtrackCfg.base_url || '').trim().length > 0));
         setHasAzure(azureConnected);
         setHasJira(jiraConnected);
+        setHasYoutrack(youtrackConnected);
         setAzureBaseUrl((azureCfg?.base_url || '').trim().replace(/\/$/, ''));
         setJiraBaseUrl((jiraCfg?.base_url || '').trim().replace(/\/$/, ''));
 
@@ -117,6 +123,9 @@ export default function TeamPage() {
         const jiraProject = typeof rawSettings.jira_project === 'string' ? rawSettings.jira_project : '';
         const jiraBoard = typeof rawSettings.jira_board === 'string' ? rawSettings.jira_board : '';
         const jiraSprint = typeof rawSettings.jira_sprint_id === 'string' ? rawSettings.jira_sprint_id : '';
+        const ytProject = typeof rawSettings.youtrack_project === 'string' ? rawSettings.youtrack_project : '';
+        const ytBoard = typeof rawSettings.youtrack_board === 'string' ? rawSettings.youtrack_board : '';
+        const ytSprint = typeof rawSettings.youtrack_sprint_id === 'string' ? rawSettings.youtrack_sprint_id : '';
         const azureProject = prefs.azure_project || '';
         const azureTeam = prefs.azure_team || '';
         const azureSprint = prefs.azure_sprint_path || '';
@@ -125,19 +134,23 @@ export default function TeamPage() {
         const jiraSprintValue = jiraSprint || '';
         const hasAzureProfileSelection = Boolean(azureProject || azureTeam || azureSprint);
         const hasJiraProfileSelection = Boolean(jiraProjectValue || jiraBoardValue || jiraSprintValue);
-        const selectedProvider: 'azure' | 'jira' =
+        const hasYoutrackProfileSelection = Boolean(ytProject || ytBoard || ytSprint);
+        const selectedProvider: 'azure' | 'jira' | 'youtrack' =
           (azureConnected && hasAzureProfileSelection) ? 'azure' :
           (jiraConnected && hasJiraProfileSelection) ? 'jira' :
-          (azureConnected ? 'azure' : 'jira');
+          (youtrackConnected && hasYoutrackProfileSelection) ? 'youtrack' :
+          (azureConnected ? 'azure' : jiraConnected ? 'jira' : youtrackConnected ? 'youtrack' : 'azure');
         setProvider(selectedProvider);
         setProviderDefaults({
           azure: { project: azureProject, team: azureTeam, sprint: azureSprint },
           jira: { project: jiraProjectValue, team: jiraBoardValue, sprint: jiraSprintValue },
+          youtrack: { project: ytProject, team: ytBoard, sprint: ytSprint },
         });
         const bySourceRaw = prefs.my_team_by_source;
-        const bySource: Record<'azure' | 'jira', AzureMember[]> = {
+        const bySource: Record<'azure' | 'jira' | 'youtrack', AzureMember[]> = {
           azure: (bySourceRaw && Array.isArray(bySourceRaw.azure)) ? bySourceRaw.azure : (prefs.my_team || []),
           jira: (bySourceRaw && Array.isArray(bySourceRaw.jira)) ? bySourceRaw.jira : (Array.isArray(rawSettings.my_team_jira) ? rawSettings.my_team_jira as AzureMember[] : []),
+          youtrack: (bySourceRaw && Array.isArray((bySourceRaw as Record<string, AzureMember[]>).youtrack)) ? (bySourceRaw as Record<string, AzureMember[]>).youtrack : [],
         };
         setMyTeamBySource(bySource);
 
@@ -146,6 +159,11 @@ export default function TeamPage() {
           setTeam(jiraBoardValue);
           setSprintPath(jiraSprintValue);
           setMyTeam(bySource.jira || []);
+        } else if (selectedProvider === 'youtrack') {
+          setProject(ytProject);
+          setTeam(ytBoard);
+          setSprintPath(ytSprint);
+          setMyTeam(bySource.youtrack || []);
         } else {
           setProject(azureProject);
           setTeam(azureTeam);
@@ -199,9 +217,10 @@ export default function TeamPage() {
         }
       } catch (e: unknown) {
         if (e instanceof Error && e.message.toLowerCase().includes('invalid token')) return;
-        const preferred = localStorage.getItem(LS_PROVIDER) === 'jira' ? 'jira' : 'azure';
+        const lsProv = localStorage.getItem(LS_PROVIDER);
+        const preferred: 'azure' | 'jira' | 'youtrack' = lsProv === 'jira' ? 'jira' : lsProv === 'youtrack' ? 'youtrack' : 'azure';
         setProvider(preferred);
-        setMyTeamBySource({ azure: [], jira: [] });
+        setMyTeamBySource({ azure: [], jira: [], youtrack: [] });
         if (preferred === 'jira') {
           setProject(localStorage.getItem(LS_JIRA_PROJECT) || '');
           setTeam(localStorage.getItem(LS_JIRA_BOARD) || '');
@@ -229,14 +248,14 @@ export default function TeamPage() {
         // Import helper stores origin as a title prefix ("[Azure #12345] ...").
         // Tasks created via direct POST /tasks are source='internal', so filter
         // on the prefix via q= instead of source= to catch all imported items.
-        const prefix = provider === 'jira' ? '[Jira #' : '[Azure #';
+        const prefix = provider === 'jira' ? '[Jira #' : provider === 'youtrack' ? '[YouTrack #' : '[Azure #';
         type SearchRes = { items: Array<{ id: number; title: string }> };
         const res = await apiFetch<SearchRes>(
           '/tasks/search?q=' + encodeURIComponent(prefix) + '&page_size=100',
         );
         if (cancelled) return;
         const map: Record<string, number> = {};
-        const re = /^\[(Azure|Jira)\s+#([^\]]+)\]/i;
+        const re = /^\[(Azure|Jira|YouTrack)\s+#([^\]]+)\]/i;
         for (const t of res.items) {
           const m = t.title.match(re);
           if (m) map[m[2].trim()] = t.id;
@@ -254,10 +273,10 @@ export default function TeamPage() {
     const reqId = ++sprintResolveReqRef.current;
     const run = async () => {
       try {
-        if (provider === 'jira') {
+        if (provider !== 'azure') {
           if (!team) return;
           type JiraSprint = { id?: string; name: string; path?: string; is_current?: boolean };
-          const sprints = await apiFetch<JiraSprint[]>('/tasks/jira/sprints?board_id=' + encodeURIComponent(team));
+          const sprints = await apiFetch<JiraSprint[]>('/tasks/' + provider + '/sprints?board_id=' + encodeURIComponent(team));
           if (reqId !== sprintResolveReqRef.current) return;
           const current = sprints.find((s) => s.is_current) || sprints[0];
           if (!current) return;
@@ -290,14 +309,14 @@ export default function TeamPage() {
     setLoadingAll(true);
     const run = async () => {
       try {
-        if (provider === 'jira') {
+        if (provider !== 'azure') {
           if (!team || !sprintPath) {
             if (reqId !== membersReqRef.current) return;
             setAllMembers([]);
             return;
           }
           const members = await apiFetch<AzureMember[]>(
-            '/tasks/jira/members?board_id=' + encodeURIComponent(team) + '&sprint_id=' + encodeURIComponent(sprintPath),
+            '/tasks/' + provider + '/members?board_id=' + encodeURIComponent(team) + '&sprint_id=' + encodeURIComponent(sprintPath),
           );
           if (reqId !== membersReqRef.current) return;
           setAllMembers(members);
@@ -453,7 +472,7 @@ export default function TeamPage() {
           ? `${azureBaseUrl}/${encodeURIComponent(mapping.azure_project)}/_git/${encodeURIComponent(mapping.azure_repo_name)}`
           : '';
       const ctxParts = [
-        `External Source: ${provider === 'jira' ? `Jira #${item.id}` : `Azure #${item.id}`}`,
+        `External Source: ${provider === 'youtrack' ? `YouTrack #${item.id}` : provider === 'jira' ? `Jira #${item.id}` : `Azure #${item.id}`}`,
         'Prompt Instruction: Read any images in the task description and include their context in your analysis.',
         project ? `Project: ${project}` : '',
         team ? `Team: ${team}` : '',
@@ -465,7 +484,7 @@ export default function TeamPage() {
         mapping.repo_playbook ? `Repo Playbook: ${mapping.repo_playbook.replace(/\n+/g, ' ').trim()}` : '',
         mapping.github_repo_full_name ? `GitHub Repo: ${mapping.github_repo_full_name}` : '',
       ].filter(Boolean);
-      const fullTitle = `[${provider === 'jira' ? 'Jira' : 'Azure'} #${item.id}] ${item.title}`;
+      const fullTitle = `[${provider === 'youtrack' ? 'YouTrack' : provider === 'jira' ? 'Jira' : 'Azure'} #${item.id}] ${item.title}`;
       const fullDescription = `${desc || item.title}${commentsBlock}\n\n---\n${ctxParts.join('\n')}`;
 
       type AiFill = { story_context: string; acceptance_criteria: string; edge_cases: string };
@@ -510,9 +529,9 @@ export default function TeamPage() {
     if (workItems[member.id] !== undefined || !sprintPath) return;
     setLoadingItems(member.id);
     try {
-      const items = provider === 'jira'
+      const items = provider !== 'azure'
         ? await apiFetch<WorkItem[]>(
-            '/tasks/jira/member/workitems' +
+            '/tasks/' + provider + '/member/workitems' +
             '?board_id=' + encodeURIComponent(team) +
             '&sprint_id=' + encodeURIComponent(sprintPath) +
             '&assigned_to=' + encodeURIComponent(member.uniqueName),
@@ -532,7 +551,7 @@ export default function TeamPage() {
     }
   }
 
-  const hasConfig = provider === 'jira' ? !!(team && sprintPath) : !!(project && team && sprintPath);
+  const hasConfig = provider !== 'azure' ? !!(team && sprintPath) : !!(project && team && sprintPath);
 
   return (
     <div style={{ display: 'grid', gap: 24 }}>
@@ -612,6 +631,29 @@ export default function TeamPage() {
                 {t('team.providerJira')}
               </button>
             )}
+            {hasYoutrack && (
+              <button
+                onClick={() => {
+                  setProvider('youtrack');
+                  setProject(providerDefaults.youtrack.project);
+                  setTeam(providerDefaults.youtrack.team);
+                  setSprintPath(providerDefaults.youtrack.sprint);
+                  setMyTeam(myTeamBySource.youtrack || []);
+                }}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 999,
+                  border: provider === 'youtrack' ? '1px solid var(--acc)' : '1px solid var(--panel-border-3)',
+                  background: provider === 'youtrack' ? 'var(--acc-soft)' : 'var(--panel-alt)',
+                  color: provider === 'youtrack' ? 'var(--acc)' : 'var(--ink-58)',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                {t('team.providerYoutrack')}
+              </button>
+            )}
             </>}
           </div>
           <p style={{ color: 'var(--ink-35)', fontSize: 14, margin: 0 }}>
@@ -638,10 +680,10 @@ export default function TeamPage() {
         <div style={{ padding: '20px 24px', borderRadius: 10, border: '1px solid var(--panel-border)', background: 'var(--panel-alt)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <div style={{ fontWeight: 600, color: '#c98a2b', fontSize: 14 }}>
-              {provider === 'jira' ? t('team.noConfigJira') : t('team.noConfig')}
+              {provider !== 'azure' ? t('team.noConfigJira') : t('team.noConfig')}
             </div>
             <div style={{ fontSize: 12, color: 'var(--ink-35)', marginTop: 4 }}>
-              {provider === 'jira' ? t('team.noConfigDescJira') : t('team.noConfigDesc')}
+              {provider !== 'azure' ? t('team.noConfigDescJira') : t('team.noConfigDesc')}
             </div>
           </div>
           <a href="/dashboard/profile" style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--ink-78)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
@@ -939,7 +981,7 @@ export default function TeamPage() {
               {t('sprints.importRepoPicker.label' as TranslationKey)}
             </div>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink-90)', marginBottom: 2, lineHeight: 1.35 }}>
-              {`[${provider === 'jira' ? 'Jira' : 'Azure'} #${importPickerItem.id}] ${importPickerItem.title}`}
+              {`[${provider === 'youtrack' ? 'YouTrack' : provider === 'jira' ? 'Jira' : 'Azure'} #${importPickerItem.id}] ${importPickerItem.title}`}
             </div>
             <div style={{ fontSize: 11, color: 'var(--ink-55)', marginBottom: 14 }}>
               {t('sprints.importRepoPicker.hint' as TranslationKey)}

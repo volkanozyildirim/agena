@@ -1209,7 +1209,7 @@ async def _resolve_or_create_task_id(
             return int(existing_id)
 
     source = str(task.get('source') or task.get('external_source') or 'internal').strip().lower()
-    if source not in {'azure', 'jira', 'internal'}:
+    if source not in {'azure', 'jira', 'youtrack', 'internal'}:
         source = 'internal'
 
     title = str(task.get('title') or '').strip() or f'Flow Task {raw_task_id or ""}'.strip()

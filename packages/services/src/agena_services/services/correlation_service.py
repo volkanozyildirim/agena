@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 # Sources that count as "monitoring signals" (an error event)
 MONITORING_SOURCES = {'sentry', 'newrelic', 'datadog', 'appdynamics'}
 # Sources that count as "work item" signals
-WORK_ITEM_SOURCES = {'jira', 'azure_devops', 'azure'}
+WORK_ITEM_SOURCES = {'jira', 'youtrack', 'azure_devops', 'azure'}
 
 # Time window each correlation cluster spans
 WINDOW_MIN = timedelta(minutes=60)

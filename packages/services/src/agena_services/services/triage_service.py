@@ -331,6 +331,7 @@ _SOURCE_ALIASES = {
     'azure_devops': ['azure', 'azure_devops'],
     'azure': ['azure', 'azure_devops'],
     'jira': ['jira'],
+    'youtrack': ['youtrack'],
 }
 
 

@@ -19,7 +19,7 @@ from agena_services.services.task_service import TaskService
 
 router = APIRouter(prefix='/integration-rules', tags=['integration-rules'])
 
-_ALLOWED_PROVIDERS = {'jira', 'azure'}
+_ALLOWED_PROVIDERS = {'jira', 'youtrack', 'azure'}
 
 
 class RuleTestRequest(BaseModel):

@@ -248,7 +248,7 @@ async def pr_merged_webhook(
     # ticket lands in its terminal state without any manual click.
     # Separate try/except so a sync failure can't mask the Sentry
     # resolve result that was already returned above.
-    if task.source in ('jira', 'azure') and task.external_id:
+    if task.source in ('jira', 'azure', 'youtrack') and task.external_id:
         try:
             from agena_services.services.workflow_sync_service import WorkflowSyncService
             await WorkflowSyncService(db).on_pr_merged(task)

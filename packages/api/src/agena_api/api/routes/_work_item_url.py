@@ -23,8 +23,12 @@ async def build_work_item_url_resolver(
     svc = IntegrationConfigService(db)
     azure_cfg = await svc.get_config(organization_id, 'azure')
     jira_cfg = await svc.get_config(organization_id, 'jira')
+    youtrack_cfg = await svc.get_config(organization_id, 'youtrack')
     azure_base = (azure_cfg.base_url or '').rstrip('/') if azure_cfg else ''
     jira_base = (jira_cfg.base_url or '').rstrip('/') if jira_cfg else ''
+    youtrack_base = (youtrack_cfg.base_url or '').rstrip('/') if youtrack_cfg else ''
+    if youtrack_base.endswith('/api'):
+        youtrack_base = youtrack_base[: -len('/api')]
 
     azure_project = ''
     pref_rows = (await db.execute(
@@ -43,6 +47,10 @@ async def build_work_item_url_resolver(
             return f'{azure_base}/{quote(azure_project, safe="")}/_workitems/edit/{wi}'
         if '-' in wi and jira_base:
             return f'{jira_base}/browse/{wi}'
+        # YouTrack keys share the KEY-123 shape; fall back to it when Jira
+        # isn't configured but YouTrack is.
+        if '-' in wi and youtrack_base:
+            return f'{youtrack_base}/issue/{wi}'
         return None
 
     return resolve

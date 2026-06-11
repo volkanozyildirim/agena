@@ -1173,6 +1173,225 @@ async def list_jira_states(
     return ['To Do', 'In Progress', 'Done']
 
 
+# ── YouTrack sprint browsing (mirrors the Jira endpoints above) ─────────────
+
+@router.get('/youtrack', response_model=TaskListResponse)
+async def get_youtrack_tasks(
+    project_key: str | None = Query(default=None),
+    board_id: str | None = Query(default=None),
+    sprint_id: str | None = Query(default=None),
+    state: str | None = Query(default=None),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> TaskListResponse:
+    integration_service = IntegrationConfigService(db)
+    config = await integration_service.get_config(tenant.organization_id, 'youtrack')
+    if config is None:
+        raise HTTPException(status_code=400, detail='YouTrack integration not configured for this organization')
+
+    task_service = TaskService(db)
+    yt_cfg = {'base_url': config.base_url, 'token': config.secret}
+    if board_id:
+        tasks = await task_service.youtrack_client.fetch_board_issues(
+            yt_cfg, board_id=board_id, sprint_id=sprint_id, state=state,
+        )
+    else:
+        tasks = await task_service.youtrack_client.fetch_todo_issues(yt_cfg)
+    return TaskListResponse(items=tasks)
+
+
+@router.get('/youtrack/projects')
+async def list_youtrack_projects(
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[dict[str, str]]:
+    cached = await _cache_get(tenant.organization_id, 'youtrack', 'projects')
+    if cached is not None:
+        return cached
+    service = IntegrationConfigService(db)
+    config = await service.get_config(tenant.organization_id, 'youtrack')
+    if config is None or not config.secret:
+        return []
+    task_service = TaskService(db)
+    try:
+        projects = await task_service.youtrack_client.fetch_projects(
+            {'base_url': config.base_url, 'token': config.secret}
+        )
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 401:
+            await _notify_integration_auth_expired(db, tenant, 'YouTrack', 'Please update your YouTrack token in Integrations.')
+            raise HTTPException(status_code=401, detail='YouTrack token is invalid or expired') from exc
+        raise HTTPException(status_code=502, detail='YouTrack projects fetch failed') from exc
+    result = [{'id': p['key'], 'name': p['name']} for p in projects if p.get('key') and p.get('name')]
+    await _cache_set(result, tenant.organization_id, 'youtrack', 'projects')
+    return result
+
+
+@router.get('/youtrack/boards')
+async def list_youtrack_boards(
+    project_key: str | None = Query(default=None),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[dict[str, str]]:
+    cached = await _cache_get(tenant.organization_id, 'youtrack', 'boards', project_key or '')
+    if cached is not None:
+        return cached
+    service = IntegrationConfigService(db)
+    config = await service.get_config(tenant.organization_id, 'youtrack')
+    if config is None or not config.secret:
+        raise HTTPException(status_code=400, detail='YouTrack integration not configured')
+    task_service = TaskService(db)
+    try:
+        boards = await task_service.youtrack_client.fetch_boards(
+            {'base_url': config.base_url, 'token': config.secret},
+            project_key=project_key,
+        )
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 401:
+            await _notify_integration_auth_expired(db, tenant, 'YouTrack', 'Please update your YouTrack token in Integrations.')
+            raise HTTPException(status_code=401, detail='YouTrack token is invalid or expired') from exc
+        raise HTTPException(status_code=502, detail='YouTrack boards fetch failed') from exc
+    result = [{'id': b['id'], 'name': b['name']} for b in boards if b.get('id') and b.get('name')]
+    await _cache_set(result, tenant.organization_id, 'youtrack', 'boards', project_key or '')
+    return result
+
+
+@router.get('/youtrack/sprints')
+async def list_youtrack_sprints(
+    board_id: str = Query(...),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[dict[str, Any]]:
+    cached = await _cache_get(tenant.organization_id, 'youtrack', 'sprints', board_id)
+    if cached is not None:
+        return cached
+    service = IntegrationConfigService(db)
+    config = await service.get_config(tenant.organization_id, 'youtrack')
+    if config is None or not config.secret:
+        raise HTTPException(status_code=400, detail='YouTrack integration not configured')
+    task_service = TaskService(db)
+    try:
+        sprints = await task_service.youtrack_client.fetch_sprints(
+            {'base_url': config.base_url, 'token': config.secret},
+            board_id=board_id,
+        )
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 401:
+            await _notify_integration_auth_expired(db, tenant, 'YouTrack', 'Please update your YouTrack token in Integrations.')
+            raise HTTPException(status_code=401, detail='YouTrack token is invalid or expired') from exc
+        raise HTTPException(status_code=502, detail='YouTrack sprints fetch failed') from exc
+    result = [
+        {
+            'id': s['id'],
+            'name': s['name'],
+            'path': s['id'],
+            'is_current': (s.get('state') or '').lower() == 'active',
+            'timeframe': s.get('state'),
+            'start_date': s.get('start_date') or None,
+            'finish_date': s.get('finish_date') or None,
+        }
+        for s in sprints
+        if s.get('id') and s.get('name')
+    ]
+    await _cache_set(result, tenant.organization_id, 'youtrack', 'sprints', board_id)
+    return result
+
+
+@router.get('/youtrack/states')
+async def list_youtrack_states(
+    board_id: str = Query(...),
+    sprint_id: str | None = Query(default=None),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[str]:
+    _ = sprint_id
+    service = IntegrationConfigService(db)
+    config = await service.get_config(tenant.organization_id, 'youtrack')
+    if config is None or not config.secret:
+        raise HTTPException(status_code=400, detail='YouTrack integration not configured')
+    task_service = TaskService(db)
+    try:
+        states = await task_service.youtrack_client.fetch_board_states(
+            {'base_url': config.base_url, 'token': config.secret},
+            board_id=board_id,
+        )
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 401:
+            await _notify_integration_auth_expired(db, tenant, 'YouTrack', 'Please update your YouTrack token in Integrations.')
+            raise HTTPException(status_code=401, detail='YouTrack token is invalid or expired') from exc
+        raise HTTPException(status_code=502, detail='YouTrack states fetch failed') from exc
+    if states:
+        return states
+    return ['Open', 'In Progress', 'Fixed']
+
+
+@router.get('/youtrack/members')
+async def list_youtrack_sprint_members(
+    board_id: str = Query(...),
+    sprint_id: str = Query(...),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[dict[str, str]]:
+    service = IntegrationConfigService(db)
+    config = await service.get_config(tenant.organization_id, 'youtrack')
+    if config is None or not config.secret:
+        raise HTTPException(status_code=400, detail='YouTrack integration not configured')
+    task_service = TaskService(db)
+    try:
+        items = await task_service.youtrack_client.fetch_sprint_work_items(
+            {'base_url': config.base_url, 'token': config.secret},
+            board_id=board_id, sprint_id=sprint_id,
+        )
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 401:
+            await _notify_integration_auth_expired(db, tenant, 'YouTrack', 'Please update your YouTrack token in Integrations.')
+            raise HTTPException(status_code=401, detail='YouTrack token is invalid or expired') from exc
+        raise HTTPException(status_code=502, detail='YouTrack members fetch failed') from exc
+    seen: dict[str, dict[str, str]] = {}
+    for it in items:
+        name = (getattr(it, 'assigned_to', None) or '').strip()
+        if name and name not in seen:
+            seen[name] = {'id': name, 'displayName': name, 'uniqueName': name}
+    return sorted(seen.values(), key=lambda x: x['displayName'])
+
+
+@router.get('/youtrack/member/workitems')
+async def list_youtrack_member_workitems(
+    board_id: str = Query(...),
+    sprint_id: str = Query(...),
+    assigned_to: str = Query(...),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[dict[str, Any]]:
+    service = IntegrationConfigService(db)
+    config = await service.get_config(tenant.organization_id, 'youtrack')
+    if config is None or not config.secret:
+        raise HTTPException(status_code=400, detail='YouTrack integration not configured')
+    task_service = TaskService(db)
+    try:
+        items = await task_service.youtrack_client.fetch_sprint_work_items(
+            {'base_url': config.base_url, 'token': config.secret},
+            board_id=board_id, sprint_id=sprint_id,
+        )
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 401:
+            await _notify_integration_auth_expired(db, tenant, 'YouTrack', 'Please update your YouTrack token in Integrations.')
+            raise HTTPException(status_code=401, detail='YouTrack token is invalid or expired') from exc
+        raise HTTPException(status_code=502, detail='YouTrack member workitems fetch failed') from exc
+    target = assigned_to.strip().lower()
+    out: list[dict[str, Any]] = []
+    for it in items:
+        if (getattr(it, 'assigned_to', None) or '').strip().lower() != target:
+            continue
+        out.append({
+            'id': str(it.id),
+            'title': str(it.title or ''),
+            'state': str(it.state or ''),
+            'description': str(it.description or ''),
+        })
+    return out
+
+
 @router.get('/azure', response_model=TaskListResponse)
 async def get_azure_tasks(
     project: str | None = Query(default=None),

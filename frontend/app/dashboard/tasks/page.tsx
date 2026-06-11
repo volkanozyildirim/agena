@@ -27,7 +27,7 @@ function useIsMobile(breakpoint = 768) {
 }
 
 const STATUS_FILTERS = ['all', 'new', 'queued', 'running', 'completed', 'failed'];
-const SOURCE_FILTERS = ['all', 'internal', 'azure', 'jira', 'newrelic', 'sentry'];
+const SOURCE_FILTERS = ['all', 'internal', 'azure', 'jira', 'youtrack', 'newrelic', 'sentry'];
 
 function statusColor(s: string) {
   const m: Record<string, string> = { new: '#94a3b8', queued: '#c98a2b', running: '#5b9bd5', completed: '#3f9d6a', answered: '#a78bfa', failed: '#cf5b57' };
@@ -329,9 +329,10 @@ export default function DashboardTasksPage() {
   // to localStorage if the DB call fails.
   const [activeAzureSprintLabel, setActiveAzureSprintLabel] = useState('');
   const [activeJiraSprintLabel, setActiveJiraSprintLabel] = useState('');
+  const [activeYoutrackSprintLabel, setActiveYoutrackSprintLabel] = useState('');
   // Create-modal "fetch from sprint" picker. Empty = blank task; otherwise
   // the user is browsing Azure/Jira items and a click prefills the form.
-  const [pickerSource, setPickerSource] = useState<'empty' | 'azure' | 'jira'>('empty');
+  const [pickerSource, setPickerSource] = useState<'empty' | 'azure' | 'jira' | 'youtrack'>('empty');
   type SprintItem = { id: string; title: string; description?: string; state?: string | null; work_item_type?: string | null };
   const [pickerItems, setPickerItems] = useState<SprintItem[]>([]);
   const [pickerLoading, setPickerLoading] = useState(false);
@@ -345,7 +346,7 @@ export default function DashboardTasksPage() {
   // navigating until they confirm in a themed modal (replaces the
   // jarring window.confirm browser dialog).
   const [alreadyImportedPrompt, setAlreadyImportedPrompt] = useState<{ taskId: number; title: string } | null>(null);
-  const [createSource, setCreateSource] = useState<'internal' | 'azure' | 'jira'>('internal');
+  const [createSource, setCreateSource] = useState<'internal' | 'azure' | 'jira' | 'youtrack'>('internal');
   const [createExternalId, setCreateExternalId] = useState('');
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -513,11 +514,12 @@ export default function DashboardTasksPage() {
     if (!showCreate) return;
     type Prefs = {
       azure_sprint_path?: string | null;
-      profile_settings?: { jira_sprint_id?: string; jira_sprint_name?: string } | null;
+      profile_settings?: { jira_sprint_id?: string; jira_sprint_name?: string; youtrack_sprint_id?: string; youtrack_sprint_name?: string } | null;
     };
     void (async () => {
       let azLeaf = '';
       let jiraName = '';
+      let youtrackName = '';
       try {
         const prefs = await apiFetch<Prefs>('/preferences');
         const azPath = (prefs.azure_sprint_path || '').trim();
@@ -525,18 +527,22 @@ export default function DashboardTasksPage() {
         azLeaf = azPath ? azPath.split(/[\\/]/).filter(Boolean).pop() || azPath : '';
         const ps = prefs.profile_settings || {};
         jiraName = (ps.jira_sprint_name || ps.jira_sprint_id || '').toString().trim();
+        youtrackName = (ps.youtrack_sprint_name || ps.youtrack_sprint_id || '').toString().trim();
       } catch { /* fall through to workspace */ }
       // No personal sprint → use the workspace's sprint from the DB (never
       // localStorage, which could be a stale value from another session).
-      if (!azLeaf && !jiraName) {
+      if (!azLeaf && !jiraName && !youtrackName) {
         const ws = await fetchActiveWorkspaceSprint();
         if (ws) {
           const leaf = ws.path.split(/[\\/]/).filter(Boolean).pop() || ws.path;
-          if (ws.provider === 'jira') jiraName = leaf; else azLeaf = leaf;
+          if (ws.provider === 'jira') jiraName = leaf;
+          else if (ws.provider === 'youtrack') youtrackName = leaf;
+          else azLeaf = leaf;
         }
       }
       setActiveAzureSprintLabel(azLeaf);
       setActiveJiraSprintLabel(jiraName);
+      setActiveYoutrackSprintLabel(youtrackName);
     })();
   }, [showCreate]);
 
@@ -565,7 +571,7 @@ export default function DashboardTasksPage() {
     } catch { return null; }
   }
 
-  async function loadSprintItems(source: 'azure' | 'jira') {
+  async function loadSprintItems(source: 'azure' | 'jira' | 'youtrack') {
     setPickerLoading(true);
     setPickerError('');
     try {
@@ -581,15 +587,16 @@ export default function DashboardTasksPage() {
       };
       const prefs = await apiFetch<Prefs>('/preferences').catch(() => ({} as Prefs));
       const ps = prefs.profile_settings || {};
-      let project = (source === 'jira' ? (ps.jira_project || '') : prefs.azure_project) || '';
-      let team = (source === 'jira' ? (ps.jira_board || '') : prefs.azure_team) || '';
-      let sprint = (source === 'jira' ? (ps.jira_sprint_id || '') : prefs.azure_sprint_path) || '';
+      const isAzure = source === 'azure';
+      let project = (isAzure ? prefs.azure_project : ps[`${source}_project`]) || '';
+      let team = (isAzure ? prefs.azure_team : ps[`${source}_board`]) || '';
+      let sprint = (isAzure ? prefs.azure_sprint_path : ps[`${source}_sprint_id`]) || '';
       if (!sprint) {
         // Fall back to the workspace's sprint (members have no personal one).
         const wsSprint = await fetchActiveWorkspaceSprint();
         if (wsSprint && wsSprint.provider === source) {
           project = wsSprint.project;
-          team = source === 'jira' ? wsSprint.board : wsSprint.team;
+          team = isAzure ? wsSprint.team : wsSprint.board;
           sprint = wsSprint.path;
         }
       }
@@ -599,7 +606,7 @@ export default function DashboardTasksPage() {
         return;
       }
       const qs = new URLSearchParams();
-      if (source === 'jira') {
+      if (source !== 'azure') {
         if (project) qs.set('project_key', project);
         if (team) qs.set('board_id', team);
         if (sprint) qs.set('sprint_id', sprint);
@@ -611,7 +618,7 @@ export default function DashboardTasksPage() {
         // the sprint so the picker can pull bugs / in-progress items too.
         qs.set('state', '');
       }
-      const path = source === 'jira' ? '/tasks/jira' : '/tasks/azure';
+      const path = source === 'azure' ? '/tasks/azure' : '/tasks/' + source;
       const data = await apiFetch<{ items?: SprintItem[] } | SprintItem[]>(`${path}?${qs.toString()}`);
       const items = Array.isArray(data) ? data : (data.items || []);
       setPickerItems(items);
@@ -626,7 +633,7 @@ export default function DashboardTasksPage() {
           if (r.external_id) map[r.external_id] = r.id;
         }
         // Legacy: pre-source imports still use `[Azure #N] / [Jira KEY]` titles.
-        const titleRe = new RegExp(`^\\[${source === 'jira' ? 'Jira' : 'Azure'}\\s*#([^\\]\\s]+)\\]`);
+        const titleRe = new RegExp(`^\\[${source === 'youtrack' ? 'YouTrack' : source === 'jira' ? 'Jira' : 'Azure'}\\s*#([^\\]\\s]+)\\]`);
         for (const r of internal.items || []) {
           const m = r.title ? titleRe.exec(r.title) : null;
           if (m && m[1] && !map[m[1]]) map[m[1]] = r.id;
@@ -645,8 +652,8 @@ export default function DashboardTasksPage() {
     }
   }
 
-  function applyPickedItem(source: 'azure' | 'jira', item: SprintItem) {
-    const prefix = source === 'jira' ? 'Jira' : 'Azure';
+  function applyPickedItem(source: 'azure' | 'jira' | 'youtrack', item: SprintItem) {
+    const prefix = source === 'youtrack' ? 'YouTrack' : source === 'jira' ? 'Jira' : 'Azure';
     setTitle(`[${prefix} #${item.id}] ${item.title}`);
     // Keep the original HTML — the textarea shows raw markup for editing
     // but a live preview pane (renderMarkdown, same path the task detail
@@ -1201,7 +1208,7 @@ export default function DashboardTasksPage() {
               {t('tasks.picker.label' as TranslationKey)}
             </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {(['empty', 'azure', 'jira'] as const).map((src) => {
+              {(['empty', 'azure', 'jira', 'youtrack'] as const).map((src) => {
                 const active = pickerSource === src;
                 return (
                   <button
@@ -1242,6 +1249,14 @@ export default function DashboardTasksPage() {
                         )}
                       </>
                     )}
+                    {src === 'youtrack' && (
+                      <>
+                        <NavIcon name="box" size={14} /> {t('tasks.picker.youtrack' as TranslationKey)}
+                        {activeYoutrackSprintLabel && (
+                          <span style={{ marginLeft: 6, fontWeight: 500, opacity: 0.75 }}>({activeYoutrackSprintLabel})</span>
+                        )}
+                      </>
+                    )}
                   </button>
                 );
               })}
@@ -1259,7 +1274,7 @@ export default function DashboardTasksPage() {
                   />
                   <button
                     type='button'
-                    onClick={() => void loadSprintItems(pickerSource as 'azure' | 'jira')}
+                    onClick={() => void loadSprintItems(pickerSource as 'azure' | 'jira' | 'youtrack')}
                     disabled={pickerLoading}
                     title={t('tasks.picker.refresh' as TranslationKey)}
                     style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--panel-border-3)', background: 'var(--panel-alt)', color: 'var(--ink-78)', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}
@@ -1290,7 +1305,7 @@ export default function DashboardTasksPage() {
                                 // without losing their place in the picker.
                                 setAlreadyImportedPrompt({ taskId: existingId, title: it.title });
                               } else {
-                                applyPickedItem(pickerSource as 'azure' | 'jira', it);
+                                applyPickedItem(pickerSource as 'azure' | 'jira' | 'youtrack', it);
                               }
                             }}
                             title={isTaken ? t('tasks.picker.alreadyImportedHint' as TranslationKey, { id: String(existingId) }) : ''}

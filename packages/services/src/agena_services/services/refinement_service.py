@@ -21,6 +21,7 @@ from agena_agents.memory.qdrant import QdrantMemoryStore
 from agena_core.settings import get_settings
 from agena_services.integrations.azure_client import AzureDevOpsClient
 from agena_services.integrations.jira_client import JiraClient
+from agena_services.integrations.youtrack_client import YouTrackClient
 from agena_models.models.user_preference import UserPreference
 from agena_models.models.refinement_record import RefinementRecord
 from agena_models.schemas.refinement import (
@@ -203,6 +204,7 @@ class RefinementService:
         self.settings = get_settings()
         self.azure_client = AzureDevOpsClient()
         self.jira_client = JiraClient()
+        self.youtrack_client = YouTrackClient()
         self.integration_service = IntegrationConfigService(db)
         self.cost_tracker = CostTracker()
         self.memory = QdrantMemoryStore()
@@ -643,6 +645,21 @@ class RefinementService:
                                     )
                         except Exception as exc:
                             logger.info('Jira image fetch skipped for item %s: %s', item.id, exc)
+                    elif request.provider == 'youtrack':
+                        try:
+                            yt_cfg_for_img = await self.integration_service.get_config(organization_id, 'youtrack')
+                            if yt_cfg_for_img and yt_cfg_for_img.secret:
+                                fetched = await self.youtrack_client.fetch_issue_images(
+                                    item.id,
+                                    cfg={'base_url': yt_cfg_for_img.base_url or '', 'token': yt_cfg_for_img.secret},
+                                    max_images=6,
+                                )
+                                if fetched:
+                                    item_images_data_urls, item_image_paths = self._materialize_images_for_llm(
+                                        fetched, item.id,
+                                    )
+                        except Exception as exc:
+                            logger.info('YouTrack image fetch skipped for item %s: %s', item.id, exc)
 
                     if use_cli:
                         # Run via CLI bridge instead of LLM API
@@ -922,6 +939,40 @@ class RefinementService:
                     success=results[-1].success,
                     error_message=results[-1].message if not results[-1].success else '',
                 )
+        elif provider == 'youtrack':
+            config = await self.integration_service.get_config(organization_id, 'youtrack')
+            if config is None or not config.secret:
+                raise ValueError('YouTrack integration is not configured')
+            cfg = {'base_url': config.base_url, 'token': config.secret}
+            for item in items:
+                comment = self._with_signature(item.comment, signature)
+                assignee = (item.assignee_unique_name or '').strip()
+                try:
+                    await self.youtrack_client.writeback_refinement(
+                        cfg=cfg,
+                        issue_key=item.item_id,
+                        suggested_story_points=item.suggested_story_points,
+                        comment=comment,
+                        board_id=request.board_id or '',
+                        assignee_email=assignee or None,
+                    )
+                    msg = 'ok' + (f' + assigned {assignee}' if assignee else '')
+                    results.append(RefinementWritebackResult(item_id=item.item_id, success=True, message=msg))
+                except Exception as exc:
+                    results.append(RefinementWritebackResult(item_id=item.item_id, success=False, message=str(exc)[:220]))
+                await self._save_writeback_history(
+                    organization_id=organization_id,
+                    user_id=None,
+                    provider='youtrack',
+                    sprint_ref=request.sprint_id or request.sprint_name or '',
+                    sprint_name=request.sprint_name or '',
+                    item_id=item.item_id,
+                    suggested_story_points=int(item.suggested_story_points or 0),
+                    comment=comment,
+                    signature=signature,
+                    success=results[-1].success,
+                    error_message=results[-1].message if not results[-1].success else '',
+                )
         else:
             raise ValueError(f'Unsupported provider: {request.provider}')
 
@@ -984,6 +1035,25 @@ class RefinementService:
                     'email': config.username or '',
                     'api_token': config.secret,
                 },
+                board_id=normalized_board,
+                sprint_id=normalized_sprint_id,
+            )
+            resolved_name = (sprint_name or normalized_sprint_id).strip()
+            for item in items:
+                item.sprint_name = resolved_name
+                item.sprint_id = item.sprint_id or normalized_sprint_id
+            return items, resolved_name, normalized_sprint_id
+
+        if provider_key == 'youtrack':
+            config = await self.integration_service.get_config(organization_id, 'youtrack')
+            if config is None or not config.secret:
+                raise ValueError('YouTrack integration is not configured')
+            normalized_board = (board_id or '').strip()
+            normalized_sprint_id = (sprint_id or '').strip()
+            if not normalized_board or not normalized_sprint_id:
+                raise ValueError('YouTrack board and sprint are required')
+            items = await self.youtrack_client.fetch_sprint_work_items(
+                {'base_url': config.base_url, 'token': config.secret},
                 board_id=normalized_board,
                 sprint_id=normalized_sprint_id,
             )
@@ -1491,6 +1561,13 @@ class RefinementService:
                             'email': (cfg.extra_config or {}).get('email') or '',
                             'api_token': cfg.secret,
                         },
+                        issue_key=str(external_id),
+                    )
+            elif prov == 'youtrack':
+                cfg = await self.integration_service.get_config(organization_id, 'youtrack')
+                if cfg and cfg.secret:
+                    return await self.youtrack_client.fetch_issue_comments(
+                        cfg={'base_url': cfg.base_url or '', 'token': cfg.secret},
                         issue_key=str(external_id),
                     )
         except Exception as exc:

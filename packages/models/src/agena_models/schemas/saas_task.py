@@ -195,6 +195,13 @@ class JiraImportRequest(BaseModel):
     state: str | None = None
 
 
+class YouTrackImportRequest(BaseModel):
+    project_key: str | None = None
+    board_id: str | None = None
+    sprint_id: str | None = None
+    state: str | None = None
+
+
 class NewRelicImportRequest(BaseModel):
     entity_guid: str | None = None
     since: str = '24 hours ago'

@@ -19,6 +19,7 @@ from agena_agents.memory.qdrant import QdrantMemoryStore
 from agena_models.schemas.task import ExternalTask
 from agena_services.integrations.azure_client import AzureDevOpsClient
 from agena_services.integrations.jira_client import JiraClient
+from agena_services.integrations.youtrack_client import YouTrackClient
 from agena_services.services.integration_config_service import IntegrationConfigService
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,7 @@ class RefinementHistoryIndexer:
         self.integration_service = IntegrationConfigService(db)
         self.azure_client = AzureDevOpsClient()
         self.jira_client = JiraClient()
+        self.youtrack_client = YouTrackClient()
         self.memory = QdrantMemoryStore()
 
     async def backfill(
@@ -72,8 +74,8 @@ class RefinementHistoryIndexer:
             return {'indexed': 0, 'skipped_no_sp': 0, 'total_seen': 0, **err}
 
         src = (source or 'azure').strip().lower()
-        if src not in ('azure', 'jira'):
-            err = {'error': f'Source {src!r} is not supported; use azure or jira.'}
+        if src not in ('azure', 'jira', 'youtrack'):
+            err = {'error': f'Source {src!r} is not supported; use azure, jira or youtrack.'}
             _emit(**err, status='failed')
             return {'indexed': 0, 'skipped_no_sp': 0, 'total_seen': 0, **err}
 
@@ -108,6 +110,32 @@ class RefinementHistoryIndexer:
                 )
             except Exception as exc:
                 msg = f'Azure sorgulanamadı: {exc}'
+                _emit(status='failed', error=msg)
+                return {'indexed': 0, 'skipped_no_sp': 0, 'total_seen': 0, 'error': msg}
+        elif src == 'youtrack':
+            config = await self.integration_service.get_config(organization_id, 'youtrack')
+            if config is None or not config.secret:
+                err = {'error': 'YouTrack entegrasyonu ayarlı değil. Önce YouTrack integration\'ı bağla.'}
+                _emit(**err, status='failed')
+                return {'indexed': 0, 'skipped_no_sp': 0, 'total_seen': 0, **err}
+
+            resolved_project = (project or '').strip()
+            if not resolved_project:
+                err = {'error': 'YouTrack project seçilmedi. İstek gövdesinde project key geçir.'}
+                _emit(**err, status='failed')
+                return {'indexed': 0, 'skipped_no_sp': 0, 'total_seen': 0, **err}
+
+            _emit(status='fetching', phase='youtrack_query', message=f'YouTrack\'tan tamamlanmış issue\'lar çekiliyor ({resolved_project})...')
+            try:
+                items = await self.youtrack_client.fetch_completed_issues(
+                    {'base_url': config.base_url, 'token': config.secret},
+                    project=resolved_project,
+                    board_id=board_id,
+                    since_days=since_days,
+                    max_items=max_items,
+                )
+            except Exception as exc:
+                msg = f'YouTrack sorgulanamadı: {exc}'
                 _emit(status='failed', error=msg)
                 return {'indexed': 0, 'skipped_no_sp': 0, 'total_seen': 0, 'error': msg}
         else:  # jira

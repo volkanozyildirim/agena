@@ -7,7 +7,7 @@ import { useLocale } from '@/lib/i18n';
 import { useCanDo } from '@/lib/permissions';
 
 type Opt = { id: string; name: string; path?: string; is_current?: boolean };
-type Provider = 'azure' | 'jira';
+type Provider = 'azure' | 'jira' | 'youtrack';
 
 export const SPRINT_CHANGED_EVENT = 'agena:sprint-changed';
 
@@ -41,6 +41,7 @@ export default function SprintSwitcher() {
   const [open, setOpen] = useState(false);
   const [provider, setProvider] = useState<Provider>('azure');
   const [jiraConnected, setJiraConnected] = useState(false);
+  const [youtrackConnected, setYoutrackConnected] = useState(false);
 
   // Azure state
   const [azProjects, setAzProjects] = useState<Opt[]>([]);
@@ -62,6 +63,16 @@ export default function SprintSwitcher() {
   const [loadingJiraBoards, setLoadingJiraBoards] = useState(false);
   const [loadingJiraSprints, setLoadingJiraSprints] = useState(false);
 
+  // YouTrack state (mirrors Jira: project → board → sprint)
+  const [ytProjects, setYtProjects] = useState<Opt[]>([]);
+  const [ytBoards, setYtBoards] = useState<Opt[]>([]);
+  const [ytSprints, setYtSprints] = useState<Opt[]>([]);
+  const [ytProject, setYtProject] = useState('');
+  const [ytBoard, setYtBoard] = useState('');
+  const [ytSprint, setYtSprint] = useState('');
+  const [loadingYtBoards, setLoadingYtBoards] = useState(false);
+  const [loadingYtSprints, setLoadingYtSprints] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
 
@@ -73,6 +84,10 @@ export default function SprintSwitcher() {
         const connected = Boolean(jiraCfg && (jiraCfg.has_secret || (jiraCfg.base_url || '').trim() || (jiraCfg.username || '').trim()));
         setJiraConnected(connected);
         if (connected) apiFetch<Opt[]>('/tasks/jira/projects').then(setJiraProjects).catch(() => {});
+        const ytCfg = integrations.find((cfg) => cfg.provider === 'youtrack');
+        const ytConn = Boolean(ytCfg && (ytCfg.has_secret || (ytCfg.base_url || '').trim()));
+        setYoutrackConnected(ytConn);
+        if (ytConn) apiFetch<Opt[]>('/tasks/youtrack/projects').then(setYtProjects).catch(() => {});
       })
       .catch(() => {});
 
@@ -92,8 +107,11 @@ export default function SprintSwitcher() {
       const jp = typeof rawSettings.jira_project === 'string' ? rawSettings.jira_project : '';
       const jb = typeof rawSettings.jira_board === 'string' ? rawSettings.jira_board : '';
       const js = typeof rawSettings.jira_sprint_id === 'string' ? rawSettings.jira_sprint_id : '';
+      const ytp = typeof rawSettings.youtrack_project === 'string' ? rawSettings.youtrack_project : '';
+      const ytb = typeof rawSettings.youtrack_board === 'string' ? rawSettings.youtrack_board : '';
+      const yts = typeof rawSettings.youtrack_sprint_id === 'string' ? rawSettings.youtrack_sprint_id : '';
       const preferred = typeof rawSettings.preferred_sprint_provider === 'string' ? rawSettings.preferred_sprint_provider : '';
-      if (preferred === 'jira' || preferred === 'azure') setProvider(preferred as Provider);
+      if (preferred === 'jira' || preferred === 'azure' || preferred === 'youtrack') setProvider(preferred as Provider);
       if (p) {
         setAzProject(p);
         if (tm) {
@@ -116,6 +134,17 @@ export default function SprintSwitcher() {
           }
         }
       }
+      if (ytp) {
+        setYtProject(ytp);
+        if (ytb) {
+          setYtBoards(await apiFetch<Opt[]>('/tasks/youtrack/boards?project_key=' + encodeURIComponent(ytp)).catch(() => [] as Opt[]));
+          setYtBoard(ytb);
+          if (yts) {
+            setYtSprints(await apiFetch<Opt[]>('/tasks/youtrack/sprints?board_id=' + encodeURIComponent(ytb)).catch(() => [] as Opt[]));
+            setYtSprint(yts);
+          }
+        }
+      }
     } catch { /* no-op */ }
   }
 
@@ -129,13 +158,18 @@ export default function SprintSwitcher() {
       ws = list.find((w) => w.id === wsId) || list[0];
     } catch { ws = undefined; }
     if (!ws || !ws.sprint_path) return;
-    const prov: Provider = ws.sprint_provider === 'jira' ? 'jira' : 'azure';
+    const prov: Provider = ws.sprint_provider === 'jira' ? 'jira' : ws.sprint_provider === 'youtrack' ? 'youtrack' : 'azure';
     setProvider(prov);
     if (prov === 'azure') {
       setAzProject(ws.sprint_project || '');
       setAzTeam(ws.sprint_team || '');
       setAzSprint(ws.sprint_path || '');
       if (ws.sprint_team) setAzSprints(await apiFetch<Opt[]>('/tasks/azure/sprints?project=' + encodeURIComponent(ws.sprint_project || '') + '&team=' + encodeURIComponent(ws.sprint_team)).catch(() => [] as Opt[]));
+    } else if (prov === 'youtrack') {
+      setYtProject(ws.sprint_project || '');
+      setYtBoard(ws.sprint_board || '');
+      setYtSprint(ws.sprint_path || '');
+      if (ws.sprint_board) setYtSprints(await apiFetch<Opt[]>('/tasks/youtrack/sprints?board_id=' + encodeURIComponent(ws.sprint_board)).catch(() => [] as Opt[]));
     } else {
       setJiraProject(ws.sprint_project || '');
       setJiraBoard(ws.sprint_board || '');
@@ -204,6 +238,27 @@ export default function SprintSwitcher() {
       .catch(() => {}).finally(() => setLoadingJiraSprints(false));
   }, []);
 
+  const onYtProjectChange = useCallback((v: string) => {
+    setYtProject(v); setYtBoard(''); setYtBoards([]); setYtSprint(''); setYtSprints([]);
+    if (!v) return;
+    setLoadingYtBoards(true);
+    apiFetch<Opt[]>('/tasks/youtrack/boards?project_key=' + encodeURIComponent(v))
+      .then(setYtBoards).catch(() => {}).finally(() => setLoadingYtBoards(false));
+  }, []);
+
+  const onYtBoardChange = useCallback((v: string) => {
+    setYtBoard(v); setYtSprint(''); setYtSprints([]);
+    if (!v) return;
+    setLoadingYtSprints(true);
+    apiFetch<Opt[]>('/tasks/youtrack/sprints?board_id=' + encodeURIComponent(v))
+      .then((sps) => {
+        setYtSprints(sps);
+        const current = sps.find((s) => s.is_current);
+        if (current) setYtSprint(current.path ?? current.name);
+      })
+      .catch(() => {}).finally(() => setLoadingYtSprints(false));
+  }, []);
+
   // Editors only — save the user's OWN sprint to their prefs. Workspace
   // sprints are managed separately on the Workspaces page.
   async function save() {
@@ -221,6 +276,9 @@ export default function SprintSwitcher() {
           jira_project: jiraProject,
           jira_board: jiraBoard,
           jira_sprint_id: jiraSprint,
+          youtrack_project: ytProject,
+          youtrack_board: ytBoard,
+          youtrack_sprint_id: ytSprint,
           preferred_sprint_provider: provider,
         },
       });
@@ -228,7 +286,7 @@ export default function SprintSwitcher() {
       window.setTimeout(() => setSavedFlash(false), 1500);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent(SPRINT_CHANGED_EVENT, {
-          detail: { provider, azure: { project: azProject, team: azTeam, sprint: azSprint }, jira: { project: jiraProject, board: jiraBoard, sprint: jiraSprint } },
+          detail: { provider, azure: { project: azProject, team: azTeam, sprint: azSprint }, jira: { project: jiraProject, board: jiraBoard, sprint: jiraSprint }, youtrack: { project: ytProject, board: ytBoard, sprint: ytSprint } },
         }));
       }
       setOpen(false);
@@ -241,20 +299,26 @@ export default function SprintSwitcher() {
 
   const selAzSprintObj = azSprints.find((s) => (s.path ?? s.name) === azSprint);
   const selJiraSprintObj = jiraSprints.find((s) => (s.path ?? s.name) === jiraSprint);
+  const selYtSprintObj = ytSprints.find((s) => (s.path ?? s.name) === ytSprint);
 
   const activeLabel = (() => {
     if (provider === 'jira') {
       if (jiraSprint) return selJiraSprintObj?.name || jiraSprint;
       return t('sprintSwitcher.noSprint');
     }
+    if (provider === 'youtrack') {
+      if (ytSprint) return selYtSprintObj?.name || ytSprint;
+      return t('sprintSwitcher.noSprint');
+    }
     if (azSprint) return selAzSprintObj?.name || azSprint.split('\\').pop() || azSprint;
     return t('sprintSwitcher.noSprint');
   })();
 
-  const activeColor = provider === 'jira' ? 'var(--tab-jira)' : 'var(--tab-azure)';
-  const activeBg = provider === 'jira' ? 'var(--tab-jira-bg)' : 'var(--tab-azure-bg)';
-  const activeBorder = provider === 'jira' ? 'rgba(99,102,241,0.3)' : 'rgba(13,148,136,0.3)';
-  const hasActiveSprint = provider === 'jira' ? Boolean(jiraSprint) : Boolean(azSprint);
+  const isTracker = provider === 'jira' || provider === 'youtrack';
+  const activeColor = isTracker ? 'var(--tab-jira)' : 'var(--tab-azure)';
+  const activeBg = isTracker ? 'var(--tab-jira-bg)' : 'var(--tab-azure-bg)';
+  const activeBorder = isTracker ? 'rgba(99,102,241,0.3)' : 'rgba(13,148,136,0.3)';
+  const hasActiveSprint = provider === 'jira' ? Boolean(jiraSprint) : provider === 'youtrack' ? Boolean(ytSprint) : Boolean(azSprint);
 
   return (
     <div ref={rootRef} className='sprint-switcher-root' style={{ position: 'relative' }}>
@@ -272,7 +336,7 @@ export default function SprintSwitcher() {
           maxWidth: 220,
         }}
       >
-        <span style={{ fontSize: 13 }}>{provider === 'jira' ? '◉' : '◎'}</span>
+        <span style={{ fontSize: 13 }}>{isTracker ? '◉' : '◎'}</span>
         <span className='sprint-switcher-label' style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>{activeLabel}</span>
         <span style={{ fontSize: 9, opacity: 0.7 }}>&#9660;</span>
       </button>
@@ -294,7 +358,7 @@ export default function SprintSwitcher() {
           {!canEdit ? (
             <div style={{ display: 'grid', gap: 8 }}>
               <div style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid var(--panel-border-2)', background: 'var(--panel-alt)' }}>
-                <div style={{ fontSize: 10, color: 'var(--ink-35)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>{provider === 'jira' ? 'Jira' : 'Azure'} · {t('sprintSwitcher.activeSprint')}</div>
+                <div style={{ fontSize: 10, color: 'var(--ink-35)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>{provider === 'jira' ? 'Jira' : provider === 'youtrack' ? 'YouTrack' : 'Azure'} · {t('sprintSwitcher.activeSprint')}</div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: hasActiveSprint ? 'var(--ink-90)' : 'var(--ink-45)' }}>{activeLabel}</div>
               </div>
               <div style={{ fontSize: 11, color: 'var(--ink-45)', lineHeight: 1.45 }}>
@@ -312,6 +376,7 @@ export default function SprintSwitcher() {
               <div style={{ display: 'flex', gap: 4, padding: 3, borderRadius: 10, background: 'var(--panel)', border: '1px solid var(--panel-border-3)' }}>
                 <TabBtn active={provider === 'azure'} onClick={() => setProvider('azure')} label='Azure' color='var(--tab-azure)' />
                 <TabBtn active={provider === 'jira'} onClick={() => setProvider('jira')} label='Jira' color='var(--tab-jira)' disabled={!jiraConnected} />
+                <TabBtn active={provider === 'youtrack'} onClick={() => setProvider('youtrack')} label='YouTrack' color='var(--tab-jira)' disabled={!youtrackConnected} />
               </div>
 
               {provider === 'azure' && (
@@ -345,6 +410,28 @@ export default function SprintSwitcher() {
                       <CompactSel label={t('profile.jiraSprint')} value={jiraSprint} onChange={setJiraSprint}
                         options={jiraSprints.map((s) => ({ id: s.path ?? s.name, name: s.name }))}
                         placeholder={jiraBoard ? t('profile.selectSprint') : t('profile.selectBoardFirst')} loading={loadingJiraSprints} disabled={!jiraBoard} />
+                    </>
+                  )}
+                </div>
+              )}
+
+              {provider === 'youtrack' && (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {!youtrackConnected ? (
+                    <div style={{ fontSize: 12, color: 'var(--muted)', padding: '12px 8px', textAlign: 'center' }}>
+                      {t('sprintSwitcher.youtrackNotConnected')}
+                    </div>
+                  ) : (
+                    <>
+                      <CompactSel label={t('profile.youtrackProject')} value={ytProject} onChange={onYtProjectChange}
+                        options={ytProjects.map((p) => ({ id: p.id ?? p.name, name: p.name }))}
+                        placeholder={t('profile.selectProject')} loading={false} disabled={false} />
+                      <CompactSel label={t('profile.youtrackBoard')} value={ytBoard} onChange={onYtBoardChange}
+                        options={ytBoards.map((b) => ({ id: b.id ?? b.name, name: b.name }))}
+                        placeholder={ytProject ? t('profile.selectBoard') : t('profile.selectTeamFirst')} loading={loadingYtBoards} disabled={!ytProject} />
+                      <CompactSel label={t('profile.youtrackSprint')} value={ytSprint} onChange={setYtSprint}
+                        options={ytSprints.map((s) => ({ id: s.path ?? s.name, name: s.name }))}
+                        placeholder={ytBoard ? t('profile.selectSprint') : t('profile.selectBoardFirst')} loading={loadingYtSprints} disabled={!ytBoard} />
                     </>
                   )}
                 </div>

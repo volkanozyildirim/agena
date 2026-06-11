@@ -6,7 +6,7 @@ import { useLocale } from '@/lib/i18n';
 import NavIcon from '@/components/NavIcon';
 
 type IntegrationConfig = {
-  provider: 'jira' | 'azure' | 'openai' | 'gemini' | 'github' | 'gitlab' | 'bitbucket' | 'playbook' | 'slack' | 'teams' | 'telegram' | 'hal' | 'newrelic' | 'sentry' | 'datadog' | 'appdynamics';
+  provider: 'jira' | 'youtrack' | 'azure' | 'openai' | 'gemini' | 'github' | 'gitlab' | 'bitbucket' | 'playbook' | 'slack' | 'teams' | 'telegram' | 'hal' | 'newrelic' | 'sentry' | 'datadog' | 'appdynamics';
   extra_config?: Record<string, string | boolean | number | null | undefined> | null;
   base_url: string;
   project?: string | null;
@@ -56,6 +56,11 @@ export default function IntegrationsPage() {
   const [azureAiTagName, setAzureAiTagName] = useState('ai-agena');
   const [jiraAiTagEnabled, setJiraAiTagEnabled] = useState(false);
   const [jiraAiTagName, setJiraAiTagName] = useState('ai-agena');
+  const [youtrackBaseUrl, setYoutrackBaseUrl] = useState('');
+  const [youtrackSecret, setYoutrackSecret] = useState('');
+  const [youtrackTokenPreview, setYoutrackTokenPreview] = useState('');
+  const [youtrackAiTagEnabled, setYoutrackAiTagEnabled] = useState(false);
+  const [youtrackAiTagName, setYoutrackAiTagName] = useState('ai-agena');
   const [githubBaseUrl, setGithubBaseUrl] = useState('https://api.github.com');
   const [githubOwner, setGithubOwner] = useState('');
   const [githubToken, setGithubToken] = useState('');
@@ -132,6 +137,16 @@ export default function IntegrationsPage() {
       ],
       link: 'https://id.atlassian.com/manage-profile/security/api-tokens',
       note: t('integrations.helpJiraNote'),
+    },
+    youtrack: {
+      title: t('integrations.helpYoutrackTitle'),
+      steps: [
+        t('integrations.helpYoutrackStep1'),
+        t('integrations.helpYoutrackStep2'),
+        t('integrations.helpYoutrackStep3'),
+        t('integrations.helpYoutrackStep4'),
+      ],
+      note: t('integrations.helpYoutrackNote'),
     },
     azure: {
       title: t('integrations.helpAzureTitle'),
@@ -261,6 +276,7 @@ export default function IntegrationsPage() {
     setConfigs(data);
     setPlaybookText(playbook.content || '');
     const jira = data.find((c) => c.provider === 'jira');
+    const youtrack = data.find((c) => c.provider === 'youtrack');
     const azure = data.find((c) => c.provider === 'azure');
     const github = data.find((c) => c.provider === 'github');
     const openai = data.find((c) => c.provider === 'openai');
@@ -271,6 +287,11 @@ export default function IntegrationsPage() {
       setJiraBaseUrl(jira.base_url); setJiraEmail(jira.username ?? '');
       setJiraAiTagEnabled(Boolean(jira.extra_config?.ai_tag_enabled));
       setJiraAiTagName(String(jira.extra_config?.ai_tag_name ?? 'ai-agena') || 'ai-agena');
+    }
+    if (youtrack) {
+      setYoutrackBaseUrl(youtrack.base_url);
+      setYoutrackAiTagEnabled(Boolean(youtrack.extra_config?.ai_tag_enabled));
+      setYoutrackAiTagName(String(youtrack.extra_config?.ai_tag_name ?? 'ai-agena') || 'ai-agena');
     }
     if (azure) {
       setAzureOrgUrl(azure.base_url); setAzureProject(azure.project ?? '');
@@ -322,6 +343,7 @@ export default function IntegrationsPage() {
     setAzurePatPreview(loadSecretPreview('azure'));
     setGithubTokenPreview(loadSecretPreview('github'));
     setJiraTokenPreview(loadSecretPreview('jira'));
+    setYoutrackTokenPreview(loadSecretPreview('youtrack'));
     setSlackPreview(loadSecretPreview('slack'));
     setTeamsPreview(loadSecretPreview('teams'));
     setTelegramPreview(loadSecretPreview('telegram'));
@@ -376,6 +398,27 @@ export default function IntegrationsPage() {
         saveSecretPreview('jira', preview);
       }
       setJiraSecret(''); setMsg(t('integrations.savedJira'));
+    }).catch((e) => { setError(e instanceof Error ? e.message : t('integrations.saveFailed')); });
+  }
+
+  async function saveYouTrack() {
+    Promise.all([
+      apiFetch('/integrations/youtrack', {
+        method: 'PUT',
+        body: JSON.stringify({
+          base_url: youtrackBaseUrl,
+          secret: youtrackSecret || undefined,
+          extra_config: { ai_tag_enabled: youtrackAiTagEnabled, ai_tag_name: youtrackAiTagName || 'ai-agena' },
+        }),
+      }),
+      loadIntegrationState(),
+    ]).then(() => {
+      if (youtrackSecret.trim()) {
+        const preview = maskSecretPreview(youtrackSecret);
+        setYoutrackTokenPreview(preview);
+        saveSecretPreview('youtrack', preview);
+      }
+      setYoutrackSecret(''); setMsg(t('integrations.savedYoutrack'));
     }).catch((e) => { setError(e instanceof Error ? e.message : t('integrations.saveFailed')); });
   }
 
@@ -724,6 +767,7 @@ export default function IntegrationsPage() {
   }
 
   const jiraConfig = configs.find((c) => c.provider === 'jira');
+  const youtrackConfig = configs.find((c) => c.provider === 'youtrack');
   const azureConfig = configs.find((c) => c.provider === 'azure');
   const githubConfig = configs.find((c) => c.provider === 'github');
   const openaiConfig = configs.find((c) => c.provider === 'openai');
@@ -745,7 +789,7 @@ export default function IntegrationsPage() {
   };
   const isProviderEnabled = (p: string) => !providerModule[p] || enabledModules.has(providerModule[p]);
 
-  const taskProviders: IntegrationConfig['provider'][] = (['azure', 'github', 'gitlab', 'bitbucket', 'jira', 'newrelic', 'sentry', 'datadog', 'appdynamics'] as const).filter(isProviderEnabled);
+  const taskProviders: IntegrationConfig['provider'][] = (['azure', 'github', 'gitlab', 'bitbucket', 'jira', 'youtrack', 'newrelic', 'sentry', 'datadog', 'appdynamics'] as const).filter(isProviderEnabled);
   const aiProviders: IntegrationConfig['provider'][] = (['openai', 'gemini', 'hal', 'playbook'] as const).filter(isProviderEnabled);
   const notificationProviders: IntegrationConfig['provider'][] = (['slack', 'teams', 'telegram'] as const).filter(isProviderEnabled);
   const connectedCount = configs.filter((c) => c.has_secret).length;
@@ -995,6 +1039,48 @@ export default function IntegrationsPage() {
           {configs.find(c => c.provider === 'jira')?.has_secret && (
             <button onClick={() => void deleteIntegration('jira')} style={{ width: '100%', marginTop: 4, padding: '7px', borderRadius: 8, border: '1px solid rgba(207,91,87,0.25)', background: 'transparent', color: '#cf5b57', fontSize: 11, cursor: 'pointer', fontWeight: 600, transition: 'all 0.15s' }}>
               {t('integrations.deleteJiraConnection')}
+            </button>
+          )}
+        </IntegrationCard>}
+
+        {/* YouTrack */}
+        {activeTab === 'task' && isProviderEnabled('youtrack') && <IntegrationCard
+          title={t('integrations.providerYoutrack')}
+          icon='🟪'
+          color='var(--acc)'
+          connected={youtrackConfig?.has_secret ?? false}
+          updatedAt={youtrackConfig?.updated_at}
+          onHelp={() => setHelp(helpByProvider.youtrack)}
+        >
+          <FieldGroup label={t('integrations.baseUrl')}>
+            <input value={youtrackBaseUrl} onChange={(e) => setYoutrackBaseUrl(e.target.value)} placeholder={t('integrations.youtrackBaseUrlPlaceholder')} />
+          </FieldGroup>
+          <FieldGroup label={t('integrations.youtrackToken')}>
+            <input
+              type='password'
+              value={youtrackSecret}
+              onChange={(e) => setYoutrackSecret(e.target.value)}
+              placeholder={youtrackConfig?.has_secret ? `${youtrackConfig?.secret_preview || youtrackTokenPreview || '****'} (${t('integrations.keepExisting')})` : t('integrations.youtrackTokenPlaceholder')}
+            />
+          </FieldGroup>
+          <FieldGroup label={t('integrations.aiTagLabelJira') || 'AI label on completed issues'}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--ink-50)', marginBottom: 6, cursor: 'pointer' }}>
+              <input type='checkbox' checked={youtrackAiTagEnabled} onChange={(e) => setYoutrackAiTagEnabled(e.target.checked)} />
+              {t('integrations.aiTagEnabledJira') || 'Label source issues handled by AI'}
+            </label>
+            <input
+              value={youtrackAiTagName}
+              onChange={(e) => setYoutrackAiTagName(e.target.value)}
+              placeholder='ai-agena'
+              disabled={!youtrackAiTagEnabled}
+            />
+          </FieldGroup>
+          <button className='button button-primary' onClick={() => void saveYouTrack()} style={{ width: '100%', justifyContent: 'center', marginTop: 2 }}>
+            {t('integrations.saveYoutrack')}
+          </button>
+          {configs.find(c => c.provider === 'youtrack')?.has_secret && (
+            <button onClick={() => void deleteIntegration('youtrack')} style={{ width: '100%', marginTop: 4, padding: '7px', borderRadius: 8, border: '1px solid rgba(207,91,87,0.25)', background: 'transparent', color: '#cf5b57', fontSize: 11, cursor: 'pointer', fontWeight: 600, transition: 'all 0.15s' }}>
+              {t('integrations.deleteYoutrackConnection')}
             </button>
           )}
         </IntegrationCard>}

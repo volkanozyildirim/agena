@@ -8,7 +8,7 @@ import NavIcon from '@/components/NavIcon';
 
 const FALLBACK_AGENT_ROLES = ['manager', 'pm', 'analyzer', 'planner', 'developer', 'lead_developer', 'reviewer', 'qa', 'security_developer'];
 
-type Provider = 'jira' | 'azure';
+type Provider = 'jira' | 'youtrack' | 'azure';
 
 interface RuleMatch {
   reporter?: string;
@@ -151,6 +151,7 @@ function Pill({ children, color = '#5b9bd5' }: { children: React.ReactNode; colo
 
 const PROVIDER_BRAND: Record<Provider, { icon: string; color: string; gradient: string }> = {
   jira: { icon: 'clipboard', color: '#5b9bd5', gradient: 'var(--panel-alt)' },
+  youtrack: { icon: 'clipboard', color: '#5b9bd5', gradient: 'var(--panel-alt)' },
   azure: { icon: 'box', color: '#5b9bd5', gradient: 'var(--panel-alt)' },
 };
 
@@ -208,11 +209,13 @@ export default function IntegrationRulesPage() {
   }, [msg]);
 
   useEffect(() => {
-    if (provider !== 'jira') return;
-    void apiFetch<JiraReporter[]>('/integrations/jira/reporters').then(setJiraReporters).catch(() => setJiraReporters([]));
-    void apiFetch<JiraIssueType[]>('/integrations/jira/issuetypes').then(setJiraIssueTypes).catch(() => setJiraIssueTypes([]));
-    void apiFetch<JiraLabel[]>('/integrations/jira/labels').then(setJiraLabels).catch(() => setJiraLabels([]));
-    void apiFetch<JiraProject[]>('/integrations/jira/projects').then(setJiraProjects).catch(() => setJiraProjects([]));
+    // Jira & YouTrack share the same rule-metadata shapes. YouTrack only
+    // exposes reporters + projects; issuetypes/labels 404 → caught → empty.
+    if (provider === 'azure') return;
+    void apiFetch<JiraReporter[]>(`/integrations/${provider}/reporters`).then(setJiraReporters).catch(() => setJiraReporters([]));
+    void apiFetch<JiraIssueType[]>(`/integrations/${provider}/issuetypes`).then(setJiraIssueTypes).catch(() => setJiraIssueTypes([]));
+    void apiFetch<JiraLabel[]>(`/integrations/${provider}/labels`).then(setJiraLabels).catch(() => setJiraLabels([]));
+    void apiFetch<JiraProject[]>(`/integrations/${provider}/projects`).then(setJiraProjects).catch(() => setJiraProjects([]));
   }, [provider]);
 
   useEffect(() => {
@@ -387,7 +390,7 @@ export default function IntegrationRulesPage() {
 
       {/* Provider tabs */}
       <div style={{ display: 'flex', gap: 0, background: 'var(--panel)', border: '1px solid var(--panel-border)', borderRadius: 10, padding: 4 }}>
-        {(['jira', 'azure'] as const).map((p) => (
+        {(['jira', 'youtrack', 'azure'] as const).map((p) => (
           <button key={p} onClick={() => setProvider(p)}
             style={{
               flex: 1, padding: '10px 14px', borderRadius: 8, border: 'none',
@@ -397,7 +400,7 @@ export default function IntegrationRulesPage() {
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}>
             <span style={{ display: 'inline-flex' }}><NavIcon name={PROVIDER_BRAND[p].icon} size={14} /></span>
-            <span>{p === 'jira' ? 'Jira' : 'Azure DevOps'}</span>
+            <span>{p === 'jira' ? 'Jira' : p === 'youtrack' ? 'YouTrack' : 'Azure DevOps'}</span>
             <span style={{ fontSize: 10, opacity: 0.7 }}>({rules.filter((r) => r.provider === p).length})</span>
           </button>
         ))}
@@ -500,7 +503,7 @@ export default function IntegrationRulesPage() {
             value={testInput}
             onChange={(e) => setTestInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') void runTest(); }}
-            placeholder={provider === 'jira' ? 'PROJ-123  ·  https://…/browse/PROJ-123' : '63318  ·  https://dev.azure.com/…/_workitems/edit/63318'}
+            placeholder={provider !== 'azure' ? 'PROJ-123  ·  https://…/browse/PROJ-123' : '63318  ·  https://dev.azure.com/…/_workitems/edit/63318'}
             style={{ flex: 1, minWidth: 240, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--panel-border)', background: 'var(--surface)', color: 'var(--ink-90)', fontSize: 13 }}
           />
           <button onClick={() => void runTest()} disabled={testing || !testInput.trim()} style={{ ...btnPrimary, opacity: testing || !testInput.trim() ? 0.5 : 1 }}>
@@ -597,8 +600,8 @@ function RuleEditor({ provider, existing, repos, jiraReporters, jiraIssueTypes, 
   const [agentRole, setAgentRole] = useState(existing?.action.agent_role ?? '');
   const [saving, setSaving] = useState(false);
 
-  const reporterList = provider === 'jira' ? jiraReporters.map((r) => ({ value: r.email || r.display_name, label: r.display_name + (r.email ? ` (${r.email})` : '') })) : azureUsers.map((u) => ({ value: u.email || u.display_name, label: u.display_name + (u.email ? ` (${u.email})` : '') }));
-  const typeList = provider === 'jira' ? jiraIssueTypes.map((i) => i.name) : azureWITypes.map((t) => t.name);
+  const reporterList = provider !== 'azure' ? jiraReporters.map((r) => ({ value: r.email || r.display_name, label: r.display_name + (r.email ? ` (${r.email})` : '') })) : azureUsers.map((u) => ({ value: u.email || u.display_name, label: u.display_name + (u.email ? ` (${u.email})` : '') }));
+  const typeList = provider !== 'azure' ? jiraIssueTypes.map((i) => i.name) : azureWITypes.map((t) => t.name);
 
   async function save() {
     setSaving(true);
@@ -657,7 +660,7 @@ function RuleEditor({ provider, existing, repos, jiraReporters, jiraIssueTypes, 
               {existing ? (t('integrationRules.editRule') || 'Edit rule') : (t('integrationRules.addRule') || 'Add rule')}
             </div>
             <div style={{ fontSize: 11, color: 'var(--ink-45)', marginTop: 2 }}>
-              {provider === 'jira' ? 'Jira' : 'Azure DevOps'}
+              {provider === 'jira' ? 'Jira' : provider === 'youtrack' ? 'YouTrack' : 'Azure DevOps'}
             </div>
           </div>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--ink-58)', display: 'inline-flex', alignItems: 'center' }}><NavIcon name="close" size={18} /></button>
@@ -675,14 +678,14 @@ function RuleEditor({ provider, existing, repos, jiraReporters, jiraIssueTypes, 
             </div>
             <div style={{ display: 'grid', gap: 10 }}>
               <div>
-                <label style={labelStyle}>{provider === 'jira' ? (t('integrationRules.reporter') || 'Reporter') : (t('integrationRules.createdBy') || 'Created by')}</label>
+                <label style={labelStyle}>{provider !== 'azure' ? (t('integrationRules.reporter') || 'Reporter') : (t('integrationRules.createdBy') || 'Created by')}</label>
                 <select value={reporter} onChange={(e) => setReporter(e.target.value)} style={inputStyle}>
                   <option value=''>—</option>
                   {reporterList.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
                 </select>
               </div>
               <div>
-                <label style={labelStyle}>{provider === 'jira' ? (t('integrationRules.issueType') || 'Issue type') : (t('integrationRules.workItemType') || 'Work item type')}</label>
+                <label style={labelStyle}>{provider !== 'azure' ? (t('integrationRules.issueType') || 'Issue type') : (t('integrationRules.workItemType') || 'Work item type')}</label>
                 <select value={issueType} onChange={(e) => setIssueType(e.target.value)} style={inputStyle}>
                   <option value=''>—</option>
                   {typeList.map((n) => <option key={n} value={n}>{n}</option>)}
@@ -690,7 +693,7 @@ function RuleEditor({ provider, existing, repos, jiraReporters, jiraIssueTypes, 
               </div>
               <div>
                 <label style={labelStyle}>{t('integrationRules.project') || 'Project key / name'}</label>
-                {provider === 'jira' && jiraProjects.length > 0 ? (
+                {provider !== 'azure' && jiraProjects.length > 0 ? (
                   <select value={project} onChange={(e) => setProject(e.target.value)} style={inputStyle}>
                     <option value=''>—</option>
                     {jiraProjects.map((p) => (
@@ -713,11 +716,11 @@ function RuleEditor({ provider, existing, repos, jiraReporters, jiraIssueTypes, 
                 <ChipInput
                   values={labels}
                   onChange={setLabels}
-                  suggestions={provider === 'jira' ? jiraLabels.map((l) => l.name) : provider === 'azure' ? azureTags.map((t) => t.name) : []}
-                  placeholder={provider === 'jira' ? (t('integrationRules.labelsPlaceholderJira') || 'Pick or type a label') : provider === 'azure' ? (t('integrationRules.labelsPlaceholderAzure') || 'Pick or type a tag') : (t('integrationRules.labelsPlaceholder') || 'security, urgent')}
+                  suggestions={provider !== 'azure' ? jiraLabels.map((l) => l.name) : provider === 'azure' ? azureTags.map((t) => t.name) : []}
+                  placeholder={provider !== 'azure' ? (t('integrationRules.labelsPlaceholderJira') || 'Pick or type a label') : provider === 'azure' ? (t('integrationRules.labelsPlaceholderAzure') || 'Pick or type a tag') : (t('integrationRules.labelsPlaceholder') || 'security, urgent')}
                   inputStyle={inputStyle}
                 />
-                {((provider === 'jira' && jiraLabels.length === 0) || (provider === 'azure' && azureTags.length === 0)) && (
+                {((provider !== 'azure' && jiraLabels.length === 0) || (provider === 'azure' && azureTags.length === 0)) && (
                   <div style={{ fontSize: 10, color: 'var(--ink-35)', marginTop: 4 }}>
                     {provider === 'azure'
                       ? (t('integrationRules.tagsHintAzure') || 'Suggestions appear after Azure tags load (requires a default project in /dashboard/sprints).')

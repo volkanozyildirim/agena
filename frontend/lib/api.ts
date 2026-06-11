@@ -366,7 +366,7 @@ export async function savePrefs(partial: Partial<{
   azure_team: string;
   azure_sprint_path: string;
   my_team: AzureMember[];
-  my_team_source: 'azure' | 'jira';
+  my_team_source: 'azure' | 'jira' | 'youtrack';
   agents: Record<string, unknown>[];
   flows: Record<string, unknown>[];
   repo_mappings: RepoMapping[];

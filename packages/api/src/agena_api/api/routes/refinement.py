@@ -320,7 +320,23 @@ async def ask_refinement_question(
                 raise HTTPException(status_code=502, detail=f'Jira returned {resp.status_code}: {resp.text[:200]}')
         return {'status': 'ok'}
 
-    raise HTTPException(status_code=400, detail='source must be azure or jira')
+    if src == 'youtrack':
+        cfg = await cfg_service.get_config(tenant.organization_id, 'youtrack')
+        if cfg is None or not cfg.secret:
+            raise HTTPException(status_code=400, detail='YouTrack integration not configured')
+        from agena_services.integrations.youtrack_client import YouTrackClient
+        prefix = f'@{(payload.mention_unique_name or "").strip()} ' if payload.mention_unique_name else ''
+        try:
+            await YouTrackClient().add_comment(
+                cfg={'base_url': cfg.base_url or '', 'token': cfg.secret},
+                issue_key=wid,
+                text=f'{prefix}Refinement sorusu: {qtext}',
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f'YouTrack comment failed: {exc}')
+        return {'status': 'ok'}
+
+    raise HTTPException(status_code=400, detail='source must be azure, jira or youtrack')
 
 
 @router.get('/file-history')
@@ -456,7 +472,20 @@ async def assign_recommended_author(
                 raise HTTPException(status_code=502, detail=f'Jira returned {resp.status_code}: {resp.text[:200]}')
         return {'status': 'ok', 'assignee': upn}
 
-    raise HTTPException(status_code=400, detail='source must be azure or jira')
+    if src == 'youtrack':
+        cfg = await cfg_service.get_config(tenant.organization_id, 'youtrack')
+        if cfg is None or not cfg.secret:
+            raise HTTPException(status_code=400, detail='YouTrack integration not configured')
+        from agena_services.integrations.youtrack_client import YouTrackClient
+        client = YouTrackClient()
+        ok = await client._run_command(
+            base_url=cfg.base_url or '', token=cfg.secret, issue_key=wid, query=f'Assignee {upn}',
+        )
+        if not ok:
+            raise HTTPException(status_code=502, detail='YouTrack assignee command failed')
+        return {'status': 'ok', 'assignee': upn}
+
+    raise HTTPException(status_code=400, detail='source must be azure, jira or youtrack')
 
 
 @router.post(
@@ -662,7 +691,45 @@ async def delete_refinement_comment(
         await db.commit()
         return {'deleted': deleted}
 
-    raise HTTPException(status_code=400, detail='provider must be azure or jira')
+    if src == 'youtrack':
+        cfg = await cfg_service.get_config(tenant.organization_id, 'youtrack')
+        if cfg is None or not cfg.secret:
+            raise HTTPException(status_code=400, detail='YouTrack integration not configured')
+        import httpx
+        base = (cfg.base_url or '').rstrip('/')
+        api = base if base.endswith('/api') else f'{base}/api'
+        headers = {'Authorization': f'Bearer {cfg.secret}', 'Accept': 'application/json'}
+        deleted = 0
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(
+                f'{api}/issues/{wid}/comments',
+                params={'fields': 'id,text', '$top': 200}, headers=headers,
+            )
+            if resp.status_code >= 400:
+                raise HTTPException(status_code=502, detail=f'YouTrack list comments {resp.status_code}: {resp.text[:200]}')
+            for c in resp.json() or []:
+                cid = str((c or {}).get('id') or '')
+                plain = str((c or {}).get('text') or '')
+                if not cid or not plain.strip().startswith(prefix):
+                    continue
+                d = await client.delete(f'{api}/issues/{wid}/comments/{cid}', headers=headers)
+                if d.status_code in (200, 204, 404):
+                    deleted += 1
+        await db.execute(
+            update(RefinementRecord)
+            .where(
+                RefinementRecord.organization_id == tenant.organization_id,
+                RefinementRecord.provider == 'youtrack',
+                RefinementRecord.external_item_id == wid,
+                RefinementRecord.phase == 'writeback',
+                RefinementRecord.status == 'completed',
+            )
+            .values(status='deleted')
+        )
+        await db.commit()
+        return {'deleted': deleted}
+
+    raise HTTPException(status_code=400, detail='provider must be azure, jira or youtrack')
 
 
 def _adf_plain_text(node: dict) -> str:
