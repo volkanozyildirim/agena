@@ -3874,5 +3874,6 @@
   "sprintPicker.youtrackSprint": "YouTrack Sprint",
   "sprintPicker.youtrackNotConnected": "YouTrack 未连接。",
   "tasks.picker.youtrack": "从 YouTrack Sprint 获取",
-  "team.providerYoutrack": "YouTrack"
+  "team.providerYoutrack": "YouTrack",
+  "landing.integrationYoutrack": "YouTrack"
 }

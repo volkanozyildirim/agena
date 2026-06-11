@@ -16,7 +16,7 @@ AGENA is a production-ready, multi-tenant **agentic AI** orchestration platform.
 
 - 🔑 **No API keys, no per-token billing** — AGENA runs on your existing **Claude Code / Codex CLI** subscription locally via a host bridge. Your plan does the work; nothing is metered per token.
 - 🔁 **The full loop, autonomously** — production error (Sentry / New Relic) → task → AI fix → **pull request** → merge → issue auto-resolved.
-- 🧩 **Where your work already lives** — Sentry, New Relic, Jira, Azure DevOps, GitHub. Pulls real sprint items and ships real PRs.
+- 🧩 **Where your work already lives** — Sentry, New Relic, Jira, YouTrack, Azure DevOps, GitHub. Pulls real sprint items and ships real PRs.
 - 🔒 **Self-hostable & multi-tenant** — your code and repos stay on your own infrastructure (bring-your-own runtime).
 
 ## Demo
@@ -174,7 +174,7 @@ they get re-applied.
 
 **DevOps Automation**
 - Auto-generates branches, commits, and pull requests (GitHub + Azure DevOps)
-- Sprint import from Jira and Azure DevOps
+- Sprint import from Jira, YouTrack and Azure DevOps
 - DORA metrics dashboard (deployment frequency, lead time, change failure rate, MTTR)
 - Team health symptom analysis (knowledge silos, bus factor, stale PRs, etc.)
 

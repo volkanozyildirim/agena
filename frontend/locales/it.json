@@ -3874,5 +3874,6 @@
   "sprintPicker.youtrackSprint": "Sprint YouTrack",
   "sprintPicker.youtrackNotConnected": "YouTrack non è connesso.",
   "tasks.picker.youtrack": "Prendi dallo sprint YouTrack",
-  "team.providerYoutrack": "YouTrack"
+  "team.providerYoutrack": "YouTrack",
+  "landing.integrationYoutrack": "YouTrack"
 }

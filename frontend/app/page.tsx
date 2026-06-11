@@ -267,6 +267,7 @@ export default function HomePage() {
   const integrations = [
     { key: 'azure', logo: '/media/azure-logo.svg', name: t('landing.integrationAzure') },
     { key: 'jira', logo: '/media/jira-logo.svg', name: t('landing.integrationJira') },
+    { key: 'youtrack', logo: '/media/youtrack-logo.svg', name: t('landing.integrationYoutrack') },
     { key: 'github', logo: '/media/github-logo.svg', name: t('landing.integrationGithub') },
     { key: 'openai', logo: '/media/openai-logo.svg', name: t('landing.integrationOpenai') },
     { key: 'gemini', logo: '/media/gemini-logo.svg', name: t('landing.integrationGemini') },

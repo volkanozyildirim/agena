@@ -3874,5 +3874,6 @@
   "sprintPicker.youtrackSprint": "YouTrack スプリント",
   "sprintPicker.youtrackNotConnected": "YouTrack が接続されていません。",
   "tasks.picker.youtrack": "YouTrack スプリントから取得",
-  "team.providerYoutrack": "YouTrack"
+  "team.providerYoutrack": "YouTrack",
+  "landing.integrationYoutrack": "YouTrack"
 }
